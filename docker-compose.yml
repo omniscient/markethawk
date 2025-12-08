@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: stockscanner-db
+    environment:
+      POSTGRES_DB: stockscanner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: stockscanner123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    networks:
+      - stockscanner-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stockscanner-api
+    environment:
+      DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
+      ENVIRONMENT: development
+      WATCHFILES_FORCE_POLLING: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+    networks:
+      - stockscanner-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: stockscanner-frontend
+    command: sh -c "npm install && npm run dev -- --host"
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      VITE_API_TARGET: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - stockscanner-network
+    restart: unless-stopped
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: stockscanner-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - stockscanner-network
+
+  # Celery for background tasks
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stockscanner-celery
+    command: celery -A main.celery worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - stockscanner-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+
+networks:
+  stockscanner-network:
+    driver: bridge
