@@ -1,0 +1,15 @@
+"""
+Routers package.
+"""
+
+from app.routers.health import router as health_router
+from app.routers.scanner import router as scanner_router
+from app.routers.universe import router as universe_router
+from app.routers.stocks import router as stocks_router
+
+__all__ = [
+    "health_router",
+    "scanner_router",
+    "universe_router",
+    "stocks_router",
+]

@@ -122,6 +122,33 @@ export const updateStockUniverse = async (id: number, universe: {
   return response.data;
 };
 
+export interface MonitoredStock {
+  id: number;
+  ticker: string;
+  company_name?: string;
+  sector?: string;
+  market_cap?: number;
+  added_date: string;
+  is_active: boolean;
+}
+
+export interface RefreshUniverseResponse {
+  status: string;
+  scanned: number;
+  added: number;
+  message: string;
+}
+
+export const refreshUniverseStocks = async (id: number): Promise<RefreshUniverseResponse> => {
+  const response = await apiClient.post(`/universe/${id}/refresh`);
+  return response.data;
+};
+
+export const fetchUniverseStocks = async (id: number): Promise<MonitoredStock[]> => {
+  const response = await apiClient.get(`/universe/${id}/stocks`);
+  return response.data;
+};
+
 export const fetchHistoricalData = async (
   ticker: string,
   period: string = '30d'

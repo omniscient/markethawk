@@ -1,0 +1,144 @@
+"""
+Stock Data Service - Polygon.io integration for stock data.
+"""
+
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
+
+import pandas as pd
+from polygon import RESTClient
+
+from app.core.config import settings
+
+
+# Initialize Polygon client
+polygon_client: Optional[RESTClient] = (
+    RESTClient(settings.POLYGON_API_KEY) if settings.POLYGON_API_KEY else None
+)
+
+
+class StockDataService:
+    """Service for fetching stock data from Polygon.io."""
+
+    @staticmethod
+    async def get_historical_data(ticker: str, period: str = "30d") -> pd.DataFrame:
+        """Get historical stock data from Polygon.io."""
+        try:
+            if not polygon_client:
+                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
+                return pd.DataFrame()
+
+            # Convert period to days
+            days = int(period.replace("d", "")) if "d" in period else 30
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+
+            # Fetch daily aggregates from Polygon
+            aggs = polygon_client.get_aggs(
+                ticker=ticker.upper(),
+                multiplier=1,
+                timespan="day",
+                from_=start_date.strftime("%Y-%m-%d"),
+                to=end_date.strftime("%Y-%m-%d"),
+                limit=50000,
+            )
+
+            if not aggs:
+                return pd.DataFrame()
+
+            # Convert to DataFrame
+            data = []
+            for agg in aggs:
+                data.append(
+                    {
+                        "Date": datetime.fromtimestamp(agg.timestamp / 1000),
+                        "Open": agg.open,
+                        "High": agg.high,
+                        "Low": agg.low,
+                        "Close": agg.close,
+                        "Volume": agg.volume,
+                    }
+                )
+
+            df = pd.DataFrame(data)
+            df.set_index("Date", inplace=True)
+            return df
+
+        except Exception as e:
+            logging.error(f"Error fetching data for {ticker}: {e}")
+            return pd.DataFrame()
+
+    @staticmethod
+    async def get_pre_market_data(ticker: str) -> Dict[str, Any]:
+        """Get pre-market data from Polygon.io."""
+        try:
+            if not polygon_client:
+                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
+                return {}
+
+            today = datetime.now()
+
+            # Fetch minute-level data for extended hours
+            aggs = polygon_client.get_aggs(
+                ticker=ticker.upper(),
+                multiplier=1,
+                timespan="minute",
+                from_=today.strftime("%Y-%m-%d"),
+                to=today.strftime("%Y-%m-%d"),
+                limit=50000,
+            )
+
+            if not aggs:
+                return {}
+
+            # Filter for pre-market hours (4:00 AM - 9:30 AM ET)
+            pre_market_data = []
+            for agg in aggs:
+                agg_time = datetime.fromtimestamp(agg.timestamp / 1000)
+                hour = agg_time.hour
+                minute = agg_time.minute
+
+                # Pre-market: 4:00 AM to 9:30 AM
+                if (hour >= 4 and hour < 9) or (hour == 9 and minute < 30):
+                    pre_market_data.append(agg)
+
+            if not pre_market_data:
+                return {}
+
+            return {
+                "pre_market_volume": sum(agg.volume for agg in pre_market_data),
+                "pre_market_high": max(agg.high for agg in pre_market_data),
+                "pre_market_low": min(agg.low for agg in pre_market_data),
+                "pre_market_open": pre_market_data[0].open if pre_market_data else None,
+            }
+
+        except Exception as e:
+            logging.error(f"Error fetching pre-market data for {ticker}: {e}")
+            return {}
+
+    @staticmethod
+    async def get_stock_info(ticker: str) -> Dict[str, Any]:
+        """Get stock details from Polygon.io."""
+        try:
+            if not polygon_client:
+                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
+                return {}
+
+            details = polygon_client.get_ticker_details(ticker.upper())
+
+            if not details:
+                return {}
+
+            return {
+                "longName": details.name,
+                "shortName": details.name,
+                "sector": getattr(details, "sic_description", "") or "",
+                "industry": getattr(details, "sic_description", "") or "",
+                "marketCap": getattr(details, "market_cap", None),
+                "currentPrice": None,  # Will be fetched from latest quote if needed
+            }
+
+        except Exception as e:
+            logging.error(f"Error fetching stock info for {ticker}: {e}")
+            return {}

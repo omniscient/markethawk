@@ -14,7 +14,7 @@ A professional-grade stock scanner and alert system designed to identify pre-mar
 
 ### Technical Features
 - **Modern Architecture**: React frontend with FastAPI backend
-- **Real-time Data**: Yahoo Finance integration with caching layer
+- **Real-time Data**: Polygon.io integration with professional market data
 - **Scalable Design**: Cloud-native architecture supporting high throughput
 - **Professional UI**: Financial-grade user interface with dark theme
 - **API-first Design**: RESTful API with comprehensive documentation
@@ -35,8 +35,9 @@ The system identifies stocks meeting the following criteria:
 - **Framework**: FastAPI (Python)
 - **Database**: PostgreSQL with SQLAlchemy ORM
 - **Caching**: Redis for performance optimization
-- **Data Source**: Yahoo Finance API
+- **Data Source**: Polygon.io API (Professional market data)
 - **Task Queue**: Celery for background processing
+- **Async Support**: AsyncPG, HTTPX for high-performance async operations
 
 ### Frontend
 - **Framework**: React 18 with TypeScript
@@ -62,8 +63,8 @@ The system identifies stocks meeting the following criteria:
                                 │
                                 ▼
                        ┌─────────────────┐
-                       │   Yahoo Finance │
-                       │   API           │
+                       │   Polygon.io    │
+                       │   Market Data   │
                        └─────────────────┘
 ```
 
@@ -135,6 +136,9 @@ npm run dev
 ```bash
 # Database
 DATABASE_URL=postgresql://user:pass@host:5432/stockscanner
+
+# Market Data API
+POLYGON_API_KEY=your-polygon-api-key
 
 # Redis (optional)
 REDIS_URL=redis://localhost:6379/0
@@ -305,7 +309,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **Yahoo Finance**: For providing reliable market data
+- **Polygon.io**: For providing professional-grade market data
 - **FastAPI**: For the excellent web framework
 - **React Community**: For the powerful frontend ecosystem
 - **Financial Markets**: For providing endless opportunities for analysis

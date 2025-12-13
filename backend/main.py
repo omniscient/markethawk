@@ -30,13 +30,16 @@ from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
 # Financial data imports
-import yfinance as yf
+from polygon import RESTClient
 import pandas as pd
 import numpy as np
 
 # Configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://username:password@localhost/stockscanner")
-YAHOO_FINANCE_BASE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/"
+POLYGON_API_KEY = os.getenv("POLYGON_API_KEY", "")
+
+# Initialize Polygon client
+polygon_client = RESTClient(POLYGON_API_KEY) if POLYGON_API_KEY else None
 
 # Database setup
 engine = create_engine(DATABASE_URL)
@@ -168,6 +171,26 @@ class VolumeEventResponse(BaseModel):
     criteria_met: Dict[str, Any]
     created_at: datetime
 
+class MonitoredStockResponse(BaseModel):
+    id: int
+    ticker: str
+    company_name: Optional[str]
+    sector: Optional[str]
+    market_cap: Optional[float]
+    added_date: date
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+# Common stocks for scanning (Mock "All Stocks" source)
+# In production, this would be replaced by a real market screener API
+COMMON_STOCKS = [
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "TSM", "UNH",
+    "JNJ", "JPM", "V", "PG", "MA", "HD", "CVX", "MRK", "ABBV", "PEP",
+    "KO", "LLY", "BAC", "COST", "AVGO", "TMO", "DIS", "WMT", "CSCO", "ACN"
+]
+
 # FastAPI App
 app = FastAPI(
     title="Stock Scanner API",
@@ -195,37 +218,122 @@ def get_db():
 class StockDataService:
     @staticmethod
     async def get_historical_data(ticker: str, period: str = "30d") -> pd.DataFrame:
-        """Get historical stock data from Yahoo Finance"""
+        """Get historical stock data from Polygon.io"""
         try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period=period)
-            return hist
+            if not polygon_client:
+                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
+                return pd.DataFrame()
+            
+            # Convert period to days
+            days = int(period.replace("d", "")) if "d" in period else 30
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+            
+            # Fetch daily aggregates from Polygon
+            aggs = polygon_client.get_aggs(
+                ticker=ticker.upper(),
+                multiplier=1,
+                timespan="day",
+                from_=start_date.strftime("%Y-%m-%d"),
+                to=end_date.strftime("%Y-%m-%d"),
+                limit=50000
+            )
+            
+            if not aggs:
+                return pd.DataFrame()
+            
+            # Convert to DataFrame
+            data = []
+            for agg in aggs:
+                data.append({
+                    'Date': datetime.fromtimestamp(agg.timestamp / 1000),
+                    'Open': agg.open,
+                    'High': agg.high,
+                    'Low': agg.low,
+                    'Close': agg.close,
+                    'Volume': agg.volume
+                })
+            
+            df = pd.DataFrame(data)
+            df.set_index('Date', inplace=True)
+            return df
+            
         except Exception as e:
             logging.error(f"Error fetching data for {ticker}: {e}")
             return pd.DataFrame()
     
     @staticmethod
     async def get_pre_market_data(ticker: str) -> Dict[str, Any]:
-        """Get pre-market data for a stock"""
+        """Get pre-market data from Polygon.io"""
         try:
-            stock = yf.Ticker(ticker)
-            # Get today's data with extended hours
-            today = stock.history(period="1d", interval="1m", prepost=True)
-            
-            if today.empty:
+            if not polygon_client:
+                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
                 return {}
             
-            # Filter for pre-market hours (4:00 AM - 9:30 AM EST)
-            pre_market = today.between_time('04:00', '09:30')
+            today = datetime.now()
+            
+            # Fetch minute-level data for extended hours
+            aggs = polygon_client.get_aggs(
+                ticker=ticker.upper(),
+                multiplier=1,
+                timespan="minute",
+                from_=today.strftime("%Y-%m-%d"),
+                to=today.strftime("%Y-%m-%d"),
+                limit=50000
+            )
+            
+            if not aggs:
+                return {}
+            
+            # Filter for pre-market hours (4:00 AM - 9:30 AM ET)
+            pre_market_data = []
+            for agg in aggs:
+                agg_time = datetime.fromtimestamp(agg.timestamp / 1000)
+                hour = agg_time.hour
+                minute = agg_time.minute
+                
+                # Pre-market: 4:00 AM to 9:30 AM
+                if (hour >= 4 and hour < 9) or (hour == 9 and minute < 30):
+                    pre_market_data.append(agg)
+            
+            if not pre_market_data:
+                return {}
             
             return {
-                "pre_market_volume": int(pre_market['Volume'].sum()),
-                "pre_market_high": float(pre_market['High'].max()),
-                "pre_market_low": float(pre_market['Low'].min()),
-                "pre_market_open": float(pre_market['Open'].iloc[0]) if not pre_market.empty else None
+                "pre_market_volume": sum(agg.volume for agg in pre_market_data),
+                "pre_market_high": max(agg.high for agg in pre_market_data),
+                "pre_market_low": min(agg.low for agg in pre_market_data),
+                "pre_market_open": pre_market_data[0].open if pre_market_data else None
             }
+            
         except Exception as e:
             logging.error(f"Error fetching pre-market data for {ticker}: {e}")
+            return {}
+    
+    @staticmethod
+    async def get_stock_info(ticker: str) -> Dict[str, Any]:
+        """Get stock details from Polygon.io"""
+        try:
+            if not polygon_client:
+                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
+                return {}
+            
+            details = polygon_client.get_ticker_details(ticker.upper())
+            
+            if not details:
+                return {}
+            
+            return {
+                "longName": details.name,
+                "shortName": details.name,
+                "sector": getattr(details, 'sic_description', '') or '',
+                "industry": getattr(details, 'sic_description', '') or '',
+                "marketCap": getattr(details, 'market_cap', None),
+                "currentPrice": None  # Will be fetched from latest quote if needed
+            }
+            
+        except Exception as e:
+            logging.error(f"Error fetching stock info for {ticker}: {e}")
             return {}
 
 # Scanner Service
@@ -266,9 +374,8 @@ class ScannerService:
                 
                 # Check if all criteria are met
                 if all(criteria_met.values()):
-                    # Get current stock info
-                    stock = yf.Ticker(ticker)
-                    info = stock.info
+                    # Get current stock info using Polygon.io
+                    info = await StockDataService.get_stock_info(ticker)
                     
                     event = {
                         "ticker": ticker,
@@ -410,6 +517,97 @@ async def list_stock_universes(
     """List all stock universes"""
     universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
     return universes
+
+@app.post("/api/universe/{universe_id}/refresh")
+async def refresh_universe_stocks(
+    universe_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh stocks in a universe based on criteria.
+    Scans common stocks and adds those matching the universe criteria.
+    """
+    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+    if not universe:
+        raise HTTPException(status_code=404, detail="Universe not found")
+    
+    # Clear existing stocks for this universe
+    db.query(MonitoredStock).filter(MonitoredStock.universe_id == universe_id).delete()
+    
+    added_count = 0
+    scanned_count = 0
+    criteria = universe.criteria or {}
+    
+    # Get filter criteria
+    min_market_cap = criteria.get("min_market_cap")
+    max_market_cap = criteria.get("max_market_cap")
+    target_sector = criteria.get("sector")
+    min_price = criteria.get("min_price")
+    max_price = criteria.get("max_price")
+    
+    for ticker in COMMON_STOCKS:
+        scanned_count += 1
+        try:
+            # Fetch stock info from Polygon.io
+            info = await StockDataService.get_stock_info(ticker)
+            
+            # Apply filters based on criteria
+            should_add = True
+            
+            market_cap = info.get("marketCap")
+            current_price = info.get("currentPrice")
+            sector = info.get("sector")
+            
+            if min_market_cap and market_cap and market_cap < min_market_cap:
+                should_add = False
+            if max_market_cap and market_cap and market_cap > max_market_cap:
+                should_add = False
+            if target_sector and sector and target_sector.lower() not in sector.lower():
+                should_add = False
+            if min_price and current_price and current_price < min_price:
+                should_add = False
+            if max_price and current_price and current_price > max_price:
+                should_add = False
+            
+            if should_add:
+                monitored_stock = MonitoredStock(
+                    ticker=ticker,
+                    universe_id=universe_id,
+                    added_date=datetime.now().date(),
+                    is_active=True,
+                    company_name=info.get("longName") or info.get("shortName") or ticker,
+                    sector=sector,
+                    industry=info.get("industry"),
+                    market_cap=market_cap,
+                    stock_metadata={"source": "auto_refresh", "current_price": current_price}
+                )
+                db.add(monitored_stock)
+                added_count += 1
+                
+        except Exception as e:
+            logging.warning(f"Error processing {ticker}: {e}")
+            continue
+    
+    db.commit()
+    
+    return {
+        "status": "completed",
+        "scanned": scanned_count,
+        "added": added_count,
+        "message": f"Successfully refreshed universe. Added {added_count} stocks."
+    }
+
+@app.get("/api/universe/{universe_id}/stocks", response_model=List[MonitoredStockResponse])
+async def get_universe_stocks(
+    universe_id: int,
+    db: Session = Depends(get_db)
+):
+    """List all stocks in a universe"""
+    stocks = db.query(MonitoredStock).filter(
+        MonitoredStock.universe_id == universe_id,
+        MonitoredStock.is_active == True
+    ).all()
+    return stocks
 
 @app.get("/api/stocks/historical/{ticker}")
 async def get_historical_data(
