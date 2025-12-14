@@ -5,6 +5,13 @@ Application configuration using pydantic-settings.
 from functools import lru_cache
 from typing import Optional
 import os
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load .env from root directory
+root_dir = Path(__file__).resolve().parent.parent.parent.parent
+env_path = root_dir / ".env"
+load_dotenv(dotenv_path=env_path)
 
 
 class Settings:

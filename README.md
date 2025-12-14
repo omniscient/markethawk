@@ -103,12 +103,28 @@ docker-compose up -d
 # Backend setup
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 
 # Frontend setup  
 cd frontend
 npm install
 npm run dev
+```
+
+### 🧪 Running Tests
+```bash
+cd backend
+python -m pytest
+```
+
+### 🗄️ Database Migrations
+```bash
+cd backend
+# Run migrations
+python -m alembic upgrade head
+
+# Create new migration (after model changes)
+python -m alembic revision --autogenerate -m "description_of_change"
 ```
 
 ## 📱 User Interface

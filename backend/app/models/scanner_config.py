@@ -3,8 +3,7 @@ ScannerConfig SQLAlchemy model.
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text, Uuid as UUID
 import uuid
 
 from app.core.database import Base

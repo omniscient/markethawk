@@ -20,10 +20,34 @@ The Docker setup includes three management tools for monitoring and managing you
 # See ENV_VARIABLES.md for details
 
 # Start all containers including management tools
+# Start all containers including management tools
 docker-compose up -d
 
 # Check all services are running
 docker-compose ps
+```
+
+### Database Migrations (New!)
+The project now uses **Alembic** for database migrations.
+
+```bash
+# Apply migrations (inside container)
+docker exec -it stockscanner-api python -m alembic upgrade head
+
+# Create a new migration (after modifying models)
+# 1. Edit models in backend/app/models/
+# 2. Run:
+docker exec -it stockscanner-api python -m alembic revision --autogenerate -m "describe_changes"
+# 3. Apply:
+docker exec -it stockscanner-api python -m alembic upgrade head
+```
+
+### Running Tests
+The project uses **Pytest** for automated testing.
+
+```bash
+# Run tests inside the container
+docker exec -it stockscanner-api python -m pytest
 ```
 
 > **🔑 API Keys Required:** Before starting, create a `.env` file with your Polygon.io API key. See [ENV_VARIABLES.md](ENV_VARIABLES.md) for detailed instructions.

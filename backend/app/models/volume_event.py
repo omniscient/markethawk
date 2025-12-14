@@ -3,8 +3,7 @@ VolumeEvent SQLAlchemy model.
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, JSON, Uuid as UUID
 import uuid
 
 from app.core.database import Base
