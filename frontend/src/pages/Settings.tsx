@@ -8,12 +8,14 @@ import {
   Database,
   Key,
   Save,
-  Mail
+  Mail,
+  RefreshCw
 } from 'lucide-react';
 
 // Components
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import { syncFundamentals, syncMetrics } from '../api/scanner';
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
@@ -45,6 +47,33 @@ const Settings: React.FC = () => {
   const handleSave = () => {
     // Save settings logic here
     console.log('Saving settings:', settings);
+  };
+
+  const [syncingFundamentals, setSyncingFundamentals] = useState(false);
+  const [syncingMetrics, setSyncingMetrics] = useState(false);
+
+  const handleSyncFundamentals = async () => {
+    try {
+      setSyncingFundamentals(true);
+      await syncFundamentals();
+      alert('Fundamental sync started in background');
+    } catch (e) {
+      alert('Failed to start sync');
+    } finally {
+      setSyncingFundamentals(false);
+    }
+  };
+
+  const handleSyncMetrics = async () => {
+    try {
+      setSyncingMetrics(true);
+      await syncMetrics();
+      alert('Metrics update started in background');
+    } catch (e) {
+      alert('Failed to start update');
+    } finally {
+      setSyncingMetrics(false);
+    }
   };
 
   return (
@@ -425,6 +454,42 @@ const Settings: React.FC = () => {
           {activeTab === 'data' && (
             <Card title="Data & Storage" icon={Database as any}>
               <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium text-financial-light mb-4">Market Data Sync</h3>
+                  <div className="p-4 bg-gray-800 rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-financial-light">Master Ticker List</h4>
+                        <p className="text-sm text-gray-400">Syncs ~10,000 active tickers and their fundamentals (Market Cap, Shares, etc.)</p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={RefreshCw}
+                        loading={syncingFundamentals}
+                        onClick={handleSyncFundamentals}
+                      >
+                        Sync Fundamentals
+                      </Button>
+                    </div>
+                    <div className="border-t border-gray-700 pt-4 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-financial-light">Daily Technical Metrics</h4>
+                        <p className="text-sm text-gray-400">Updates SMA, Volume, and Price data for the entire market (Run after close)</p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={RefreshCw}
+                        loading={syncingMetrics}
+                        onClick={handleSyncMetrics}
+                      >
+                        Update Metrics
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <h3 className="text-lg font-medium text-financial-light mb-4">Data Retention</h3>
 

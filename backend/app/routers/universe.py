@@ -90,14 +90,38 @@ async def list_stock_universes(
     return universes
 
 
+from fastapi import BackgroundTasks
+from app.services.discovery_service import DiscoveryService
+
+@router.post("/sync/fundamentals")
+async def sync_fundamental_data(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Trigger background sync of fundamental data from Polygon."""
+    service = DiscoveryService(db)
+    background_tasks.add_task(service.sync_fundamental_data)
+    return {"status": "accepted", "message": "Fundamental sync started in background"}
+
+@router.post("/sync/metrics")
+async def sync_daily_metrics(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Trigger background update of daily technical metrics."""
+    service = DiscoveryService(db)
+    background_tasks.add_task(service.update_daily_metrics_snapshot)
+    return {"status": "accepted", "message": "Daily metrics update started in background"}
+
+
 @router.post("/{universe_id}/refresh")
 async def refresh_universe_stocks(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
     """
-    Refresh stocks in a universe based on criteria.
-    Scans common stocks and adds those matching the universe criteria.
+    Refresh stocks in a universe using the Universe Discovery Engine.
+    Efficiently queries local cache of 10,000+ stocks.
     """
     universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
     if not universe:
@@ -105,71 +129,42 @@ async def refresh_universe_stocks(
 
     # Clear existing stocks for this universe
     db.query(MonitoredStock).filter(MonitoredStock.universe_id == universe_id).delete()
-
-    added_count = 0
-    scanned_count = 0
+    
+    # Use Discovery Service
+    service = DiscoveryService(db)
     criteria = universe.criteria or {}
-
-    # Get filter criteria
-    min_market_cap = criteria.get("min_market_cap")
-    max_market_cap = criteria.get("max_market_cap")
-    target_sector = criteria.get("sector")
-    min_price = criteria.get("min_price")
-    max_price = criteria.get("max_price")
-
-    for ticker in COMMON_STOCKS:
-        scanned_count += 1
-        try:
-            # Fetch stock info from Polygon.io
-            info = await StockDataService.get_stock_info(ticker)
-
-            # Apply filters based on criteria
-            should_add = True
-
-            market_cap = info.get("marketCap")
-            current_price = info.get("currentPrice")
-            sector = info.get("sector")
-
-            if min_market_cap and market_cap and market_cap < min_market_cap:
-                should_add = False
-            if max_market_cap and market_cap and market_cap > max_market_cap:
-                should_add = False
-            if target_sector and sector and target_sector.lower() not in sector.lower():
-                should_add = False
-            if min_price and current_price and current_price < min_price:
-                should_add = False
-            if max_price and current_price and current_price > max_price:
-                should_add = False
-
-            if should_add:
-                monitored_stock = MonitoredStock(
-                    ticker=ticker,
-                    universe_id=universe_id,
-                    added_date=datetime.now().date(),
-                    is_active=True,
-                    company_name=info.get("longName") or info.get("shortName") or ticker,
-                    sector=sector,
-                    industry=info.get("industry"),
-                    market_cap=market_cap,
-                    stock_metadata={
-                        "source": "auto_refresh",
-                        "current_price": current_price,
-                    },
-                )
-                db.add(monitored_stock)
-                added_count += 1
-
-        except Exception as e:
-            logging.warning(f"Error processing {ticker}: {e}")
-            continue
-
+    
+    # Execute Screen
+    results = service.run_screen(criteria)
+    
+    added_count = 0
+    
+    # Bulk insert (or optimized loop)
+    for res in results:
+        monitored_stock = MonitoredStock(
+            ticker=res["ticker"],
+            universe_id=universe_id,
+            added_date=datetime.now().date(),
+            is_active=True,
+            company_name=res["name"],
+            sector=res["sector"],
+            market_cap=res["market_cap"],
+            stock_metadata={
+                "source": "discovery_engine",
+                "close_price": res["close_price"],
+                "volume": res["volume"]
+            }
+        )
+        db.add(monitored_stock)
+        added_count += 1
+        
     db.commit()
 
     return {
         "status": "completed",
-        "scanned": scanned_count,
+        "scanned": "ALL",  # We scanned the whole DB effectively
         "added": added_count,
-        "message": f"Successfully refreshed universe. Added {added_count} stocks.",
+        "message": f"Successfully refreshed universe. Added {added_count} stocks from Discovery Engine.",
     }
 
 

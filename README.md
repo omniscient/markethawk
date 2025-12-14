@@ -89,7 +89,14 @@ docker-compose up -d
 # Frontend: http://localhost:3000
 # Backend API: http://localhost:8000
 # API Docs: http://localhost:8000/docs
+
+# Management Tools
+# pgAdmin (PostgreSQL): http://localhost:5050
+# Flower (Celery): http://localhost:5555
 ```
+
+> **📖 For detailed setup and connection instructions, see [DEVELOPMENT.md](DEVELOPMENT.md)**
+
 
 ### Manual Setup
 ```bash

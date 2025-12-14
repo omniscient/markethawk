@@ -26,12 +26,14 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       WATCHFILES_FORCE_POLLING: "true"
     ports:
       - "8000:8000"
     depends_on:
       - postgres
+      - redis
     volumes:
       - ./backend:/app
     networks:
@@ -87,9 +89,45 @@ services:
     networks:
       - stockscanner-network
 
+  # Flower for Celery monitoring
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stockscanner-flower
+    command: celery -A app.main.celery flower --port=5555
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - celery-worker
+    networks:
+      - stockscanner-network
+
+  # pgAdmin for PostgreSQL management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: stockscanner-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@stockscanner.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - stockscanner-network
+
 volumes:
   postgres_data:
   redis_data:
+  pgadmin_data:
 
 
 networks:

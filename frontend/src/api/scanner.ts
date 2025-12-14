@@ -139,6 +139,16 @@ export interface RefreshUniverseResponse {
   message: string;
 }
 
+export const syncFundamentals = async (): Promise<any> => {
+  const response = await apiClient.post('/universe/sync/fundamentals');
+  return response.data;
+};
+
+export const syncMetrics = async (): Promise<any> => {
+  const response = await apiClient.post('/universe/sync/metrics');
+  return response.data;
+};
+
 export const refreshUniverseStocks = async (id: number): Promise<RefreshUniverseResponse> => {
   const response = await apiClient.post(`/universe/${id}/refresh`);
   return response.data;

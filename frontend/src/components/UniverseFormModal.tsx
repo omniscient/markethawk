@@ -122,13 +122,86 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                         placeholder="Optional description..."
                     />
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Criteria (JSON)</label>
-                    <textarea
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-financial-blue h-40"
-                        value={criteriaJson}
-                        onChange={(e) => setCriteriaJson(e.target.value)}
-                    />
+
+                <div className="border-t border-gray-700 pt-4">
+                    <h4 className="text-sm font-medium text-financial-light mb-3">Screening Criteria</h4>
+
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label className="block text-xs text-gray-400 mb-1">Min Market Cap</label>
+                            <input
+                                type="number"
+                                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                                placeholder="1000000000"
+                                onChange={(e) => {
+                                    try {
+                                        const c = JSON.parse(criteriaJson);
+                                        c.min_market_cap = parseFloat(e.target.value);
+                                        setCriteriaJson(JSON.stringify(c, null, 2));
+                                    } catch (err) { }
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-400 mb-1">Min Volume</label>
+                            <input
+                                type="number"
+                                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                                placeholder="500000"
+                                onChange={(e) => {
+                                    try {
+                                        const c = JSON.parse(criteriaJson);
+                                        c.min_volume = parseFloat(e.target.value);
+                                        setCriteriaJson(JSON.stringify(c, null, 2));
+                                    } catch (err) { }
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-400 mb-1">Sector</label>
+                            <select
+                                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                                onChange={(e) => {
+                                    try {
+                                        const c = JSON.parse(criteriaJson);
+                                        c.sector = e.target.value;
+                                        setCriteriaJson(JSON.stringify(c, null, 2));
+                                    } catch (err) { }
+                                }}
+                            >
+                                <option value="">Any</option>
+                                <option value="Technology">Technology</option>
+                                <option value="Healthcare">Healthcare</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Energy">Energy</option>
+                            </select>
+                        </div>
+                        <div className="flex items-center pt-4">
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="form-checkbox text-financial-blue rounded bg-gray-800 border-gray-700"
+                                    onChange={(e) => {
+                                        try {
+                                            const c = JSON.parse(criteriaJson);
+                                            c.price_above_sma50 = e.target.checked;
+                                            setCriteriaJson(JSON.stringify(c, null, 2));
+                                        } catch (err) { }
+                                    }}
+                                />
+                                <span className="text-sm text-gray-300">Price &gt; SMA 50</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Raw Criteria (JSON)</label>
+                        <textarea
+                            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-financial-blue h-32"
+                            value={criteriaJson}
+                            onChange={(e) => setCriteriaJson(e.target.value)}
+                        />
+                    </div>
                 </div>
             </div>
         </Modal>
