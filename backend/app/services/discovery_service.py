@@ -87,17 +87,20 @@ class DiscoveryService:
             self.db.rollback()
             raise
 
-    def sync_ticker_details_crawler(self):
+    def sync_ticker_details_crawler(self, delay_seconds: float = 15.0):
         """
         Triggers the background crawler to fetch detailed info (employees, description, etc.)
         for all tickers one-by-one.
+        
+        Args:
+            delay_seconds: Time to wait between requests (15.0 for free tier, 0.2 for paid)
         """
         from app.tasks import start_details_crawl
         
-        logger.info("🚀 Triggering background details crawler...")
-        start_details_crawl.delay()
+        logger.info(f"🚀 Triggering background details crawler with delay={delay_seconds}s...")
+        start_details_crawl.delay(delay_seconds=delay_seconds)
         
-        return {"status": "started", "message": "Details crawler started in background"}
+        return {"status": "started", "message": f"Details crawler started in background (delay={delay_seconds}s)"}
 
     def run_screen(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
         """

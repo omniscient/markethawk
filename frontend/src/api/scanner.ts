@@ -149,8 +149,10 @@ export const syncMetrics = async (): Promise<any> => {
   return response.data;
 };
 
-export const syncTickerDetails = async (): Promise<any> => {
-  const response = await apiClient.post('/universe/sync/details');
+export const syncTickerDetails = async (delay: number = 15.0): Promise<any> => {
+  const response = await apiClient.post('/universe/sync/details', null, {
+    params: { delay }
+  });
   return response.data;
 };
 

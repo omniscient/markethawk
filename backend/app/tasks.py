@@ -91,14 +91,14 @@ def sync_tickers_batch(self, next_url: str = None):
 
 
 @celery_app.task(bind=True, max_retries=3)
-def sync_ticker_details(self, ticker: str):
+def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
     """
     Slow crawler task to fetch details for ONE ticker.
-    Reschedules itself for the NEXT ticker after 15 seconds.
+    Reschedules itself for the NEXT ticker after `delay_seconds`.
     """
     db: Session = SessionLocal()
     try:
-        logger.info(f"🔍 Fetching details for ticker: {ticker}")
+        logger.info(f"🔍 Fetching details for ticker: {ticker} (Delay: {delay_seconds}s)")
         
         # 1. Fetch Data
         url = f"https://api.polygon.io/v3/reference/tickers/{ticker}"
@@ -149,8 +149,12 @@ def sync_ticker_details(self, ticker: str):
         )
         
         if next_ticker:
-            logger.info(f"⏭️ Scheduling details sync for {next_ticker.ticker} in 15 seconds...")
-            sync_ticker_details.apply_async(args=[next_ticker.ticker], countdown=15)
+            logger.info(f"⏭️ Scheduling details sync for {next_ticker.ticker} in {delay_seconds} seconds...")
+            sync_ticker_details.apply_async(
+                args=[next_ticker.ticker], 
+                kwargs={"delay_seconds": delay_seconds},
+                countdown=delay_seconds
+            )
         else:
             logger.info("🎉 All tickers updated! Crawler sleeping.")
 
@@ -164,7 +168,7 @@ def sync_ticker_details(self, ticker: str):
         db.close()
 
 @celery_app.task(bind=True)
-def start_details_crawl(self):
+def start_details_crawl(self, delay_seconds: float = 15.0):
     """
     Kicks off the details crawler if it's not running.
     """
@@ -179,8 +183,8 @@ def start_details_crawl(self):
         )
         
         if next_ticker:
-            logger.info(f"🚀 Starting Details Crawler with {next_ticker.ticker}")
-            sync_ticker_details.delay(next_ticker.ticker)
+            logger.info(f"🚀 Starting Details Crawler with {next_ticker.ticker} (Delay: {delay_seconds}s)")
+            sync_ticker_details.delay(ticker=next_ticker.ticker, delay_seconds=delay_seconds)
         else:
             logger.info("No tickers need detail updates.")
             

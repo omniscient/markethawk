@@ -106,15 +106,18 @@ async def sync_fundamental_data(
 @router.post("/sync/details")
 async def sync_ticker_details(
     background_tasks: BackgroundTasks,
+    delay: float = 15.0, # Default to 15s (Free Tier)
     db: Session = Depends(get_db),
 ):
-    """Trigger background sync of ticker details (Description, etc)."""
+    """
+    Trigger background sync of ticker details (Description, etc).
+    delay: Seconds to wait between requests (15.0=Free, 0.2=Paid)
+    """
     service = DiscoveryService(db)
-    background_tasks.add_task(service.sync_ticker_details_crawler)
-    return {"status": "accepted", "message": "Ticker details sync started in background"}
+    background_tasks.add_task(service.sync_ticker_details_crawler, delay)
+    return {"status": "accepted", "message": f"Ticker details sync started in background (delay={delay}s)"}
 
-    background_tasks.add_task(service.sync_ticker_details_crawler)
-    return {"status": "accepted", "message": "Ticker details sync started in background"}
+
 
 @router.post("/sync/stop")
 async def stop_sync(

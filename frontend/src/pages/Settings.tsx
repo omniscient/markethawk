@@ -40,6 +40,9 @@ const Settings: React.FC = () => {
   const [syncingDetails, setSyncingDetails] = useState(false);
   const [stopping, setStopping] = useState(false);
 
+  // Speed setting (15.0 for Free, 0.2 for Paid/Unlimited)
+  const [crawlSpeed, setCrawlSpeed] = useState<number>(15.0);
+
   const tabs = [
     { id: 'general', name: 'General', icon: SettingsIcon as any },
     { id: 'profile', name: 'Profile', icon: User as any },
@@ -83,8 +86,10 @@ const Settings: React.FC = () => {
   const handleSyncDetails = async () => {
     try {
       setSyncingDetails(true);
-      await syncTickerDetails();
-      alert('Details crawler started in background (1 ticker/15s)');
+      // Pass the selected speed
+      await syncTickerDetails(crawlSpeed);
+      const speedLabel = crawlSpeed < 1 ? 'FAST' : 'SLOW';
+      alert(`Details crawler started (${speedLabel} mode: ${crawlSpeed}s delay)`);
     } catch (e) {
       alert('Failed to start details sync');
     } finally {
@@ -503,7 +508,18 @@ const Settings: React.FC = () => {
                     <div className="border-t border-gray-700 pt-4 flex items-center justify-between">
                       <div>
                         <h4 className="font-medium text-financial-light">Ticker Details Crawler</h4>
-                        <p className="text-sm text-gray-400">Deep sync for Description, Employees, etc. (Slow: 1 ticker/15s)</p>
+                        <p className="text-sm text-gray-400">Deep sync for Description, Employees, etc.</p>
+                        <div className="flex items-center mt-2 space-x-2">
+                          <span className="text-xs text-gray-500">Speed:</span>
+                          <select
+                            value={crawlSpeed}
+                            onChange={(e) => setCrawlSpeed(parseFloat(e.target.value))}
+                            className="bg-gray-800 border-none text-xs text-financial-blue font-bold rounded px-2 py-1 focus:ring-1 focus:ring-financial-blue cursor-pointer"
+                          >
+                            <option value={15.0}>🐢 Free (15s delay)</option>
+                            <option value={0.2}>🚀 Paid (Unlimited)</option>
+                          </select>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <Button
@@ -512,7 +528,7 @@ const Settings: React.FC = () => {
                           loading={stopping}
                           onClick={handleStopSync}
                         >
-                          Stop Sync
+                          Stop
                         </Button>
                         <Button
                           variant="secondary"
@@ -521,7 +537,7 @@ const Settings: React.FC = () => {
                           loading={syncingDetails}
                           onClick={handleSyncDetails}
                         >
-                          Sync Details
+                          Sync
                         </Button>
                       </div>
                     </div>
