@@ -103,6 +103,16 @@ async def sync_fundamental_data(
     background_tasks.add_task(service.sync_fundamental_data)
     return {"status": "accepted", "message": "Fundamental sync started in background"}
 
+@router.post("/sync/details")
+async def sync_ticker_details(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Trigger background sync of ticker details (Description, etc)."""
+    service = DiscoveryService(db)
+    background_tasks.add_task(service.sync_ticker_details_crawler)
+    return {"status": "accepted", "message": "Ticker details sync started in background"}
+
 @router.post("/sync/metrics")
 async def sync_daily_metrics(
     background_tasks: BackgroundTasks,

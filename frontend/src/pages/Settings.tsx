@@ -15,7 +15,7 @@ import {
 // Components
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { syncFundamentals, syncMetrics } from '../api/scanner';
+import { syncFundamentals, syncMetrics, syncTickerDetails } from '../api/scanner';
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
@@ -51,6 +51,7 @@ const Settings: React.FC = () => {
 
   const [syncingFundamentals, setSyncingFundamentals] = useState(false);
   const [syncingMetrics, setSyncingMetrics] = useState(false);
+  const [syncingDetails, setSyncingDetails] = useState(false);
 
   const handleSyncFundamentals = async () => {
     try {
@@ -61,6 +62,18 @@ const Settings: React.FC = () => {
       alert('Failed to start sync');
     } finally {
       setSyncingFundamentals(false);
+    }
+  };
+
+  const handleSyncDetails = async () => {
+    try {
+      setSyncingDetails(true);
+      await syncTickerDetails();
+      alert('Details crawler started in background (1 ticker/15s)');
+    } catch (e) {
+      alert('Failed to start details sync');
+    } finally {
+      setSyncingDetails(false);
     }
   };
 
@@ -470,6 +483,21 @@ const Settings: React.FC = () => {
                         onClick={handleSyncFundamentals}
                       >
                         Sync Fundamentals
+                      </Button>
+                    </div>
+                    <div className="border-t border-gray-700 pt-4 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-financial-light">Ticker Details Crawler</h4>
+                        <p className="text-sm text-gray-400">Deep sync for Description, Employees, etc. (Slow: 1 ticker/15s)</p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={RefreshCw}
+                        loading={syncingDetails}
+                        onClick={handleSyncDetails}
+                      >
+                        Sync Details
                       </Button>
                     </div>
                     <div className="border-t border-gray-700 pt-4 flex items-center justify-between">

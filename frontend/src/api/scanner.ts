@@ -149,6 +149,11 @@ export const syncMetrics = async (): Promise<any> => {
   return response.data;
 };
 
+export const syncTickerDetails = async (): Promise<any> => {
+  const response = await apiClient.post('/universe/sync/details');
+  return response.data;
+};
+
 export const refreshUniverseStocks = async (id: number): Promise<RefreshUniverseResponse> => {
   const response = await apiClient.post(`/universe/${id}/refresh`);
   return response.data;

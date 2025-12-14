@@ -62,6 +62,7 @@ def sync_tickers_batch(self, next_url: str = None):
                 stmt.name = t.get("name")
                 stmt.market_cap = t.get("market_cap") or 0
                 stmt.sector = t.get("type")
+                stmt.primary_exchange = t.get("primary_exchange")
                 stmt.last_updated = datetime.utcnow()
                 count += 1
                 
@@ -85,5 +86,103 @@ def sync_tickers_batch(self, next_url: str = None):
         logger.error(f"❌ Error in sync_tickers_batch: {str(e)}")
         db.rollback()
         raise e
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True, max_retries=3)
+def sync_ticker_details(self, ticker: str):
+    """
+    Slow crawler task to fetch details for ONE ticker.
+    Reschedules itself for the NEXT ticker after 15 seconds.
+    """
+    db: Session = SessionLocal()
+    try:
+        logger.info(f"🔍 Fetching details for ticker: {ticker}")
+        
+        # 1. Fetch Data
+        url = f"https://api.polygon.io/v3/reference/tickers/{ticker}"
+        headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
+        
+        with httpx.Client(timeout=30.0) as client:
+            response = client.get(url, headers=headers)
+            
+            if response.status_code == 429:
+                logger.warning(f"⚠️ Rate limit hit for {ticker}. Retrying in 60s...")
+                raise self.retry(countdown=60)
+                
+            if response.status_code == 404:
+                logger.warning(f"Ticker {ticker} not found on Polygon. Skipping.")
+                # Don't fail, just move to next
+            else:
+                response.raise_for_status()
+                data = response.json()
+                results = data.get("results", {})
+                
+                # 2. Update DB
+                stmt = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
+                if stmt:
+                    stmt.description = results.get("description")
+                    stmt.primary_exchange = results.get("primary_exchange")
+                    stmt.list_date = results.get("list_date")
+                    stmt.total_employees = results.get("total_employees")
+                    stmt.share_class_shares_outstanding = results.get("share_class_shares_outstanding")
+                    stmt.weighted_shares_outstanding = results.get("weighted_shares_outstanding")
+                    stmt.sic_code = results.get("sic_code")
+                    stmt.sic_description = results.get("sic_description")
+                    stmt.homepage_url = results.get("homepage_url")
+                    stmt.last_details_update = datetime.utcnow()
+                    
+                    db.commit()
+                    logger.info(f"✅ Updated details for {ticker}")
+
+        # 3. Schedule Next Ticker (Recursive Chain)
+        # Find next ticker that hasn't been updated recently (or at all)
+        next_ticker = (
+            db.query(TickerReference.ticker)
+            .filter(
+                (TickerReference.last_details_update == None) | 
+                (TickerReference.last_details_update < datetime.utcnow().date())
+            )
+            .order_by(TickerReference.last_updated.desc()) # Prioritize recently active
+            .first()
+        )
+        
+        if next_ticker:
+            logger.info(f"⏭️ Scheduling details sync for {next_ticker.ticker} in 15 seconds...")
+            sync_ticker_details.apply_async(args=[next_ticker.ticker], countdown=15)
+        else:
+            logger.info("🎉 All tickers updated! Crawler sleeping.")
+
+    except Exception as e:
+        logger.error(f"❌ Error syncing details for {ticker}: {e}")
+        db.rollback()
+        # Even if error, try to schedule next so chain doesn't die?
+        # Maybe better to let retry handle it.
+        raise self.retry(exc=e, countdown=60)
+    finally:
+        db.close()
+
+@celery_app.task(bind=True)
+def start_details_crawl(self):
+    """
+    Kicks off the details crawler if it's not running.
+    """
+    db: Session = SessionLocal()
+    try:
+        # Find first candidate
+        next_ticker = (
+            db.query(TickerReference.ticker)
+            .filter(TickerReference.last_details_update == None)
+            .order_by(TickerReference.last_updated.desc())
+            .first()
+        )
+        
+        if next_ticker:
+            logger.info(f"🚀 Starting Details Crawler with {next_ticker.ticker}")
+            sync_ticker_details.delay(next_ticker.ticker)
+        else:
+            logger.info("No tickers need detail updates.")
+            
     finally:
         db.close()

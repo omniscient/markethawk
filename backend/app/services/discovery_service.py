@@ -87,24 +87,17 @@ class DiscoveryService:
             self.db.rollback()
             raise
 
-    def sync_details_batch(self, tickers: List[str]):
+    def sync_ticker_details_crawler(self):
         """
-        Detailed sync for a list of tickers to get Shares Outstanding / Market Cap
+        Triggers the background crawler to fetch detailed info (employees, description, etc.)
+        for all tickers one-by-one.
         """
-        for ticker in tickers:
-            try:
-                details = self.client.get_ticker_details(ticker)
-                
-                ref = self.db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
-                if ref:
-                    ref.market_cap = details.market_cap
-                    ref.outstanding_shares = details.share_class_shares_outstanding
-                    ref.sector = details.sic_description # or standardized sector
-                    ref.industry = details.sic_description 
-                    ref.last_updated = datetime.utcnow()
-                    self.db.commit()
-            except Exception as e:
-                logger.error(f"Error syncing details for {ticker}: {e}")
+        from app.tasks import start_details_crawl
+        
+        logger.info("🚀 Triggering background details crawler...")
+        start_details_crawl.delay()
+        
+        return {"status": "started", "message": "Details crawler started in background"}
 
     def run_screen(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
