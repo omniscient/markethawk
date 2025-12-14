@@ -15,7 +15,7 @@ import {
 // Components
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { syncFundamentals, syncMetrics, syncTickerDetails } from '../api/scanner';
+import { syncFundamentals, syncMetrics, syncTickerDetails, stopSync } from '../api/scanner'; // Import stopSync
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
@@ -35,6 +35,11 @@ const Settings: React.FC = () => {
     }
   });
 
+  const [syncingFundamentals, setSyncingFundamentals] = useState(false);
+  const [syncingMetrics, setSyncingMetrics] = useState(false);
+  const [syncingDetails, setSyncingDetails] = useState(false);
+  const [stopping, setStopping] = useState(false);
+
   const tabs = [
     { id: 'general', name: 'General', icon: SettingsIcon as any },
     { id: 'profile', name: 'Profile', icon: User as any },
@@ -49,9 +54,19 @@ const Settings: React.FC = () => {
     console.log('Saving settings:', settings);
   };
 
-  const [syncingFundamentals, setSyncingFundamentals] = useState(false);
-  const [syncingMetrics, setSyncingMetrics] = useState(false);
-  const [syncingDetails, setSyncingDetails] = useState(false);
+  const handleStopSync = async () => {
+    try {
+      setStopping(true);
+      const res = await stopSync();
+      // @ts-ignore
+      alert(res.message);
+    } catch (e) {
+      alert('Failed to stop sync');
+    } finally {
+      setStopping(false);
+    }
+  };
+
 
   const handleSyncFundamentals = async () => {
     try {
@@ -490,15 +505,25 @@ const Settings: React.FC = () => {
                         <h4 className="font-medium text-financial-light">Ticker Details Crawler</h4>
                         <p className="text-sm text-gray-400">Deep sync for Description, Employees, etc. (Slow: 1 ticker/15s)</p>
                       </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        icon={RefreshCw}
-                        loading={syncingDetails}
-                        onClick={handleSyncDetails}
-                      >
-                        Sync Details
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          loading={stopping}
+                          onClick={handleStopSync}
+                        >
+                          Stop Sync
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={RefreshCw}
+                          loading={syncingDetails}
+                          onClick={handleSyncDetails}
+                        >
+                          Sync Details
+                        </Button>
+                      </div>
                     </div>
                     <div className="border-t border-gray-700 pt-4 flex items-center justify-between">
                       <div>

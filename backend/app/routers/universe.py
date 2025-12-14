@@ -113,6 +113,27 @@ async def sync_ticker_details(
     background_tasks.add_task(service.sync_ticker_details_crawler)
     return {"status": "accepted", "message": "Ticker details sync started in background"}
 
+    background_tasks.add_task(service.sync_ticker_details_crawler)
+    return {"status": "accepted", "message": "Ticker details sync started in background"}
+
+@router.post("/sync/stop")
+async def stop_sync(
+    db: Session = Depends(get_db),
+):
+    """
+    Stops any running sync process by purging the Celery queue.
+    This breaks the recursive chain.
+    """
+    from app.core.celery_app import celery_app
+    
+    # Purge all pending tasks
+    purged_count = celery_app.control.purge()
+    
+    return {
+        "status": "stopped", 
+        "message": f"Sync process stopped. {purged_count} pending tasks removed."
+    }
+
 @router.post("/sync/metrics")
 async def sync_daily_metrics(
     background_tasks: BackgroundTasks,
