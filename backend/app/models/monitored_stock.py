@@ -23,6 +23,6 @@ class MonitoredStock(Base):
     last_scanned = Column(DateTime)
     scan_count = Column(Integer, default=0)
     is_active = Column(Boolean, default=True, index=True)
-    stock_metadata = Column(JSON, default=dict)
+    stock_metadata = Column("metadata", JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

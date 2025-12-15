@@ -29,6 +29,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       WATCHFILES_FORCE_POLLING: "true"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
       - "8000:8000"
     depends_on:

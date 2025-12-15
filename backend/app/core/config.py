@@ -32,7 +32,7 @@ class Settings:
     # Application
     APP_NAME: str = "Stock Scanner API"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
     
     # CORS
     CORS_ORIGINS: list = ["*"]

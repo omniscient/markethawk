@@ -157,40 +157,154 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                 }}
                             />
                         </div>
+                        {/* Sector Multi-select */}
+                        <div className="col-span-2">
+                            <label className="block text-xs text-gray-400 mb-2">Sectors</label>
+                            <div className="flex flex-wrap gap-2">
+                                {['Technology', 'Healthcare', 'Finance', 'Energy', 'Consumer Cyclical', 'Consumer Defensive', 'Industrials', 'Utilities', 'Real Estate', 'Basic Materials', 'Communication Services'].map((sector) => {
+                                    const currentSectors = (() => {
+                                        try { return JSON.parse(criteriaJson).sector || []; } catch { return []; }
+                                    })();
+                                    const isSelected = Array.isArray(currentSectors) ? currentSectors.includes(sector) : currentSectors === sector;
+
+                                    return (
+                                        <button
+                                            key={sector}
+                                            type="button"
+                                            onClick={() => {
+                                                try {
+                                                    const c = JSON.parse(criteriaJson);
+                                                    let s = c.sector || [];
+                                                    if (!Array.isArray(s)) s = [s]; // normalize
+
+                                                    if (s.includes(sector)) {
+                                                        s = s.filter((item: string) => item !== sector);
+                                                    } else {
+                                                        s.push(sector);
+                                                    }
+                                                    c.sector = s;
+                                                    setCriteriaJson(JSON.stringify(c, null, 2));
+                                                } catch (err) { }
+                                            }}
+                                            className={`px-2 py-1 text-xs rounded border ${isSelected
+                                                    ? 'bg-financial-blue text-white border-financial-blue'
+                                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
+                                                }`}
+                                        >
+                                            {sector}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Exchange Multi-select */}
+                        <div className="col-span-2 mt-2">
+                            <label className="block text-xs text-gray-400 mb-2">Exchanges</label>
+                            <div className="flex gap-2">
+                                {[
+                                    { id: 'XNYS', label: 'NYSE' },
+                                    { id: 'XNAS', label: 'NASDAQ' },
+                                    { id: 'XASE', label: 'AMEX' }
+                                ].map((ex) => {
+                                    const currentExchanges = (() => {
+                                        try { return JSON.parse(criteriaJson).primary_exchange || []; } catch { return []; }
+                                    })();
+                                    const isSelected = Array.isArray(currentExchanges) ? currentExchanges.includes(ex.id) : currentExchanges === ex.id;
+
+                                    return (
+                                        <button
+                                            key={ex.id}
+                                            type="button"
+                                            onClick={() => {
+                                                try {
+                                                    const c = JSON.parse(criteriaJson);
+                                                    let e = c.primary_exchange || [];
+                                                    if (!Array.isArray(e)) e = [e];
+
+                                                    if (e.includes(ex.id)) {
+                                                        e = e.filter((item: string) => item !== ex.id);
+                                                    } else {
+                                                        e.push(ex.id);
+                                                    }
+                                                    c.primary_exchange = e;
+                                                    setCriteriaJson(JSON.stringify(c, null, 2));
+                                                } catch (err) { }
+                                            }}
+                                            className={`px-3 py-1 text-xs rounded border ${isSelected
+                                                    ? 'bg-financial-blue text-white border-financial-blue'
+                                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
+                                                }`}
+                                        >
+                                            {ex.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Employee Range */}
                         <div>
-                            <label className="block text-xs text-gray-400 mb-1">Sector</label>
-                            <select
+                            <label className="block text-xs text-gray-400 mb-1">Min Employees</label>
+                            <input
+                                type="number"
                                 className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                                placeholder="0"
                                 onChange={(e) => {
                                     try {
                                         const c = JSON.parse(criteriaJson);
-                                        c.sector = e.target.value;
+                                        c.min_employees = parseFloat(e.target.value);
                                         setCriteriaJson(JSON.stringify(c, null, 2));
                                     } catch (err) { }
                                 }}
-                            >
-                                <option value="">Any</option>
-                                <option value="Technology">Technology</option>
-                                <option value="Healthcare">Healthcare</option>
-                                <option value="Finance">Finance</option>
-                                <option value="Energy">Energy</option>
-                            </select>
+                            />
                         </div>
-                        <div className="flex items-center pt-4">
-                            <label className="flex items-center space-x-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    className="form-checkbox text-financial-blue rounded bg-gray-800 border-gray-700"
-                                    onChange={(e) => {
-                                        try {
-                                            const c = JSON.parse(criteriaJson);
-                                            c.price_above_sma50 = e.target.checked;
-                                            setCriteriaJson(JSON.stringify(c, null, 2));
-                                        } catch (err) { }
-                                    }}
-                                />
-                                <span className="text-sm text-gray-300">Price &gt; SMA 50</span>
-                            </label>
+                        <div>
+                            <label className="block text-xs text-gray-400 mb-1">Max Employees</label>
+                            <input
+                                type="number"
+                                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                                placeholder="Unlimited"
+                                onChange={(e) => {
+                                    try {
+                                        const c = JSON.parse(criteriaJson);
+                                        c.max_employees = parseFloat(e.target.value);
+                                        setCriteriaJson(JSON.stringify(c, null, 2));
+                                    } catch (err) { }
+                                }}
+                            />
+                        </div>
+
+                        {/* Shares Range */}
+                        <div>
+                            <label className="block text-xs text-gray-400 mb-1">Min Shares Out</label>
+                            <input
+                                type="number"
+                                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                                placeholder="0"
+                                onChange={(e) => {
+                                    try {
+                                        const c = JSON.parse(criteriaJson);
+                                        c.min_share_class_shares = parseFloat(e.target.value);
+                                        setCriteriaJson(JSON.stringify(c, null, 2));
+                                    } catch (err) { }
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-400 mb-1">Max Shares Out</label>
+                            <input
+                                type="number"
+                                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                                placeholder="Unlimited"
+                                onChange={(e) => {
+                                    try {
+                                        const c = JSON.parse(criteriaJson);
+                                        c.max_share_class_shares = parseFloat(e.target.value);
+                                        setCriteriaJson(JSON.stringify(c, null, 2));
+                                    } catch (err) { }
+                                }}
+                            />
                         </div>
                     </div>
 

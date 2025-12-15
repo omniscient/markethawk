@@ -19,6 +19,12 @@ from app.core.celery_app import celery_app as celery
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, settings.LOG_LEVEL),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
     app = FastAPI(
         title=settings.APP_NAME,
         description="Professional stock scanning and alert system",

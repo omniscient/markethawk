@@ -186,7 +186,11 @@ async def refresh_universe_stocks(
             stock_metadata={
                 "source": "discovery_engine",
                 "close_price": res["close_price"],
-                "volume": res["volume"]
+                "volume": res["volume"],
+                "primary_exchange": res.get("primary_exchange"),
+                "employees": res.get("employees"),
+                "sic_code": res.get("sic_code"),
+                "description_preview": (res.get("description") or "")[:100] + "..." if res.get("description") else None
             }
         )
         db.add(monitored_stock)

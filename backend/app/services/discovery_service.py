@@ -107,47 +107,101 @@ class DiscoveryService:
         Executes a screen based on provided criteria.
         Returns list of matching tickers with their fundamental data.
         """
-        # Start query joining Reference and Metric
-        # Note: In production we need to ensure we join the *latest* metric.
-        # Here we assume the metrics table is clean or we filter by date.
-        query = self.db.query(TickerReference, StockMetric).join(
-            StockMetric, TickerReference.ticker == StockMetric.ticker
-        )
+        
+        # Determine if we need to filter by metrics
+        # Currently only min_volume is handled in this logic
+        has_metric_filters = "min_volume" in criteria and criteria["min_volume"] > 0
+        
+        if has_metric_filters:
+            # Need metrics -> Inner Join
+            # Using inner join because if we filter by volume, we MUST have the volume data
+            query = self.db.query(TickerReference, StockMetric).join(
+                StockMetric, TickerReference.ticker == StockMetric.ticker
+            )
+        else:
+            # No metric filters -> Query only Reference for performance
+            # No need to join metrics table
+            query = self.db.query(TickerReference)
         
         # Apply Fundamental Filters
-        if "min_market_cap" in criteria:
+        # Only apply filters if value is non-default/truthy
+        if "min_market_cap" in criteria and criteria["min_market_cap"] > 0:
             query = query.filter(TickerReference.market_cap >= criteria["min_market_cap"])
             
-        if "min_outstanding_shares" in criteria:
+        if "min_outstanding_shares" in criteria and criteria["min_outstanding_shares"] > 0:
             query = query.filter(TickerReference.outstanding_shares >= criteria["min_outstanding_shares"])
             
         if "sector" in criteria and criteria["sector"]:
-            query = query.filter(TickerReference.sector == criteria["sector"])
+            if isinstance(criteria["sector"], list):
+                if len(criteria["sector"]) > 0:
+                    query = query.filter(TickerReference.sector.in_(criteria["sector"]))
+            elif criteria["sector"]: # Single value not empty string
+                query = query.filter(TickerReference.sector == criteria["sector"])
 
-        # Apply Technical Filters
-        if "price_above_sma50" in criteria and criteria["price_above_sma50"]:
-            query = query.filter(StockMetric.close_price > StockMetric.sma_50)
+        if "primary_exchange" in criteria and criteria["primary_exchange"]:
+             if isinstance(criteria["primary_exchange"], list):
+                if len(criteria["primary_exchange"]) > 0:
+                    query = query.filter(TickerReference.primary_exchange.in_(criteria["primary_exchange"]))
+             elif criteria["primary_exchange"]:
+                query = query.filter(TickerReference.primary_exchange == criteria["primary_exchange"])
+
+        if "sic_code" in criteria and criteria["sic_code"]:
+            query = query.filter(TickerReference.sic_code == criteria["sic_code"])
             
-        if "price_below_sma50" in criteria and criteria["price_below_sma50"]:
-             query = query.filter(StockMetric.close_price < StockMetric.sma_50)
+        if "description_contains" in criteria and criteria["description_contains"]:
+             query = query.filter(TickerReference.description.ilike(f"%{criteria['description_contains']}%"))
+
+        # Range Filters for new numeric fields
+        if "min_employees" in criteria and criteria["min_employees"] > 0:
+             query = query.filter(TickerReference.total_employees >= criteria["min_employees"])
              
-        if "min_volume" in criteria:
-            query = query.filter(StockMetric.volume >= criteria["min_volume"])
+        if "max_employees" in criteria and criteria["max_employees"] > 0:
+             query = query.filter(TickerReference.total_employees <= criteria["max_employees"])
+             
+        if "min_share_class_shares" in criteria and criteria["min_share_class_shares"] > 0:
+             query = query.filter(TickerReference.share_class_shares_outstanding >= criteria["min_share_class_shares"])
+             
+        if "max_share_class_shares" in criteria and criteria["max_share_class_shares"] > 0:
+             query = query.filter(TickerReference.share_class_shares_outstanding <= criteria["max_share_class_shares"])
+
+        if has_metric_filters:
+            if "min_volume" in criteria and criteria["min_volume"] > 0:
+                query = query.filter(StockMetric.volume >= criteria["min_volume"])
+
+        # Debug Logging
+        if settings.LOG_LEVEL == "DEBUG":
+            try:
+                 # Compile query with literal binds for readability
+                 statement = query.statement.compile(compile_kwargs={"literal_binds": True})
+                 logger.info(f"🔍 Discovery Screen Query: {statement}")
+            except Exception as e:
+                 logger.error(f"Failed to log debug query: {e}")
 
         # Execute
         results = query.limit(100).all() # Safety limit
         
         # Format output
         output = []
-        for ref, metric in results:
+        for row in results:
+            if has_metric_filters:
+                # Result is tuple (TickerReference, StockMetric)
+                ref, metric = row
+            else:
+                # Result is TickerReference (can be row or object depending on driver, usually object in ORM)
+                ref = row
+                metric = None
+
             output.append({
                 "ticker": ref.ticker,
                 "name": ref.name,
                 "market_cap": ref.market_cap,
-                "close_price": metric.close_price,
-                "volume": metric.volume,
-                "sector": ref.sector
+                "close_price": metric.close_price if metric else None,
+                "volume": metric.volume if metric else None,
+                "sector": ref.sector,
+                "primary_exchange": ref.primary_exchange,
+                "employees": ref.total_employees,
+                "sic_code": ref.sic_code,
+                "description": ref.description
             })
             
         return output
-
