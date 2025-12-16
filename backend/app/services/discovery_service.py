@@ -18,15 +18,15 @@ class DiscoveryService:
         self.db = db
         self.client = RESTClient(settings.POLYGON_API_KEY)
 
-    def sync_fundamental_data(self, limit: int = None, batch_size: int = 1000):
+    def sync_fundamental_data(self, limit: int = None, batch_size: int = 1000, delay_seconds: float = 15.0):
         """
         Triggers the background Celery task chain to sync tickers.
         """
         from app.tasks import sync_tickers_batch
         
-        logger.info("🚀 Triggering fundamental data sync via Celery task chain...")
+        logger.info(f"🚀 Triggering fundamental data sync via Celery task chain (delay={delay_seconds}s)...")
         # Start the chain
-        sync_tickers_batch.delay()
+        sync_tickers_batch.delay(delay_seconds=delay_seconds)
         
         return {"status": "started", "message": "Sync started in background task chain"}
 
@@ -87,18 +87,19 @@ class DiscoveryService:
             self.db.rollback()
             raise
 
-    def sync_ticker_details_crawler(self, delay_seconds: float = 15.0):
+    def sync_ticker_details_crawler(self, delay_seconds: float = 15.0, resync: bool = False):
         """
         Triggers the background crawler to fetch detailed info (employees, description, etc.)
         for all tickers one-by-one.
         
         Args:
             delay_seconds: Time to wait between requests (15.0 for free tier, 0.2 for paid)
+            resync: If True, resets the update status for ALL tickers to force a full re-crawl.
         """
         from app.tasks import start_details_crawl
         
-        logger.info(f"🚀 Triggering background details crawler with delay={delay_seconds}s...")
-        start_details_crawl.delay(delay_seconds=delay_seconds)
+        logger.info(f"🚀 Triggering background details crawler with delay={delay_seconds}s (resync={resync})...")
+        start_details_crawl.delay(delay_seconds=delay_seconds, resync=resync)
         
         return {"status": "started", "message": f"Details crawler started in background (delay={delay_seconds}s)"}
 

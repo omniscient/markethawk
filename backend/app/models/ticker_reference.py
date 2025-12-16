@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime
+from sqlalchemy import Column, String, Float, DateTime, Boolean
 from datetime import datetime
 from app.core.database import Base
 
@@ -24,3 +24,10 @@ class TickerReference(Base):
     sic_description = Column(String, nullable=True)
     homepage_url = Column(String, nullable=True)
     last_details_update = Column(DateTime, nullable=True)
+
+    # New fields from Massive API /v3/reference/tickers
+    active = Column(Boolean, default=True)
+    cik = Column(String, nullable=True)
+    composite_figi = Column(String, nullable=True)
+    market = Column(String, nullable=True)
+    type = Column(String, nullable=True)

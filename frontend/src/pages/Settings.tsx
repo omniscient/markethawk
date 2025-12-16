@@ -74,8 +74,9 @@ const Settings: React.FC = () => {
   const handleSyncFundamentals = async () => {
     try {
       setSyncingFundamentals(true);
-      await syncFundamentals();
-      alert('Fundamental sync started in background');
+      await syncFundamentals(crawlSpeed);
+      const speedLabel = crawlSpeed < 1 ? 'FAST' : 'SLOW';
+      alert(`Fundamental sync started in background (${speedLabel} mode: ${crawlSpeed}s delay)`);
     } catch (e) {
       alert('Failed to start sync');
     } finally {
@@ -488,7 +489,21 @@ const Settings: React.FC = () => {
             <Card title="Data & Storage" icon={Database as any}>
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-financial-light mb-4">Market Data Sync</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-financial-light">Market Data Sync</h3>
+                    <div className="flex items-center space-x-2 bg-gray-900/50 px-3 py-1.5 rounded-lg border border-gray-700">
+                      <span className="text-sm text-gray-400">Global API Speed:</span>
+                      <select
+                        value={crawlSpeed}
+                        onChange={(e) => setCrawlSpeed(parseFloat(e.target.value))}
+                        className="bg-transparent border-none text-sm text-financial-blue font-bold focus:ring-0 cursor-pointer"
+                      >
+                        <option value={15.0}>🐢 Free (15s delay)</option>
+                        <option value={0.2}>🚀 Paid (Unlimited)</option>
+                        <option value={0.05}>⚡ Paid (Turbo)</option>
+                      </select>
+                    </div>
+                  </div>
                   <div className="p-4 bg-gray-800 rounded-lg space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -510,15 +525,6 @@ const Settings: React.FC = () => {
                         <h4 className="font-medium text-financial-light">Ticker Details Crawler</h4>
                         <p className="text-sm text-gray-400">Deep sync for Description, Employees, etc.</p>
                         <div className="flex items-center mt-2 space-x-2">
-                          <span className="text-xs text-gray-500">Speed:</span>
-                          <select
-                            value={crawlSpeed}
-                            onChange={(e) => setCrawlSpeed(parseFloat(e.target.value))}
-                            className="bg-gray-800 border-none text-xs text-financial-blue font-bold rounded px-2 py-1 focus:ring-1 focus:ring-financial-blue cursor-pointer"
-                          >
-                            <option value={15.0}>🐢 Free (15s delay)</option>
-                            <option value={0.2}>🚀 Paid (Unlimited)</option>
-                          </select>
                         </div>
                       </div>
                       <div className="flex gap-2">

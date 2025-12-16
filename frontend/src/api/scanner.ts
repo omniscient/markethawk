@@ -139,8 +139,10 @@ export interface RefreshUniverseResponse {
   message: string;
 }
 
-export const syncFundamentals = async (): Promise<any> => {
-  const response = await apiClient.post('/universe/sync/fundamentals');
+export const syncFundamentals = async (delay: number = 15.0): Promise<any> => {
+  const response = await apiClient.post('/universe/sync/fundamentals', null, {
+    params: { delay }
+  });
   return response.data;
 };
 

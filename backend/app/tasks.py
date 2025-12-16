@@ -1,5 +1,6 @@
 import logging
 import httpx
+import redis
 from datetime import datetime
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,7 @@ from app.models.ticker_reference import TickerReference
 logger = logging.getLogger(__name__)
 
 @celery_app.task(bind=True, max_retries=3)
-def sync_tickers_batch(self, next_url: str = None):
+def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
     """
     Celery task to sync tickers in batches using strict rate limiting (recursive chaining).
     Each execution processes one page and schedules the next page 15 seconds later.
@@ -60,8 +61,18 @@ def sync_tickers_batch(self, next_url: str = None):
                     db.add(stmt)
                 
                 stmt.name = t.get("name")
-                stmt.market_cap = t.get("market_cap") or 0
-                stmt.sector = t.get("type")
+                stmt.active = t.get("active")
+                stmt.cik = t.get("cik")
+                stmt.composite_figi = t.get("composite_figi")
+                stmt.market = t.get("market")
+                stmt.type = t.get("type")
+
+                # Market Cap not in Polygon v3 list response
+                # stmt.market_cap = t.get("market_cap") or 0
+                
+                # Type is NOT sector (e.g. 'CS' = Common Stock)
+                # stmt.sector = t.get("type") # REMOVED: User confirmed this was wrong
+                
                 stmt.primary_exchange = t.get("primary_exchange")
                 stmt.last_updated = datetime.utcnow()
                 count += 1
@@ -76,9 +87,13 @@ def sync_tickers_batch(self, next_url: str = None):
         # 4. Schedule Next Batch (Recursive Chain)
         next_page = data.get("next_url")
         if next_page:
-            logger.info(f"⏭️ Next page found. Scheduling next batch in 15 seconds...")
+            logger.info(f"⏭️ Next page found. Scheduling next batch in {delay_seconds} seconds...")
             # Schedule next task 15 seconds from now
-            sync_tickers_batch.apply_async(args=[next_page], countdown=15)
+            sync_tickers_batch.apply_async(
+                args=[next_page], 
+                kwargs={"delay_seconds": delay_seconds},
+                countdown=delay_seconds
+            )
         else:
             logger.info("🎉 Sync Complete! No more pages.")
 
@@ -123,6 +138,7 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
                 stmt = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
                 if stmt:
                     stmt.description = results.get("description")
+                    stmt.market_cap = results.get("market_cap")
                     stmt.primary_exchange = results.get("primary_exchange")
                     stmt.list_date = results.get("list_date")
                     stmt.total_employees = results.get("total_employees")
@@ -130,6 +146,12 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
                     stmt.weighted_shares_outstanding = results.get("weighted_shares_outstanding")
                     stmt.sic_code = results.get("sic_code")
                     stmt.sic_description = results.get("sic_description")
+                    # Map SIC description to Industry as a fallback/primary
+                    stmt.industry = results.get("sic_description")
+                    # Clear out the incorrect 'CS' sector values if present
+                    if stmt.sector == 'CS':
+                        stmt.sector = None
+                        
                     stmt.homepage_url = results.get("homepage_url")
                     stmt.last_details_update = datetime.utcnow()
                     
@@ -149,6 +171,15 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
         )
         
         if next_ticker:
+            # 4. Check for Stop Flag Check
+            try:
+                r = redis.from_url(settings.REDIS_URL)
+                if r.exists("CRAWLER_STOP_FLAG"):
+                    logger.warning("🛑 Stop Flag detected. Halting crawler.")
+                    return
+            except Exception as e:
+                logger.error(f"Redis check failed: {e}")
+
             logger.info(f"⏭️ Scheduling details sync for {next_ticker.ticker} in {delay_seconds} seconds...")
             sync_ticker_details.apply_async(
                 args=[next_ticker.ticker], 
@@ -168,16 +199,31 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
         db.close()
 
 @celery_app.task(bind=True)
-def start_details_crawl(self, delay_seconds: float = 15.0):
+def start_details_crawl(self, delay_seconds: float = 15.0, resync: bool = False):
     """
     Kicks off the details crawler if it's not running.
     """
     db: Session = SessionLocal()
     try:
-        # Find first candidate
+        if resync:
+            logger.info("♻️ Force Resync requested. Resetting crawl status for all tickers...")
+            db.query(TickerReference).update({TickerReference.last_details_update: None})
+            db.commit()
+        
+        # Clear Stop Flag to allow restart
+        try:
+             r = redis.from_url(settings.REDIS_URL)
+             r.delete("CRAWLER_STOP_FLAG")
+        except Exception:
+             pass
+        
+        # Find first candidate (Priority: Never updated > Updated long ago)
         next_ticker = (
             db.query(TickerReference.ticker)
-            .filter(TickerReference.last_details_update == None)
+            .filter(
+                (TickerReference.last_details_update == None) | 
+                (TickerReference.last_details_update < datetime.utcnow().date())
+            )
             .order_by(TickerReference.last_updated.desc())
             .first()
         )

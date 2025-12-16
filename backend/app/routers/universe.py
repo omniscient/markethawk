@@ -96,26 +96,29 @@ from app.services.discovery_service import DiscoveryService
 @router.post("/sync/fundamentals")
 async def sync_fundamental_data(
     background_tasks: BackgroundTasks,
+    delay: float = 15.0, # Default to 15s (Free Tier)
     db: Session = Depends(get_db),
 ):
     """Trigger background sync of fundamental data from Polygon."""
     service = DiscoveryService(db)
-    background_tasks.add_task(service.sync_fundamental_data)
-    return {"status": "accepted", "message": "Fundamental sync started in background"}
+    background_tasks.add_task(service.sync_fundamental_data, delay_seconds=delay)
+    return {"status": "accepted", "message": f"Fundamental sync started in background (delay={delay}s)"}
 
 @router.post("/sync/details")
 async def sync_ticker_details(
     background_tasks: BackgroundTasks,
     delay: float = 15.0, # Default to 15s (Free Tier)
+    resync: bool = False,
     db: Session = Depends(get_db),
 ):
     """
     Trigger background sync of ticker details (Description, etc).
     delay: Seconds to wait between requests (15.0=Free, 0.2=Paid)
+    resync: Set to true to force re-crawling all tickers even if recently updated.
     """
     service = DiscoveryService(db)
-    background_tasks.add_task(service.sync_ticker_details_crawler, delay)
-    return {"status": "accepted", "message": f"Ticker details sync started in background (delay={delay}s)"}
+    background_tasks.add_task(service.sync_ticker_details_crawler, delay, resync)
+    return {"status": "accepted", "message": f"Ticker details sync started in background (delay={delay}s, resync={resync})"}
 
 
 
@@ -124,17 +127,27 @@ async def stop_sync(
     db: Session = Depends(get_db),
 ):
     """
-    Stops any running sync process by purging the Celery queue.
-    This breaks the recursive chain.
+    Stops any running sync process by setting a Stop Flag in Redis and purging the queue.
     """
     from app.core.celery_app import celery_app
-    
-    # Purge all pending tasks
+    from app.core.config import settings
+    import redis
+
+    # 1. Set Stop Flag in Redis
+    # Tasks check this flag before scheduling the next iteration
+    try:
+        r = redis.from_url(settings.REDIS_URL)
+        r.setex("CRAWLER_STOP_FLAG", 60, "1") # Set flag for 60 seconds (enough to catch running tasks)
+        redis_status = "Flag set."
+    except Exception as e:
+        redis_status = f"Redis error: {e}"
+
+    # 2. Purge all pending tasks (Classic method)
     purged_count = celery_app.control.purge()
     
     return {
         "status": "stopped", 
-        "message": f"Sync process stopped. {purged_count} pending tasks removed."
+        "message": f"Stop signal sent ({redis_status}). {purged_count} pending tasks removed."
     }
 
 @router.post("/sync/metrics")
