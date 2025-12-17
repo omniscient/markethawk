@@ -241,7 +241,17 @@ def start_details_crawl(self, delay_seconds: float = 15.0, resync: bool = False)
         db.close()
 
 @celery_app.task(bind=True, max_retries=3)
-def sync_stock_aggregates(self, ticker: str, from_date: str, to_date: str, multiplier: int = 1, timespan: str = "minute"):
+def sync_stock_aggregates(
+    self, 
+    ticker: str, 
+    from_date: str, 
+    to_date: str, 
+    multiplier: int = 1, 
+    timespan: str = "minute",
+    adjusted: bool = True,
+    sort: str = "asc",
+    limit: int = 50000
+):
     """
     Fetch and store aggregates for a specific ticker and date range.
     """
@@ -260,7 +270,10 @@ def sync_stock_aggregates(self, ticker: str, from_date: str, to_date: str, multi
             multiplier=multiplier,
             timespan=timespan,
             from_date=from_date,
-            to_date=to_date
+            to_date=to_date,
+            adjusted=adjusted,
+            sort=sort,
+            limit=limit
         ))
         
         if not aggs:

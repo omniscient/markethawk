@@ -7,7 +7,8 @@ import {
   Trash2,
   Eye,
   Filter,
-  Search
+  Search,
+  DownloadCloud
 } from 'lucide-react';
 
 // Components
@@ -15,6 +16,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import UniverseFormModal from '../components/UniverseFormModal';
 import UniverseDetailsModal from '../components/UniverseDetailsModal';
+import SyncUniverseModal from '../components/SyncUniverseModal';
 import { StockUniverse } from '../api/scanner';
 
 // API functions
@@ -25,6 +27,7 @@ const Universes: React.FC = () => {
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingUniverse, setEditingUniverse] = useState<StockUniverse | null>(null);
   const [selectedUniverse, setSelectedUniverse] = useState<StockUniverse | null>(null);
+  const [syncingUniverse, setSyncingUniverse] = useState<StockUniverse | null>(null);
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
@@ -166,14 +169,22 @@ const Universes: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={DownloadCloud}
+                  onClick={() => setSyncingUniverse(universe)}
+                >
+                  <span className="hidden xl:inline">Sync</span>
+                </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   icon={Eye}
                   onClick={() => setSelectedUniverse(universe)}
                 >
-                  View
+                  <span className="hidden xl:inline">View</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -183,16 +194,17 @@ const Universes: React.FC = () => {
                     setShowFormModal(true);
                   }}
                 >
-                  Edit
+                  <Edit className="h-4 w-4 xl:mr-2" />
+                  <span className="hidden xl:inline">Edit</span>
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  icon={Trash2}
                   className="text-red-400 hover:text-red-300"
                   onClick={() => handleDelete(universe.id)}
                 >
-                  Delete
+                  <Trash2 className="h-4 w-4 xl:mr-2" />
+                  <span className="hidden xl:inline">Delete</span>
                 </Button>
               </div>
             </Card>
@@ -235,6 +247,12 @@ const Universes: React.FC = () => {
         isOpen={!!selectedUniverse}
         onClose={() => setSelectedUniverse(null)}
         universe={selectedUniverse}
+      />
+
+      <SyncUniverseModal
+        isOpen={!!syncingUniverse}
+        onClose={() => setSyncingUniverse(null)}
+        universe={syncingUniverse}
       />
     </div>
   );

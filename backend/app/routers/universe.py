@@ -296,6 +296,9 @@ async def sync_universe_aggregates(
     to_date: str,
     multiplier: int = 1,
     timespan: str = "minute",
+    adjusted: bool = True,
+    sort: str = "asc",
+    limit: int = 50000,
     db: Session = Depends(get_db),
 ):
     """
@@ -324,7 +327,10 @@ async def sync_universe_aggregates(
             from_date=from_date,
             to_date=to_date,
             multiplier=multiplier,
-            timespan=timespan
+            timespan=timespan,
+            adjusted=adjusted,
+            sort=sort,
+            limit=limit
         )
         count += 1
         

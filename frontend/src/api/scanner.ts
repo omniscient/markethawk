@@ -177,15 +177,30 @@ export const fetchUniverseStocks = async (id: number): Promise<MonitoredStock[]>
   return response.data;
 };
 
+export interface SyncAggregatesOptions {
+  from_date: string;
+  to_date: string;
+  multiplier?: number;
+  timespan?: string;
+  adjusted?: boolean;
+  sort?: string;
+  limit?: number;
+}
+
 export const syncUniverseAggregates = async (
   id: number,
-  from_date: string,
-  to_date: string,
-  multiplier: number = 1,
-  timespan: string = "minute"
+  options: SyncAggregatesOptions
 ): Promise<{ status: string; message: string }> => {
   const response = await apiClient.post(`/universe/${id}/sync-aggregates`, null, {
-    params: { from_date, to_date, multiplier, timespan }
+    params: {
+      from_date: options.from_date,
+      to_date: options.to_date,
+      multiplier: options.multiplier ?? 1,
+      timespan: options.timespan ?? "minute",
+      adjusted: options.adjusted ?? true,
+      sort: options.sort ?? "asc",
+      limit: options.limit ?? 50000
+    }
   });
   return response.data;
 };

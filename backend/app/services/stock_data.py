@@ -149,7 +149,10 @@ class StockDataService:
         multiplier: int,
         timespan: str,
         from_date: str,
-        to_date: str
+        to_date: str,
+        adjusted: bool = True,
+        sort: str = "asc",
+        limit: int = 50000
     ) -> list[Dict[str, Any]]:
         """Fetch aggregates from Polygon.io."""
         try:
@@ -163,7 +166,9 @@ class StockDataService:
                 timespan=timespan,
                 from_=from_date,
                 to=to_date,
-                limit=50000,
+                adjusted=adjusted,
+                sort=sort,
+                limit=limit,
             )
 
             if not aggs:
