@@ -143,6 +143,21 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                             />
                         </div>
                         <div>
+                            <label className="block text-xs text-gray-400 mb-1">Max Market Cap</label>
+                            <input
+                                type="number"
+                                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
+                                placeholder="Unlimited"
+                                onChange={(e) => {
+                                    try {
+                                        const c = JSON.parse(criteriaJson);
+                                        c.max_market_cap = parseFloat(e.target.value);
+                                        setCriteriaJson(JSON.stringify(c, null, 2));
+                                    } catch (err) { }
+                                }}
+                            />
+                        </div>
+                        <div>
                             <label className="block text-xs text-gray-400 mb-1">Min Volume</label>
                             <input
                                 type="number"
@@ -187,8 +202,8 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                                 } catch (err) { }
                                             }}
                                             className={`px-2 py-1 text-xs rounded border ${isSelected
-                                                    ? 'bg-financial-blue text-white border-financial-blue'
-                                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
+                                                ? 'bg-financial-blue text-white border-financial-blue'
+                                                : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
                                                 }`}
                                         >
                                             {sector}
@@ -232,8 +247,8 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                                 } catch (err) { }
                                             }}
                                             className={`px-3 py-1 text-xs rounded border ${isSelected
-                                                    ? 'bg-financial-blue text-white border-financial-blue'
-                                                    : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
+                                                ? 'bg-financial-blue text-white border-financial-blue'
+                                                : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
                                                 }`}
                                         >
                                             {ex.label}

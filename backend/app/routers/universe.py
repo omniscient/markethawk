@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import StockUniverse, MonitoredStock
+from app.models import StockUniverse, MonitoredStock, StockUniverseTicker
 from app.schemas import (
     StockUniverseCreate,
     StockUniverseUpdate,
@@ -176,6 +176,7 @@ async def refresh_universe_stocks(
 
     # Clear existing stocks for this universe
     db.query(MonitoredStock).filter(MonitoredStock.universe_id == universe_id).delete()
+    db.query(StockUniverseTicker).filter(StockUniverseTicker.universe_id == universe_id).delete()
     
     # Use Discovery Service
     service = DiscoveryService(db)
@@ -207,6 +208,15 @@ async def refresh_universe_stocks(
             }
         )
         db.add(monitored_stock)
+        
+        # Also populate StockUniverseTicker for persistent ticker list
+        stock_ticker = StockUniverseTicker(
+            universe_id=universe_id,
+            ticker=res["ticker"],
+            created_at=datetime.utcnow()
+        )
+        db.add(stock_ticker)
+
         added_count += 1
         
     db.commit()

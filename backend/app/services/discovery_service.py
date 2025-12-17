@@ -128,6 +128,9 @@ class DiscoveryService:
         # Only apply filters if value is non-default/truthy
         if "min_market_cap" in criteria and criteria["min_market_cap"] > 0:
             query = query.filter(TickerReference.market_cap >= criteria["min_market_cap"])
+
+        if "max_market_cap" in criteria and criteria["max_market_cap"] > 0:
+            query = query.filter(TickerReference.market_cap <= criteria["max_market_cap"])
             
         if "min_outstanding_shares" in criteria and criteria["min_outstanding_shares"] > 0:
             query = query.filter(TickerReference.outstanding_shares >= criteria["min_outstanding_shares"])
@@ -179,7 +182,8 @@ class DiscoveryService:
                  logger.error(f"Failed to log debug query: {e}")
 
         # Execute
-        results = query.limit(100).all() # Safety limit
+        # Execute
+        results = query.all() # No limit as requested by user
         
         # Format output
         output = []
