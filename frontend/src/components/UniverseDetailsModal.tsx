@@ -2,8 +2,8 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
-import { RefreshCw, TrendingUp } from 'lucide-react';
-import { StockUniverse, MonitoredStock, refreshUniverseStocks, fetchUniverseStocks } from '../api/scanner';
+import { RefreshCw, TrendingUp, Calendar, DownloadCloud } from 'lucide-react';
+import { StockUniverse, MonitoredStock, refreshUniverseStocks, fetchUniverseStocks, syncUniverseAggregates } from '../api/scanner';
 
 interface UniverseDetailsModalProps {
     isOpen: boolean;
@@ -34,6 +34,26 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
         },
     });
 
+    // Sync mutation
+    const syncMutation = useMutation({
+        mutationFn: () => {
+            // Default to last 7 days for now to keep UI simple
+            // In a real app we'd add a date picker
+            const end = new Date();
+            const start = new Date();
+            start.setDate(end.getDate() - 7);
+
+            return syncUniverseAggregates(
+                universe!.id,
+                start.toISOString().split('T')[0],
+                end.toISOString().split('T')[0]
+            );
+        },
+        onSuccess: () => {
+            // Maybe show a toast
+        }
+    });
+
     if (!universe) return null;
 
     const formatMarketCap = (cap?: number) => {
@@ -59,6 +79,20 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
                     >
                         {refreshMutation.isPending ? 'Refreshing...' : 'Refresh Stocks'}
                     </Button>
+
+                    <Button
+                        variant="secondary"
+                        icon={DownloadCloud}
+                        onClick={() => {
+                            if (confirm("Sync pre-market aggregates for the last 7 days for all stocks?")) {
+                                syncMutation.mutate();
+                            }
+                        }}
+                        disabled={syncMutation.isPending}
+                    >
+                        {syncMutation.isPending ? 'Syncing...' : 'Sync Data'}
+                    </Button>
+
                     <Button variant="secondary" onClick={onClose}>Close</Button>
                 </div>
             }
@@ -114,6 +148,12 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
                     {refreshMutation.isSuccess && (
                         <div className="mb-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm">
                             {refreshMutation.data?.message}
+                        </div>
+                    )}
+
+                    {syncMutation.isSuccess && (
+                        <div className="mb-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 text-sm">
+                            {syncMutation.data?.message}
                         </div>
                     )}
 

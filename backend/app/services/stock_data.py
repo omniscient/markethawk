@@ -142,3 +142,47 @@ class StockDataService:
         except Exception as e:
             logging.error(f"Error fetching stock info for {ticker}: {e}")
             return {}
+
+    @staticmethod
+    async def get_aggregates(
+        ticker: str,
+        multiplier: int,
+        timespan: str,
+        from_date: str,
+        to_date: str
+    ) -> list[Dict[str, Any]]:
+        """Fetch aggregates from Polygon.io."""
+        try:
+            if not polygon_client:
+                logging.error("Polygon client not initialized")
+                return []
+
+            aggs = polygon_client.get_aggs(
+                ticker=ticker.upper(),
+                multiplier=multiplier,
+                timespan=timespan,
+                from_=from_date,
+                to=to_date,
+                limit=50000,
+            )
+
+            if not aggs:
+                return []
+
+            return [
+                {
+                    "timestamp": datetime.fromtimestamp(agg.timestamp / 1000),
+                    "open": agg.open,
+                    "high": agg.high,
+                    "low": agg.low,
+                    "close": agg.close,
+                    "volume": agg.volume,
+                    "vwap": getattr(agg, "vwap", None),
+                    "transactions": getattr(agg, "transactions", None)
+                }
+                for agg in aggs
+            ]
+
+        except Exception as e:
+            logging.error(f"Error fetching aggregates for {ticker}: {e}")
+            return []

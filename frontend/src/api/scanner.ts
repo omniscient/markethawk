@@ -173,6 +173,19 @@ export const fetchUniverseStocks = async (id: number): Promise<MonitoredStock[]>
   return response.data;
 };
 
+export const syncUniverseAggregates = async (
+  id: number, 
+  from_date: string, 
+  to_date: string,
+  multiplier: number = 1,
+  timespan: string = "minute"
+): Promise<{ status: string; message: string }> => {
+  const response = await apiClient.post(`/universe/${id}/sync-aggregates`, null, {
+    params: { from_date, to_date, multiplier, timespan }
+  });
+  return response.data;
+};
+
 export const fetchHistoricalData = async (
   ticker: string,
   period: string = '30d'

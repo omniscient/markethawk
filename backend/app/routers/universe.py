@@ -234,3 +234,49 @@ async def get_universe_stocks(
         .all()
     )
     return stocks
+
+
+@router.post("/{universe_id}/sync-aggregates")
+async def sync_universe_aggregates(
+    universe_id: int,
+    background_tasks: BackgroundTasks,
+    from_date: str,
+    to_date: str,
+    multiplier: int = 1,
+    timespan: str = "minute",
+    db: Session = Depends(get_db),
+):
+    """
+    Trigger backfill of aggregates for all stocks in the universe.
+    """
+    # 1. Get stocks in universe
+    stocks = (
+        db.query(MonitoredStock)
+        .filter(
+            MonitoredStock.universe_id == universe_id,
+            MonitoredStock.is_active == True,
+        )
+        .all()
+    )
+    
+    if not stocks:
+         return {"status": "skipped", "message": "No active stocks in this universe."}
+         
+    # 2. Schedule tasks
+    from app.tasks import sync_stock_aggregates
+    
+    count = 0
+    for stock in stocks:
+        sync_stock_aggregates.delay(
+            ticker=stock.ticker,
+            from_date=from_date,
+            to_date=to_date,
+            multiplier=multiplier,
+            timespan=timespan
+        )
+        count += 1
+        
+    return {
+        "status": "accepted", 
+        "message": f"Scheduled aggregate sync for {count} stocks ({from_date} to {to_date})."
+    }

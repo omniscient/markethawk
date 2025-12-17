@@ -1,13 +1,16 @@
 import logging
 import httpx
 import redis
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.config import settings
 from app.models.ticker_reference import TickerReference
+from app.models.stock_aggregate import StockAggregate
+from app.services.stock_data import StockDataService
 
 logger = logging.getLogger(__name__)
 
@@ -234,5 +237,78 @@ def start_details_crawl(self, delay_seconds: float = 15.0, resync: bool = False)
         else:
             logger.info("No tickers need detail updates.")
             
+    finally:
+        db.close()
+
+@celery_app.task(bind=True, max_retries=3)
+def sync_stock_aggregates(self, ticker: str, from_date: str, to_date: str, multiplier: int = 1, timespan: str = "minute"):
+    """
+    Fetch and store aggregates for a specific ticker and date range.
+    """
+    db: Session = SessionLocal()
+    try:
+        logger.info(f"📊 Syncing aggregates for {ticker} ({from_date} to {to_date})")
+        
+        # 1. Fetch data
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+             loop = asyncio.new_event_loop()
+             asyncio.set_event_loop(loop)
+             
+        aggs = loop.run_until_complete(StockDataService.get_aggregates(
+            ticker=ticker,
+            multiplier=multiplier,
+            timespan=timespan,
+            from_date=from_date,
+            to_date=to_date
+        ))
+        
+        if not aggs:
+            logger.info(f"No aggregates found for {ticker}")
+            return
+            
+        # 2. Delete existing data for this range to avoid duplicates
+        start_dt = datetime.strptime(from_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
+        
+        db.query(StockAggregate).filter(
+            StockAggregate.ticker == ticker,
+            StockAggregate.timestamp >= start_dt,
+            StockAggregate.timestamp < end_dt
+        ).delete()
+        
+        # 3. Insert new data
+        new_records = []
+        for agg in aggs:
+            # Determine if pre-market (Simple heuristic: < 9:30 AM ET)
+            ts = agg['timestamp']
+            hour = ts.hour
+            minute = ts.minute
+            is_pre_market = (hour < 9) or (hour == 9 and minute < 30)
+            
+            record = StockAggregate(
+                ticker=ticker,
+                timestamp=ts,
+                multiplier=multiplier,
+                timespan=timespan,
+                open=agg['open'],
+                high=agg['high'],
+                low=agg['low'],
+                close=agg['close'],
+                volume=agg['volume'],
+                vwap=agg['vwap'],
+                transactions=agg['transactions'],
+                is_pre_market=is_pre_market
+            )
+            new_records.append(record)
+            
+        db.bulk_save_objects(new_records)
+        db.commit()
+        logger.info(f"✅ Saved {len(new_records)} aggregates for {ticker}")
+
+    except Exception as e:
+        logger.error(f"❌ Error syncing aggregates for {ticker}: {e}")
+        db.rollback()
+        raise self.retry(exc=e, countdown=60)
     finally:
         db.close()
