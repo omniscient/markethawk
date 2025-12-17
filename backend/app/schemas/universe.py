@@ -32,6 +32,10 @@ class StockUniverseResponse(BaseModel):
     criteria: Dict[str, Any]
     created_at: datetime
     is_active: bool
+    ticker_count: Optional[int] = 0
+    aggregate_count: Optional[int] = 0
+    min_aggregate_date: Optional[datetime] = None
+    max_aggregate_date: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -139,6 +139,31 @@ const Universes: React.FC = () => {
                     {Object.keys(universe.criteria).length}
                   </span>
                 </div>
+                {/* New Stats */}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Stock Count:</span>
+                  <span className="text-financial-light">
+                    {universe.ticker_count || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Aggregate Records:</span>
+                  <span className="text-financial-light">
+                    {universe.aggregate_count?.toLocaleString() || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Min Date:</span>
+                  <span className="text-financial-light">
+                    {universe.min_aggregate_date ? new Date(universe.min_aggregate_date).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Max Date:</span>
+                  <span className="text-financial-light">
+                    {universe.max_aggregate_date ? new Date(universe.max_aggregate_date).toLocaleDateString() : 'N/A'}
+                  </span>
+                </div>
               </div>
 
               <div className="flex space-x-2">

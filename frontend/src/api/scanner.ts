@@ -48,6 +48,10 @@ export interface StockUniverse {
   criteria: Record<string, any>;
   created_at: string;
   is_active: boolean;
+  ticker_count?: number;
+  aggregate_count?: number;
+  min_aggregate_date?: string;
+  max_aggregate_date?: string;
 }
 
 export interface ScannerRunRequest {
@@ -174,8 +178,8 @@ export const fetchUniverseStocks = async (id: number): Promise<MonitoredStock[]>
 };
 
 export const syncUniverseAggregates = async (
-  id: number, 
-  from_date: string, 
+  id: number,
+  from_date: string,
   to_date: string,
   multiplier: number = 1,
   timespan: string = "minute"

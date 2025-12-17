@@ -85,9 +85,51 @@ async def delete_stock_universe(
 async def list_stock_universes(
     db: Session = Depends(get_db),
 ):
+    from sqlalchemy import func
+    from app.models import StockAggregate, StockUniverseTicker
+
     """List all stock universes."""
     universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
-    return universes
+
+    # Enrich with stats
+    # Optimization: Could use a single complex query, but loop is clearer for now given <50 universes
+    results = []
+    for universe in universes:
+        # 1. Ticker Count
+        ticker_count = (
+            db.query(func.count(StockUniverseTicker.id))
+            .filter(StockUniverseTicker.universe_id == universe.id)
+            .scalar()
+        )
+
+        # 2. Aggregates Stats
+        # Get all tickers in this universe
+        # Subquery or fetch?
+        # Let's do a join: count(StockAggregate) join StockUniverseTicker
+        
+        agg_stats = (
+            db.query(
+                func.count(StockAggregate.id),
+                func.min(StockAggregate.timestamp),
+                func.max(StockAggregate.timestamp)
+            )
+            .join(StockUniverseTicker, StockAggregate.ticker == StockUniverseTicker.ticker)
+            .filter(StockUniverseTicker.universe_id == universe.id)
+            .first()
+        )
+        
+        count_aggs, min_date, max_date = agg_stats if agg_stats else (0, None, None)
+
+        # Convert to Pydantic model with extra fields
+        universe_data = StockUniverseResponse.from_orm(universe)
+        universe_data.ticker_count = ticker_count or 0
+        universe_data.aggregate_count = count_aggs or 0
+        universe_data.min_aggregate_date = min_date
+        universe_data.max_aggregate_date = max_date
+        
+        results.append(universe_data)
+
+    return results
 
 
 from fastapi import BackgroundTasks
