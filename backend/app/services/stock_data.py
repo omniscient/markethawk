@@ -111,6 +111,7 @@ class StockDataService:
                 "pre_market_high": max(agg.high for agg in pre_market_data),
                 "pre_market_low": min(agg.low for agg in pre_market_data),
                 "pre_market_open": pre_market_data[0].open if pre_market_data else None,
+                "pre_market_close": pre_market_data[-1].close if pre_market_data else None,
             }
 
         except Exception as e:

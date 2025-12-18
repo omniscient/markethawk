@@ -17,17 +17,24 @@ import ScannerConfig from '../components/ScannerConfig';
 import ScannerResults from '../components/ScannerResults';
 
 // API functions
-import { runScanner, fetchScannerConfigs } from '../api/scanner';
+import { runScanner, fetchScannerConfigs, fetchStockUniverses, StockUniverse } from '../api/scanner';
 
 const Scanner: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<string>('pre_market_volume');
+  const [selectedUniverse, setSelectedUniverse] = useState<number | null>(null);
   const [scanResults, setScanResults] = useState<any>(null);
 
   // Fetch scanner configurations
   const { data: configs, isLoading: loadingConfigs } = useQuery({
     queryKey: ['scannerConfigs'],
     queryFn: fetchScannerConfigs,
+  });
+
+  // Fetch stock universes
+  const { data: universes, isLoading: loadingUniverses } = useQuery({
+    queryKey: ['stockUniverses'],
+    queryFn: fetchStockUniverses,
   });
 
   // Run scanner mutation
@@ -44,15 +51,23 @@ const Scanner: React.FC = () => {
   });
 
   const handleRunScanner = async () => {
+    // Basic validation
+    if (!selectedUniverse && !selectedConfig) {
+      alert("Please select a universe and scan type");
+      return;
+    }
+
     setIsScanning(true);
     try {
       scannerMutation.mutate({
         scanner_type: selectedConfig,
-        tickers: ["AAPL", "MSFT", "GOOGL", "TSLA", "NVDA", "AMZN", "META", "AMD", "SPY", "QQQ"],
+        universe_id: selectedUniverse || undefined,
+        tickers: [], // Backend handles universe lookup
         dry_run: false
       });
     } catch (e) {
       console.error('Error triggering mutation:', e);
+      setIsScanning(false);
     }
   };
 
@@ -110,10 +125,13 @@ const Scanner: React.FC = () => {
         <div className="lg:col-span-2">
           <Card title="Scanner Configuration" icon={Settings as any}>
             <ScannerConfig
-              configs={configs}
+              configs={configs || []}
+              universes={universes || []}
               selectedConfig={selectedConfig}
+              selectedUniverse={selectedUniverse}
               onConfigChange={setSelectedConfig}
-              loading={loadingConfigs}
+              onUniverseChange={setSelectedUniverse}
+              loading={loadingConfigs || loadingUniverses}
             />
           </Card>
         </div>

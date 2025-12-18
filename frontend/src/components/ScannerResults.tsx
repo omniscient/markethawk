@@ -107,6 +107,7 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({ results }) => {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-700">
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Date</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Ticker</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Volume Spike</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Rel Volume</th>
@@ -118,6 +119,9 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({ results }) => {
             <tbody>
               {filteredEvents.map((event) => (
                 <tr key={event.id} className="border-b border-gray-800 hover:bg-gray-800/50">
+                  <td className="py-3 px-4 text-gray-400 text-sm">
+                    {event.event_date}
+                  </td>
                   <td className="py-3 px-4">
                     <div>
                       <div className="font-medium text-financial-light">{event.ticker}</div>
@@ -138,18 +142,18 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({ results }) => {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    {event.price_gap_pct > 0 ? (
+                    {(event.price_gap_pct || 0) > 0 ? (
                       <div className="flex items-center space-x-1">
                         <TrendingUp className="h-4 w-4 text-positive" />
                         <span className="text-positive font-medium">
-                          +{event.price_gap_pct.toFixed(1)}%
+                          +{(event.price_gap_pct || 0).toFixed(1)}%
                         </span>
                       </div>
                     ) : (
                       <div className="flex items-center space-x-1">
                         <TrendingDown className="h-4 w-4 text-negative" />
                         <span className="text-negative font-medium">
-                          {event.price_gap_pct.toFixed(1)}%
+                          {(event.price_gap_pct || 0).toFixed(1)}%
                         </span>
                       </div>
                     )}

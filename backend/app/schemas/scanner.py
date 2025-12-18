@@ -21,3 +21,4 @@ class ScannerRunResponse(BaseModel):
     stocks_scanned: int
     events_detected: int
     execution_time_ms: int
+    events: List[dict] = []

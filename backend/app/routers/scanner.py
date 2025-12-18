@@ -46,7 +46,11 @@ async def run_scanner(
 
     # Run scanner
     scan_id = str(uuid.uuid4())
-    results = await ScannerService.run_pre_market_scan(tickers, db)
+    
+    if request.scanner_type == "liquidity_hunt":
+        results = await ScannerService.run_liquidity_hunt_scan(tickers, db)
+    else:
+        results = await ScannerService.run_pre_market_scan(tickers, db)
 
     execution_time = int((datetime.now() - start_time).total_seconds() * 1000)
 
@@ -56,6 +60,7 @@ async def run_scanner(
         stocks_scanned=len(tickers),
         events_detected=len(results),
         execution_time_ms=execution_time,
+        events=results,
     )
 
 

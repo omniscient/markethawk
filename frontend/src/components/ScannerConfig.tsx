@@ -3,15 +3,21 @@ import { Settings, Info } from 'lucide-react';
 
 interface ScannerConfigProps {
   configs: any[];
+  universes: any[];
   selectedConfig: string;
+  selectedUniverse: number | null;
   onConfigChange: (config: string) => void;
+  onUniverseChange: (universeId: number | null) => void;
   loading: boolean;
 }
 
 const ScannerConfig: React.FC<ScannerConfigProps> = ({
   configs,
+  universes,
   selectedConfig,
+  selectedUniverse,
   onConfigChange,
+  onUniverseChange,
   loading
 }) => {
   if (loading) {
@@ -27,6 +33,25 @@ const ScannerConfig: React.FC<ScannerConfigProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Universe Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Stock Universe
+        </label>
+        <select
+          value={selectedUniverse || ''}
+          onChange={(e) => onUniverseChange(e.target.value ? Number(e.target.value) : null)}
+          className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light focus:outline-none focus:ring-2 focus:ring-financial-blue focus:border-transparent mb-4"
+        >
+          <option value="">Select a universe...</option>
+          {universes?.map((universe) => (
+            <option key={universe.id} value={universe.id}>
+              {universe.name} ({universe.ticker_count || 0} tickers)
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* Scanner Type Selection */}
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -37,7 +62,9 @@ const ScannerConfig: React.FC<ScannerConfigProps> = ({
           onChange={(e) => onConfigChange(e.target.value)}
           className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light focus:outline-none focus:ring-2 focus:ring-financial-blue focus:border-transparent"
         >
-          {configs?.map((config) => (
+          <option value="pre_market_volume">Pre-market Volume</option>
+          <option value="liquidity_hunt">Pre-market Liquidity Hunt</option>
+          {configs?.filter(c => c.scanner_type !== 'pre_market_volume').map((config) => (
             <option key={config.scanner_type} value={config.scanner_type}>
               {config.name}
             </option>
