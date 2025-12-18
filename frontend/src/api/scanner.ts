@@ -81,6 +81,7 @@ export interface MarketStats {
 export const fetchScannerResults = async (params?: {
   ticker?: string;
   event_type?: string;
+  universe_id?: number | null;
   limit?: number;
   offset?: number;
 }): Promise<VolumeEvent[]> => {

@@ -68,6 +68,7 @@ async def run_scanner(
 async def get_scanner_results(
     ticker: Optional[str] = None,
     event_type: Optional[str] = None,
+    universe_id: Optional[int] = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -80,6 +81,13 @@ async def get_scanner_results(
 
     if event_type:
         query = query.filter(VolumeEvent.event_type == event_type)
+
+    if universe_id:
+        query = query.join(
+            MonitoredStock, 
+            (VolumeEvent.ticker == MonitoredStock.ticker) & 
+            (MonitoredStock.universe_id == universe_id)
+        )
 
     results = (
         query.order_by(VolumeEvent.created_at.desc()).limit(limit).offset(offset).all()

@@ -17,7 +17,7 @@ import ScannerConfig from '../components/ScannerConfig';
 import ScannerResults from '../components/ScannerResults';
 
 // API functions
-import { runScanner, fetchScannerConfigs, fetchStockUniverses, StockUniverse } from '../api/scanner';
+import { runScanner, fetchScannerConfigs, fetchStockUniverses, fetchScannerResults, StockUniverse } from '../api/scanner';
 
 const Scanner: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
@@ -36,6 +36,31 @@ const Scanner: React.FC = () => {
     queryKey: ['stockUniverses'],
     queryFn: fetchStockUniverses,
   });
+
+  // Auto-load existing results
+  const { data: existingResults } = useQuery({
+    queryKey: ['scannerResults', selectedUniverse, selectedConfig],
+    queryFn: () => fetchScannerResults({
+      universe_id: selectedUniverse,
+      event_type: selectedConfig === 'pre_market_volume_spike' ? 'pre_market_volume_spike' : 'liquidity_hunt',
+      limit: 100
+    }),
+    enabled: !!selectedUniverse && !!selectedConfig,
+  });
+
+  // Update scanResults when existingResults changes (if no manual scan run recently)
+  React.useEffect(() => {
+    if (existingResults && !isScanning) {
+      setScanResults({
+        scan_id: 'historical',
+        status: 'completed',
+        stocks_scanned: 0, // Unknown for historical
+        events_detected: existingResults.length,
+        execution_time_ms: 0,
+        events: existingResults
+      });
+    }
+  }, [existingResults, isScanning]);
 
   // Run scanner mutation
   const scannerMutation = useMutation({
