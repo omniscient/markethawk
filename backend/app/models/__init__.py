@@ -10,6 +10,8 @@ from app.models.scanner_config import ScannerConfig
 from app.models.ticker_reference import TickerReference
 from app.models.stock_metric import StockMetric
 from app.models.stock_aggregate import StockAggregate
+from app.models.news_article import NewsArticle
+from app.models.news_preference import NewsPreference
 
 __all__ = [
     "StockUniverse",
@@ -19,4 +21,6 @@ __all__ = [
     "TickerReference",
     "StockMetric",
     "StockAggregate",
+    "NewsArticle",
+    "NewsPreference",
 ]

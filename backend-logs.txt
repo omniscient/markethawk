@@ -1,0 +1,334 @@
+﻿docker : INFO:     ('172.18.0.1', 32912) - 
+"WebSocket /ws/news" 403
+At line:1 char:1
++ docker logs stockscanner-api --tail 200 2>&1 | 
+Out-File backend-logs. ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO:   
+      ('172...t /ws/news" 403:String) [], RemoteExc  
+  eption
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 32916) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 32926) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 45286) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 45290) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 45296) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 45308) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 47072) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 47080) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 55944) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 55946) - "WebSocket 
+/api/news/ws" [accepted]
+INFO:     connection open
+INFO:     ('172.18.0.1', 55958) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 55960) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 58586) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 58596) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 58600) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 58612) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 51112) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 51128) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 38524) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 38540) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 38556) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 38570) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 54000) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 54016) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 58370) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 58374) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 58388) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 58400) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 50926) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 50942) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 50948) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 50962) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 52644) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 52654) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 56496) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 56502) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 56506) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 52858) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 52872) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 52876) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 38188) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 38190) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 38204) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     172.18.0.3:50748 - "GET /api/scanner/results?limit=50 HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     ('172.18.0.1', 38220) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 39072) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 39074) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 39078) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 36696) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 36700) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 36706) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     ('172.18.0.1', 46276) - "WebSocket 
+/ws/news" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     connection closed
+INFO:     connection closed
+2026-03-23 13:34:18,650 - root - INFO - 
+[DEBUG SQL]:
+SELECT volume_events.id AS volume_events_id, 
+volume_events.uuid AS volume_events_uuid, 
+volume_events.ticker AS volume_events_ticker, 
+volume_events.event_date AS 
+volume_events_event_date, volume_events.event_type 
+AS volume_events_event_type, 
+volume_events.pre_market_volume AS 
+volume_events_pre_market_volume, 
+volume_events.regular_volume AS 
+volume_events_regular_volume, 
+volume_events.avg_volume_20d AS 
+volume_events_avg_volume_20d, 
+volume_events.avg_volume_50d AS 
+volume_events_avg_volume_50d, 
+volume_events.relative_volume AS 
+volume_events_relative_volume, 
+volume_events.volume_spike_ratio AS 
+volume_events_volume_spike_ratio, 
+volume_events.previous_close AS 
+volume_events_previous_close, 
+volume_events.pre_market_high AS 
+volume_events_pre_market_high, 
+volume_events.pre_market_low AS 
+volume_events_pre_market_low, 
+volume_events.opening_price AS 
+volume_events_opening_price, 
+volume_events.closing_price AS 
+volume_events_closing_price, 
+volume_events.price_change_pct AS 
+volume_events_price_change_pct, 
+volume_events.price_gap_pct AS 
+volume_events_price_gap_pct, 
+volume_events.criteria_met AS 
+volume_events_criteria_met, volume_events.news_count 
+AS volume_events_news_count, 
+volume_events.earnings_date AS 
+volume_events_earnings_date, 
+volume_events.market_cap_at_event AS 
+volume_events_market_cap_at_event, 
+volume_events.raw_data AS volume_events_raw_data, 
+volume_events.created_at AS 
+volume_events_created_at, volume_events.updated_at 
+AS volume_events_updated_at 
+FROM volume_events ORDER BY volume_events.created_at 
+DESC 
+ LIMIT 50 OFFSET 0;
+
+2026-03-23 13:34:18,704 - root - INFO - 
+[DEBUG SQL]:
+SELECT news_preferences.id AS news_preferences_id, 
+news_preferences.uuid AS news_preferences_uuid, 
+news_preferences.include_general_market AS 
+news_preferences_include_general_market, 
+news_preferences.tracked_tickers AS 
+news_preferences_tracked_tickers, 
+news_preferences.tracked_universes AS 
+news_preferences_tracked_universes, 
+news_preferences.created_at AS 
+news_preferences_created_at, 
+news_preferences.updated_at AS 
+news_preferences_updated_at 
+FROM news_preferences 
+ LIMIT 1;
+
+2026-03-23 13:34:18,705 - root - INFO - 
+[DEBUG SQL RAW]:
+SELECT stock_universes.id AS stock_universes_id, 
+stock_universes.uuid AS stock_universes_uuid, 
+stock_universes.name AS stock_universes_name, 
+stock_universes.description AS 
+stock_universes_description, 
+stock_universes.criteria AS 
+stock_universes_criteria, stock_universes.created_at 
+AS stock_universes_created_at, 
+stock_universes.updated_at AS 
+stock_universes_updated_at, 
+stock_universes.is_active AS 
+stock_universes_is_active 
+FROM stock_universes 
+WHERE stock_universes.is_active = true 
+Params: {}
+
+2026-03-23 13:34:18,707 - root - INFO - 
+[DEBUG SQL]:
+SELECT count(stock_universe_tickers.id) AS count_1 
+FROM stock_universe_tickers 
+WHERE stock_universe_tickers.universe_id = 6;
+
+2026-03-23 13:34:18,709 - root - INFO - 
+[DEBUG SQL]:
+SELECT count(stock_aggregates.id) AS count_1, 
+min(stock_aggregates.timestamp) AS min_1, 
+max(stock_aggregates.timestamp) AS max_1 
+FROM stock_aggregates JOIN stock_universe_tickers ON 
+stock_aggregates.ticker = 
+stock_universe_tickers.ticker 
+WHERE stock_universe_tickers.universe_id = 6 
+ LIMIT 1;
+
+INFO:     ('172.18.0.1', 46304) - "WebSocket 
+/api/news/ws" [accepted]
+INFO:     connection open
+INFO:     ('172.18.0.1', 46310) - "WebSocket 
+/api/news/ws" [accepted]
+INFO:     connection open
+WARNING:  WatchFiles detected changes in 
+'app/models/news_preference.py'. Reloading...
+INFO:     Shutting down
+INFO:     connection closed
+INFO:     connection closed
+INFO:     Waiting for background tasks to complete. 
+(CTRL+C to force quit)
+INFO:     172.18.0.3:50758 - "GET /api/universe/list HTTP/1.1" 200 OK
+INFO:     172.18.0.1:46292 - "GET /api/news/preferences HTTP/1.1" 200 OK

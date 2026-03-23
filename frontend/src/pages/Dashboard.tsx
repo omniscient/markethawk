@@ -16,6 +16,8 @@ import MetricCard from '../components/ui/MetricCard';
 import Chart from '../components/ui/Chart';
 import AlertList from '../components/AlertList';
 import RecentEvents from '../components/RecentEvents';
+import NewsFeed from '../components/NewsFeed';
+import NewsSettings from '../components/NewsSettings';
 
 // API functions
 import { fetchScannerResults, fetchMarketStats } from '../api/scanner';
@@ -43,6 +45,14 @@ const Dashboard: React.FC = () => {
   }
 
   const recentEvents = scannerResults?.slice(0, 10) || [];
+  const recentAlerts = (scannerResults?.slice(0, 5) || []).map((event: any) => ({
+    id: event.uuid || String(event.id),
+    ticker: event.ticker,
+    type: event.event_type === 'volume_spike' ? 'volume_spike' : 'price_movement',
+    message: `${event.ticker} triggered a ${event.event_type || 'scanner'} alert with ${(event.relative_volume || 0).toFixed(1)}x relative volume.`,
+    timestamp: event.created_at || event.event_date || new Date().toISOString(),
+    severity: (event.relative_volume || 0) > 5 ? 'high' : ((event.relative_volume || 0) > 3 ? 'medium' : 'low'),
+  }));
   const totalEvents = scannerResults?.length || 0;
   const todayEvents = scannerResults?.filter(
     (event: any) => event.event_date === format(new Date(), 'yyyy-MM-dd')
@@ -114,7 +124,7 @@ const Dashboard: React.FC = () => {
         {/* Recent Alerts */}
         <div>
           <Card title="Recent Alerts" icon={Bell as any}>
-            <AlertList alerts={recentEvents as any} />
+            <AlertList alerts={recentAlerts as any} />
           </Card>
         </div>
       </div>
@@ -146,6 +156,16 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </Card>
+      </div>
+
+      {/* News Feed Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <NewsFeed />
+        </div>
+        <div>
+          <NewsSettings />
+        </div>
       </div>
     </div>
   );

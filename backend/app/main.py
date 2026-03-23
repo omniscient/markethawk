@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.routers import health_router, scanner_router, universe_router, stocks_router
+from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router
 from app.core.celery_app import celery_app as celery
 
 # Celery Configuration
@@ -101,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(scanner_router)
     app.include_router(universe_router)
     app.include_router(stocks_router)
+    app.include_router(news_router)
 
     # Startup event
     @app.on_event("startup")

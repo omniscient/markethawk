@@ -11,6 +11,10 @@ from app.core.config import settings
 from app.models.ticker_reference import TickerReference
 from app.models.stock_aggregate import StockAggregate
 from app.services.stock_data import StockDataService
+from app.models.news_preference import NewsPreference
+from app.models.news_article import NewsArticle
+from app.models.monitored_stock import MonitoredStock
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -323,5 +327,108 @@ def sync_stock_aggregates(
         logger.error(f"❌ Error syncing aggregates for {ticker}: {e}")
         db.rollback()
         raise self.retry(exc=e, countdown=60)
+    finally:
+        db.close()
+
+@celery_app.task(bind=True, max_retries=3)
+def poll_massive_news(self, limit: int = 50):
+    """
+    Celery task to poll Polygon.io News API based on NewsPreference settings.
+    Dispatches events via Redis PubSub for real-time frontend updates.
+    """
+    db: Session = SessionLocal()
+    try:
+        pref = db.query(NewsPreference).first()
+        if not pref:
+            logger.info("No NewsPreference found. Skipping poll.")
+            return
+
+        now = datetime.utcnow()
+        if pref.last_polled_at:
+            delta_minutes = (now - pref.last_polled_at).total_seconds() / 60.0
+            if delta_minutes < pref.refresh_interval_minutes:
+                # Not enough time has passed
+                return
+        
+        # Build list of tickers
+        tickers_to_poll = set()
+        if pref.tracked_tickers:
+            tickers_to_poll.update(pref.tracked_tickers)
+        
+        if pref.tracked_universes:
+            db_tickers = db.query(MonitoredStock.ticker).filter(
+                MonitoredStock.universe_id.in_(pref.tracked_universes)
+            ).all()
+            for (t,) in db_tickers:
+                tickers_to_poll.add(t)
+
+        r = redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+        def fetch_category(query_params: dict):
+            url = "https://api.polygon.io/v2/reference/news"
+            headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
+            with httpx.Client(timeout=30.0) as client:
+                response = client.get(url, headers=headers, params=query_params)
+                if response.status_code == 429:
+                     logger.warning("Rate limit hit polling news.")
+                     return
+                response.raise_for_status()
+                data = response.json()
+            
+            results = data.get("results", [])
+            new_articles = 0
+            for item in reversed(results): # Process oldest to newest
+                article_url = item.get("article_url")
+                if db.query(NewsArticle).filter(NewsArticle.article_url == article_url).first():
+                     continue 
+                     
+                pub_utc = item.get("published_utc")
+                dt = datetime.strptime(pub_utc.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z") if pub_utc else datetime.utcnow()
+                dt = dt.replace(tzinfo=None)
+
+                article = NewsArticle(
+                    title=item.get("title", ""),
+                    author=item.get("author"),
+                    published_utc=dt,
+                    article_url=article_url,
+                    image_url=item.get("image_url"),
+                    description=item.get("description"),
+                    provider=item.get("publisher", {}).get("name"),
+                    tickers=item.get("tickers", [])
+                )
+                db.add(article)
+                db.commit()
+                db.refresh(article)
+                new_articles += 1
+
+                msg = {
+                    "id": article.id,
+                    "title": article.title,
+                    "author": article.author,
+                    "published_utc": pub_utc,
+                    "article_url": article.article_url,
+                    "image_url": article.image_url,
+                    "description": article.description,
+                    "provider": article.provider,
+                    "tickers": article.tickers
+                }
+                r.publish("news_updates", json.dumps(msg))
+            if new_articles > 0:
+                logger.info(f"Polled news params={query_params}. Found {new_articles} new articles.")
+
+        if pref.include_general_market:
+            fetch_category({"limit": limit, "order": "desc"})
+        
+        if tickers_to_poll:
+            for t in tickers_to_poll:
+                fetch_category({"ticker": t, "limit": 5, "order": "desc"})
+                
+        # Update last_polled_at
+        pref.last_polled_at = now
+        db.commit()
+        
+    except Exception as e:
+        logger.error(f"Error polling news: {e}")
+        db.rollback()
     finally:
         db.close()

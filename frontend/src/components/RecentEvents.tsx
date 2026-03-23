@@ -49,7 +49,7 @@ const RecentEvents: React.FC<RecentEventsProps> = ({ events, maxItems = 10 }) =>
         <div className="col-span-2">Gap %</div>
         <div className="col-span-2">Status</div>
       </div>
-      
+
       {displayEvents.map((event) => (
         <div
           key={event.id}
@@ -58,51 +58,50 @@ const RecentEvents: React.FC<RecentEventsProps> = ({ events, maxItems = 10 }) =>
           <div className="col-span-2">
             <span className="font-medium text-financial-light">{event.ticker}</span>
           </div>
-          
+
           <div className="col-span-2 text-sm text-gray-400">
             {format(new Date(event.event_date), 'MMM d')}
           </div>
-          
+
           <div className="col-span-2">
             <div className="flex items-center space-x-1">
               <TrendingUp className="h-4 w-4 text-positive" />
               <span className="text-positive font-medium">
-                {event.volume_spike_ratio}x
+                {event.volume_spike_ratio ?? 0}x
               </span>
             </div>
           </div>
-          
+
           <div className="col-span-2">
             <span className="text-financial-light font-medium">
-              {event.relative_volume.toFixed(1)}x
+              {(event.relative_volume ?? 0).toFixed(1)}x
             </span>
           </div>
-          
+
           <div className="col-span-2">
-            {event.price_gap_pct > 0 ? (
+            {(event.price_gap_pct ?? 0) > 0 ? (
               <div className="flex items-center space-x-1">
                 <TrendingUp className="h-4 w-4 text-positive" />
                 <span className="text-positive font-medium">
-                  +{event.price_gap_pct.toFixed(1)}%
+                  +{(event.price_gap_pct ?? 0).toFixed(1)}%
                 </span>
               </div>
             ) : (
               <div className="flex items-center space-x-1">
                 <TrendingDown className="h-4 w-4 text-negative" />
                 <span className="text-negative font-medium">
-                  {event.price_gap_pct.toFixed(1)}%
+                  {(event.price_gap_pct ?? 0).toFixed(1)}%
                 </span>
               </div>
             )}
           </div>
-          
+
           <div className="col-span-2">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${
-              Object.values(event.criteria_met).every(Boolean)
+            <span className={`px-2 py-1 rounded text-xs font-medium ${Object.values(event.criteria_met || {}).every(Boolean)
                 ? 'bg-green-500/20 text-green-400'
                 : 'bg-yellow-500/20 text-yellow-400'
-            }`}>
-              {Object.values(event.criteria_met).every(Boolean) ? 'All Met' : 'Partial'}
+              }`}>
+              {Object.values(event.criteria_met || {}).every(Boolean) ? 'All Met' : 'Partial'}
             </span>
           </div>
         </div>
