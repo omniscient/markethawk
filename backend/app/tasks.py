@@ -367,6 +367,11 @@ def poll_massive_news(self, limit: int = 50):
         def fetch_category(query_params: dict):
             url = "https://api.polygon.io/v2/reference/news"
             headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
+            
+            # Ensure we don't fetch archaic news
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            query_params["published_utc.gte"] = seven_days_ago.strftime("%Y-%m-%d")
+
             with httpx.Client(timeout=30.0) as client:
                 response = client.get(url, headers=headers, params=query_params)
                 if response.status_code == 429:
@@ -385,6 +390,9 @@ def poll_massive_news(self, limit: int = 50):
                 pub_utc = item.get("published_utc")
                 dt = datetime.strptime(pub_utc.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z") if pub_utc else datetime.utcnow()
                 dt = dt.replace(tzinfo=None)
+
+                if dt < seven_days_ago:
+                    continue
 
                 article = NewsArticle(
                     title=item.get("title", ""),
@@ -405,7 +413,7 @@ def poll_massive_news(self, limit: int = 50):
                     "id": article.id,
                     "title": article.title,
                     "author": article.author,
-                    "published_utc": pub_utc,
+                    "published_utc": dt.isoformat(),
                     "article_url": article.article_url,
                     "image_url": article.image_url,
                     "description": article.description,

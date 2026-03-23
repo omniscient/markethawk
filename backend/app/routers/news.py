@@ -52,10 +52,10 @@ def update_news_preferences(
 
 @router.get("/recent", response_model=List[NewsArticleResponse])
 def get_recent_news(db: Session = Depends(get_db)):
-    """Get news from the last 60 minutes."""
-    one_hour_ago = datetime.utcnow() - timedelta(minutes=60)
-    # Order descending so newest is first
-    articles = db.query(NewsArticle).filter(NewsArticle.published_utc >= one_hour_ago).order_by(NewsArticle.published_utc.desc()).limit(100).all()
+    """Get the latest 100 news articles."""
+    # We no longer enforce a strict 60-minute cutoff because if market news is slow, 
+    # it results in a completely blank dashboard. The DB already drops news older than 7 days.
+    articles = db.query(NewsArticle).order_by(NewsArticle.published_utc.desc()).limit(100).all()
     return articles
 
 from fastapi import WebSocket, WebSocketDisconnect
