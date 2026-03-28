@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   TrendingUp,
@@ -23,10 +23,13 @@ import NewsSettings from '../components/NewsSettings';
 import { fetchScannerResults, fetchMarketStats } from '../api/scanner';
 
 const Dashboard: React.FC = () => {
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
   // Fetch recent scanner results
   const { data: scannerResults, isLoading: loadingResults } = useQuery({
-    queryKey: ['scannerResults', { limit: 50 }],
-    queryFn: () => fetchScannerResults({ limit: 50 }),
+    queryKey: ['scannerResults', { limit: 50, sortBy, sortOrder }],
+    queryFn: () => fetchScannerResults({ limit: 50, sort_by: sortBy, sort_order: sortOrder }),
     refetchInterval: 60000, // Refetch every minute
   });
 
@@ -145,7 +148,19 @@ const Dashboard: React.FC = () => {
       {/* Recent Events Table */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="Recent Volume Events" icon={Activity as any}>
-          <RecentEvents events={recentEvents as any} />
+          <RecentEvents 
+            events={recentEvents as any} 
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSort={(column) => {
+              if (column === sortBy) {
+                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              } else {
+                setSortBy(column);
+                setSortOrder('desc');
+              }
+            }}
+          />
         </Card>
 
         {/* Market Overview */}

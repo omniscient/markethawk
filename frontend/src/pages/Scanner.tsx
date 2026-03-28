@@ -24,6 +24,8 @@ const Scanner: React.FC = () => {
   const [selectedConfig, setSelectedConfig] = useState<string>('pre_market_volume');
   const [selectedUniverse, setSelectedUniverse] = useState<number | null>(null);
   const [scanResults, setScanResults] = useState<any>(null);
+  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Fetch scanner configurations
   const { data: configs, isLoading: loadingConfigs } = useQuery({
@@ -39,10 +41,12 @@ const Scanner: React.FC = () => {
 
   // Auto-load existing results
   const { data: existingResults } = useQuery({
-    queryKey: ['scannerResults', selectedUniverse, selectedConfig],
+    queryKey: ['scannerResults', selectedUniverse, selectedConfig, sortBy, sortOrder],
     queryFn: () => fetchScannerResults({
       universe_id: selectedUniverse,
       event_type: selectedConfig === 'pre_market_volume_spike' ? 'pre_market_volume_spike' : 'liquidity_hunt',
+      sort_by: sortBy,
+      sort_order: sortOrder,
       limit: 100
     }),
     enabled: !!selectedUniverse && !!selectedConfig,
@@ -215,7 +219,19 @@ const Scanner: React.FC = () => {
       {/* Results */}
       {scanResults && (
         <div className="animate-slide-up">
-          <ScannerResults results={scanResults} />
+          <ScannerResults 
+            results={scanResults} 
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSort={(column) => {
+              if (column === sortBy) {
+                setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              } else {
+                setSortBy(column);
+                setSortOrder('desc');
+              }
+            }}
+          />
         </div>
       )}
 

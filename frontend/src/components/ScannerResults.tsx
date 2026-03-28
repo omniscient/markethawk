@@ -5,6 +5,8 @@ import {
   Download,
   Eye,
   Filter,
+  ChevronUp,
+  ChevronDown,
   Search
 } from 'lucide-react';
 import Card from './ui/Card';
@@ -18,9 +20,17 @@ interface ScannerResultsProps {
     execution_time_ms: number;
     events?: any[];
   };
+  onSort?: (column: string) => void;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
-const ScannerResults: React.FC<ScannerResultsProps> = ({ results }) => {
+const ScannerResults: React.FC<ScannerResultsProps> = ({ 
+  results, 
+  onSort, 
+  sortBy, 
+  sortOrder 
+}) => {
   const [filterTicker, setFilterTicker] = useState('');
   const [minVolumeSpike, setMinVolumeSpike] = useState(0);
 
@@ -107,12 +117,48 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({ results }) => {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-700">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Date</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Ticker</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Volume Spike</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Rel Volume</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Gap %</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Pre-Market Vol</th>
+                <SortableHeader 
+                  label="Date" 
+                  sortKey="event_date" 
+                  currentSort={sortBy} 
+                  currentOrder={sortOrder} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Ticker" 
+                  sortKey="ticker" 
+                  currentSort={sortBy} 
+                  currentOrder={sortOrder} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Volume Spike" 
+                  sortKey="volume_spike_ratio" 
+                  currentSort={sortBy} 
+                  currentOrder={sortOrder} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Rel Volume" 
+                  sortKey="relative_volume" 
+                  currentSort={sortBy} 
+                  currentOrder={sortOrder} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Gap %" 
+                  sortKey="price_gap_pct" 
+                  currentSort={sortBy} 
+                  currentOrder={sortOrder} 
+                  onSort={onSort} 
+                />
+                <SortableHeader 
+                  label="Pre-Market Vol" 
+                  sortKey="pre_market_volume" 
+                  currentSort={sortBy} 
+                  currentOrder={sortOrder} 
+                  onSort={onSort} 
+                />
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Criteria</th>
               </tr>
             </thead>
@@ -182,6 +228,43 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({ results }) => {
         </div>
       )}
     </Card>
+  );
+};
+
+interface SortableHeaderProps {
+  label: string;
+  sortKey: string;
+  currentSort?: string;
+  currentOrder?: 'asc' | 'desc';
+  onSort?: (key: string) => void;
+}
+
+const SortableHeader: React.FC<SortableHeaderProps> = ({ 
+  label, 
+  sortKey, 
+  currentSort, 
+  currentOrder, 
+  onSort 
+}) => {
+  const isActive = currentSort === sortKey;
+  
+  return (
+    <th 
+      className="text-left py-3 px-4 text-sm font-medium text-gray-400 cursor-pointer hover:text-financial-light transition-colors group"
+      onClick={() => onSort?.(sortKey)}
+    >
+      <div className="flex items-center space-x-1">
+        <span>{label}</span>
+        <div className="flex flex-col">
+          <ChevronUp 
+            className={`h-3 w-3 -mb-1 ${isActive && currentOrder === 'asc' ? 'text-financial-blue' : 'text-gray-600 group-hover:text-gray-400'}`} 
+          />
+          <ChevronDown 
+            className={`h-3 w-3 ${isActive && currentOrder === 'desc' ? 'text-financial-blue' : 'text-gray-600 group-hover:text-gray-400'}`} 
+          />
+        </div>
+      </div>
+    </th>
   );
 };
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, Activity, ChevronUp, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Event {
@@ -16,19 +16,19 @@ interface Event {
 interface RecentEventsProps {
   events: Event[];
   maxItems?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  onSort?: (column: string) => void;
 }
 
-const RecentEvents: React.FC<RecentEventsProps> = ({ events, maxItems = 10 }) => {
+const RecentEvents: React.FC<RecentEventsProps> = ({ 
+  events, 
+  maxItems = 10,
+  sortBy,
+  sortOrder,
+  onSort
+}) => {
   const displayEvents = events.slice(0, maxItems);
-
-  const formatVolume = (volume: number) => {
-    if (volume >= 1000000) {
-      return `${(volume / 1000000).toFixed(1)}M`;
-    } else if (volume >= 1000) {
-      return `${(volume / 1000).toFixed(1)}K`;
-    }
-    return volume.toString();
-  };
 
   if (displayEvents.length === 0) {
     return (
@@ -42,11 +42,46 @@ const RecentEvents: React.FC<RecentEventsProps> = ({ events, maxItems = 10 }) =>
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-gray-400 border-b border-gray-700">
-        <div className="col-span-2">Ticker</div>
-        <div className="col-span-2">Date</div>
-        <div className="col-span-2">Volume Spike</div>
-        <div className="col-span-2">Rel Volume</div>
-        <div className="col-span-2">Gap %</div>
+        <SortableGridHeader 
+          label="Ticker" 
+          sortKey="ticker" 
+          currentSort={sortBy} 
+          currentOrder={sortOrder} 
+          onSort={onSort} 
+          className="col-span-2"
+        />
+        <SortableGridHeader 
+          label="Date" 
+          sortKey="event_date" 
+          currentSort={sortBy} 
+          currentOrder={sortOrder} 
+          onSort={onSort} 
+          className="col-span-2"
+        />
+        <SortableGridHeader 
+          label="Volume Spike" 
+          sortKey="volume_spike_ratio" 
+          currentSort={sortBy} 
+          currentOrder={sortOrder} 
+          onSort={onSort} 
+          className="col-span-2"
+        />
+        <SortableGridHeader 
+          label="Rel Volume" 
+          sortKey="relative_volume" 
+          currentSort={sortBy} 
+          currentOrder={sortOrder} 
+          onSort={onSort} 
+          className="col-span-2"
+        />
+        <SortableGridHeader 
+          label="Gap %" 
+          sortKey="price_gap_pct" 
+          currentSort={sortBy} 
+          currentOrder={sortOrder} 
+          onSort={onSort} 
+          className="col-span-2"
+        />
         <div className="col-span-2">Status</div>
       </div>
 
@@ -106,6 +141,45 @@ const RecentEvents: React.FC<RecentEventsProps> = ({ events, maxItems = 10 }) =>
           </div>
         </div>
       ))}
+    </div>
+  );
+};
+
+interface SortableGridHeaderProps {
+  label: string;
+  sortKey: string;
+  currentSort?: string;
+  currentOrder?: 'asc' | 'desc';
+  onSort?: (key: string) => void;
+  className?: string;
+}
+
+const SortableGridHeader: React.FC<SortableGridHeaderProps> = ({ 
+  label, 
+  sortKey, 
+  currentSort, 
+  currentOrder, 
+  onSort,
+  className = ""
+}) => {
+  const isActive = currentSort === sortKey;
+  
+  return (
+    <div 
+      className={`${className} cursor-pointer hover:text-financial-light transition-colors group select-none`}
+      onClick={() => onSort?.(sortKey)}
+    >
+      <div className="flex items-center space-x-1">
+        <span>{label}</span>
+        <div className="flex flex-col">
+          <ChevronUp 
+            className={`h-2.5 w-2.5 -mb-0.5 ${isActive && currentOrder === 'asc' ? 'text-financial-blue' : 'text-gray-600 group-hover:text-gray-400'}`} 
+          />
+          <ChevronDown 
+            className={`h-2.5 w-2.5 ${isActive && currentOrder === 'desc' ? 'text-financial-blue' : 'text-gray-600 group-hover:text-gray-400'}`} 
+          />
+        </div>
+      </div>
     </div>
   );
 };

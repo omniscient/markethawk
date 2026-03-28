@@ -82,6 +82,8 @@ export const fetchScannerResults = async (params?: {
   ticker?: string;
   event_type?: string;
   universe_id?: number | null;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
 }): Promise<VolumeEvent[]> => {

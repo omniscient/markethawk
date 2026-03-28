@@ -69,6 +69,8 @@ async def get_scanner_results(
     ticker: Optional[str] = None,
     event_type: Optional[str] = None,
     universe_id: Optional[int] = None,
+    sort_by: Optional[str] = "created_at",
+    sort_order: Optional[str] = "desc",
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -89,8 +91,25 @@ async def get_scanner_results(
             (MonitoredStock.universe_id == universe_id)
         )
 
+    # Sorting logic
+    try:
+        if sort_by:
+            # Map frontend names to model fields if necessary
+            # For now, assume they match or handle specifically
+            sort_attr = getattr(VolumeEvent, sort_by, VolumeEvent.created_at)
+            
+            if sort_order.lower() == "desc":
+                query = query.order_by(sort_attr.desc())
+            else:
+                query = query.order_by(sort_attr.asc())
+        else:
+            query = query.order_by(VolumeEvent.created_at.desc())
+    except Exception:
+        # Fallback to default sorting if attribute is invalid
+        query = query.order_by(VolumeEvent.created_at.desc())
+
     results = (
-        query.order_by(VolumeEvent.created_at.desc()).limit(limit).offset(offset).all()
+        query.limit(limit).offset(offset).all()
     )
 
     return results
