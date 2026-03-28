@@ -58,15 +58,14 @@ def get_recent_news(
     query = db.query(NewsArticle)
     
     if ticker:
-        # Use JSON_CONTAINS to check if the ticker is in the tickers list
-        from sqlalchemy import func
-        # Note: Depending on the DB (SQLite vs PostgreSQL), the syntax for JSON filtering varies.
-        # This project seems to use SQLite for tests and potentially PG for prod.
-        # Let's check the database-schema.sql or main.py to be sure.
-        # For now, I'll use a more generic approach or check the DB type.
-        query = query.filter(NewsArticle.tickers.contains([ticker.upper()]))
+        # Extremely robust filtering for both JSON and JSONB type across different databases
+        # Using string search on the JSON representation is the most universal fallback
+        from sqlalchemy import String, cast
+        query = query.filter(cast(NewsArticle.tickers, String).contains(f'"{ticker.upper()}"'))
+
 
     articles = query.order_by(NewsArticle.published_utc.desc()).limit(100).all()
+
     return articles
 
 from fastapi import WebSocket, WebSocketDisconnect

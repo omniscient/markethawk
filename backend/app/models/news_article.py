@@ -4,6 +4,7 @@ NewsArticle SQLAlchemy model.
 
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, Uuid as UUID
+from sqlalchemy.dialects.postgresql import JSONB
 import uuid
 
 from app.core.database import Base
@@ -24,6 +25,7 @@ class NewsArticle(Base):
     description = Column(Text)
     provider = Column(String(100))
     # JSON list of ticker strings that this article is about
-    tickers = Column(JSON, default=list)
+    # Using JSONB for Postgres to support indexed contains() checks
+    tickers = Column(JSON().with_variant(JSONB, "postgresql"), default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

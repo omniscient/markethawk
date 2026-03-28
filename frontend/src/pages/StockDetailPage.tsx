@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   ArrowLeft, 
   Activity, 
@@ -22,13 +22,30 @@ import RecentEvents from '../components/RecentEvents';
 import NewsFeed from '../components/NewsFeed';
 
 // API
-import { fetchStockDetails } from '../api/stocks';
+import { fetchStockDetails, refreshStockData } from '../api/stocks';
 import { fetchScannerResults, fetchHistoricalData } from '../api/scanner';
 import { fetchRecentNews } from '../api/news';
 
 const StockDetailPage: React.FC = () => {
   const { ticker } = useParams<{ ticker: string }>();
   const symbol = ticker?.toUpperCase() || '';
+  const [period, setPeriod] = React.useState('1y');
+  const [timespan, setTimespan] = React.useState('day');
+  const queryClient = useQueryClient();
+
+  // 0. Refresh Data on Mount
+  const refreshMutation = useMutation({
+    mutationFn: (sym: string) => refreshStockData(sym, timespan),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
+    }
+  });
+
+  React.useEffect(() => {
+    if (symbol) {
+      refreshMutation.mutate(symbol);
+    }
+  }, [symbol, timespan]);
 
   // 1. Consolidated Details (Fundamentals, Pre-market)
   const { data: details, isLoading: loadingDetails } = useQuery({
@@ -37,10 +54,10 @@ const StockDetailPage: React.FC = () => {
     enabled: !!symbol,
   });
 
-  // 2. Historical Data (Daily)
-  const { data: historicalResponse, isLoading: loadingHistorical } = useQuery({
-    queryKey: ['historicalData', symbol, '30d'],
-    queryFn: () => fetchHistoricalData(symbol, '30d'),
+  // 2. Historical Data (Variable Period)
+  const { data: historicalResponse, isLoading: loadingHistorical, isFetching: fetchingHistorical } = useQuery({
+    queryKey: ['historicalData', symbol, period, timespan],
+    queryFn: () => fetchHistoricalData(symbol, period, timespan),
     enabled: !!symbol,
   });
 
@@ -117,17 +134,61 @@ const StockDetailPage: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           {/* Daily Price Chart */}
           <Card 
-            title="Daily Performance (30D)" 
-            subtitle="Closing price history"
+            title={`Performance History (${period})`} 
+            subtitle={`${timespan === 'day' ? 'Daily' : 'Intraday'} candlestick chart`}
             icon={BarChart2 as any}
+            actions={
+              <div className="flex space-x-2">
+                <div className="flex space-x-1 p-1 bg-gray-900 rounded-lg">
+                  {['minute', 'hour', 'day'].map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTimespan(t)}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
+                        timespan === t 
+                          ? 'bg-financial-blue text-white shadow-lg' 
+                          : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      {t === 'minute' ? '1M' : t === 'hour' ? '1H' : '1D'}
+                    </button>
+                  ))}
+
+                </div>
+                <div className="flex space-x-1 p-1 bg-gray-900 rounded-lg">
+                  {['30d', '90d', '1y', '2y'].map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPeriod(p)}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
+                        period === p 
+                          ? 'bg-financial-blue text-white shadow-lg' 
+                          : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      {p.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            }
           >
-            <Chart
-              data={historicalData}
-              type="candlestick"
-              xKey="Date"
-              height={500}
-            />
+
+            {(loadingHistorical || (fetchingHistorical && !historicalData.length)) ? (
+              <div className="flex flex-col items-center justify-center h-[500px] bg-gray-900/50 rounded-lg">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-financial-blue mb-4"></div>
+                <p className="text-gray-500 font-medium">Fetching historical data...</p>
+              </div>
+            ) : (
+              <Chart
+                data={historicalData}
+                type="candlestick"
+                xKey="Date"
+                height={500}
+              />
+            )}
           </Card>
+
 
           {/* Key Statistics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -29,7 +29,14 @@ export interface StockDetailConsolidated {
   last_updated: string;
 }
 
-export const fetchStockDetails = async (ticker: string): Promise<StockDetailConsolidated> => {
+export const fetchStockDetails = async (ticker: string) : Promise<StockDetailConsolidated> => {
   const response = await apiClient.get(`/stocks/details/${ticker}`);
+  return response.data;
+};
+
+export const refreshStockData = async (ticker: string, timespan: string = 'day'): Promise<any> => {
+  const response = await apiClient.post(`/stocks/refresh/${ticker}`, null, {
+    params: { timespan }
+  });
   return response.data;
 };

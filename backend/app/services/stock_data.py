@@ -9,7 +9,13 @@ from typing import Dict, Any, Optional
 import pandas as pd
 from polygon import RESTClient
 
+import pandas as pd
+from polygon import RESTClient
+from sqlalchemy.orm import Session
+from sqlalchemy import func, desc
+
 from app.core.config import settings
+from app.models.stock_aggregate import StockAggregate
 
 
 # Initialize Polygon client
@@ -147,6 +153,183 @@ class StockDataService:
         except Exception as e:
             logging.error(f"Error fetching stock info for {ticker}: {e}")
             return {}
+
+    @staticmethod
+    async def get_historical_from_db(
+        db: Session,
+        ticker: str,
+        period: str = "30d",
+        timespan: str = "day",
+        multiplier: int = 1
+    ) -> pd.DataFrame:
+        """Fetch historical data from the local database."""
+        try:
+            # Calculate start date based on period
+            days = 30
+            if period.endswith("d"):
+                days = int(period[:-1])
+            elif period.endswith("y"):
+                days = int(period[:-1]) * 365
+            elif period.endswith("w"):
+                days = int(period[:-1]) * 7
+            elif period.isdigit():
+                days = int(period)
+            
+            start_date = datetime.now() - timedelta(days=days)
+            
+            # Query DB
+            query = db.query(StockAggregate).filter(
+                StockAggregate.ticker == ticker,
+                StockAggregate.timespan == timespan,
+                StockAggregate.multiplier == multiplier,
+                StockAggregate.timestamp >= start_date
+            ).order_by(StockAggregate.timestamp.asc())
+            
+            results = query.all()
+            
+            if not results:
+                return pd.DataFrame()
+            
+            # Convert to DataFrame
+            data = []
+            for r in results:
+                data.append({
+                    "Date": r.timestamp,
+                    "Open": float(r.open),
+                    "High": float(r.high),
+                    "Low": float(r.low),
+                    "Close": float(r.close),
+                    "Volume": int(r.volume),
+                    "vwap": float(r.vwap) if r.vwap else None,
+                    "transactions": r.transactions
+                })
+            
+            df = pd.DataFrame(data)
+            df.set_index("Date", inplace=True)
+            return df
+            
+        except Exception as e:
+            logging.error(f"Error fetching historical data from DB for {ticker}: {e}")
+            return pd.DataFrame()
+
+    @staticmethod
+    async def refresh_stock_data(
+        db: Session,
+        ticker: str,
+        timespan: str = "day",
+        multiplier: int = 1,
+        full_history: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Refresh stock data from Polygon to DB incrementally.
+        Pokes the DB to find the last available date and fetches the delta.
+        """
+        try:
+            if not polygon_client:
+                return {"status": "error", "message": "Polygon client not initialized"}
+
+            ticker = ticker.upper()
+            
+            # 1. Determine from_date
+            last_entry = db.query(func.max(StockAggregate.timestamp)).filter(
+                StockAggregate.ticker == ticker,
+                StockAggregate.timespan == timespan,
+                StockAggregate.multiplier == multiplier
+            ).scalar()
+            
+            now = datetime.now()
+            
+            if last_entry and not full_history:
+                # Start from one unit after the last entry
+                # For daily, +1 day. For minute, +1 minute.
+                if timespan == "day":
+                    from_date_dt = last_entry + timedelta(days=1)
+                elif timespan == "minute":
+                    from_date_dt = last_entry + timedelta(minutes=1)
+                else:
+                    from_date_dt = last_entry + timedelta(seconds=1)
+            else:
+                # Full history requested or no entries
+                if timespan == "day":
+                    # Go back 2 years for daily full history
+                    from_date_dt = now - timedelta(days=365 * 2)
+                else:
+                    # Generic fallback (e.g. 7 days for minute data)
+                    from_date_dt = now - timedelta(days=7)
+            
+            from_date = from_date_dt.strftime("%Y-%m-%d")
+            to_date = now.strftime("%Y-%m-%d")
+            
+            if from_date_dt.date() > now.date() and timespan == "day":
+                return {"status": "success", "message": "Already up to date", "added": 0}
+
+            # 2. Fetch from Polygon
+            logging.info(f"🔄 Refreshing {ticker} {timespan} data from {from_date} to {to_date}")
+            
+            # This is essentially what sync_stock_aggregates task does
+            # We call the service method directly here for synchronous response
+            aggs = await StockDataService.get_aggregates(
+                ticker=ticker,
+                multiplier=multiplier,
+                timespan=timespan,
+                from_date=from_date,
+                to_date=to_date,
+                limit=50000
+            )
+            
+            if not aggs:
+                return {"status": "success", "message": "No new data found", "added": 0}
+            
+            # 3. Store in DB
+            new_records = []
+            for agg in aggs:
+                ts = agg['timestamp']
+                
+                # Check for duplicates if we didn't start strictly after
+                # (Polygon API from_date is inclusive)
+                if last_entry and ts <= last_entry:
+                    continue
+                
+                # Extended hours logic (copied from tasks.py)
+                hour = ts.hour
+                minute = ts.minute
+                is_pre_market = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
+                is_after_market = (hour >= 16 and hour < 20)
+                
+                record = StockAggregate(
+                    ticker=ticker,
+                    timestamp=ts,
+                    multiplier=multiplier,
+                    timespan=timespan,
+                    open=agg['open'],
+                    high=agg['high'],
+                    low=agg['low'],
+                    close=agg['close'],
+                    volume=agg['volume'],
+                    vwap=agg['vwap'],
+                    transactions=agg['transactions'],
+                    is_pre_market=is_pre_market,
+                    is_after_market=is_after_market
+                )
+                new_records.append(record)
+            
+            if new_records:
+                db.bulk_save_objects(new_records)
+                db.commit()
+                logging.info(f"✅ Saved {len(new_records)} new aggregates for {ticker}")
+            
+            return {
+                "status": "success",
+                "message": f"Refreshed {len(new_records)} records",
+                "added": len(new_records),
+                "from_date": from_date,
+                "to_date": to_date
+            }
+
+        except Exception as e:
+            logging.error(f"Error refreshing data for {ticker}: {e}")
+            db.rollback()
+            return {"status": "error", "message": str(e)}
 
     @staticmethod
     async def get_aggregates(

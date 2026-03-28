@@ -17,11 +17,30 @@ router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 async def get_historical_data(
     ticker: str,
     period: str = "30d",
+    timespan: str = "day",
+    multiplier: int = 1,
     db: Session = Depends(get_db),
 ):
-    """Get historical stock data."""
+    """Get historical stock data from DB, fallback to Polygon."""
+    ticker = ticker.upper()
     try:
-        data = await StockDataService.get_historical_data(ticker.upper(), period)
+        # 1. Try to fetch from DB first
+        data = await StockDataService.get_historical_from_db(
+            db, ticker, period, timespan, multiplier
+        )
+
+        # 2. If NO data in DB at all, we might want to trigger a sync or fetch once from Polygon
+        # But the user wants a specific 'refresh' call, so let's just return what we have
+        # Or if it's empty, we can do a one-time fetch.
+        if data.empty:
+            # Fallback to direct Polygon fetch for the requested period only (non-persistent)
+            # or we could trigger the massive refresh here.
+            # User said: "pokes the database to know the last computed day... and just refresh"
+            # So I'll implement the refresh logic and use it.
+            await StockDataService.refresh_stock_data(db, ticker, timespan, multiplier)
+            data = await StockDataService.get_historical_from_db(
+                db, ticker, period, timespan, multiplier
+            )
 
         if data.empty:
             raise HTTPException(status_code=404, detail="No data found for ticker")
@@ -29,14 +48,23 @@ async def get_historical_data(
         # Convert to JSON-serializable format
         data_dict = data.reset_index().to_dict("records")
         for record in data_dict:
-            record["Date"] = record["Date"].strftime("%Y-%m-%d")
-            for key in ["Open", "High", "Low", "Close", "Volume"]:
+            # Handle both Date and timestamp columns
+            date_col = "Date" if "Date" in record else "timestamp"
+            if date_col in record and record[date_col]:
+                if isinstance(record[date_col], str):
+                    pass # Already string
+                else:
+                    record["Date"] = record[date_col].strftime("%Y-%m-%d %H:%M:%S")
+            
+            for key in ["Open", "High", "Low", "Close", "Volume", "open", "high", "low", "close", "volume"]:
                 if key in record:
                     record[key] = float(record[key]) if pd.notna(record[key]) else None
 
         return {
-            "ticker": ticker.upper(),
+            "ticker": ticker,
             "period": period,
+            "timespan": timespan,
+            "multiplier": multiplier,
             "data_points": len(data_dict),
             "data": data_dict,
         }
@@ -44,7 +72,29 @@ async def get_historical_data(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
+
+
+@router.post("/refresh/{ticker}")
+async def refresh_stock_data(
+    ticker: str,
+    timespan: str = "day",
+    multiplier: int = 1,
+    full_history: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Trigger a refresh of stock data from Polygon to DB."""
+    try:
+        ticker = ticker.upper()
+        result = await StockDataService.refresh_stock_data(
+            db, ticker, timespan, multiplier, full_history
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error refreshing data: {str(e)}")
+
 
 
 @router.get("/details/{ticker}")

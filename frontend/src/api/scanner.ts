@@ -210,15 +210,19 @@ export const syncUniverseAggregates = async (
 
 export const fetchHistoricalData = async (
   ticker: string,
-  period: string = '30d'
+  period: string = '30d',
+  timespan: string = 'day',
+  multiplier: number = 1
 ): Promise<{
   ticker: string;
   period: string;
+  timespan: string;
+  multiplier: number;
   data_points: number;
   data: any[];
 }> => {
   const response = await apiClient.get(`/stocks/historical/${ticker}`, {
-    params: { period }
+    params: { period, timespan, multiplier }
   });
   return response.data;
 };
