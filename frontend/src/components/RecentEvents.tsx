@@ -1,6 +1,7 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Activity, ChevronUp, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
 
 interface Event {
   id: string;
@@ -91,7 +92,12 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
           className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
         >
           <div className="col-span-2">
-            <span className="font-medium text-financial-light">{event.ticker}</span>
+            <Link 
+              to={`/stock/${event.ticker}`}
+              className="font-medium text-financial-blue hover:text-blue-400 transition-colors"
+            >
+              {event.ticker}
+            </Link>
           </div>
 
           <div className="col-span-2 text-sm text-gray-400">

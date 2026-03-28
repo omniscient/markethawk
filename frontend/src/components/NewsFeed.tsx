@@ -11,7 +11,12 @@ import { fetchRecentNews, NewsArticle, triggerNewsRefresh } from '../api/news';
 const parsePublishedUtc = (dateStr: string): number =>
     new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z').getTime();
 
-const NewsFeed: React.FC = () => {
+interface NewsFeedProps {
+    ticker?: string;
+    limit?: number;
+}
+
+const NewsFeed: React.FC<NewsFeedProps> = ({ ticker, limit = 50 }) => {
     const [articles, setArticles] = useState<NewsArticle[]>([]);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const ws = useRef<WebSocket | null>(null);
@@ -22,7 +27,7 @@ const NewsFeed: React.FC = () => {
             await triggerNewsRefresh();
             // We usually wait for WebSocket for the actual update, 
             // but we could also re-fetch here for immediate feedback.
-            const data = await fetchRecentNews();
+            const data = await fetchRecentNews(ticker);
             data.sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
             setArticles(data);
         } catch (err) {
@@ -34,7 +39,7 @@ const NewsFeed: React.FC = () => {
 
     useEffect(() => {
         // Fetch initial history
-        fetchRecentNews()
+        fetchRecentNews(ticker)
             .then(data => {
                 data.sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
                 setArticles(data);
@@ -55,7 +60,7 @@ const NewsFeed: React.FC = () => {
 
                     const combined = [newArticle, ...prev];
                     combined.sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
-                    return combined.slice(0, 50);
+                    return combined.slice(0, limit);
                 });
             };
 
@@ -70,7 +75,7 @@ const NewsFeed: React.FC = () => {
         return () => {
             ws.current?.close();
         };
-    }, []);
+    }, [ticker, limit]);
 
     const sortedArticles = articles
         .slice()

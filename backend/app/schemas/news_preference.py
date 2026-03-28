@@ -2,13 +2,13 @@
 News Preference schemas for API requests and responses.
 """
 from pydantic import BaseModel, ConfigDict
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 class NewsPreferenceBase(BaseModel):
     tracked_tickers: List[str] = []
     tracked_universes: List[int] = []
-    refresh_interval_minutes: int = 5
+    refresh_interval_minutes: Optional[int] = 5
 
 class NewsPreferenceCreate(NewsPreferenceBase):
     pass

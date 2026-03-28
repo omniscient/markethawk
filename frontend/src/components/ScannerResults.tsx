@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Search
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Card from './ui/Card';
 
 interface ScannerResultsProps {
@@ -170,7 +171,12 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                   </td>
                   <td className="py-3 px-4">
                     <div>
-                      <div className="font-medium text-financial-light">{event.ticker}</div>
+                      <Link 
+                        to={`/stock/${event.ticker}`}
+                        className="font-medium text-financial-blue hover:text-blue-400 transition-colors"
+                      >
+                        {event.ticker}
+                      </Link>
                       <div className="text-xs text-gray-400">{event.company_name}</div>
                     </div>
                   </td>

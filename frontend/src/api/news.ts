@@ -35,8 +35,10 @@ export interface NewsArticle {
     tickers?: string[];
 }
 
-export const fetchRecentNews = async (): Promise<NewsArticle[]> => {
-    const response = await api.get('/api/news/recent');
+export const fetchRecentNews = async (ticker?: string): Promise<NewsArticle[]> => {
+    const response = await api.get('/api/news/recent', {
+        params: { ticker }
+    });
     return response.data;
 };
 

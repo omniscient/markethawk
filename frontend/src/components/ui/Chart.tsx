@@ -11,14 +11,16 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend
+  Legend,
+  Cell,
+  ComposedChart
 } from 'recharts';
 
 interface ChartProps {
   data: any[];
-  type: 'line' | 'area' | 'bar';
+  type: 'line' | 'area' | 'bar' | 'candlestick';
   xKey: string;
-  yKey: string;
+  yKey?: string; // Optional if candlestick
   color?: string;
   height?: number;
   showGrid?: boolean;
@@ -132,11 +134,54 @@ const Chart: React.FC<ChartProps> = ({
             {showTooltip && <Tooltip content={<CustomTooltip />} />}
             {showLegend && <Legend />}
             <Bar
-              dataKey={yKey}
+              dataKey={yKey!}
               fill={color}
               radius={[4, 4, 0, 0]}
             />
           </BarChart>
+        );
+
+      case 'candlestick':
+        const candlestickData = data.map(d => ({
+          ...d,
+          candleBody: [d.Open, d.Close],
+          candleWick: [d.Low, d.High],
+          isPositive: d.Close >= d.Open
+        }));
+
+        return (
+          <ComposedChart data={candlestickData} margin={commonProps.margin}>
+             {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />}
+             <XAxis 
+               dataKey={xKey} 
+               stroke="#9ca3af"
+               fontSize={10}
+               tickLine={false}
+               tickFormatter={(val) => {
+                 try {
+                   return val.split('-').slice(1).join('/'); // MM/DD
+                 } catch (e) {
+                   return val;
+                 }
+               }}
+             />
+             <YAxis 
+               stroke="#9ca3af"
+               fontSize={12}
+               tickLine={false}
+               domain={['auto', 'auto']}
+             />
+             {showTooltip && <Tooltip 
+               contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #4b5563', borderRadius: '8px' }}
+               itemStyle={{ color: '#f3f4f6' }}
+             />}
+             <Bar dataKey="candleWick" fill="#6b7280" barSize={1} />
+             <Bar dataKey="candleBody">
+               {candlestickData.map((entry, index) => (
+                 <Cell key={`cell-${index}`} fill={entry.isPositive ? '#10b981' : '#ef4444'} />
+               ))}
+             </Bar>
+          </ComposedChart>
         );
       
       default:

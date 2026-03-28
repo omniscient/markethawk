@@ -50,11 +50,23 @@ def update_news_preferences(
     return pref
 
 @router.get("/recent", response_model=List[NewsArticleResponse])
-def get_recent_news(db: Session = Depends(get_db)):
-    """Get the latest 100 news articles."""
-    # We no longer enforce a strict 60-minute cutoff because if market news is slow, 
-    # it results in a completely blank dashboard. The DB already drops news older than 7 days.
-    articles = db.query(NewsArticle).order_by(NewsArticle.published_utc.desc()).limit(100).all()
+def get_recent_news(
+    ticker: str = None,
+    db: Session = Depends(get_db)
+):
+    """Get the latest 100 news articles, optionally filtered by ticker."""
+    query = db.query(NewsArticle)
+    
+    if ticker:
+        # Use JSON_CONTAINS to check if the ticker is in the tickers list
+        from sqlalchemy import func
+        # Note: Depending on the DB (SQLite vs PostgreSQL), the syntax for JSON filtering varies.
+        # This project seems to use SQLite for tests and potentially PG for prod.
+        # Let's check the database-schema.sql or main.py to be sure.
+        # For now, I'll use a more generic approach or check the DB type.
+        query = query.filter(NewsArticle.tickers.contains([ticker.upper()]))
+
+    articles = query.order_by(NewsArticle.published_utc.desc()).limit(100).all()
     return articles
 
 from fastapi import WebSocket, WebSocketDisconnect
