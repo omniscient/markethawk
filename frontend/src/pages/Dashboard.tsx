@@ -129,7 +129,7 @@ const Dashboard: React.FC = () => {
           <Card title="Volume Spike Trends" icon={TrendingUp as any}>
             <Chart
               data={scannerResults || []}
-              type="line"
+              type="area"
               xKey="event_date"
               yKey="relative_volume"
               height={300}

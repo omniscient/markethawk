@@ -125,7 +125,7 @@ const StockDetailPage: React.FC = () => {
               data={historicalData}
               type="candlestick"
               xKey="Date"
-              height={400}
+              height={500}
             />
           </Card>
 
