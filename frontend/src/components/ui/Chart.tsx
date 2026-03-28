@@ -17,6 +17,8 @@ interface ChartProps {
   type: 'line' | 'area' | 'bar' | 'candlestick';
   xKey: string;
   yKey?: string; // Optional if candlestick
+  events?: any[];
+  highlightDate?: string;
   color?: string;
   height?: number;
   showGrid?: boolean;
@@ -29,6 +31,8 @@ const Chart: React.FC<ChartProps> = ({
   type,
   xKey,
   yKey,
+  events,
+  highlightDate,
   color = '#0ea5e9',
   height = 300,
   showGrid = true,
@@ -58,6 +62,8 @@ const Chart: React.FC<ChartProps> = ({
             data={data} 
             type={type} 
             height={height} 
+            events={events}
+            highlightDate={highlightDate}
             colors={{
               background: 'transparent', // Let the card handle background
               upColor: '#10b981',

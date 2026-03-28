@@ -8,7 +8,8 @@ import {
   Settings, 
   Menu, 
   X,
-  TrendingUp
+  TrendingUp,
+  BookOpen
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -23,6 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Dashboard', href: '/', icon: BarChart3 },
     { name: 'Scanner', href: '/scanner', icon: ScanLine },
     { name: 'Universes', href: '/universes', icon: Database },
+    { name: 'Journal', href: '/journal', icon: BookOpen },
     { name: 'Alerts', href: '/alerts', icon: Bell },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];

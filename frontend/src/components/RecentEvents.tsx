@@ -20,6 +20,7 @@ interface RecentEventsProps {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   onSort?: (column: string) => void;
+  onEventClick?: (event: Event) => void;
 }
 
 const RecentEvents: React.FC<RecentEventsProps> = ({ 
@@ -27,7 +28,8 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
   maxItems = 10,
   sortBy,
   sortOrder,
-  onSort
+  onSort,
+  onEventClick
 }) => {
   const displayEvents = events.slice(0, maxItems);
 
@@ -89,6 +91,7 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
       {displayEvents.map((event) => (
         <div
           key={event.id}
+          onClick={() => onEventClick?.(event)}
           className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
         >
           <div className="col-span-2">
@@ -101,7 +104,7 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
           </div>
 
           <div className="col-span-2 text-sm text-gray-400">
-            {format(new Date(event.event_date), 'MMM d')}
+            {format(new Date(event.event_date.includes('T') ? event.event_date : `${event.event_date}T00:00:00`), 'MMM d')}
           </div>
 
           <div className="col-span-2">

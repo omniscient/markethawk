@@ -32,6 +32,7 @@ const StockDetailPage: React.FC = () => {
   const symbol = ticker?.toUpperCase() || '';
   const [period, setPeriod] = React.useState('1y');
   const [timespan, setTimespan] = React.useState('day');
+  const [highlightDate, setHighlightDate] = React.useState<string | undefined>(undefined);
   const queryClient = useQueryClient();
 
   // 0. Refresh Data on Mount
@@ -98,6 +99,22 @@ const StockDetailPage: React.FC = () => {
 
   const historicalData = historicalResponse?.data || [];
   
+  // Safely extract results array if wrapped in an object or from a paginated response
+  const resultsArray = Array.isArray(scannerResults) 
+    ? scannerResults 
+    : (scannerResults as any)?.data || (scannerResults as any)?.results || [];
+    
+  const events = resultsArray.map((e: any) => ({
+    id: String(e.id),
+    ticker: e.ticker,
+    event_date: e.event_date,
+    event_type: e.event_type,
+    relative_volume: e.relative_volume,
+    volume_spike_ratio: e.volume_spike_ratio,
+    price_gap_pct: e.price_gap_pct,
+    criteria_met: e.criteria_met
+  }));
+  
   // Use live data if available, otherwise fallback to details or historical
   const currentPrice = liveData ? liveData.c : (details.latest_price || (historicalData.length > 0 ? historicalData[historicalData.length - 1].Close : 0));
   const latestPrice = currentPrice;
@@ -106,6 +123,12 @@ const StockDetailPage: React.FC = () => {
   const changePct = (change / prevClose) * 100;
   
   const lastUpdatedTime = liveData ? new Date(liveData.e) : new Date(details.last_updated);
+
+  const handleEventClick = (event: any) => {
+    setHighlightDate(event.event_date);
+    // Scroll to top where chart is
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -199,6 +222,8 @@ const StockDetailPage: React.FC = () => {
                 type="candlestick"
                 xKey="Date"
                 height={500}
+                events={events}
+                highlightDate={highlightDate}
               />
             )}
           </Card>
@@ -256,17 +281,9 @@ const StockDetailPage: React.FC = () => {
           {/* Scanner Event History */}
           <Card title="Scanner Event History" icon={Zap as any}>
             <RecentEvents 
-              events={(scannerResults || []).map(e => ({
-                id: String(e.id),
-                ticker: e.ticker,
-                event_date: e.event_date,
-                event_type: e.event_type,
-                relative_volume: e.relative_volume,
-                volume_spike_ratio: e.volume_spike_ratio,
-                price_gap_pct: e.price_gap_pct,
-                criteria_met: e.criteria_met
-              }))} 
+              events={events} 
               maxItems={10} 
+              onEventClick={handleEventClick}
             />
           </Card>
         </div>

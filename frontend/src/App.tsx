@@ -11,6 +11,7 @@ import Universes from './pages/Universes';
 import Alerts from './pages/Alerts';
 import Settings from './pages/Settings';
 import StockDetailPage from './pages/StockDetailPage';
+import Journal from './pages/Journal';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -34,6 +35,7 @@ function App() {
               <Route path="/universes" element={<Universes />} />
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/journal" element={<Journal />} />
               <Route path="/stock/:ticker" element={<StockDetailPage />} />
             </Routes>
           </Layout>
