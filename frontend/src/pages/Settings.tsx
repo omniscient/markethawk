@@ -338,7 +338,7 @@ const Settings: React.FC = () => {
                     <option value="15min">Every 15 minutes</option>
                     <option value="30min">Every 30 minutes</option>
                     <option value="1hour">Every hour</option>
-                    <option value="pre_market">Pre-market only</option>
+                    <option value="pre_market">Extended hours only</option>
                   </select>
                 </div>
 

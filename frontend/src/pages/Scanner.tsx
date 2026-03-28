@@ -21,7 +21,7 @@ import { runScanner, fetchScannerConfigs, fetchStockUniverses, fetchScannerResul
 
 const Scanner: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
-  const [selectedConfig, setSelectedConfig] = useState<string>('pre_market_volume');
+  const [selectedConfig, setSelectedConfig] = useState<string>('pre_market_volume_spike');
   const [selectedUniverse, setSelectedUniverse] = useState<number | null>(null);
   const [scanResults, setScanResults] = useState<any>(null);
   const [sortBy, setSortBy] = useState<string>('created_at');

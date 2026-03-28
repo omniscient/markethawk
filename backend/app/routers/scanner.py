@@ -10,8 +10,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import MonitoredStock, VolumeEvent
-from app.schemas import ScannerRunRequest, ScannerRunResponse, VolumeEventResponse, ScannerStatsResponse
+from app.models import MonitoredStock, VolumeEvent, ScannerConfig
+from app.schemas import (
+    ScannerRunRequest, 
+    ScannerRunResponse, 
+    VolumeEventResponse, 
+    ScannerStatsResponse,
+    ScannerConfigResponse
+)
 from app.services import ScannerService
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
@@ -155,3 +161,11 @@ async def get_scanner_stats(
         totalEvents=total_events,
         todayEvents=today_events,
     )
+
+
+@router.get("/configs", response_model=List[ScannerConfigResponse])
+async def get_scanner_configs(
+    db: Session = Depends(get_db),
+):
+    """Get all available scanner configurations."""
+    return db.query(ScannerConfig).filter(ScannerConfig.is_active == True).all()

@@ -92,26 +92,30 @@ class StockDataService:
             if not aggs:
                 return {}
 
-            # Filter for pre-market hours (4:00 AM - 9:30 AM ET)
-            pre_market_data = []
+            # Filter for extended hours (Pre-market: 4:00 AM - 9:30 AM AND After-market: 4:00 PM - 8:00 PM ET)
+            extended_data = []
             for agg in aggs:
                 agg_time = datetime.fromtimestamp(agg.timestamp / 1000)
                 hour = agg_time.hour
                 minute = agg_time.minute
 
                 # Pre-market: 4:00 AM to 9:30 AM
-                if (hour >= 4 and hour < 9) or (hour == 9 and minute < 30):
-                    pre_market_data.append(agg)
+                is_pre = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
+                # After-market: 4:00 PM to 8:00 PM
+                is_after = (hour >= 16 and hour < 20)
+                
+                if is_pre or is_after:
+                    extended_data.append(agg)
 
-            if not pre_market_data:
+            if not extended_data:
                 return {}
 
             return {
-                "pre_market_volume": sum(agg.volume for agg in pre_market_data),
-                "pre_market_high": max(agg.high for agg in pre_market_data),
-                "pre_market_low": min(agg.low for agg in pre_market_data),
-                "pre_market_open": pre_market_data[0].open if pre_market_data else None,
-                "pre_market_close": pre_market_data[-1].close if pre_market_data else None,
+                "pre_market_volume": sum(agg.volume for agg in extended_data),
+                "pre_market_high": max(agg.high for agg in extended_data),
+                "pre_market_low": min(agg.low for agg in extended_data),
+                "pre_market_open": extended_data[0].open if extended_data else None,
+                "pre_market_close": extended_data[-1].close if extended_data else None,
             }
 
         except Exception as e:

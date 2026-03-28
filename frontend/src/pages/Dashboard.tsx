@@ -171,8 +171,8 @@ const Dashboard: React.FC = () => {
               <span className="text-positive font-semibold">Open</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
-              <span className="text-gray-400">Pre-Market Hours</span>
-              <span className="text-financial-light">4:00 AM - 9:30 AM EST</span>
+              <span className="text-gray-400">Extended Hours</span>
+              <span className="text-financial-light">4 AM - 9:30 AM & 4 PM - 8 PM EST</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
               <span className="text-gray-400">Last Scanner Run</span>

@@ -29,6 +29,7 @@ class StockAggregate(Base):
     transactions = Column(Integer)
     
     is_pre_market = Column(Boolean, default=False, index=True)
+    is_after_market = Column(Boolean, default=False, index=True)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     

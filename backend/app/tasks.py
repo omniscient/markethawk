@@ -298,11 +298,15 @@ def sync_stock_aggregates(
         # 3. Insert new data
         new_records = []
         for agg in aggs:
-            # Determine if pre-market (Simple heuristic: < 9:30 AM ET)
+            # Determine if pre-market (4:00 AM - 9:30 AM ET) or after-market (4:00 PM - 8:00 PM ET)
             ts = agg['timestamp']
             hour = ts.hour
             minute = ts.minute
-            is_pre_market = (hour < 9) or (hour == 9 and minute < 30)
+            
+            # Pre-market: [4:00, 9:30)
+            is_pre_market = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
+            # After-market: [16:00, 20:00)
+            is_after_market = (hour >= 16 and hour < 20)
             
             record = StockAggregate(
                 ticker=ticker,
@@ -316,7 +320,8 @@ def sync_stock_aggregates(
                 volume=agg['volume'],
                 vwap=agg['vwap'],
                 transactions=agg['transactions'],
-                is_pre_market=is_pre_market
+                is_pre_market=is_pre_market,
+                is_after_market=is_after_market
             )
             new_records.append(record)
             

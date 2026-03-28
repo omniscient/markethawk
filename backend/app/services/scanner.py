@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 import pandas as pd
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, or_
 
 from app.models.volume_event import VolumeEvent
 from app.models.stock_aggregate import StockAggregate
@@ -27,8 +27,8 @@ class ScannerService:
         tickers: List[str], db: Session
     ) -> List[Dict[str, Any]]:
         """
-        Run Pre-market Liquidity Hunt scan using DB Aggregates across all history.
-        Strategy: High pre-market activity + price spike + retrace to origin.
+        Run Extended Hours Liquidity Hunt scan using DB Aggregates across all history.
+        Strategy: High extended-hours activity + price spike + retrace to origin.
         Optimized to use stock_aggregates table and scan entire available timeline.
         """
         results = []
@@ -43,10 +43,10 @@ class ScannerService:
                     func.date(StockAggregate.timestamp).label('event_date'),
                     func.sum(StockAggregate.volume).label('total_vol'),
                     func.max(StockAggregate.high).label('high_price'),
-                    func.max(StockAggregate.timestamp).label('last_pre_market_time')
+                    func.max(StockAggregate.timestamp).label('last_extended_hours_time')
                 )
                 .filter(
-                    StockAggregate.is_pre_market == True,
+                    or_(StockAggregate.is_pre_market == True, StockAggregate.is_after_market == True),
                     StockAggregate.ticker.in_(tickers)
                 )
                 .group_by(StockAggregate.ticker, func.date(StockAggregate.timestamp))
@@ -74,14 +74,14 @@ class ScannerService:
 
                 pre_market_volume = float(cand.total_vol)
                 pre_market_high = float(cand.high_price)
-                last_time = cand.last_pre_market_time
+                last_time = cand.last_extended_hours_time
                 
                 # Start of the event day for relative lookups
                 day_start = datetime.combine(event_date, datetime.min.time())
 
                 # Step 2: Get specific price points needed for logic
                 
-                # A. Current/Last Pre-market Price (at the end of pre-market for that day)
+                # A. Current/Last Extended Hours Price (at the end of the session for that day)
                 current_price_row = (
                     db.query(StockAggregate.close)
                     .filter(
@@ -239,7 +239,7 @@ class ScannerService:
     async def run_pre_market_scan(
         tickers: List[str], db: Session
     ) -> List[Dict[str, Any]]:
-        """Run pre-market volume spike scanner."""
+        """Run extended hours (pre+post) volume spike scanner."""
         results = []
 
         for ticker in tickers:

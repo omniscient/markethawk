@@ -62,9 +62,12 @@ const ScannerConfig: React.FC<ScannerConfigProps> = ({
           onChange={(e) => onConfigChange(e.target.value)}
           className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light focus:outline-none focus:ring-2 focus:ring-financial-blue focus:border-transparent"
         >
-          <option value="pre_market_volume">Pre-market Volume</option>
-          <option value="liquidity_hunt">Pre-market Liquidity Hunt</option>
-          {configs?.filter(c => c.scanner_type !== 'pre_market_volume').map((config) => (
+          <option value="pre_market_volume_spike">Extended Hours Volume</option>
+          <option value="liquidity_hunt">Extended Hours Liquidity Hunt</option>
+          {configs?.filter(c => 
+            c.scanner_type !== 'pre_market_volume_spike' && 
+            c.scanner_type !== 'liquidity_hunt'
+          ).map((config) => (
             <option key={config.scanner_type} value={config.scanner_type}>
               {config.name}
             </option>
