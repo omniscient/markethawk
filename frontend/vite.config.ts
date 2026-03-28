@@ -12,6 +12,7 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_TARGET || 'http://backend:8000',
         changeOrigin: true,
+        ws: true,
       }
     }
   },

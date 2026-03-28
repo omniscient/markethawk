@@ -10,8 +10,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router
+from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router
 from app.core.celery_app import celery_app as celery
+from app.services.websocket_manager import websocket_manager
 
 # Celery Configuration
 # celery instance is imported from app.core.celery_app
@@ -102,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(universe_router)
     app.include_router(stocks_router)
     app.include_router(news_router)
+    app.include_router(live_data_router)
 
     # Startup event
     @app.on_event("startup")
@@ -109,6 +111,10 @@ def create_app() -> FastAPI:
         """Initialize database tables."""
         Base.metadata.create_all(bind=engine)
         logging.info("Database tables initialized")
+        
+        # Start Polygon WebSocket Manager
+        websocket_manager.start()
+        logging.info("Stock WebSocket Manager started")
 
     # Shutdown event
     @app.on_event("shutdown")

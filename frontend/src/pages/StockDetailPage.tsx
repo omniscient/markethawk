@@ -25,6 +25,7 @@ import NewsFeed from '../components/NewsFeed';
 import { fetchStockDetails, refreshStockData } from '../api/stocks';
 import { fetchScannerResults, fetchHistoricalData } from '../api/scanner';
 import { fetchRecentNews } from '../api/news';
+import { useLiveStockData } from '../hooks/useLiveStockData';
 
 const StockDetailPage: React.FC = () => {
   const { ticker } = useParams<{ ticker: string }>();
@@ -68,6 +69,9 @@ const StockDetailPage: React.FC = () => {
     enabled: !!symbol,
   });
 
+  // 4. Live Data Subscription
+  const { liveData, isConnected } = useLiveStockData(symbol);
+
   if (loadingDetails || loadingHistorical || loadingScanner) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -93,10 +97,15 @@ const StockDetailPage: React.FC = () => {
   }
 
   const historicalData = historicalResponse?.data || [];
-  const latestPrice = details.latest_price || (historicalData.length > 0 ? historicalData[historicalData.length - 1].Close : 0);
+  
+  // Use live data if available, otherwise fallback to details or historical
+  const currentPrice = liveData ? liveData.c : (details.latest_price || (historicalData.length > 0 ? historicalData[historicalData.length - 1].Close : 0));
+  const latestPrice = currentPrice;
   const prevClose = historicalData.length > 1 ? historicalData[historicalData.length - 2].Close : latestPrice;
   const change = latestPrice - prevClose;
   const changePct = (change / prevClose) * 100;
+  
+  const lastUpdatedTime = liveData ? new Date(liveData.e) : new Date(details.last_updated);
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -124,7 +133,12 @@ const StockDetailPage: React.FC = () => {
               {Math.abs(change).toFixed(2)} ({Math.abs(changePct).toFixed(2)}%)
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-1">Last updated: {format(new Date(details.last_updated), 'h:mm:ss a')}</p>
+          <p className="text-sm text-gray-500 mt-1 flex items-center justify-end">
+            {isConnected && (
+              <span className="flex h-2 w-2 rounded-full bg-positive mr-2 animate-pulse" title="Live connection active"></span>
+            )}
+            Last updated: {format(lastUpdatedTime, 'h:mm:ss a')}
+          </p>
         </div>
       </div>
 
