@@ -6,7 +6,6 @@ from typing import List
 from datetime import datetime
 
 class NewsPreferenceBase(BaseModel):
-    include_general_market: bool = True
     tracked_tickers: List[str] = []
     tracked_universes: List[int] = []
     refresh_interval_minutes: int = 5

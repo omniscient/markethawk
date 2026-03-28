@@ -2,7 +2,8 @@ import logging
 import httpx
 import redis
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
@@ -331,11 +332,34 @@ def sync_stock_aggregates(
         db.close()
 
 @celery_app.task(bind=True, max_retries=3)
-def poll_massive_news(self, limit: int = 50):
+def poll_massive_news(self, limit: int = 50, force: bool = False):
     """
     Celery task to poll Polygon.io News API based on NewsPreference settings.
     Dispatches events via Redis PubSub for real-time frontend updates.
+
+    Schedule window: Monday 2 AM ET through Friday 8 PM ET.
+    Pass force=True to bypass the schedule check (manual refresh).
     """
+    # ── Trading-hours guard ──────────────────────────────────────────
+    if not force:
+        et = ZoneInfo("America/New_York")
+        now_et = datetime.now(et)
+        weekday = now_et.weekday()  # 0=Mon … 6=Sun
+
+        # Completely skip Saturday (5) and Sunday (6)
+        if weekday >= 5:
+            return
+
+        # Monday (0): only allow from 2 AM onward
+        if weekday == 0 and now_et.hour < 2:
+            return
+
+        # Friday (4): only allow until 8 PM (hour < 20 means before 8 PM,
+        # hour == 20 and minute > 0 would be past 8 PM)
+        if weekday == 4 and now_et.hour >= 20:
+            return
+
+    # ── Main logic ───────────────────────────────────────────────────
     db: Session = SessionLocal()
     try:
         pref = db.query(NewsPreference).first()
@@ -344,7 +368,7 @@ def poll_massive_news(self, limit: int = 50):
             return
 
         now = datetime.utcnow()
-        if pref.last_polled_at:
+        if not force and pref.last_polled_at:
             delta_minutes = (now - pref.last_polled_at).total_seconds() / 60.0
             if delta_minutes < pref.refresh_interval_minutes:
                 # Not enough time has passed
@@ -424,9 +448,6 @@ def poll_massive_news(self, limit: int = 50):
             if new_articles > 0:
                 logger.info(f"Polled news params={query_params}. Found {new_articles} new articles.")
 
-        if pref.include_general_market:
-            fetch_category({"limit": limit, "order": "desc"})
-        
         if tickers_to_poll:
             for t in tickers_to_poll:
                 fetch_category({"ticker": t, "limit": 5, "order": "desc"})

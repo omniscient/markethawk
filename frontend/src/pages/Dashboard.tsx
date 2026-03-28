@@ -8,7 +8,7 @@ import {
   Calendar,
   Zap
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 
 // Components
 import Card from '../components/ui/Card';
@@ -57,6 +57,19 @@ const Dashboard: React.FC = () => {
   const todayEvents = scannerResults?.filter(
     (event: any) => event.event_date === format(new Date(), 'yyyy-MM-dd')
   ).length || 0;
+
+  const lastScanTime = scannerResults && scannerResults.length > 0 
+    ? new Date(Math.max(...scannerResults
+        .map((e: any) => e.created_at ? new Date(e.created_at).getTime() : 0)
+        .filter((t: number) => !isNaN(t) && t > 0)
+      ))
+    : null;
+  
+  const lastScanValid = lastScanTime && !isNaN(lastScanTime.getTime()) && lastScanTime.getTime() > 0;
+  
+  const lastScanFormatted = lastScanValid 
+    ? formatDistanceToNow(lastScanTime, { addSuffix: true })
+    : 'Never';
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -148,11 +161,11 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
               <span className="text-gray-400">Last Scanner Run</span>
-              <span className="text-financial-light">2 minutes ago</span>
+              <span className="text-financial-light">{lastScanFormatted}</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
-              <span className="text-gray-400">Next Scheduled Scan</span>
-              <span className="text-financial-light">In 13 minutes</span>
+              <span className="text-gray-400">Scanner Schedule</span>
+              <span className="text-financial-light">Every 15 minutes</span>
             </div>
           </div>
         </Card>

@@ -7,7 +7,7 @@ from app.schemas.universe import (
     StockUniverseUpdate,
     StockUniverseResponse,
 )
-from app.schemas.scanner import ScannerRunRequest, ScannerRunResponse
+from app.schemas.scanner import ScannerRunRequest, ScannerRunResponse, ScannerStatsResponse
 from app.schemas.event import VolumeEventResponse
 from app.schemas.stock import MonitoredStockResponse
 
@@ -17,6 +17,7 @@ __all__ = [
     "StockUniverseResponse",
     "ScannerRunRequest",
     "ScannerRunResponse",
+    "ScannerStatsResponse",
     "VolumeEventResponse",
     "MonitoredStockResponse",
 ]

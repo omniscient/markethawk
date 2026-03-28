@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import MonitoredStock, VolumeEvent
-from app.schemas import ScannerRunRequest, ScannerRunResponse, VolumeEventResponse
+from app.schemas import ScannerRunRequest, ScannerRunResponse, VolumeEventResponse, ScannerStatsResponse
 from app.services import ScannerService
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
@@ -94,3 +94,45 @@ async def get_scanner_results(
     )
 
     return results
+
+
+@router.get("/stats", response_model=ScannerStatsResponse)
+async def get_scanner_stats(
+    db: Session = Depends(get_db),
+):
+    """Get scanner statistics for the dashboard."""
+    from sqlalchemy import func
+    from datetime import datetime, timedelta
+
+    # Total events
+    total_events = db.query(func.count(VolumeEvent.id)).scalar() or 0
+
+    # Today's events
+    today = datetime.now().date()
+    today_events = (
+        db.query(func.count(VolumeEvent.id))
+        .filter(VolumeEvent.event_date == today)
+        .scalar()
+        or 0
+    )
+
+    # Active alerts (last 24 hours)
+    last_24h = datetime.utcnow() - timedelta(hours=24)
+    active_alerts = (
+        db.query(func.count(VolumeEvent.id))
+        .filter(VolumeEvent.created_at >= last_24h)
+        .scalar()
+        or 0
+    )
+
+    # Average volume spike ratio (of all events or recent ones)
+    avg_spike = (
+        db.query(func.avg(VolumeEvent.volume_spike_ratio)).scalar() or 0.0
+    )
+
+    return ScannerStatsResponse(
+        activeAlerts=active_alerts,
+        avgVolumeSpike=round(float(avg_spike), 2),
+        totalEvents=total_events,
+        todayEvents=today_events,
+    )

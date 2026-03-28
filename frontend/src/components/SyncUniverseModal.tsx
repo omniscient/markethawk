@@ -9,12 +9,14 @@ interface SyncUniverseModalProps {
     isOpen: boolean;
     onClose: () => void;
     universe: StockUniverse | null;
+    onSyncStarted?: () => void;
 }
 
 const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
     isOpen,
     onClose,
-    universe
+    universe,
+    onSyncStarted
 }) => {
     // Default sync options
     const [syncOptions, setSyncOptions] = React.useState<SyncAggregatesOptions>({
@@ -27,6 +29,8 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
         limit: 50000
     });
 
+    const queryClient = useQueryClient();
+
     // Sync mutation
     const syncMutation = useMutation({
         mutationFn: () => {
@@ -34,7 +38,10 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
             return syncUniverseAggregates(universe.id, syncOptions);
         },
         onSuccess: (data) => {
-            alert(data.message); // Simple feedback for now
+            // Invalidate the universes query so the list refreshes with updated stats
+            queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
+            // Notify parent to start polling for background task results
+            onSyncStarted?.();
             onClose();
         }
     });

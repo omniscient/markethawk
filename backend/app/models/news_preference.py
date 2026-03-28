@@ -3,7 +3,7 @@ NewsPreference SQLAlchemy model.
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, DateTime, Boolean, JSON, Uuid as UUID
+from sqlalchemy import Column, Integer, DateTime, JSON, Uuid as UUID
 import uuid
 
 from app.core.database import Base
@@ -18,7 +18,6 @@ class NewsPreference(Base):
     uuid = Column(UUID, default=uuid.uuid4, index=True, unique=True)
     
     # Filtering settings
-    include_general_market = Column(Boolean, default=True)
     tracked_tickers = Column(JSON, default=list)  # List of strings e.g. ["AAPL", "NVDA"]
     tracked_universes = Column(JSON, default=list) # List of universe IDs e.g. [1, 2]
     

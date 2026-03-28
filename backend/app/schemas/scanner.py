@@ -22,3 +22,11 @@ class ScannerRunResponse(BaseModel):
     events_detected: int
     execution_time_ms: int
     events: List[dict] = []
+
+
+class ScannerStatsResponse(BaseModel):
+    """Schema for scanner statistics."""
+    activeAlerts: int
+    avgVolumeSpike: float
+    totalEvents: int
+    todayEvents: int

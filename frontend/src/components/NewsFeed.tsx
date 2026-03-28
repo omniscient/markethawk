@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 import React, { useEffect, useState, useRef } from 'react';
-import { Newspaper, ExternalLink, Clock } from 'lucide-react';
+import { Newspaper, ExternalLink, Clock, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { fetchRecentNews, NewsArticle } from '../api/news';
+import { fetchRecentNews, NewsArticle, triggerNewsRefresh } from '../api/news';
 
 // Normalize a published_utc string to ensure consistent UTC parsing.
 // The REST API may return "2026-03-23T15:30:00" (no Z) while WebSocket
@@ -13,7 +13,24 @@ const parsePublishedUtc = (dateStr: string): number =>
 
 const NewsFeed: React.FC = () => {
     const [articles, setArticles] = useState<NewsArticle[]>([]);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const ws = useRef<WebSocket | null>(null);
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await triggerNewsRefresh();
+            // We usually wait for WebSocket for the actual update, 
+            // but we could also re-fetch here for immediate feedback.
+            const data = await fetchRecentNews();
+            data.sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
+            setArticles(data);
+        } catch (err) {
+            console.error("Manual news refresh failed:", err);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     useEffect(() => {
         // Fetch initial history
@@ -55,12 +72,8 @@ const NewsFeed: React.FC = () => {
         };
     }, []);
 
-    const stockArticles = articles
-        .filter(a => a.tickers && a.tickers.length > 0)
-        .sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
-
-    const marketArticles = articles
-        .filter(a => !a.tickers || a.tickers.length === 0)
+    const sortedArticles = articles
+        .slice()
         .sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
 
     const renderArticle = (article: NewsArticle) => (
@@ -114,52 +127,44 @@ const NewsFeed: React.FC = () => {
     );
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Stock Specific News Column */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
+        <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-4">
                     <h3 className="text-lg font-semibold text-financial-light flex items-center">
                         <Newspaper className="h-5 w-5 mr-2 text-financial-blue" />
-                        Stock Specific News
+                        Stock News
                     </h3>
-                    <span className="flex items-center text-xs text-positive bg-positive/10 px-2 py-1 rounded border border-positive/20">
-                        <span className="relative flex h-2 w-2 mr-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-positive opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-positive"></span>
-                        </span>
-                        Live
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className={`flex items-center text-xs font-medium px-2 py-1 rounded border transition-colors ${
+                            isRefreshing 
+                                ? 'bg-gray-700/50 text-gray-400 border-gray-600' 
+                                : 'bg-financial-blue/10 text-financial-blue border-financial-blue/20 hover:bg-financial-blue/20'
+                        }`}
+                        title="Force refresh news (bypasses weekend schedule)"
+                    >
+                        <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                </div>
+                <span className="flex items-center text-xs text-positive bg-positive/10 px-2 py-1 rounded border border-positive/20">
+                    <span className="relative flex h-2 w-2 mr-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-positive opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-positive"></span>
                     </span>
-                </div>
-
-                <div className="max-h-[500px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                    {stockArticles.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400 text-sm">
-                            Waiting for stock news updates...
-                        </div>
-                    ) : (
-                        stockArticles.map(renderArticle)
-                    )}
-                </div>
+                    Live
+                </span>
             </div>
 
-            {/* General Market News Column */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-financial-light flex items-center">
-                        <Newspaper className="h-5 w-5 mr-2 text-financial-blue" />
-                        Market Related News
-                    </h3>
-                </div>
-
-                <div className="max-h-[500px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                    {marketArticles.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400 text-sm">
-                            Waiting for market news updates...
-                        </div>
-                    ) : (
-                        marketArticles.map(renderArticle)
-                    )}
-                </div>
+            <div className="max-h-[600px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                {sortedArticles.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 text-sm">
+                        Waiting for stock news updates...
+                    </div>
+                ) : (
+                    sortedArticles.map(renderArticle)
+                )}
             </div>
         </div>
     );

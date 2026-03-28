@@ -22,7 +22,6 @@ def get_news_preferences(db: Session = Depends(get_db)):
     if not pref:
         # Create a default if none exists
         pref = NewsPreference(
-            include_general_market=True,
             tracked_tickers=[],
             tracked_universes=[]
         )
@@ -63,6 +62,12 @@ import asyncio
 import redis.asyncio as aioredis
 from app.core.config import settings
 import json
+@router.post("/refresh")
+def trigger_news_refresh():
+    """Manually trigger a news refresh (bypasses weekday/time schedule)."""
+    from app.tasks import poll_massive_news
+    result = poll_massive_news.apply_async(kwargs={"force": True})
+    return {"status": "ok", "task_id": str(result.id)}
 
 @router.websocket("/ws")
 async def news_websocket(websocket: WebSocket):

@@ -8,7 +8,6 @@ const api = axios.create({
 
 export interface NewsPreference {
     id?: number;
-    include_general_market: boolean;
     tracked_tickers: string[];
     tracked_universes: number[];
     refresh_interval_minutes: number;
@@ -38,5 +37,10 @@ export interface NewsArticle {
 
 export const fetchRecentNews = async (): Promise<NewsArticle[]> => {
     const response = await api.get('/api/news/recent');
+    return response.data;
+};
+
+export const triggerNewsRefresh = async (): Promise<{ status: string; task_id: string }> => {
+    const response = await api.post('/api/news/refresh');
     return response.data;
 };

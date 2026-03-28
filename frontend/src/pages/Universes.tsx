@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Database,
@@ -28,7 +28,24 @@ const Universes: React.FC = () => {
   const [editingUniverse, setEditingUniverse] = useState<StockUniverse | null>(null);
   const [selectedUniverse, setSelectedUniverse] = useState<StockUniverse | null>(null);
   const [syncingUniverse, setSyncingUniverse] = useState<StockUniverse | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
+
+  // Start polling after a sync is triggered so the UI updates as background tasks complete
+  const handleSyncStarted = useCallback(() => {
+    setIsPolling(true);
+    // Stop polling after 2 minutes
+    if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
+    pollingTimerRef.current = setTimeout(() => setIsPolling(false), 2 * 60 * 1000);
+  }, []);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
+    };
+  }, []);
 
   const deleteMutation = useMutation({
     mutationFn: deleteStockUniverse,
@@ -43,10 +60,11 @@ const Universes: React.FC = () => {
     }
   };
 
-  // Fetch stock universes
+  // Fetch stock universes (polls every 10s while a sync is in progress)
   const { data: universes, isLoading } = useQuery({
     queryKey: ['stockUniverses'],
     queryFn: fetchStockUniverses,
+    refetchInterval: isPolling ? 10_000 : false,
   });
 
   const filteredUniverses = universes?.filter(universe =>
@@ -253,6 +271,7 @@ const Universes: React.FC = () => {
         isOpen={!!syncingUniverse}
         onClose={() => setSyncingUniverse(null)}
         universe={syncingUniverse}
+        onSyncStarted={handleSyncStarted}
       />
     </div>
   );

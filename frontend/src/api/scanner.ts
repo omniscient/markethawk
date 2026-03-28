@@ -222,13 +222,8 @@ export const fetchHistoricalData = async (
 };
 
 export const fetchMarketStats = async (): Promise<MarketStats> => {
-  // Mock data for now - will be replaced with real API call
-  return {
-    activeAlerts: 8,
-    avgVolumeSpike: 5.2,
-    totalEvents: 156,
-    todayEvents: 23
-  };
+  const response = await apiClient.get('/scanner/stats');
+  return response.data;
 };
 
 // WebSocket connection for real-time updates (future implementation)

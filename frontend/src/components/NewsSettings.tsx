@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Save, Plus, X, Globe } from 'lucide-react';
+import { Settings, Save, Plus, X } from 'lucide-react';
 import { fetchNewsPreferences, updateNewsPreferences, NewsPreference } from '../api/news';
 import { fetchStockUniverses } from '../api/scanner';
 
@@ -19,7 +19,7 @@ const NewsSettings: React.FC = () => {
         queryFn: fetchStockUniverses,
     });
 
-    const [includeGeneral, setIncludeGeneral] = useState(true);
+
     const [refreshInterval, setRefreshInterval] = useState(5);
     const [trackedTickers, setTrackedTickers] = useState<string[]>([]);
     const [trackedUniverses, setTrackedUniverses] = useState<number[]>([]);
@@ -28,7 +28,7 @@ const NewsSettings: React.FC = () => {
     // Setup local state when data loads
     useEffect(() => {
         if (pref) {
-            setIncludeGeneral(pref.include_general_market);
+
             setRefreshInterval(pref.refresh_interval_minutes || 5);
             setTrackedTickers(pref.tracked_tickers || []);
             setTrackedUniverses(pref.tracked_universes || []);
@@ -45,7 +45,6 @@ const NewsSettings: React.FC = () => {
 
     const handleSave = () => {
         mutation.mutate({
-            include_general_market: includeGeneral,
             refresh_interval_minutes: refreshInterval,
             tracked_tickers: trackedTickers,
             tracked_universes: trackedUniverses,
@@ -85,26 +84,6 @@ const NewsSettings: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-                {/* General Market Toggle */}
-                <div className="flex items-center justify-between bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                    <div className="flex items-center">
-                        <Globe className="w-5 h-5 text-financial-blue mr-3" />
-                        <div>
-                            <p className="font-medium text-financial-light">Broad Market News</p>
-                            <p className="text-xs text-gray-400">Include general financial news alongside your tickers</p>
-                        </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                            type="checkbox"
-                            className="sr-only peer"
-                            checked={includeGeneral}
-                            onChange={(e) => setIncludeGeneral(e.target.checked)}
-                        />
-                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-financial-blue"></div>
-                    </label>
-                </div>
-
                 {/* Refresh Interval Slider */}
                 <div>
                     <h4 className="text-sm font-medium text-gray-300 mb-2">Polling Frequency</h4>

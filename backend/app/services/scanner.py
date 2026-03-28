@@ -182,14 +182,17 @@ class ScannerService:
                 if is_high_activity and is_spike and is_accumulating and is_significant_volume:
                     market_cap = market_cap_map.get(ticker)
                     
+                    avg_vol_20d = sum(volumes) / len(volumes) if len(volumes) > 0 else 0
+                    rel_vol = pre_market_volume / avg_vol_20d if avg_vol_20d > 0 else 0
+                    
                     event = {
                         "ticker": ticker,
                         "event_date": event_date,
                         "event_type": "liquidity_hunt",
                         "pre_market_volume": pre_market_volume,
-                        "avg_volume_20d": 0, # Placeholder
-                        "relative_volume": 0, # Placeholder
-                        "volume_spike_ratio": 0, # Placeholder
+                        "avg_volume_20d": int(avg_vol_20d),
+                        "relative_volume": round(rel_vol, 2),
+                        "volume_spike_ratio": round(rel_vol, 2),
                         "previous_close": previous_close,
                         "pre_market_high": pre_market_high,
                         "pre_market_low": 0, 
@@ -213,6 +216,15 @@ class ScannerService:
                         db.flush() # Generate ID
                         event['id'] = volume_event.id
                     else:
+                        # Update existing if it was a placeholder
+                        if float(existing_event.avg_volume_20d) == 0:
+                            existing_event.avg_volume_20d = event['avg_volume_20d']
+                            existing_event.relative_volume = event['relative_volume']
+                            existing_event.volume_spike_ratio = event['volume_spike_ratio']
+                            existing_event.price_change_pct = event['price_change_pct']
+                            existing_event.price_gap_pct = event['price_gap_pct']
+                            existing_event.market_cap_at_event = event['market_cap_at_event']
+                            existing_event.criteria_met = event['criteria_met']
                         event['id'] = existing_event.id
                     
                     results.append(event)
