@@ -165,6 +165,8 @@ const EdgeExplorer: React.FC = () => {
                 <Tooltip 
                   cursor={{ strokeDasharray: '3 3' }} 
                   contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px' }}
+                  itemStyle={{ color: '#F9FAFB' }}
+                  labelStyle={{ color: '#9CA3AF' }}
                 />
                 <Legend verticalAlign="top" height={36}/>
                 <Scatter name="Events" data={events} fill="#3B82F6">
@@ -199,6 +201,8 @@ const EdgeExplorer: React.FC = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px' }}
+                  itemStyle={{ color: '#F9FAFB' }}
+                  labelStyle={{ color: '#9CA3AF' }}
                 />
                 <Legend verticalAlign="top" height={36}/>
                 <Area 
