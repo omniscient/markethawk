@@ -163,6 +163,27 @@ async def get_scanner_stats(
     )
 
 
+@router.get("/edge-stats")
+async def get_edge_stats(
+    period: str = "monthly",
+    ticker: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Get aggregated statistical edge data."""
+    from app.services.stats import StatsService
+    return StatsService.get_edge_stats(db, ticker=ticker, period=period)
+
+
+@router.get("/edge-distribution")
+async def get_edge_distribution(
+    ticker: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Get distribution data for scatter plots."""
+    from app.services.stats import StatsService
+    return StatsService.get_distribution_data(db, ticker=ticker)
+
+
 @router.get("/configs", response_model=List[ScannerConfigResponse])
 async def get_scanner_configs(
     db: Session = Depends(get_db),

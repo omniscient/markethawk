@@ -21,6 +21,7 @@ interface ChartProps {
   highlightDate?: string;
   color?: string;
   height?: number;
+  timespan?: string;
   showGrid?: boolean;
   showTooltip?: boolean;
   showLegend?: boolean;
@@ -35,6 +36,7 @@ const Chart: React.FC<ChartProps> = ({
   highlightDate,
   color = '#0ea5e9',
   height = 300,
+  timespan = 'day',
   showGrid = true,
   showTooltip = true,
   showLegend = false
@@ -61,6 +63,7 @@ const Chart: React.FC<ChartProps> = ({
           <StockChart 
             data={data} 
             type={type} 
+            timespan={timespan}
             height={height} 
             events={events}
             highlightDate={highlightDate}

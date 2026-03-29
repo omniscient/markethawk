@@ -34,9 +34,9 @@ export const fetchStockDetails = async (ticker: string) : Promise<StockDetailCon
   return response.data;
 };
 
-export const refreshStockData = async (ticker: string, timespan: string = 'day'): Promise<any> => {
+export const refreshStockData = async (ticker: string, timespan: string = 'day', period?: string): Promise<any> => {
   const response = await apiClient.post(`/stocks/refresh/${ticker}`, null, {
-    params: { timespan }
+    params: { timespan, period }
   });
   return response.data;
 };

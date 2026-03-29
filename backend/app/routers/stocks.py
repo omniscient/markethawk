@@ -9,6 +9,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.services import StockDataService
+from typing import Optional
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
@@ -83,13 +84,17 @@ async def refresh_stock_data(
     timespan: str = "day",
     multiplier: int = 1,
     full_history: bool = False,
+    period: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Trigger a refresh of stock data from Polygon to DB."""
     try:
         ticker = ticker.upper()
+        # If period is provided, the service could potentially use it, 
+        # but for now StockDataService.refresh_stock_data will handle it via its internal target_start logic
+        # if period indicates we need more than it thinks.
         result = await StockDataService.refresh_stock_data(
-            db, ticker, timespan, multiplier, full_history
+            db, ticker, timespan, multiplier, full_history, period
         )
         return result
     except Exception as e:

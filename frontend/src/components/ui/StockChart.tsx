@@ -18,6 +18,7 @@ import {
 interface StockChartProps {
   data: any[];
   type: 'candlestick' | 'area' | 'line';
+  timespan?: string;
   height?: number;
   events?: any[];
   highlightDate?: string;
@@ -36,6 +37,7 @@ interface StockChartProps {
 const StockChart: React.FC<StockChartProps> = ({
   data,
   type,
+  timespan = 'day',
   height = 400,
   events = [],
   highlightDate,
@@ -175,49 +177,94 @@ const StockChart: React.FC<StockChartProps> = ({
       const formattedData: CandlestickData[] = data
         .filter(d => d.Date && d.Open != null)
         .map(d => {
-          // Normalize to YYYY-MM-DD string for exact matching in daily charts
-          const dateStr = d.Date.split(' ')[0];
+          // Normalize time: YYYY-MM-DD for daily, Unix timestamp for intraday
+          let timeValue: Time;
+          if (timespan === 'day') {
+            timeValue = d.Date.split(' ')[0] as Time;
+          } else {
+            // Ensure we handle potential string dates or existing numeric timestamps
+            const dt = new Date(d.Date.includes(' ') ? d.Date.replace(' ', 'T') : d.Date);
+            timeValue = (dt.getTime() / 1000) as Time;
+          }
+
           return {
-            time: dateStr as Time,
+            time: timeValue,
             open: d.Open,
             high: d.High,
             low: d.Low,
             close: d.Close,
           };
         })
-        .sort((a, b) => String(a.time).localeCompare(String(b.time)));
+        .sort((a, b) => {
+          if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
+          return String(a.time).localeCompare(String(b.time));
+        });
 
-      seriesRef.current.setData(formattedData);
+      // Deduplicate by time (lightweight-charts requirement)
+      const uniqueFormattedData = formattedData.filter((item, index, self) =>
+        index === self.findIndex((t) => t.time === item.time)
+      );
+
+      seriesRef.current.setData(uniqueFormattedData);
 
       if (volumeSeriesRef.current) {
         const volumeData = data
           .filter(d => d.Date && d.Volume != null)
-          .map(d => ({
-            time: d.Date.split(' ')[0] as Time,
-            value: d.Volume,
-            color: d.Close >= d.Open ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
-          }))
-          .sort((a, b) => String(a.time).localeCompare(String(b.time)));
+          .map(d => {
+            let timeValue: Time;
+            if (timespan === 'day') {
+              timeValue = d.Date.split(' ')[0] as Time;
+            } else {
+              const dt = new Date(d.Date.includes(' ') ? d.Date.replace(' ', 'T') : d.Date);
+              timeValue = (dt.getTime() / 1000) as Time;
+            }
+            return {
+              time: timeValue,
+              value: d.Volume,
+              color: d.Close >= d.Open ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+            };
+          })
+          .sort((a, b) => {
+            if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
+            return String(a.time).localeCompare(String(b.time));
+          });
         
-        volumeSeriesRef.current.setData(volumeData);
+        // Deduplicate volume by time
+        const uniqueVolumeData = volumeData.filter((item, index, self) =>
+          index === self.findIndex((t) => t.time === item.time)
+        );
+
+        volumeSeriesRef.current.setData(uniqueVolumeData);
       }
 
       // Add markers for scanner events
       if (events && events.length > 0 && markersPluginRef.current) {
         const markers = events
           .filter(e => e.event_date)
-          .map(e => ({
-            time: e.event_date.split('T')[0].split(' ')[0] as Time,
-            position: 'belowBar' as const,
-            color: '#fbbf24', // yellow-400
-            shape: 'circle' as const,
-            size: 1,
-            text: '', // No text as requested
-          }))
-          .sort((a, b) => String(a.time).localeCompare(String(b.time)));
+          .map(e => {
+            let timeValue: Time;
+            if (timespan === 'day') {
+              timeValue = e.event_date.split('T')[0].split(' ')[0] as Time;
+            } else {
+              const dt = new Date(e.event_date.replace(' ', 'T'));
+              timeValue = (dt.getTime() / 1000) as Time;
+            }
+            return {
+              time: timeValue,
+              position: 'belowBar' as const,
+              color: '#fbbf24', // yellow-400
+              shape: 'circle' as const,
+              size: 1,
+              text: '', // No text as requested
+            };
+          })
+          .sort((a, b) => {
+            if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
+            return String(a.time).localeCompare(String(b.time));
+          });
         
         // Filter markers to only those that have a corresponding candle in the current data
-        const dataTimes = new Set(formattedData.map(d => String(d.time)));
+        const dataTimes = new Set(uniqueFormattedData.map(d => String(d.time)));
         const validMarkers = markers.filter(m => dataTimes.has(m.time as string));
         
         // Use v5 createSeriesMarkers plugin API
@@ -255,7 +302,7 @@ const StockChart: React.FC<StockChartProps> = ({
     }
 
     chartRef.current?.timeScale().fitContent();
-  }, [data, type, events]);
+  }, [data, type, events, timespan]);
 
   // Handle programmatic scrolling when highlightDate changes
   useEffect(() => {

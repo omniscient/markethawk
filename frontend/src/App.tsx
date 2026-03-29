@@ -12,6 +12,7 @@ import Alerts from './pages/Alerts';
 import Settings from './pages/Settings';
 import StockDetailPage from './pages/StockDetailPage';
 import Journal from './pages/Journal';
+import EdgeExplorer from './pages/EdgeExplorer';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ function App() {
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/journal" element={<Journal />} />
+              <Route path="/edge-explorer" element={<EdgeExplorer />} />
               <Route path="/stock/:ticker" element={<StockDetailPage />} />
             </Routes>
           </Layout>

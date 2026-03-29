@@ -9,8 +9,6 @@ from typing import Dict, Any, Optional
 import pandas as pd
 from polygon import RESTClient
 
-import pandas as pd
-from polygon import RESTClient
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -218,7 +216,8 @@ class StockDataService:
         ticker: str,
         timespan: str = "day",
         multiplier: int = 1,
-        full_history: bool = False
+        full_history: bool = False,
+        period: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Refresh stock data from Polygon to DB incrementally.
@@ -230,32 +229,54 @@ class StockDataService:
 
             ticker = ticker.upper()
             
-            # 1. Determine from_date
-            last_entry = db.query(func.max(StockAggregate.timestamp)).filter(
+            # 1. Determine from_date and target range
+            db_range = db.query(
+                func.max(StockAggregate.timestamp),
+                func.min(StockAggregate.timestamp)
+            ).filter(
                 StockAggregate.ticker == ticker,
                 StockAggregate.timespan == timespan,
                 StockAggregate.multiplier == multiplier
-            ).scalar()
+            ).first()
+            
+            last_entry = db_range[0] if db_range else None
+            first_entry = db_range[1] if db_range else None
             
             now = datetime.now()
             
-            if last_entry and not full_history:
-                # Start from one unit after the last entry
-                # For daily, +1 day. For minute, +1 minute.
+            # Determine target start date for full history/first fetch
+            if period:
+                days = 30
+                if period.endswith("d"):
+                    days = int(period[:-1])
+                elif period.endswith("y"):
+                    days = int(period[:-1]) * 365
+                elif period.endswith("w"):
+                    days = int(period[:-1]) * 7
+                elif period.isdigit():
+                    days = int(period)
+                target_start = now - timedelta(days=days)
+            elif timespan == "day" or timespan == "hour":
+                target_start = now - timedelta(days=365 * 2)
+            elif timespan == "minute":
+                target_start = now - timedelta(days=30)
+            else:
+                target_start = now - timedelta(days=7)
+
+            if full_history or not last_entry:
+                from_date_dt = target_start
+            elif first_entry and first_entry > target_start:
+                # We have some data, but not enough history. 
+                # Fetch from target start to now (incremental check will handle duplicates)
+                from_date_dt = target_start
+            else:
+                # Normal incremental update from last entry
                 if timespan == "day":
                     from_date_dt = last_entry + timedelta(days=1)
                 elif timespan == "minute":
                     from_date_dt = last_entry + timedelta(minutes=1)
                 else:
                     from_date_dt = last_entry + timedelta(seconds=1)
-            else:
-                # Full history requested or no entries
-                if timespan == "day":
-                    # Go back 2 years for daily full history
-                    from_date_dt = now - timedelta(days=365 * 2)
-                else:
-                    # Generic fallback (e.g. 7 days for minute data)
-                    from_date_dt = now - timedelta(days=7)
             
             from_date = from_date_dt.strftime("%Y-%m-%d")
             to_date = now.strftime("%Y-%m-%d")

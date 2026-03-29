@@ -37,7 +37,7 @@ const StockDetailPage: React.FC = () => {
 
   // 0. Refresh Data on Mount
   const refreshMutation = useMutation({
-    mutationFn: (sym: string) => refreshStockData(sym, timespan),
+    mutationFn: (sym: string) => refreshStockData(sym, timespan, period),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
     }
@@ -47,7 +47,7 @@ const StockDetailPage: React.FC = () => {
     if (symbol) {
       refreshMutation.mutate(symbol);
     }
-  }, [symbol, timespan]);
+  }, [symbol, timespan, period]);
 
   // 1. Consolidated Details (Fundamentals, Pre-market)
   const { data: details, isLoading: loadingDetails } = useQuery({
@@ -221,6 +221,7 @@ const StockDetailPage: React.FC = () => {
                 data={historicalData}
                 type="candlestick"
                 xKey="Date"
+                timespan={timespan}
                 height={500}
                 events={events}
                 highlightDate={highlightDate}
