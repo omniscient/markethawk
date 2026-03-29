@@ -167,8 +167,8 @@ const Journal: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Total PnL"
-          value={`$${stats?.total_pnl?.toLocaleString() || '0'}`}
-          color={stats?.total_pnl && stats.total_pnl > 0 ? 'green' : 'red'}
+          value={`$${Number(stats?.total_pnl || 0).toLocaleString()}`}
+          color={(stats?.total_pnl || 0) > 0 ? 'green' : 'red'}
           icon={Activity as any}
         />
         <MetricCard
@@ -179,12 +179,12 @@ const Journal: React.FC = () => {
         />
         <MetricCard
           title="Profit Factor"
-          value={stats?.profit_factor?.toFixed(2) || '0.00'}
+          value={Number(stats?.profit_factor || 0).toFixed(2)}
           icon={TrendingUp as any}
         />
         <MetricCard
           title="Avg Profit"
-          value={`$${stats?.avg_profit?.toFixed(2) || '0'}`}
+          value={`$${Number(stats?.avg_profit || 0).toFixed(2)}`}
           icon={TrendingDown as any}
         />
       </div>

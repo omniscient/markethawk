@@ -67,6 +67,10 @@ export interface ScannerRunResponse {
   stocks_scanned: number;
   events_detected: number;
   execution_time_ms: number;
+  scanner_type: string;
+  events?: VolumeEvent[];
+  error_message?: string;
+  created_at?: string;
 }
 
 export interface MarketStats {
@@ -98,6 +102,11 @@ export const runScanner = async (request: ScannerRunRequest): Promise<ScannerRun
 
 export const fetchScannerConfigs = async (): Promise<ScannerConfig[]> => {
   const response = await apiClient.get('/scanner/configs');
+  return response.data;
+};
+
+export const fetchScannerHistory = async (limit: number = 20): Promise<ScannerRunResponse[]> => {
+  const response = await apiClient.get('/scanner/history', { params: { limit } });
   return response.data;
 };
 

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models import MonitoredStock, VolumeEvent, ScannerConfig
+from app.models import MonitoredStock, VolumeEvent, ScannerConfig, ScannerRun
 from app.schemas import (
     ScannerRunRequest, 
     ScannerRunResponse, 
@@ -30,6 +30,17 @@ async def run_scanner(
 ):
     """Run scanner on demand."""
     start_time = datetime.now()
+    scan_id = str(uuid.uuid4())
+    
+    # Create initial run record
+    scanner_run = ScannerRun(
+        uuid=uuid.UUID(scan_id),
+        scanner_type=request.scanner_type,
+        universe_id=request.universe_id,
+        status="running",
+    )
+    db.add(scanner_run)
+    db.commit()
 
     # Get tickers to scan
     tickers = request.tickers
@@ -46,28 +57,77 @@ async def run_scanner(
         tickers = [stock.ticker for stock in stocks]
 
     if not tickers:
+        scanner_run.status = "failed"
+        scanner_run.error_message = "No tickers provided or found in universe"
+        db.commit()
         raise HTTPException(
             status_code=400, detail="No tickers provided or found in universe"
         )
 
     # Run scanner
-    scan_id = str(uuid.uuid4())
-    
-    if request.scanner_type == "liquidity_hunt":
-        results = await ScannerService.run_liquidity_hunt_scan(tickers, db)
-    else:
-        results = await ScannerService.run_pre_market_scan(tickers, db)
+    try:
+        if request.scanner_type == "liquidity_hunt":
+            results = await ScannerService.run_liquidity_hunt_scan(tickers, db)
+        else:
+            results = await ScannerService.run_pre_market_scan(tickers, db)
+        
+        status = "completed"
+        error_msg = None
+    except Exception as e:
+        results = []
+        status = "failed"
+        error_msg = str(e)
 
     execution_time = int((datetime.now() - start_time).total_seconds() * 1000)
 
+    # Update run record
+    scanner_run.status = status
+    scanner_run.stocks_scanned = len(tickers)
+    scanner_run.events_detected = len(results)
+    scanner_run.execution_time_ms = execution_time
+    scanner_run.error_message = error_msg
+    db.commit()
+
     return ScannerRunResponse(
         scan_id=scan_id,
-        status="completed",
+        status=status,
         stocks_scanned=len(tickers),
         events_detected=len(results),
         execution_time_ms=execution_time,
         events=results,
+        scanner_type=request.scanner_type,
+        error_message=error_msg,
+        created_at=scanner_run.created_at
     )
+
+
+@router.get("/history", response_model=List[ScannerRunResponse])
+async def get_scanner_history(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    """Get recent scanner runs."""
+    runs = (
+        db.query(ScannerRun)
+        .order_by(ScannerRun.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    
+    # Map to schema
+    return [
+        ScannerRunResponse(
+            scan_id=str(run.uuid),
+            status=run.status,
+            scanner_type=run.scanner_type,
+            stocks_scanned=run.stocks_scanned,
+            events_detected=run.events_detected,
+            execution_time_ms=run.execution_time_ms,
+            error_message=run.error_message,
+            created_at=run.created_at
+        )
+        for run in runs
+    ]
 
 
 @router.get("/results", response_model=List[VolumeEventResponse])

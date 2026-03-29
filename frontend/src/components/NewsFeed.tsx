@@ -47,33 +47,80 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ ticker, limit = 50 }) => {
             .catch(err => console.error("Failed to fetch initial news history:", err));
 
         // Establish WebSocket Connection
-        // Assuming backend runs on 8000, and we either hit it directly or via proxy
-        const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/news/ws';
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        const WS_URL = import.meta.env.VITE_WS_URL || `${protocol}//${host}/api/news/ws`;
+        
+        let reconnectTimer: number | undefined;
+        let isMounted = true;
 
         const connectWs = () => {
-            ws.current = new WebSocket(WS_URL);
+            if (!isMounted) return;
 
-            ws.current.onmessage = (event) => {
-                const newArticle = JSON.parse(event.data);
-                setArticles(prev => {
-                    if (prev.find(a => a.id === newArticle.id)) return prev;
+            if (ws.current) {
+                ws.current.close();
+            }
 
-                    const combined = [newArticle, ...prev];
-                    combined.sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
-                    return combined.slice(0, limit);
-                });
+            const currentWs = new WebSocket(WS_URL);
+            ws.current = currentWs;
+
+            currentWs.onmessage = (event) => {
+                if (!isMounted) return;
+                try {
+                    const newArticle = JSON.parse(event.data);
+                    setArticles(prev => {
+                        if (prev.find(a => a.id === newArticle.id)) return prev;
+
+                        const combined = [newArticle, ...prev];
+                        combined.sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
+                        return combined.slice(0, limit);
+                    });
+                } catch (err) {
+                    console.error("Error parsing news WebSocket message:", err);
+                }
             };
 
-            ws.current.onclose = () => {
-                // Reconnect after 3 seconds
-                setTimeout(connectWs, 3000);
+            currentWs.onclose = (event) => {
+                if (!isMounted) return;
+                // Only reconnect if this was the current socket and it wasn't a clean close
+                if (!event.wasClean && ws.current === currentWs) {
+                    reconnectTimer = window.setTimeout(connectWs, 3000);
+                }
+            };
+
+            currentWs.onerror = () => {
+                if (!isMounted) return;
+                setIsRefreshing(false);
             };
         };
 
-        connectWs();
+        // Delay connection slightly to avoid "closed before established" warnings 
+        // frequently caused by React Strict Mode double-renders in dev.
+        const startTimer = window.setTimeout(() => {
+            if (isMounted) connectWs();
+        }, 50);
 
         return () => {
-            ws.current?.close();
+            isMounted = false;
+            window.clearTimeout(startTimer);
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            
+            const currentWs = ws.current;
+            if (currentWs) {
+                currentWs.onopen = null;
+                currentWs.onmessage = null;
+                currentWs.onclose = null;
+                currentWs.onerror = null;
+
+                if (currentWs.readyState === WebSocket.OPEN) {
+                    currentWs.close();
+                } else if (currentWs.readyState === WebSocket.CONNECTING) {
+                    // Force the socket to close immediately AFTER it connects 
+                    // to avoid the "closed before established" console warning.
+                    currentWs.onopen = () => currentWs.close();
+                }
+                ws.current = null;
+            }
         };
     }, [ticker, limit]);
 

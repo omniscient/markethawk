@@ -26,12 +26,24 @@ const Settings: React.FC = () => {
     notifications: {
       email: true,
       push: false,
-      webhook: true
+      webhook: true,
+      alertFrequency: 'immediate'
     },
     scanner: {
       autoRun: true,
       frequency: '15min',
       maxConcurrent: 5
+    },
+    security: {
+      sessionTimeout: '30min'
+    },
+    appearance: {
+      defaultView: 'dashboard',
+      chartsTheme: 'financial'
+    },
+    data: {
+      retentionScanner: '7days',
+      retentionHistorical: '1year'
     }
   });
 
@@ -281,7 +293,14 @@ const Settings: React.FC = () => {
                     Alert Frequency
                   </label>
                   <select
-                    value="immediate"
+                    value={settings.notifications.alertFrequency}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      notifications: {
+                        ...settings.notifications,
+                        alertFrequency: e.target.value
+                      }
+                    })}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light focus:outline-none focus:ring-2 focus:ring-financial-blue"
                   >
                     <option value="immediate">Immediate</option>
@@ -408,7 +427,17 @@ const Settings: React.FC = () => {
                         <h4 className="font-medium text-financial-light">Session Timeout</h4>
                         <p className="text-sm text-gray-400">Automatically log out after inactivity</p>
                       </div>
-                      <select className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light">
+                      <select 
+                        value={settings.security.sessionTimeout}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          security: {
+                            ...settings.security,
+                            sessionTimeout: e.target.value
+                          }
+                        })}
+                        className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light"
+                      >
                         <option value="30min">30 minutes</option>
                         <option value="1hour">1 hour</option>
                         <option value="4hours">4 hours</option>
@@ -462,7 +491,17 @@ const Settings: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Default View
                       </label>
-                      <select className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light">
+                      <select 
+                        value={settings.appearance.defaultView}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          appearance: {
+                            ...settings.appearance,
+                            defaultView: e.target.value
+                          }
+                        })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light"
+                      >
                         <option value="dashboard">Dashboard</option>
                         <option value="scanner">Scanner</option>
                         <option value="alerts">Alerts</option>
@@ -473,7 +512,17 @@ const Settings: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Charts Theme
                       </label>
-                      <select className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light">
+                      <select 
+                        value={settings.appearance.chartsTheme}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          appearance: {
+                            ...settings.appearance,
+                            chartsTheme: e.target.value
+                          }
+                        })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light"
+                      >
                         <option value="financial">Financial</option>
                         <option value="minimal">Minimal</option>
                         <option value="colorful">Colorful</option>
@@ -573,7 +622,17 @@ const Settings: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Keep Scanner Results
                       </label>
-                      <select className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light">
+                      <select 
+                        value={settings.data.retentionScanner}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          data: {
+                            ...settings.data,
+                            retentionScanner: e.target.value
+                          }
+                        })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light"
+                      >
                         <option value="7days">7 days</option>
                         <option value="30days">30 days</option>
                         <option value="90days">90 days</option>
@@ -586,7 +645,17 @@ const Settings: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Keep Historical Data
                       </label>
-                      <select className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light">
+                      <select 
+                        value={settings.data.retentionHistorical}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          data: {
+                            ...settings.data,
+                            retentionHistorical: e.target.value
+                          }
+                        })}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-financial-light"
+                      >
                         <option value="1year">1 year</option>
                         <option value="2years">2 years</option>
                         <option value="5years">5 years</option>

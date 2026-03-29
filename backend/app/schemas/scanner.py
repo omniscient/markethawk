@@ -19,7 +19,12 @@ class ScannerRunResponse(BaseModel):
     stocks_scanned: int
     events_detected: int
     execution_time_ms: int
-    events: List[Dict[str, Any]] = []
+    events: Optional[List[Dict[str, Any]]] = None
+    scanner_type: str
+    error_message: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ScannerStatsResponse(BaseModel):

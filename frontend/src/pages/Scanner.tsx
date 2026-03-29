@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatDistanceToNow, format } from 'date-fns';
 import {
   Play,
   Pause,
@@ -17,7 +18,7 @@ import ScannerConfig from '../components/ScannerConfig';
 import ScannerResults from '../components/ScannerResults';
 
 // API functions
-import { runScanner, fetchScannerConfigs, fetchStockUniverses, fetchScannerResults, StockUniverse } from '../api/scanner';
+import { runScanner, fetchScannerConfigs, fetchStockUniverses, fetchScannerResults, fetchScannerHistory, StockUniverse } from '../api/scanner';
 
 const Scanner: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
@@ -38,6 +39,14 @@ const Scanner: React.FC = () => {
     queryKey: ['stockUniverses'],
     queryFn: fetchStockUniverses,
   });
+
+  // Fetch scanner history
+  const { data: scanHistory, isLoading: loadingHistory } = useQuery({
+    queryKey: ['scannerHistory'],
+    queryFn: () => fetchScannerHistory(10),
+  });
+
+  const queryClient = useQueryClient();
 
   // Auto-load existing results
   const { data: existingResults } = useQuery({
@@ -72,10 +81,14 @@ const Scanner: React.FC = () => {
     onSuccess: (data) => {
       setScanResults(data);
       setIsScanning(false);
+      // Refresh history and configs (which has last_run)
+      queryClient.invalidateQueries({ queryKey: ['scannerHistory'] });
+      queryClient.invalidateQueries({ queryKey: ['scannerConfigs'] });
     },
     onError: (error) => {
       console.error('Scanner error:', error);
       setIsScanning(false);
+      queryClient.invalidateQueries({ queryKey: ['scannerHistory'] });
     }
   });
 
@@ -180,15 +193,31 @@ const Scanner: React.FC = () => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Last Run</span>
-                <span className="text-financial-light">2 min ago</span>
+                <span className="text-financial-light">
+                  {(() => {
+                    const currentConf = configs?.find(c => c.scanner_type === (selectedConfig === 'pre_market_volume_spike' ? 'pre_market_volume_spike' : 'liquidity_hunt'));
+                    return currentConf?.last_run 
+                      ? formatDistanceToNow(new Date(currentConf.last_run), { addSuffix: true })
+                      : 'Never';
+                  })()}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Next Run</span>
-                <span className="text-financial-light">13 min</span>
+                <span className="text-financial-light">
+                  {(() => {
+                    const currentConf = configs?.find(c => c.scanner_type === (selectedConfig === 'pre_market_volume_spike' ? 'pre_market_volume_spike' : 'liquidity_hunt'));
+                    return currentConf?.next_run 
+                      ? formatDistanceToNow(new Date(currentConf.next_run), { addSuffix: true })
+                      : 'Not scheduled';
+                  })()}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Stocks in Universe</span>
-                <span className="text-financial-light">503</span>
+                <span className="text-financial-light">
+                  {universes?.find(u => u.id === selectedUniverse)?.ticker_count || universes?.find(u => u.id === selectedUniverse)?.aggregate_count || 0}
+                </span>
               </div>
             </div>
           </Card>
@@ -238,28 +267,42 @@ const Scanner: React.FC = () => {
       {/* Historical Results */}
       <Card title="Recent Scan History" icon={Clock as any}>
         <div className="space-y-4">
-          {[
-            { date: '2024-12-07 09:15', events: 12, status: 'completed', duration: '2.3s' },
-            { date: '2024-12-07 09:00', events: 8, status: 'completed', duration: '1.8s' },
-            { date: '2024-12-06 16:30', events: 15, status: 'completed', duration: '3.1s' },
-            { date: '2024-12-06 16:15', events: 0, status: 'completed', duration: '1.5s' },
-          ].map((scan, index) => (
-            <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-              <div>
-                <div className="text-financial-light font-medium">{scan.date}</div>
-                <div className="text-gray-400 text-sm">{scan.events} events detected</div>
+          {loadingHistory ? (
+            <div className="text-center py-4 text-gray-400">Loading history...</div>
+          ) : scanHistory && scanHistory.length > 0 ? (
+            scanHistory.map((scan, index) => (
+              <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <div className="text-financial-light font-medium">
+                      {scan.created_at ? format(new Date(scan.created_at), 'yyyy-MM-dd HH:mm:ss') : 'Unknown Date'}
+                    </div>
+                    <span className="text-xs text-gray-500 uppercase">({scan.scanner_type.replace(/_/g, ' ')})</span>
+                  </div>
+                  <div className="flex items-center space-x-3 mt-1">
+                    <div className="text-gray-400 text-sm">{scan.stocks_scanned} stocks analyzed</div>
+                    <div className="text-financial-blue text-sm font-semibold">{scan.events_detected} events found</div>
+                  </div>
+                  {scan.status === 'failed' && scan.error_message && (
+                    <div className="text-red-400 text-xs mt-1 italic">Error: {scan.error_message}</div>
+                  )}
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-gray-400 text-sm">{(scan.execution_time_ms / 1000).toFixed(1)}s</span>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${scan.status === 'completed'
+                    ? 'bg-green-500/20 text-green-400'
+                    : scan.status === 'running'
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'bg-red-500/20 text-red-400'
+                    }`}>
+                    {scan.status}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <span className="text-gray-400 text-sm">{scan.duration}</span>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${scan.status === 'completed'
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-yellow-500/20 text-yellow-400'
-                  }`}>
-                  {scan.status}
-                </span>
-              </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">No scan history found</div>
+          )}
         </div>
       </Card>
     </div>

@@ -30,10 +30,12 @@ export const useLiveStockData = (symbol: string | undefined) => {
 
     console.log(`Connecting to live updates: ${wsUrl}`);
     
-    let reconnectTimer: number;
+    let reconnectTimer: number | undefined;
+    let isMounted = true;
 
     const connect = () => {
-      // Close existing if any
+      if (!isMounted) return;
+
       if (wsRef.current) {
         wsRef.current.close();
       }
@@ -42,11 +44,16 @@ export const useLiveStockData = (symbol: string | undefined) => {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (!isMounted) {
+          ws.close();
+          return;
+        }
         console.log(`WebSocket OPEN for ${symbol}`);
         setIsConnected(true);
       };
 
       ws.onmessage = (event) => {
+        if (!isMounted) return;
         try {
           const data = JSON.parse(event.data) as LiveStockData;
           setLiveData(data);
@@ -56,6 +63,7 @@ export const useLiveStockData = (symbol: string | undefined) => {
       };
 
       ws.onerror = (err) => {
+        if (!isMounted) return;
         // Only log error if not self-closed or connecting
         if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
           console.error('WebSocket error:', err);
@@ -64,6 +72,7 @@ export const useLiveStockData = (symbol: string | undefined) => {
       };
 
       ws.onclose = (event) => {
+        if (!isMounted) return;
         setIsConnected(false);
         // Don't reconnect if it was a clean close from our end
         if (!event.wasClean && wsRef.current === ws) {
@@ -73,10 +82,18 @@ export const useLiveStockData = (symbol: string | undefined) => {
       };
     };
 
-    connect();
+    // Delay connection slightly to avoid "closed before established" warnings 
+    // frequently caused by React Strict Mode double-renders in dev.
+    const startTimer = window.setTimeout(() => {
+      if (isMounted) connect();
+    }, 50);
 
     return () => {
       console.log(`Cleaning up WebSocket for ${symbol}`);
+      isMounted = false;
+      window.clearTimeout(startTimer);
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      
       const ws = wsRef.current;
       if (ws) {
         // Remove listeners before closing to avoid "closed while connecting" logs
@@ -85,13 +102,14 @@ export const useLiveStockData = (symbol: string | undefined) => {
         ws.onerror = null;
         ws.onclose = null;
         
-        if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
+        if (ws.readyState === WebSocket.OPEN) {
           ws.close();
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+            // Force the socket to close immediately AFTER it connects 
+            // to avoid the "closed before established" console warning.
+            ws.onopen = () => ws.close();
         }
         wsRef.current = null;
-      }
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
       }
     };
   }, [symbol]);

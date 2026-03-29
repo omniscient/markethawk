@@ -88,7 +88,7 @@ class TradeStats(BaseModel):
     winning_trades: int
     losing_trades: int
     win_rate: float
-    total_pnl: Decimal
-    avg_profit: Decimal
+    total_pnl: float
+    avg_profit: float
     profit_factor: float
-    max_drawdown: Optional[Decimal] = None
+    max_drawdown: Optional[float] = None
