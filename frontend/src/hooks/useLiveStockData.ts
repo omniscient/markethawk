@@ -13,7 +13,7 @@ export interface LiveStockData {
   e: number;
 }
 
-export const useLiveStockData = (symbol: string | undefined) => {
+export const useLiveStockData = (symbol: string | undefined, resolution: 'minute' | 'second' = 'minute') => {
   const [liveData, setLiveData] = useState<LiveStockData | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -24,9 +24,8 @@ export const useLiveStockData = (symbol: string | undefined) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     
-    // Use the proxied URL (/api/...) on the same host (3000)
-    // Now that ws: true is in vite.config.ts, this is the most reliable path.
-    const wsUrl = `${protocol}//${host}/api/live/ws/${symbol.toUpperCase()}`;
+    // Updated to include resolution in the path
+    const wsUrl = `${protocol}//${host}/api/live/ws/${symbol.toUpperCase()}/${resolution}`;
 
     console.log(`Connecting to live updates: ${wsUrl}`);
     
@@ -112,7 +111,7 @@ export const useLiveStockData = (symbol: string | undefined) => {
         wsRef.current = null;
       }
     };
-  }, [symbol]);
+  }, [symbol, resolution]);
 
   return { liveData, isConnected };
 };

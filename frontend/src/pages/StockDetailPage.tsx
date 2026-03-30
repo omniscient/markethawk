@@ -33,6 +33,9 @@ const StockDetailPage: React.FC = () => {
   const symbol = ticker?.toUpperCase() || '';
   const [period, setPeriod] = React.useState(localStorage.getItem('stock_detail_period') || '1y');
   const [timespan, setTimespan] = React.useState(localStorage.getItem('stock_detail_timespan') || 'day');
+  const [wsResolution, setWsResolution] = React.useState<'minute' | 'second'>(
+    (localStorage.getItem('stock_detail_ws_res') as 'minute' | 'second') || 'minute'
+  );
   const [highlightDate, setHighlightDate] = React.useState<string | undefined>(undefined);
   const queryClient = useQueryClient();
 
@@ -49,7 +52,8 @@ const StockDetailPage: React.FC = () => {
   React.useEffect(() => {
     localStorage.setItem('stock_detail_period', period);
     localStorage.setItem('stock_detail_timespan', timespan);
-  }, [period, timespan]);
+    localStorage.setItem('stock_detail_ws_res', wsResolution);
+  }, [period, timespan, wsResolution]);
 
   // Initial Refresh on Mount
   React.useEffect(() => {
@@ -97,7 +101,7 @@ const StockDetailPage: React.FC = () => {
   });
 
   // 4. Live Data Subscription
-  const { liveData, isConnected } = useLiveStockData(symbol);
+  const { liveData, isConnected } = useLiveStockData(symbol, wsResolution);
 
   // 5. System Info (for Plan Detection)
   const { data: systemInfo } = useQuery({
@@ -256,8 +260,27 @@ const StockDetailPage: React.FC = () => {
             subtitle={`${timespan === 'day' ? 'Daily' : 'Intraday'} candlestick chart`}
             icon={BarChart2 as any}
             actions={
-              <div className="flex space-x-2">
-                <div className="flex space-x-1 p-1 bg-gray-900 rounded-lg">
+              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-3">
+                {/* Live Resolution Toggle */}
+                <div className="flex items-center space-x-1 p-1 bg-gray-900 rounded-lg border border-gray-800">
+                  <span className="text-[10px] uppercase font-black text-gray-500 px-2">Live Update:</span>
+                  {(['minute', 'second'] as const).map((res) => (
+                    <button
+                      key={res}
+                      onClick={() => setWsResolution(res)}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                        wsResolution === res 
+                          ? 'bg-emerald-600 text-white shadow-lg' 
+                          : 'text-gray-500 hover:text-white'
+                      }`}
+                    >
+                      {res === 'minute' ? '1M' : '1S'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex space-x-2">
+                  <div className="flex space-x-1 p-1 bg-gray-900 rounded-lg">
                   {['minute', 'hour', 'day'].map((t) => (
                     <button
                       key={t}
@@ -289,7 +312,8 @@ const StockDetailPage: React.FC = () => {
                   ))}
                 </div>
               </div>
-            }
+            </div>
+          }
           >
 
             {(loadingHistorical || (fetchingHistorical && !historicalData.length)) ? (

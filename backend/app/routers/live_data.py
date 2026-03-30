@@ -10,13 +10,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/live", tags=["live"])
 
-@router.websocket("/ws/{ticker}")
-async def stock_live_websocket(websocket: WebSocket, ticker: str):
+@router.websocket("/ws/{ticker}/{resolution}")
+async def stock_live_websocket(websocket: WebSocket, ticker: str, resolution: str):
     """
-    WebSocket endpoint for live stock updates.
-    Subscribes to Redis channel for the given ticker.
+    WebSocket endpoint for live stock updates with specific resolution (minute/second).
+    Subscribes to Redis channel for the given ticker and resolution.
     """
     ticker = ticker.upper()
+    resolution = resolution.lower()
+    if resolution not in ["minute", "second"]:
+        resolution = "minute"
+        
     await websocket.accept()
     
     # Ensure backend is connected to Polygon and subscribed to this ticker
@@ -25,10 +29,10 @@ async def stock_live_websocket(websocket: WebSocket, ticker: str):
     # Connect to Redis for this specific client request
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     pubsub = redis_client.pubsub()
-    channel = f"stock_updates:{ticker}"
+    channel = f"stock_updates:{ticker}:{resolution}"
     await pubsub.subscribe(channel)
     
-    logger.info(f"Client connected to live updates for {ticker}")
+    logger.info(f"Client connected to {resolution} updates for {ticker}")
     
     try:
         while True:

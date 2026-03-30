@@ -49,12 +49,11 @@ class StockWebSocketManager:
             return
 
         for msg in msgs:
-            # We only care about Aggregate Minute (AM) for now
-            if msg.event_type == "AM":
+            # Handle Aggregate Minute (AM) and Aggregate Second (A)
+            if msg.event_type in ["AM", "A"]:
                 ticker = msg.symbol
-                # Publish to Redis channel stock_updates:{ticker}
                 payload = {
-                    "ev": "AM",
+                    "ev": msg.event_type,
                     "sym": msg.symbol,
                     "v": msg.volume,
                     "o": msg.open,
@@ -66,16 +65,20 @@ class StockWebSocketManager:
                     "e": msg.end_timestamp
                 }
                 
+                # Determine resolution string
+                res = "minute" if msg.event_type == "AM" else "second"
+                
                 # Use the loop to call async publish
                 asyncio.run_coroutine_threadsafe(
-                    self._publish_to_redis(ticker, payload), 
+                    self._publish_to_redis(ticker, res, payload), 
                     self._loop
                 )
 
-    async def _publish_to_redis(self, ticker: str, payload: Dict[str, Any]):
+    async def _publish_to_redis(self, ticker: str, resolution: str, payload: Dict[str, Any]):
         try:
             redis = await self._get_redis()
-            channel = f"stock_updates:{ticker}"
+            # Channel format supports specific resolution subscriptions
+            channel = f"stock_updates:{ticker}:{resolution}"
             await redis.publish(channel, json.dumps(payload))
         except Exception as e:
             logger.error(f"Error publishing to Redis: {e}")
@@ -111,13 +114,14 @@ class StockWebSocketManager:
         thread.start()
 
     def subscribe(self, ticker: str):
-        """Dynamically subscribe to a ticker if not already active."""
+        """Dynamically subscribe to a ticker for both minute and second updates."""
         ticker = ticker.upper()
         if ticker not in self.active_tickers:
             self.active_tickers.add(ticker)
             if self.client and self._connected:
-                logger.info(f"Subscribing to live updates for {ticker}")
-                self.client.subscribe(f"AM.{ticker}")
+                logger.info(f"Subscribing to live updates for {ticker} (M+S)")
+                # Subscribe to both Aggregate Minute and Aggregate Second
+                self.client.subscribe(f"AM.{ticker}", f"A.{ticker}")
 
     def unsubscribe(self, ticker: str):
         """Unsubscribe from a ticker (to be called when no clients are watching)."""
