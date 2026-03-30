@@ -9,8 +9,11 @@ import {
   Menu, 
   X,
   TrendingUp,
-  BookOpen
+  BookOpen,
+  Info
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { getSystemInfo } from '../api/system';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -19,6 +22,11 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+
+  const { data: systemInfo } = useQuery({
+    queryKey: ['systemInfo'],
+    queryFn: getSystemInfo
+  });
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: BarChart3 },
@@ -84,7 +92,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Menu className="h-6 w-6" />
           </button>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center text-xs space-x-2 px-2 py-1 bg-gray-800 rounded-full border border-gray-700">
+              <span className="text-gray-500 uppercase font-bold tracking-tighter">Plan:</span>
+              <span className={`font-bold ${systemInfo?.data_mode === 'live' ? 'text-positive' : 'text-warning'}`}>
+                {systemInfo?.data_mode === 'live' ? 'LIVE-RT' : 'STARTER-15M'}
+              </span>
+            </div>
             <div className="text-sm text-gray-400">
               Market Status: <span className="text-positive">Open</span>
             </div>

@@ -25,6 +25,7 @@ class Settings:
     
     # Polygon.io API
     POLYGON_API_KEY: str = os.getenv("POLYGON_API_KEY", "")
+    POLYGON_DELAYED: bool = os.getenv("POLYGON_DELAYED", "true").lower() == "true"
     
     # Redis / Celery
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")

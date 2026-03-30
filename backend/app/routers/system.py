@@ -104,3 +104,14 @@ async def get_storage_stats(db: Session = Depends(get_db)):
             "settings": {"bytes": 0, "formatted": "N/A"},
             "total": {"bytes": 0, "formatted": "Service Error"}
         }
+
+@router.get("/info", response_model=Dict[str, Any])
+async def get_app_info():
+    """Get basic application information and configuration status."""
+    from app.core.config import settings
+    return {
+        "name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "data_mode": "delayed" if settings.POLYGON_DELAYED else "live",
+        "log_level": settings.LOG_LEVEL
+    }

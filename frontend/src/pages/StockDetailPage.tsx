@@ -25,6 +25,7 @@ import NewsFeed from '../components/NewsFeed';
 import { fetchStockDetails, refreshStockData } from '../api/stocks';
 import { fetchScannerResults, fetchHistoricalData } from '../api/scanner';
 import { fetchRecentNews } from '../api/news';
+import { getSystemInfo } from '../api/system';
 import { useLiveStockData } from '../hooks/useLiveStockData';
 
 const StockDetailPage: React.FC = () => {
@@ -97,6 +98,12 @@ const StockDetailPage: React.FC = () => {
 
   // 4. Live Data Subscription
   const { liveData, isConnected } = useLiveStockData(symbol);
+
+  // 5. System Info (for Plan Detection)
+  const { data: systemInfo } = useQuery({
+    queryKey: ['systemInfo'],
+    queryFn: getSystemInfo
+  });
 
   const lastUpdatedTime = React.useMemo(() => {
     if (liveData) return new Date(liveData.e);
@@ -219,6 +226,11 @@ const StockDetailPage: React.FC = () => {
 
         <div className="text-right">
           <div className="flex items-baseline justify-end space-x-2">
+            {systemInfo?.data_mode === 'delayed' && (
+              <span className="text-[10px] font-black bg-warning/20 text-warning px-1.5 py-0.5 rounded border border-warning/30 mr-1 uppercase tracking-tighter">
+                15M Delayed
+              </span>
+            )}
             <span className="text-4xl font-bold text-financial-light">${latestPrice?.toFixed(2)}</span>
             <span className={`text-xl font-semibold flex items-center ${change >= 0 ? 'text-positive' : 'text-negative'}`}>
               {change >= 0 ? <TrendingUp className="h-5 w-5 mr-1" /> : <TrendingDown className="h-5 w-5 mr-1" />}
@@ -229,7 +241,7 @@ const StockDetailPage: React.FC = () => {
             {isConnected && (
               <span className="flex h-2 w-2 rounded-full bg-positive mr-2 animate-pulse" title="Live connection active"></span>
             )}
-            Last updated: {format(lastUpdatedTime, 'h:mm:ss a')}
+            {systemInfo?.data_mode === 'delayed' ? 'Delayed Feed' : 'Live Feed'}: {format(lastUpdatedTime, 'h:mm:ss a')}
           </p>
         </div>
       </div>

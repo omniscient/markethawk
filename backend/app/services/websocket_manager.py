@@ -93,14 +93,15 @@ class StockWebSocketManager:
         
         def run_client():
             try:
+                feed = Feed.Delayed if settings.POLYGON_DELAYED else Feed.RealTime
+                logger.info(f"Connecting to Polygon.io WebSocket ({'Delayed' if settings.POLYGON_DELAYED else 'Live'})...")
                 self.client = WebSocketClient(
                     api_key=self.api_key,
-                    feed=Feed.Stocks,
+                    feed=feed,
                     # We'll subscribe dynamically, but start with nothing or a dummy
                     subscriptions=["AM.*"] if self.active_tickers else []
                 )
                 self._connected = True
-                logger.info("Connecting to Polygon.io WebSocket...")
                 self.client.run(self._handle_msg)
             except Exception as e:
                 logger.error(f"Polygon WebSocket Error: {e}")
