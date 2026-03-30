@@ -242,7 +242,8 @@ class StockDataService:
             last_entry = db_range[0] if db_range else None
             first_entry = db_range[1] if db_range else None
             
-            now = datetime.now()
+            # Use UTC-aware 'now' but strip tzinfo to match naive DB models if necessary
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
             
             # Determine target start date for full history/first fetch
             if period:

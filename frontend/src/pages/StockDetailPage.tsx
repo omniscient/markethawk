@@ -30,24 +30,32 @@ import { useLiveStockData } from '../hooks/useLiveStockData';
 const StockDetailPage: React.FC = () => {
   const { ticker } = useParams<{ ticker: string }>();
   const symbol = ticker?.toUpperCase() || '';
-  const [period, setPeriod] = React.useState('1y');
-  const [timespan, setTimespan] = React.useState('day');
+  const [period, setPeriod] = React.useState(localStorage.getItem('stock_detail_period') || '1y');
+  const [timespan, setTimespan] = React.useState(localStorage.getItem('stock_detail_timespan') || 'day');
   const [highlightDate, setHighlightDate] = React.useState<string | undefined>(undefined);
   const queryClient = useQueryClient();
 
-  // 0. Refresh Data on Mount
+  // 0. Refresh Data Mechanism
   const refreshMutation = useMutation({
     mutationFn: (sym: string) => refreshStockData(sym, timespan, period),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
+      queryClient.invalidateQueries({ queryKey: [ 'historicalData', symbol, period, timespan] });
+      queryClient.invalidateQueries({ queryKey: [ 'stockDetails', symbol ] });
     }
   });
 
+  // Save settings to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('stock_detail_period', period);
+    localStorage.setItem('stock_detail_timespan', timespan);
+  }, [period, timespan]);
+
+  // Initial Refresh on Mount
   React.useEffect(() => {
     if (symbol) {
       refreshMutation.mutate(symbol);
     }
-  }, [symbol, timespan, period]);
+  }, [symbol]);
 
   // Synchronize timespan and period to avoid excessive data requests
   React.useEffect(() => {
@@ -151,6 +159,46 @@ const StockDetailPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleRefreshCheck = (newTimespan?: string, newPeriod?: string) => {
+    if (refreshMutation.isPending) return;
+
+    const ts = newTimespan || timespan;
+    const p = newPeriod || period;
+    
+    // Evaluate stale state
+    const latestBar = historicalData.length > 0 ? historicalData[historicalData.length - 1] : null;
+    const now = new Date();
+    let isStale = false;
+
+    if (latestBar) {
+      const lastBarTime = new Date(latestBar.Date || latestBar.timestamp);
+      const gapMs = now.getTime() - lastBarTime.getTime();
+      
+      // Determine if stale based on timespan
+      if (ts === 'minute' && gapMs > 60 * 1000) isStale = true;
+      else if (ts === 'hour' && gapMs > 60 * 60 * 1000) isStale = true;
+      else if (ts === 'day' && gapMs > 24 * 60 * 60 * 1000) isStale = true;
+    } else {
+      isStale = true; // No data for this timeframe in DB
+    }
+
+    if (isStale) {
+      refreshMutation.mutate(symbol);
+    }
+  };
+
+  const onTimespanChange = (ts: string) => {
+    setTimespan(ts);
+    // Evaluates refresh immediately with the new target timeframe
+    refreshMutation.mutate(symbol); 
+  };
+
+  const onPeriodChange = (p: string) => {
+    setPeriod(p);
+    // Period changes also trigger a refresh check to ensure we have enough history
+    refreshMutation.mutate(symbol);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Breadcrumbs & Header */}
@@ -201,7 +249,7 @@ const StockDetailPage: React.FC = () => {
                   {['minute', 'hour', 'day'].map((t) => (
                     <button
                       key={t}
-                      onClick={() => setTimespan(t)}
+                      onClick={() => onTimespanChange(t)}
                       className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
                         timespan === t 
                           ? 'bg-financial-blue text-white shadow-lg' 
@@ -217,7 +265,7 @@ const StockDetailPage: React.FC = () => {
                   {['30d', '90d', '1y', '2y'].map((p) => (
                     <button
                       key={p}
-                      onClick={() => setPeriod(p)}
+                      onClick={() => onPeriodChange(p)}
                       className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
                         period === p 
                           ? 'bg-financial-blue text-white shadow-lg' 

@@ -44,7 +44,14 @@ async def get_historical_data(
             )
 
         if data.empty:
-            raise HTTPException(status_code=404, detail="No data found for ticker")
+            return {
+                "ticker": ticker,
+                "period": period,
+                "timespan": timespan,
+                "multiplier": multiplier,
+                "data_points": 0,
+                "data": [],
+            }
 
         # Convert to JSON-serializable format
         data_dict = data.reset_index().to_dict("records")
