@@ -77,6 +77,13 @@ const StockChart: React.FC<StockChartProps> = ({
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const markersPluginRef = useRef<any | null>(null);
   const prevDataLengthRef = useRef<number>(0);
+  const currentBarRef = useRef<{
+    time: Time;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  } | null>(null);
 
   const {
     background = '#0f172a',
@@ -213,7 +220,16 @@ const StockChart: React.FC<StockChartProps> = ({
           } else {
             // Robust ISO parsing for intraday
             const dt = new Date(d.Date);
-            timeValue = toLocalTime(dt.getTime() / 1000) as Time;
+            let timestamp = dt.getTime() / 1000;
+            
+            // Align historical timestamps to the chart's timespan
+            if (timespan === 'hour') {
+              timestamp = Math.floor(timestamp / 3600) * 3600;
+            } else if (timespan === 'minute') {
+              timestamp = Math.floor(timestamp / 60) * 60;
+            }
+            
+            timeValue = toLocalTime(timestamp) as Time;
           }
 
           return {
@@ -245,7 +261,13 @@ const StockChart: React.FC<StockChartProps> = ({
               timeValue = d.Date.split('T')[0] as Time;
             } else {
               const dt = new Date(d.Date);
-              timeValue = toLocalTime(dt.getTime() / 1000) as Time;
+              let timestamp = dt.getTime() / 1000;
+              if (timespan === 'hour') {
+                timestamp = Math.floor(timestamp / 3600) * 3600;
+              } else if (timespan === 'minute') {
+                timestamp = Math.floor(timestamp / 60) * 60;
+              }
+              timeValue = toLocalTime(timestamp) as Time;
             }
             return {
               time: timeValue,
@@ -276,7 +298,13 @@ const StockChart: React.FC<StockChartProps> = ({
               timeValue = e.event_date.split('T')[0] as Time;
             } else {
               const dt = new Date(e.event_date);
-              timeValue = toLocalTime(dt.getTime() / 1000) as Time;
+              let timestamp = dt.getTime() / 1000;
+              if (timespan === 'hour') {
+                timestamp = Math.floor(timestamp / 3600) * 3600;
+              } else if (timespan === 'minute') {
+                timestamp = Math.floor(timestamp / 60) * 60;
+              }
+              timeValue = toLocalTime(timestamp) as Time;
             }
             return {
               time: timeValue,
@@ -356,24 +384,55 @@ const StockChart: React.FC<StockChartProps> = ({
       const day = String(localDate.getDate()).padStart(2, '0');
       timeValue = `${year}-${month}-${day}` as Time;
     } else {
-      // For intraday charts, use Unix timestamp in seconds (shifted for local display)
-      timeValue = toLocalTime(liveData.s / 1000) as Time;
+      // For intraday charts, round to the current timespan resolution
+      let timestamp = liveData.s / 1000;
+      
+      if (timespan === 'hour') {
+        // Round to nearest hour
+        timestamp = Math.floor(timestamp / 3600) * 3600;
+      } else if (timespan === 'minute') {
+        // Round to nearest minute
+        timestamp = Math.floor(timestamp / 60) * 60;
+      }
+      
+      timeValue = toLocalTime(timestamp) as Time;
     }
 
     if (type === 'candlestick') {
-      seriesRef.current.update({
+      const isNewBar = !currentBarRef.current || currentBarRef.current.time !== timeValue;
+      
+      const open = isNewBar ? liveData.o : currentBarRef.current!.open;
+      const high = isNewBar ? liveData.h : Math.max(currentBarRef.current!.high, liveData.h);
+      const low = isNewBar ? liveData.l : Math.min(currentBarRef.current!.low, liveData.l);
+      const close = liveData.c;
+
+      const barData = {
         time: timeValue,
-        open: liveData.o,
-        high: liveData.h,
-        low: liveData.l,
-        close: liveData.c,
-      });
+        open,
+        high,
+        low,
+        close,
+      };
+
+      seriesRef.current.update(barData);
+      currentBarRef.current = barData;
 
       if (volumeSeriesRef.current) {
+        // For volume, we treat it as cumulative if it's the same bar, 
+        // though Polygon's v in AM/A is already the aggregate for that slice.
+        // If it's a new bar, we start fresh; if same bar, we'd ideally know total day volume 
+        // but for a single candle detail, showing the latest slice volume is acceptable 
+        // OR we accumulate it if we want the bar's total volume.
+        // Actually, for intraday, usually you want the total bar volume. 
+        // But Polygon's AM already is the total for the minute.
+        // For 'A' updates into a 'minute' bar, we should accumulate.
+        
+        // Simplified: use the liveData volume which works well for AM->Minute 
+        // and A->Second. For mixed (A->Minute), we'll just use the latest.
         volumeSeriesRef.current.update({
           time: timeValue,
           value: liveData.v,
-          color: liveData.c >= liveData.o ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+          color: close >= open ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
         });
       }
     } else {
