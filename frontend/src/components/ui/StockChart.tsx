@@ -76,6 +76,7 @@ const StockChart: React.FC<StockChartProps> = ({
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const markersPluginRef = useRef<any | null>(null);
+  const prevDataLengthRef = useRef<number>(0);
 
   const {
     background = '#0f172a',
@@ -328,9 +329,19 @@ const StockChart: React.FC<StockChartProps> = ({
 
       seriesRef.current.setData(uniqueData);
     }
+    
+    // Only fit content on initial load or when data was previously empty
+    // This prevents the chart from "jumping" when new historical data is backfilled
+    if (data.length > 0 && prevDataLengthRef.current === 0) {
+      chartRef.current?.timeScale().fitContent();
+    }
+    prevDataLengthRef.current = data.length;
+  }, [data, type, events, timespan, symbol]);
 
-    chartRef.current?.timeScale().fitContent();
-  }, [data, type, events, timespan]);
+  // Reset initialization flag when symbol or timespan changes to allow refitting
+  useEffect(() => {
+    prevDataLengthRef.current = 0;
+  }, [symbol, timespan]);
 
   useEffect(() => {
     if (!seriesRef.current || !liveData || !symbol || liveData.sym !== symbol.toUpperCase()) return;
