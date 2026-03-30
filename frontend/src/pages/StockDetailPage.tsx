@@ -49,6 +49,23 @@ const StockDetailPage: React.FC = () => {
     }
   }, [symbol, timespan, period]);
 
+  // Synchronize timespan and period to avoid excessive data requests
+  React.useEffect(() => {
+    if (timespan === 'minute') {
+      if (period === '1y' || period === '2y' || period === '90d') {
+        setPeriod('30d');
+      }
+    } else if (timespan === 'hour') {
+      if (period === '1y' || period === '2y') {
+        setPeriod('90d');
+      }
+    } else if (timespan === 'day') {
+      if (period === '30d') {
+        setPeriod('1y');
+      }
+    }
+  }, [timespan]);
+
   // 1. Consolidated Details (Fundamentals, Pre-market)
   const { data: details, isLoading: loadingDetails } = useQuery({
     queryKey: ['stockDetails', symbol],
@@ -72,6 +89,12 @@ const StockDetailPage: React.FC = () => {
 
   // 4. Live Data Subscription
   const { liveData, isConnected } = useLiveStockData(symbol);
+
+  const lastUpdatedTime = React.useMemo(() => {
+    if (liveData) return new Date(liveData.e);
+    if (details?.last_updated) return new Date(details.last_updated);
+    return new Date();
+  }, [liveData, details?.last_updated]);
 
   if (loadingDetails || loadingHistorical || loadingScanner) {
     return (
@@ -121,8 +144,6 @@ const StockDetailPage: React.FC = () => {
   const prevClose = historicalData.length > 1 ? historicalData[historicalData.length - 2].Close : latestPrice;
   const change = latestPrice - prevClose;
   const changePct = (change / prevClose) * 100;
-  
-  const lastUpdatedTime = liveData ? new Date(liveData.e) : new Date(details.last_updated);
 
   const handleEventClick = (event: any) => {
     setHighlightDate(event.event_date);
@@ -225,6 +246,8 @@ const StockDetailPage: React.FC = () => {
                 height={500}
                 events={events}
                 highlightDate={highlightDate}
+                symbol={symbol}
+                liveData={liveData}
               />
             )}
           </Card>

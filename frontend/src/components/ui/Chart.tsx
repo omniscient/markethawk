@@ -22,6 +22,8 @@ interface ChartProps {
   color?: string;
   height?: number;
   timespan?: string;
+  symbol?: string;
+  liveData?: any;
   showGrid?: boolean;
   showTooltip?: boolean;
   showLegend?: boolean;
@@ -37,6 +39,8 @@ const Chart: React.FC<ChartProps> = ({
   color = '#0ea5e9',
   height = 300,
   timespan = 'day',
+  symbol,
+  liveData,
   showGrid = true,
   showTooltip = true,
   showLegend = false
@@ -67,6 +71,8 @@ const Chart: React.FC<ChartProps> = ({
             height={height} 
             events={events}
             highlightDate={highlightDate}
+            symbol={symbol}
+            liveData={liveData}
             colors={{
               background: 'transparent', // Let the card handle background
               upColor: '#10b981',

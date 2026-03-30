@@ -5,7 +5,7 @@ Stocks router - historical data endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.database import get_db
 from app.services import StockDataService
@@ -53,9 +53,15 @@ async def get_historical_data(
             date_col = "Date" if "Date" in record else "timestamp"
             if date_col in record and record[date_col]:
                 if isinstance(record[date_col], str):
-                    pass # Already string
+                    if not record[date_col].endswith('Z') and 'T' in record[date_col]:
+                        record["Date"] = record[date_col] + 'Z'
+                    else:
+                        record["Date"] = record[date_col]
                 else:
-                    record["Date"] = record[date_col].strftime("%Y-%m-%d %H:%M:%S")
+                    # Convert to ISO format with Z
+                    record["Date"] = record[date_col].isoformat()
+                    if not record["Date"].endswith('Z') and '+' not in record["Date"]:
+                        record["Date"] += 'Z'
             
             for key in ["Open", "High", "Low", "Close", "Volume", "open", "high", "low", "close", "volume"]:
                 if key in record:
@@ -132,7 +138,7 @@ async def get_stock_detail_consolidated(
             "info": info,
             "pre_market": pre_market,
             "latest_price": latest_price,
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stock details: {str(e)}")

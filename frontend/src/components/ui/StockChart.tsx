@@ -22,6 +22,19 @@ interface StockChartProps {
   height?: number;
   events?: any[];
   highlightDate?: string;
+  symbol?: string; // Ticker symbol for live data filtering
+  liveData?: {
+    ev: string;
+    sym: string;
+    v: number;
+    o: number;
+    c: number;
+    h: number;
+    l: number;
+    vw: number | null;
+    s: number;
+    e: number;
+  } | null;
   colors?: {
     background?: string;
     text?: string;
@@ -41,8 +54,23 @@ const StockChart: React.FC<StockChartProps> = ({
   height = 400,
   events = [],
   highlightDate,
+  symbol,
+  liveData,
   colors = {}
 }) => {
+  // Helper to shift UTC timestamps to match the browser's local time labels
+  const toLocalTime = (utcSeconds: number): number => {
+    const d = new Date(utcSeconds * 1000);
+    return Date.UTC(
+      d.getFullYear(),
+      d.getMonth(),
+      d.getDate(),
+      d.getHours(),
+      d.getMinutes(),
+      d.getSeconds()
+    ) / 1000;
+  };
+
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
@@ -180,11 +208,11 @@ const StockChart: React.FC<StockChartProps> = ({
           // Normalize time: YYYY-MM-DD for daily, Unix timestamp for intraday
           let timeValue: Time;
           if (timespan === 'day') {
-            timeValue = d.Date.split(' ')[0] as Time;
+            timeValue = d.Date.split('T')[0] as Time;
           } else {
-            // Ensure we handle potential string dates or existing numeric timestamps
-            const dt = new Date(d.Date.includes(' ') ? d.Date.replace(' ', 'T') : d.Date);
-            timeValue = (dt.getTime() / 1000) as Time;
+            // Robust ISO parsing for intraday
+            const dt = new Date(d.Date);
+            timeValue = toLocalTime(dt.getTime() / 1000) as Time;
           }
 
           return {
@@ -213,10 +241,10 @@ const StockChart: React.FC<StockChartProps> = ({
           .map(d => {
             let timeValue: Time;
             if (timespan === 'day') {
-              timeValue = d.Date.split(' ')[0] as Time;
+              timeValue = d.Date.split('T')[0] as Time;
             } else {
-              const dt = new Date(d.Date.includes(' ') ? d.Date.replace(' ', 'T') : d.Date);
-              timeValue = (dt.getTime() / 1000) as Time;
+              const dt = new Date(d.Date);
+              timeValue = toLocalTime(dt.getTime() / 1000) as Time;
             }
             return {
               time: timeValue,
@@ -244,10 +272,10 @@ const StockChart: React.FC<StockChartProps> = ({
           .map(e => {
             let timeValue: Time;
             if (timespan === 'day') {
-              timeValue = e.event_date.split('T')[0].split(' ')[0] as Time;
+              timeValue = e.event_date.split('T')[0] as Time;
             } else {
-              const dt = new Date(e.event_date.replace(' ', 'T'));
-              timeValue = (dt.getTime() / 1000) as Time;
+              const dt = new Date(e.event_date);
+              timeValue = toLocalTime(dt.getTime() / 1000) as Time;
             }
             return {
               time: timeValue,
@@ -279,8 +307,8 @@ const StockChart: React.FC<StockChartProps> = ({
       const formattedData: (LineData | AreaData)[] = data
         .filter(d => d[xKey] && d[yKey] != null)
         .map(d => {
-          const timeValue = String(d[xKey]).includes(':') 
-            ? (new Date(d[xKey]).getTime() / 1000) as Time
+          const timeValue = String(d[xKey]).includes('T') || String(d[xKey]).includes(':') 
+            ? toLocalTime(new Date(d[xKey]).getTime() / 1000) as Time
             : d[xKey].split('T')[0] as Time;
           
           return {
@@ -303,6 +331,47 @@ const StockChart: React.FC<StockChartProps> = ({
 
     chartRef.current?.timeScale().fitContent();
   }, [data, type, events, timespan]);
+
+  useEffect(() => {
+    if (!seriesRef.current || !liveData || !symbol || liveData.sym !== symbol.toUpperCase()) return;
+
+    let timeValue: Time;
+
+    if (timespan === 'day') {
+      // For daily charts, update the bar matching the current local date
+      const localDate = new Date(liveData.s);
+      const year = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      timeValue = `${year}-${month}-${day}` as Time;
+    } else {
+      // For intraday charts, use Unix timestamp in seconds (shifted for local display)
+      timeValue = toLocalTime(liveData.s / 1000) as Time;
+    }
+
+    if (type === 'candlestick') {
+      seriesRef.current.update({
+        time: timeValue,
+        open: liveData.o,
+        high: liveData.h,
+        low: liveData.l,
+        close: liveData.c,
+      });
+
+      if (volumeSeriesRef.current) {
+        volumeSeriesRef.current.update({
+          time: timeValue,
+          value: liveData.v,
+          color: liveData.c >= liveData.o ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+        });
+      }
+    } else {
+      seriesRef.current.update({
+        time: timeValue,
+        value: liveData.c,
+      });
+    }
+  }, [liveData, type, symbol, timespan]);
 
   // Handle programmatic scrolling when highlightDate changes
   useEffect(() => {
@@ -327,7 +396,7 @@ const StockChart: React.FC<StockChartProps> = ({
       });
     } else {
       // For intraday or other numeric time scales
-      const targetTime = (new Date(highlightDate).getTime() / 1000) as Time;
+      const targetTime = toLocalTime(new Date(highlightDate).getTime() / 1000) as Time;
       
       const dataFreqSeconds = data.length > 1 
         ? (new Date(data[1].Date || data[1].event_date).getTime() - new Date(data[0].Date || data[0].event_date).getTime()) / 1000

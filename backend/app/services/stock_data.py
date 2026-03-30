@@ -3,7 +3,7 @@ Stock Data Service - Polygon.io integration for stock data.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 import pandas as pd
@@ -56,7 +56,7 @@ class StockDataService:
             for agg in aggs:
                 data.append(
                     {
-                        "Date": datetime.fromtimestamp(agg.timestamp / 1000),
+                        "Date": datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc),
                         "Open": agg.open,
                         "High": agg.high,
                         "Low": agg.low,
@@ -99,7 +99,7 @@ class StockDataService:
             # Filter for extended hours (Pre-market: 4:00 AM - 9:30 AM AND After-market: 4:00 PM - 8:00 PM ET)
             extended_data = []
             for agg in aggs:
-                agg_time = datetime.fromtimestamp(agg.timestamp / 1000)
+                agg_time = datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc)
                 hour = agg_time.hour
                 minute = agg_time.minute
 
@@ -385,7 +385,7 @@ class StockDataService:
 
             return [
                 {
-                    "timestamp": datetime.fromtimestamp(agg.timestamp / 1000),
+                    "timestamp": datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc),
                     "open": agg.open,
                     "high": agg.high,
                     "low": agg.low,
