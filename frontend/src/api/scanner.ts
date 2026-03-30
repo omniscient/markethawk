@@ -80,6 +80,31 @@ export interface MarketStats {
   todayEvents: number;
 }
 
+export interface PreMarketMover {
+  ticker: string;
+  name: string | null;
+  price: number;
+  change_percent: number;
+  change_value: number;
+  volume: number;
+  prev_close: number;
+  sector?: string;
+  market_cap?: number;
+}
+
+export interface PreMarketMoversResponse {
+  status: string;
+  movers: PreMarketMover[];
+  timestamp: string;
+}
+
+export interface StorageStats {
+  scanner: { bytes: number; formatted: string };
+  historical: { bytes: number; formatted: string };
+  settings: { bytes: number; formatted: string };
+  total: { bytes: number; formatted: string };
+}
+
 // API functions
 
 export const fetchScannerResults = async (params?: {
@@ -238,6 +263,19 @@ export const fetchHistoricalData = async (
 
 export const fetchMarketStats = async (): Promise<MarketStats> => {
   const response = await apiClient.get('/scanner/stats');
+  return response.data;
+};
+
+export const fetchStorageStats = async (): Promise<StorageStats> => {
+  const response = await apiClient.get('/system/storage');
+  return response.data;
+};
+
+export const fetchPreMarketMovers = async (params?: {
+  min_volume?: number;
+  limit?: number;
+}): Promise<PreMarketMoversResponse> => {
+  const response = await apiClient.get('/scanner/movers/pre-market', { params });
   return response.data;
 };
 

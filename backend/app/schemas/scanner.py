@@ -52,3 +52,23 @@ class ScannerConfigResponse(BaseModel):
     next_run: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PreMarketMover(BaseModel):
+    """Schema for a single pre-market mover."""
+    ticker: str
+    name: Optional[str] = None
+    price: float
+    change_percent: float
+    change_value: float
+    volume: int
+    prev_close: float
+    sector: Optional[str] = None
+    market_cap: Optional[float] = None
+
+
+class PreMarketMoversResponse(BaseModel):
+    """Schema for the pre-market movers list response."""
+    status: str
+    movers: List[PreMarketMover]
+    timestamp: datetime

@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import StockDetailPage from './pages/StockDetailPage';
 import Journal from './pages/Journal';
 import EdgeExplorer from './pages/EdgeExplorer';
+import PreMarketMovers from './pages/PreMarketMovers';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -38,6 +39,7 @@ function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/journal" element={<Journal />} />
               <Route path="/edge-explorer" element={<EdgeExplorer />} />
+              <Route path="/movers/pre-market" element={<PreMarketMovers />} />
               <Route path="/stock/:ticker" element={<StockDetailPage />} />
             </Routes>
           </Layout>

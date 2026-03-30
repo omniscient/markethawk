@@ -9,6 +9,7 @@ from app.routers.stocks import router as stocks_router
 from app.routers.news import router as news_router
 from app.routers.live_data import router as live_data_router
 from app.routers.journal import router as journal_router
+from app.routers.system import router as system_router
 
 __all__ = [
     "health_router",
@@ -18,4 +19,5 @@ __all__ = [
     "news_router",
     "live_data_router",
     "journal_router",
+    "system_router",
 ]

@@ -400,3 +400,90 @@ class StockDataService:
         except Exception as e:
             logging.error(f"Error fetching aggregates for {ticker}: {e}")
             return []
+
+    @staticmethod
+    async def get_pre_market_movers(
+        db: Optional[Session] = None,
+        min_volume: int = 10000,
+        limit: int = 100
+    ) -> list[Dict[str, Any]]:
+        """
+        Fetch pre-market movers for all US stocks using Polygon Snapshot API.
+        Filter by volume and return top movers by absolute percentage change.
+        """
+        try:
+            if not polygon_client:
+                logging.error("Polygon client not initialized")
+                return []
+
+            # Using get_snapshot_all for stocks
+            # This returns a list of snapshots for all tickers
+            snapshots = polygon_client.get_snapshot_all(market_type="stocks")
+
+            if not snapshots:
+                logging.warning("No snapshots returned from Polygon")
+                return []
+
+            movers = []
+            for s in snapshots:
+                # Basic validation
+                if not hasattr(s, 'ticker') or not hasattr(s, 'prev_day'):
+                    continue
+                
+                # Check volume (current day volume, which in pre-market includes pre-market trades)
+                # We check both day.volume and min.accumulated_volume because s.day.volume is often 0 in pre-market
+                day_vol = getattr(s.day, 'volume', 0) or 0
+                min_acc_vol = getattr(s.min, 'accumulated_volume', 0) or 0
+                volume = max(day_vol, min_acc_vol)
+                
+                if volume < min_volume:
+                    continue
+                
+                prev_close = getattr(s.prev_day, 'close', 0) or getattr(s.prev_day, 'c', 0)
+                if prev_close == 0:
+                    continue
+                
+                # Snapshot's todays_change_percent is the percentage change from previous close
+                change_percent = getattr(s, 'todays_change_percent', 0) or 0
+                
+                # If change is 0, we might still be in pre-market and it hasn't updated 
+                # but if there is volume, there should be a price.
+                # Use current minute close or last trade price
+                current_price = getattr(s.min, 'close', 0) or getattr(s.last_trade, 'price', 0) or getattr(s.last_trade, 'p', 0)
+                
+                if current_price == 0:
+                    continue
+
+                movers.append({
+                    "ticker": s.ticker,
+                    "name": None,  # Snapshot doesn't include name, we'd need ticker details but that's a lot of calls
+                    "price": float(current_price),
+                    "change_percent": float(change_percent),
+                    "change_value": float(getattr(s, 'todays_change', 0)),
+                    "volume": int(volume),
+                    "prev_close": float(prev_close)
+                })
+
+            # Sort by absolute change percent descending
+            movers.sort(key=lambda x: abs(x["change_percent"]), reverse=True)
+            top_movers = movers[:limit]
+
+            # Enrich with DB data if available
+            if db and top_movers:
+                from app.models.ticker_reference import TickerReference
+                ticker_list = [m["ticker"] for m in top_movers]
+                refs = db.query(TickerReference).filter(TickerReference.ticker.in_(ticker_list)).all()
+                ref_map = {r.ticker: r for r in refs}
+                
+                for m in top_movers:
+                    ref = ref_map.get(m["ticker"])
+                    if ref:
+                        m["name"] = ref.name
+                        m["sector"] = ref.sector
+                        m["market_cap"] = ref.market_cap
+
+            return top_movers
+
+        except Exception as e:
+            logging.error(f"Error fetching pre-market movers: {e}")
+            return []

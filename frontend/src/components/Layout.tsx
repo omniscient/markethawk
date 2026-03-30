@@ -23,6 +23,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: BarChart3 },
     { name: 'Scanner', href: '/scanner', icon: ScanLine },
+    { name: 'Pre-market Movers', href: '/movers/pre-market', icon: TrendingUp },
     { name: 'Edge Explorer', href: '/edge-explorer', icon: BarChart3 },
     { name: 'Universes', href: '/universes', icon: Database },
     { name: 'Journal', href: '/journal', icon: BookOpen },

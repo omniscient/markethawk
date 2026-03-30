@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon,
   User,
@@ -15,7 +15,7 @@ import {
 // Components
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { syncFundamentals, syncMetrics, syncTickerDetails, stopSync } from '../api/scanner'; // Import stopSync
+import { syncFundamentals, syncMetrics, syncTickerDetails, stopSync, fetchStorageStats, StorageStats } from '../api/scanner'; // Import stopSync and fetchStorageStats
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general');
@@ -54,6 +54,26 @@ const Settings: React.FC = () => {
 
   // Speed setting (15.0 for Free, 0.2 for Paid/Unlimited)
   const [crawlSpeed, setCrawlSpeed] = useState<number>(15.0);
+
+  const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
+  const [loadingStorage, setLoadingStorage] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'data') {
+      const loadStorageData = async () => {
+        try {
+          setLoadingStorage(true);
+          const stats = await fetchStorageStats();
+          setStorageStats(stats);
+        } catch (e) {
+          console.error('Failed to fetch storage stats:', e);
+        } finally {
+          setLoadingStorage(false);
+        }
+      };
+      loadStorageData();
+    }
+  }, [activeTab]);
 
   const tabs = [
     { id: 'general', name: 'General', icon: SettingsIcon as any },
@@ -671,19 +691,27 @@ const Settings: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
                       <span className="text-gray-400">Scanner Results</span>
-                      <span className="text-financial-light">2.3 GB</span>
+                      <span className="text-financial-light">
+                        {loadingStorage ? 'Loading...' : storageStats?.scanner.formatted || '0.0 B'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
                       <span className="text-gray-400">Historical Data</span>
-                      <span className="text-financial-light">5.7 GB</span>
+                      <span className="text-financial-light">
+                        {loadingStorage ? 'Loading...' : storageStats?.historical.formatted || '0.0 B'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
                       <span className="text-gray-400">User Settings</span>
-                      <span className="text-financial-light">15 MB</span>
+                      <span className="text-financial-light">
+                        {loadingStorage ? 'Loading...' : storageStats?.settings.formatted || '0.0 B'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-financial-blue/20 rounded-lg border border-financial-blue/30">
                       <span className="text-financial-light font-medium">Total Usage</span>
-                      <span className="text-financial-light font-medium">8.0 GB</span>
+                      <span className="text-financial-light font-medium">
+                        {loadingStorage ? 'Loading...' : storageStats?.total.formatted || '0.0 B'}
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -8,6 +8,7 @@ interface CardProps {
   icon?: LucideIcon;
   className?: string;
   actions?: React.ReactNode;
+  noPadding?: boolean;
 }
 
 const Card: React.FC<CardProps> = ({ 
@@ -16,7 +17,8 @@ const Card: React.FC<CardProps> = ({
   subtitle,
   icon: Icon, 
   className = '',
-  actions 
+  actions,
+  noPadding = false
 }) => {
   return (
     <div className={`bg-financial-gray rounded-lg border border-gray-700 shadow-lg ${className}`}>
@@ -32,7 +34,7 @@ const Card: React.FC<CardProps> = ({
           {actions && <div>{actions}</div>}
         </div>
       )}
-      <div className="p-6">
+      <div className={noPadding ? '' : 'p-6'}>
         {children}
       </div>
     </div>

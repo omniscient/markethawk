@@ -16,9 +16,11 @@ from app.schemas import (
     ScannerRunResponse, 
     VolumeEventResponse, 
     ScannerStatsResponse,
-    ScannerConfigResponse
+    ScannerConfigResponse,
+    PreMarketMoversResponse,
+    PreMarketMover
 )
-from app.services import ScannerService
+from app.services import ScannerService, StockDataService
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
 
@@ -250,3 +252,24 @@ async def get_scanner_configs(
 ):
     """Get all available scanner configurations."""
     return db.query(ScannerConfig).filter(ScannerConfig.is_active == True).all()
+
+
+@router.get("/movers/pre-market", response_model=PreMarketMoversResponse)
+async def get_pre_market_movers(
+    min_volume: int = 10000,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    """Get top pre-market movers."""
+    movers = await StockDataService.get_pre_market_movers(
+        db=db,
+        min_volume=min_volume,
+        limit=limit
+    )
+    
+    # Map to schema if necessary, but the dicts should match
+    return {
+        "status": "success",
+        "movers": movers,
+        "timestamp": datetime.now()
+    }

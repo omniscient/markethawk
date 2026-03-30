@@ -7,7 +7,14 @@ from app.schemas.universe import (
     StockUniverseUpdate,
     StockUniverseResponse,
 )
-from app.schemas.scanner import ScannerRunRequest, ScannerRunResponse, ScannerStatsResponse, ScannerConfigResponse
+from app.schemas.scanner import (
+    ScannerRunRequest, 
+    ScannerRunResponse, 
+    ScannerStatsResponse, 
+    ScannerConfigResponse, 
+    PreMarketMoversResponse, 
+    PreMarketMover
+)
 from app.schemas.event import VolumeEventResponse
 from app.schemas.stock import MonitoredStockResponse
 
@@ -21,4 +28,6 @@ __all__ = [
     "ScannerConfigResponse",
     "VolumeEventResponse",
     "MonitoredStockResponse",
+    "PreMarketMoversResponse",
+    "PreMarketMover",
 ]
