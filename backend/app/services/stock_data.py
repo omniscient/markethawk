@@ -304,17 +304,30 @@ class StockDataService:
             
             # 3. Store in DB
             new_records = []
+            
+            # Fetch existing timestamps in this range for deduplication
+            # Making them naive for comparison
+            existing_ts = set(
+                r[0] for r in db.query(StockAggregate.timestamp).filter(
+                    StockAggregate.ticker == ticker,
+                    StockAggregate.timespan == timespan,
+                    StockAggregate.multiplier == multiplier,
+                    StockAggregate.timestamp >= from_date_dt
+                ).all()
+            )
+
             for agg in aggs:
-                ts = agg['timestamp']
+                # Ensure ts is naive for comparison with set and DB storage
+                ts = agg['timestamp'].replace(tzinfo=None)
                 
-                # Check for duplicates if we didn't start strictly after
-                # (Polygon API from_date is inclusive)
-                if last_entry and ts <= last_entry:
+                if ts in existing_ts:
                     continue
                 
-                # Extended hours logic (copied from tasks.py)
+                # Extended hours logic
                 hour = ts.hour
                 minute = ts.minute
+                # US/Eastern check (approximate via UTC offset if needed, 
+                # but following the existing logic exactly)
                 is_pre_market = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
                 is_after_market = (hour >= 16 and hour < 20)
                 
@@ -334,6 +347,7 @@ class StockDataService:
                     is_after_market=is_after_market
                 )
                 new_records.append(record)
+                existing_ts.add(ts) # Prevent duplicates within the same batch
             
             if new_records:
                 db.bulk_save_objects(new_records)
@@ -347,6 +361,7 @@ class StockDataService:
                 "from_date": from_date,
                 "to_date": to_date
             }
+
 
         except Exception as e:
             logging.error(f"Error refreshing data for {ticker}: {e}")

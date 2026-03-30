@@ -25,23 +25,13 @@ async def get_historical_data(
     """Get historical stock data from DB, fallback to Polygon."""
     ticker = ticker.upper()
     try:
-        # 1. Try to fetch from DB first
+        # 1. Always trigger an incremental refresh to ensure data is up to date
+        await StockDataService.refresh_stock_data(db, ticker, timespan, multiplier, period=period)
+
+        # 2. Fetch from DB (it will now have the latest sync)
         data = await StockDataService.get_historical_from_db(
             db, ticker, period, timespan, multiplier
         )
-
-        # 2. If NO data in DB at all, we might want to trigger a sync or fetch once from Polygon
-        # But the user wants a specific 'refresh' call, so let's just return what we have
-        # Or if it's empty, we can do a one-time fetch.
-        if data.empty:
-            # Fallback to direct Polygon fetch for the requested period only (non-persistent)
-            # or we could trigger the massive refresh here.
-            # User said: "pokes the database to know the last computed day... and just refresh"
-            # So I'll implement the refresh logic and use it.
-            await StockDataService.refresh_stock_data(db, ticker, timespan, multiplier)
-            data = await StockDataService.get_historical_from_db(
-                db, ticker, period, timespan, multiplier
-            )
 
         if data.empty:
             return {
