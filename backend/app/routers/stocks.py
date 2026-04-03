@@ -43,6 +43,11 @@ async def get_historical_data(
                 "data": [],
             }
 
+        # 3. Add indicators if intraday
+        if timespan in ["minute", "hour"]:
+            from app.services.chart_indicators import ChartIndicatorsService
+            data = ChartIndicatorsService.add_indicators(data, is_intraday=True)
+
         # Convert to JSON-serializable format
         data_dict = data.reset_index().to_dict("records")
         for record in data_dict:
@@ -60,9 +65,13 @@ async def get_historical_data(
                     if not record["Date"].endswith('Z') and '+' not in record["Date"]:
                         record["Date"] += 'Z'
             
-            for key in ["Open", "High", "Low", "Close", "Volume", "open", "high", "low", "close", "volume"]:
+            for key in ["Open", "High", "Low", "Close", "Volume", "open", "high", "low", "close", "volume", "vwap_intraday"]:
                 if key in record:
                     record[key] = float(record[key]) if pd.notna(record[key]) else None
+            
+            # handle marker_type None substitution handled above but check pd.isna
+            if "marker_type" in record and pd.isna(record["marker_type"]):
+                record["marker_type"] = None
 
         return {
             "ticker": ticker,

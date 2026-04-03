@@ -23,6 +23,11 @@ export interface VolumeEvent {
   volume_spike_ratio: number;
   price_gap_pct: number;
   criteria_met: Record<string, any>;
+  outstanding_shares?: number;
+  float_rotation_pct?: number;
+  catalyst_tags?: string[];
+  catalyst_summary?: string;
+  recent_split_date?: string;
   created_at: string;
 }
 

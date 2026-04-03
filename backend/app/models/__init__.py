@@ -14,6 +14,7 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.news_article import NewsArticle
 from app.models.news_preference import NewsPreference
 from app.models.trade import Tag, Trade, TradeExecution, JournalEntry
+from app.models.stock_split import StockSplit
 
 __all__ = [
     "StockUniverse",
@@ -30,4 +31,5 @@ __all__ = [
     "Trade",
     "TradeExecution",
     "JournalEntry",
+    "StockSplit",
 ]

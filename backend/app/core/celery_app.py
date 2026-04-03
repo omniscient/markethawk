@@ -16,4 +16,8 @@ celery_app.conf.beat_schedule = {
         'task': 'app.tasks.poll_massive_news',
         'schedule': crontab(minute='*', hour='*', day_of_week='1-5'),
     },
+    'sync-stock-splits-nightly': {
+        'task': 'app.tasks.sync_stock_splits',
+        'schedule': crontab(minute='0', hour='1'),
+    },
 }

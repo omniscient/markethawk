@@ -53,8 +53,13 @@ class DiscoveryService:
                 logger.warning("No data returned for grouped daily aggs.")
                 return
 
+            valid_tickers = {t[0] for t in self.db.query(TickerReference.ticker).all()}
+
             count = 0
             for ag in aggs:
+                if ag.ticker not in valid_tickers:
+                    continue
+                    
                 # Update or create metric
                 metric = self.db.query(StockMetric).filter(
                     StockMetric.ticker == ag.ticker,

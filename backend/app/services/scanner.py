@@ -3,7 +3,7 @@ Scanner Service - Pre-market volume scanning logic.
 """
 
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Dict, Any, List
 
 import pandas as pd
@@ -16,7 +16,10 @@ from sqlalchemy import func, desc, or_
 from app.models.volume_event import VolumeEvent
 from app.models.stock_aggregate import StockAggregate
 from app.models.monitored_stock import MonitoredStock
+from app.models.ticker_reference import TickerReference
+from app.models.stock_split import StockSplit
 from app.services.stock_data import StockDataService
+from app.services.catalyst_parser import CatalystParser
 
 
 class ScannerService:
@@ -177,6 +180,23 @@ class ScannerService:
                 
                 gap_pct = (day_metrics["opening_price"] - previous_close) / previous_close * 100 if day_metrics["opening_price"] > 0 else 0
 
+                # Float Rotation
+                ticker_ref = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
+                outstanding_shares = float(ticker_ref.share_class_shares_outstanding) if ticker_ref and ticker_ref.share_class_shares_outstanding else None
+                float_rotation_pct = (pre_market_volume / outstanding_shares * 100) if outstanding_shares and outstanding_shares > 0 else None
+                
+                # Check for recent splits
+                six_months_prior = event_date - timedelta(days=180)
+                recent_split = db.query(StockSplit).filter(
+                    StockSplit.ticker == ticker,
+                    StockSplit.execution_date <= event_date,
+                    StockSplit.execution_date >= six_months_prior
+                ).order_by(desc(StockSplit.execution_date)).first()
+                recent_split_date = recent_split.execution_date if recent_split else None
+
+                # Catalyst Parser
+                catalyst_info = CatalystParser.analyze(ticker, event_date, db)
+
                 criteria_met = {
                     "high_activity": True,
                     "price_spike": bool(is_spike),
@@ -214,6 +234,11 @@ class ScannerService:
                         "price_change_pct": (current_price - previous_close) / previous_close * 100,
                         "price_gap_pct": gap_pct,
                         "market_cap_at_event": market_cap_map.get(ticker),
+                        "outstanding_shares": outstanding_shares,
+                        "float_rotation_pct": round(float_rotation_pct, 4) if float_rotation_pct else None,
+                        "catalyst_tags": catalyst_info.get("tags", []),
+                        "catalyst_summary": catalyst_info.get("summary"),
+                        "recent_split_date": recent_split_date,
                         "criteria_met": criteria_met,
                     }
 
@@ -302,6 +327,23 @@ class ScannerService:
                     
                     gap_pct = (day_metrics["opening_price"] - previous_close) / previous_close * 100 if day_metrics["opening_price"] > 0 else 0
 
+                    # Float Rotation
+                    ticker_ref = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
+                    outstanding_shares = float(ticker_ref.share_class_shares_outstanding) if ticker_ref and ticker_ref.share_class_shares_outstanding else None
+                    float_rotation_pct = (pre_market_volume / outstanding_shares * 100) if outstanding_shares and outstanding_shares > 0 else None
+                    
+                    # Check for recent splits
+                    six_months_prior = event_date - timedelta(days=180)
+                    recent_split = db.query(StockSplit).filter(
+                        StockSplit.ticker == ticker,
+                        StockSplit.execution_date <= event_date,
+                        StockSplit.execution_date >= six_months_prior
+                    ).order_by(desc(StockSplit.execution_date)).first()
+                    recent_split_date = recent_split.execution_date if recent_split else None
+
+                    # Catalyst Parser
+                    catalyst_info = CatalystParser.analyze(ticker, event_date, db)
+
                     event = {
                         "ticker": ticker,
                         "event_date": event_date,
@@ -328,6 +370,11 @@ class ScannerService:
                         "price_change_pct": (current_price - previous_close) / previous_close * 100,
                         "price_gap_pct": gap_pct,
                         "market_cap_at_event": info.get("marketCap"),
+                        "outstanding_shares": outstanding_shares,
+                        "float_rotation_pct": round(float_rotation_pct, 4) if float_rotation_pct else None,
+                        "catalyst_tags": catalyst_info.get("tags", []),
+                        "catalyst_summary": catalyst_info.get("summary"),
+                        "recent_split_date": recent_split_date,
                         "criteria_met": criteria_met,
                     }
 
@@ -354,5 +401,124 @@ class ScannerService:
                 logging.error(f"Error scanning {ticker}: {e}")
                 continue
 
+        db.commit()
+        return results
+
+    @staticmethod
+    async def run_oversold_bounce_scan(
+        tickers: List[str], db: Session
+    ) -> List[Dict[str, Any]]:
+        """Run the Oversold Bounce (Dual RSI) scan."""
+        import numpy as np
+        results = []
+        event_date = datetime.now().date()
+        
+        for ticker in tickers:
+            try:
+                # Fetch recent daily history (need at least ~30 days for reliable RSI)
+                hist_data = await StockDataService.get_historical_data(ticker, "60d")
+                if hist_data.empty or len(hist_data) < 10:
+                    continue
+                
+                df = hist_data.copy()
+                df.sort_index(inplace=True)
+                
+                # FilterOnAvgVolume: 3-day MA of Volume >= 500k
+                df['vol_ma_3'] = df['Volume'].rolling(window=3).mean()
+                
+                # FilterOnHigherPricedStock: Previous close >= 5
+                df['prev_close'] = df['Close'].shift(1)
+                
+                # RSI calculation (Wilder's Smoothing)
+                def calc_rsi(series, period):
+                    delta = series.diff()
+                    up = delta.clip(lower=0)
+                    down = -1 * delta.clip(upper=0)
+                    ema_up = up.ewm(com=period - 1, adjust=False).mean()
+                    ema_down = down.ewm(com=period - 1, adjust=False).mean()
+                    rs = ema_up / ema_down
+                    return 100 - (100 / (1 + rs))
+                    
+                df['rsi_2'] = calc_rsi(df['Close'], 2)
+                df['rsi_5'] = calc_rsi(df['Close'], 5)
+                
+                # Typical Price for Liquidity: (H + L + C + O) / 4
+                df['typ_price'] = (df['High'] + df['Low'] + df['Close'] + df['Open']) / 4
+                df['liq'] = df['Volume'] * df['typ_price']
+                df['avg_liq_5'] = df['liq'].rolling(window=5).mean()
+                
+                # True Range and ATR(1) for Target
+                df['prev_close_tr'] = df['Close'].shift(1)
+                tr1 = df['High'] - df['Low']
+                tr2 = (df['High'] - df['prev_close_tr']).abs()
+                tr3 = (df['Low'] - df['prev_close_tr']).abs()
+                df['tr'] = pd.DataFrame({'tr1': tr1, 'tr2': tr2, 'tr3': tr3}).max(axis=1)
+                df['atr_1_prev'] = df['tr'].shift(1)
+                
+                # Gap Down condition: NOT GapDown means Open >= Prev Low
+                df['prev_low'] = df['Low'].shift(1)
+                
+                # Take the last row (most recent daily candle)
+                today = df.iloc[-1]
+                yesterday = df.iloc[-2]
+                
+                vol_ok = today['vol_ma_3'] >= 500000
+                price_ok = today['prev_close'] >= 5
+                
+                short_rsi_trigger = 15
+                short_rsi_ok = yesterday['rsi_2'] < short_rsi_trigger and today['rsi_2'] >= short_rsi_trigger
+                
+                long_rsi_trigger = 27
+                long_rsi_ok = yesterday['rsi_5'] < long_rsi_trigger and today['rsi_5'] >= long_rsi_trigger
+                
+                no_gap_down = today['Open'] >= today['prev_low']
+                
+                if vol_ok and price_ok and short_rsi_ok and long_rsi_ok and no_gap_down:
+                    criteria_met = {
+                        "volume_ma_3_ok": True,
+                        "price_ge_5": True,
+                        "rsi_2_crossed": True,
+                        "rsi_5_crossed": True,
+                        "no_gap_down": True,
+                        "target_range": float(today['atr_1_prev']),
+                        "avg_liquidity_5d": float(today['avg_liq_5'])
+                    }
+                    
+                    event = {
+                        "ticker": ticker,
+                        "event_date": event_date,
+                        "event_type": "oversold_bounce",
+                        "pre_market_volume": 0,
+                        "avg_volume_20d": int(today['vol_ma_3']),
+                        "relative_volume": 0,
+                        "volume_spike_ratio": 0,
+                        "previous_close": float(today['prev_close']),
+                        "opening_price": float(today['Open']),
+                        "closing_price": float(today['Close']),
+                        "criteria_met": criteria_met,
+                    }
+                    
+                    # Store in DB
+                    existing_event = db.query(VolumeEvent).filter(
+                        VolumeEvent.ticker == ticker,
+                        VolumeEvent.event_date == event_date,
+                        VolumeEvent.event_type == "oversold_bounce"
+                    ).first()
+
+                    if not existing_event:
+                        volume_event = VolumeEvent(**event)
+                        db.add(volume_event)
+                        db.flush()
+                        event['id'] = volume_event.id
+                    else:
+                        for key, value in event.items():
+                            setattr(existing_event, key, value)
+                        event['id'] = existing_event.id
+                    
+                    results.append(event)
+                    
+            except Exception as e:
+                logging.error(f"Error in oversold_bounce scan for {ticker}: {e}")
+                
         db.commit()
         return results

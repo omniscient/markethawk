@@ -15,6 +15,7 @@ from app.services.stock_data import StockDataService
 from app.models.news_preference import NewsPreference
 from app.models.news_article import NewsArticle
 from app.models.monitored_stock import MonitoredStock
+from app.models.stock_split import StockSplit
 import json
 
 logger = logging.getLogger(__name__)
@@ -466,3 +467,72 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
         db.rollback()
     finally:
         db.close()
+
+
+@celery_app.task(bind=True, max_retries=3)
+def sync_stock_splits(self):
+    """
+    Celery task to fetch recent stock splits from Polygon.io.
+    Fetches splits executed in the last 180 days.
+    """
+    db: Session = SessionLocal()
+    try:
+        six_months_ago = (datetime.utcnow() - timedelta(days=180)).strftime("%Y-%m-%d")
+        url = "https://api.polygon.io/v3/reference/splits"
+        headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
+        params = {
+            "execution_date.gte": six_months_ago,
+            "limit": 1000,
+            "sort": "execution_date",
+            "order": "desc"
+        }
+
+        with httpx.Client(timeout=30.0) as client:
+            response = client.get(url, headers=headers, params=params)
+            if response.status_code == 429:
+                logger.warning("Rate limit hit syncing splits.")
+                raise self.retry(countdown=60)
+            response.raise_for_status()
+            data = response.json()
+            
+        results = data.get("results", [])
+        count = 0
+        
+        for item in results:
+            ticker = item.get("ticker")
+            execution_date_str = item.get("execution_date")
+            split_from = item.get("split_from")
+            split_to = item.get("split_to")
+            
+            if not all([ticker, execution_date_str, split_from, split_to]):
+                continue
+                
+            execution_date = datetime.strptime(execution_date_str, "%Y-%m-%d").date()
+            
+            # Check if exists
+            existing = db.query(StockSplit).filter(
+                StockSplit.ticker == ticker,
+                StockSplit.execution_date == execution_date
+            ).first()
+            
+            if not existing:
+                split = StockSplit(
+                    ticker=ticker,
+                    execution_date=execution_date,
+                    split_from=split_from,
+                    split_to=split_to
+                )
+                db.add(split)
+                count += 1
+                
+        db.commit()
+        if count > 0:
+            logger.info(f"✅ Synced {count} new stock splits.")
+            
+    except Exception as e:
+        logger.error(f"Error syncing stock splits: {e}")
+        db.rollback()
+        raise self.retry(exc=e, countdown=60)
+    finally:
+        db.close()
+

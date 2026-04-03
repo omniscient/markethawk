@@ -70,6 +70,8 @@ async def run_scanner(
     try:
         if request.scanner_type == "liquidity_hunt":
             results = await ScannerService.run_liquidity_hunt_scan(tickers, db)
+        elif request.scanner_type == "oversold_bounce":
+            results = await ScannerService.run_oversold_bounce_scan(tickers, db)
         else:
             results = await ScannerService.run_pre_market_scan(tickers, db)
         

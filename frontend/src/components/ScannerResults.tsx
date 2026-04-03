@@ -27,13 +27,20 @@ interface ScannerResultsProps {
 }
 
 const ScannerResults: React.FC<ScannerResultsProps> = ({ 
-  results, 
-  onSort, 
-  sortBy, 
-  sortOrder 
+  results,
+  onSort,
+  sortBy,
+  sortOrder
 }) => {
   const [filterTicker, setFilterTicker] = useState('');
   const [minVolumeSpike, setMinVolumeSpike] = useState(0);
+
+  const getCatalystColor = (tag: string) => {
+    const t = tag.toLowerCase();
+    if (t.includes('dilution') || t.includes('miss') || t.includes('downgrade')) return 'bg-red-500/20 text-red-400 border-red-500/30';
+    if (t.includes('beat') || t.includes('upgrade') || t.includes('won') || t.includes('fda') || t.includes('earnings_beat')) return 'bg-green-500/20 text-green-400 border-green-500/30';
+    return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+  };
 
   const filteredEvents = results.events?.filter(event => {
     const matchesTicker = !filterTicker ||
@@ -160,6 +167,14 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                   currentOrder={sortOrder} 
                   onSort={onSort} 
                 />
+                <SortableHeader 
+                  label="Float Rot %" 
+                  sortKey="float_rotation_pct" 
+                  currentSort={sortBy} 
+                  currentOrder={sortOrder} 
+                  onSort={onSort} 
+                />
+                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Catalysts</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Criteria</th>
               </tr>
             </thead>

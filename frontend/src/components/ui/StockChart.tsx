@@ -75,6 +75,7 @@ const StockChart: React.FC<StockChartProps> = ({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const vwapSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const markersPluginRef = useRef<any | null>(null);
   const prevDataLengthRef = useRef<number>(0);
   const currentBarRef = useRef<{
@@ -165,6 +166,16 @@ const StockChart: React.FC<StockChartProps> = ({
         },
       });
       volumeSeriesRef.current = volumeSeries;
+
+      // Add VWAP line
+      const vwapSeries = chart.addSeries(LineSeries, {
+        color: '#f97316', // orange-500
+        lineWidth: 2,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+      vwapSeriesRef.current = vwapSeries;
 
     } else if (type === 'area') {
       const areaSeries = chart.addSeries(AreaSeries, {
@@ -288,9 +299,45 @@ const StockChart: React.FC<StockChartProps> = ({
         volumeSeriesRef.current.setData(uniqueVolumeData);
       }
 
-      // Add markers for scanner events
-      if (events && events.length > 0 && markersPluginRef.current) {
-        const markers = events
+      if (vwapSeriesRef.current) {
+        const vwapData = data
+          .filter(d => d.Date && d.vwap_intraday != null)
+          .map(d => {
+            let timeValue: Time;
+            if (timespan === 'day') {
+              timeValue = d.Date.split('T')[0] as Time;
+            } else {
+              const dt = new Date(d.Date);
+              let timestamp = dt.getTime() / 1000;
+              if (timespan === 'hour') {
+                timestamp = Math.floor(timestamp / 3600) * 3600;
+              } else if (timespan === 'minute') {
+                timestamp = Math.floor(timestamp / 60) * 60;
+              }
+              timeValue = toLocalTime(timestamp) as Time;
+            }
+            return {
+              time: timeValue,
+              value: d.vwap_intraday,
+            };
+          })
+          .sort((a, b) => {
+            if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
+            return String(a.time).localeCompare(String(b.time));
+          });
+        
+        const uniqueVwapData = vwapData.filter((item, index, self) =>
+          index === self.findIndex((t) => t.time === item.time)
+        );
+
+        vwapSeriesRef.current.setData(uniqueVwapData);
+      }
+
+      // Add markers for scanner events and inline indicators
+      let allMarkers: any[] = [];
+      
+      if (events && events.length > 0) {
+        const eventsMarkers = events
           .filter(e => e.event_date)
           .map(e => {
             let timeValue: Time;
@@ -314,15 +361,63 @@ const StockChart: React.FC<StockChartProps> = ({
               size: 1,
               text: '', // No text as requested
             };
-          })
-          .sort((a, b) => {
+          });
+          allMarkers = [...allMarkers, ...eventsMarkers];
+      }
+      
+      // Map inline backend indicators (swipe, flush, high_vol) 
+      const indicatorMarkers = data
+        .filter(d => d.Date && d.marker_type != null)
+        .map(d => {
+          let timeValue: Time;
+          if (timespan === 'day') {
+            timeValue = d.Date.split('T')[0] as Time;
+          } else {
+            const dt = new Date(d.Date);
+            let timestamp = dt.getTime() / 1000;
+            if (timespan === 'hour') {
+              timestamp = Math.floor(timestamp / 3600) * 3600;
+            } else if (timespan === 'minute') {
+              timestamp = Math.floor(timestamp / 60) * 60;
+            }
+            timeValue = toLocalTime(timestamp) as Time;
+          }
+          
+          let color = '#fbbf24';
+          let shape: 'circle' | 'square' | 'arrowUp' | 'arrowDown' = 'arrowUp';
+          let position: 'aboveBar' | 'belowBar' | 'inBar' = 'belowBar';
+          
+          if (d.marker_type === 'swipe') {
+            color = '#ef4444'; // red
+            shape = 'arrowDown';
+            position = 'aboveBar';
+          } else if (d.marker_type === 'flush') {
+            color = '#10b981'; // green
+            shape = 'arrowUp';
+            position = 'belowBar';
+          }
+           
+          return {
+            time: timeValue,
+            position: position,
+            color: color,
+            shape: shape,
+            size: 1,
+            text: '',
+          };
+        });
+      
+      allMarkers = [...allMarkers, ...indicatorMarkers];
+
+      if (allMarkers.length > 0 && markersPluginRef.current) {
+        allMarkers.sort((a, b) => {
             if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
             return String(a.time).localeCompare(String(b.time));
           });
         
         // Filter markers to only those that have a corresponding candle in the current data
         const dataTimes = new Set(uniqueFormattedData.map(d => String(d.time)));
-        const validMarkers = markers.filter(m => dataTimes.has(m.time as string));
+        const validMarkers = allMarkers.filter(m => dataTimes.has(m.time as string));
         
         // Use v5 createSeriesMarkers plugin API
         markersPluginRef.current.setMarkers(validMarkers);
