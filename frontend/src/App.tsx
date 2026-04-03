@@ -14,6 +14,7 @@ import StockDetailPage from './pages/StockDetailPage';
 import Journal from './pages/Journal';
 import EdgeExplorer from './pages/EdgeExplorer';
 import PreMarketMovers from './pages/PreMarketMovers';
+import { GlobalErrorToast } from './components/ui/GlobalErrorToast';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -29,7 +30,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <div className="min-h-screen bg-financial-dark text-financial-light">
+        <div className="min-h-screen bg-financial-dark text-financial-light relative">
           <Layout>
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -43,6 +44,7 @@ function App() {
               <Route path="/stock/:ticker" element={<StockDetailPage />} />
             </Routes>
           </Layout>
+          <GlobalErrorToast />
         </div>
       </Router>
       <ReactQueryDevtools initialIsOpen={false} />

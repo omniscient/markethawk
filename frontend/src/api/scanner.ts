@@ -1,16 +1,7 @@
-import axios from 'axios';
+import { apiClient } from './client';
 
-const API_BASE_URL = '/api';
+// ---- Types ---------------------------------------------------------------- //
 
-// API client instance
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Interfaces
 export interface VolumeEvent {
   id: number;
   uuid: string;
@@ -110,7 +101,34 @@ export interface StorageStats {
   total: { bytes: number; formatted: string };
 }
 
-// API functions
+export interface MonitoredStock {
+  id: number;
+  ticker: string;
+  company_name?: string;
+  sector?: string;
+  market_cap?: number;
+  added_date: string;
+  is_active: boolean;
+}
+
+export interface RefreshUniverseResponse {
+  status: string;
+  scanned: number;
+  added: number;
+  message: string;
+}
+
+export interface SyncAggregatesOptions {
+  from_date: string;
+  to_date: string;
+  multiplier?: number;
+  timespan?: string;
+  adjusted?: boolean;
+  sort?: string;
+  limit?: number;
+}
+
+// ---- Scanner -------------------------------------------------------------- //
 
 export const fetchScannerResults = async (params?: {
   ticker?: string;
@@ -140,6 +158,21 @@ export const fetchScannerHistory = async (limit: number = 20): Promise<ScannerRu
   return response.data;
 };
 
+export const fetchMarketStats = async (): Promise<MarketStats> => {
+  const response = await apiClient.get('/scanner/stats');
+  return response.data;
+};
+
+export const fetchPreMarketMovers = async (params?: {
+  min_volume?: number;
+  limit?: number;
+}): Promise<PreMarketMoversResponse> => {
+  const response = await apiClient.get('/scanner/movers/pre-market', { params });
+  return response.data;
+};
+
+// ---- Universe ------------------------------------------------------------- //
+
 export const fetchStockUniverses = async (): Promise<StockUniverse[]> => {
   const response = await apiClient.get('/universe/list');
   return response.data;
@@ -158,37 +191,21 @@ export const deleteStockUniverse = async (id: number): Promise<void> => {
   await apiClient.delete(`/universe/${id}`);
 };
 
-export const updateStockUniverse = async (id: number, universe: {
-  name?: string;
-  description?: string;
-  criteria?: Record<string, any>;
-  is_active?: boolean;
-}): Promise<StockUniverse> => {
+export const updateStockUniverse = async (
+  id: number,
+  universe: {
+    name?: string;
+    description?: string;
+    criteria?: Record<string, any>;
+    is_active?: boolean;
+  },
+): Promise<StockUniverse> => {
   const response = await apiClient.put(`/universe/${id}`, universe);
   return response.data;
 };
 
-export interface MonitoredStock {
-  id: number;
-  ticker: string;
-  company_name?: string;
-  sector?: string;
-  market_cap?: number;
-  added_date: string;
-  is_active: boolean;
-}
-
-export interface RefreshUniverseResponse {
-  status: string;
-  scanned: number;
-  added: number;
-  message: string;
-}
-
 export const syncFundamentals = async (delay: number = 15.0): Promise<any> => {
-  const response = await apiClient.post('/universe/sync/fundamentals', null, {
-    params: { delay }
-  });
+  const response = await apiClient.post('/universe/sync/fundamentals', null, { params: { delay } });
   return response.data;
 };
 
@@ -198,9 +215,7 @@ export const syncMetrics = async (): Promise<any> => {
 };
 
 export const syncTickerDetails = async (delay: number = 15.0): Promise<any> => {
-  const response = await apiClient.post('/universe/sync/details', null, {
-    params: { delay }
-  });
+  const response = await apiClient.post('/universe/sync/details', null, { params: { delay } });
   return response.data;
 };
 
@@ -219,39 +234,31 @@ export const fetchUniverseStocks = async (id: number): Promise<MonitoredStock[]>
   return response.data;
 };
 
-export interface SyncAggregatesOptions {
-  from_date: string;
-  to_date: string;
-  multiplier?: number;
-  timespan?: string;
-  adjusted?: boolean;
-  sort?: string;
-  limit?: number;
-}
-
 export const syncUniverseAggregates = async (
   id: number,
-  options: SyncAggregatesOptions
+  options: SyncAggregatesOptions,
 ): Promise<{ status: string; message: string }> => {
   const response = await apiClient.post(`/universe/${id}/sync-aggregates`, null, {
     params: {
       from_date: options.from_date,
       to_date: options.to_date,
       multiplier: options.multiplier ?? 1,
-      timespan: options.timespan ?? "minute",
+      timespan: options.timespan ?? 'minute',
       adjusted: options.adjusted ?? true,
-      sort: options.sort ?? "asc",
-      limit: options.limit ?? 50000
-    }
+      sort: options.sort ?? 'asc',
+      limit: options.limit ?? 50000,
+    },
   });
   return response.data;
 };
+
+// ---- Stocks --------------------------------------------------------------- //
 
 export const fetchHistoricalData = async (
   ticker: string,
   period: string = '30d',
   timespan: string = 'day',
-  multiplier: number = 1
+  multiplier: number = 1,
 ): Promise<{
   ticker: string;
   period: string;
@@ -261,63 +268,47 @@ export const fetchHistoricalData = async (
   data: any[];
 }> => {
   const response = await apiClient.get(`/stocks/historical/${ticker}`, {
-    params: { period, timespan, multiplier }
+    params: { period, timespan, multiplier },
   });
   return response.data;
 };
 
-export const fetchMarketStats = async (): Promise<MarketStats> => {
-  const response = await apiClient.get('/scanner/stats');
-  return response.data;
-};
+// ---- System --------------------------------------------------------------- //
 
 export const fetchStorageStats = async (): Promise<StorageStats> => {
   const response = await apiClient.get('/system/storage');
   return response.data;
 };
 
-export const fetchPreMarketMovers = async (params?: {
-  min_volume?: number;
-  limit?: number;
-}): Promise<PreMarketMoversResponse> => {
-  const response = await apiClient.get('/scanner/movers/pre-market', { params });
-  return response.data;
-};
+// ---- WebSocket (non-Axios) ------------------------------------------------ //
 
-// WebSocket connection for real-time updates (future implementation)
+/** Create a raw WebSocket for real-time scanner updates. */
 export const createScannerWebSocket = (): WebSocket | null => {
   try {
-    const ws = new WebSocket(`ws://localhost:8000/ws/scanner`);
-
-    ws.onopen = () => {
-      console.log('Scanner WebSocket connected');
-    };
-
-    ws.onclose = () => {
-      console.log('Scanner WebSocket disconnected');
-    };
-
-    ws.onerror = (error) => {
-      console.error('Scanner WebSocket error:', error);
-    };
-
+    const wsBase = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000';
+    const ws = new WebSocket(`${wsBase}/ws/scanner`);
+    ws.onopen = () => console.log('[WS] Scanner connected');
+    ws.onclose = () => console.log('[WS] Scanner disconnected');
+    ws.onerror = (e) => console.error('[WS] Scanner error', e);
     return ws;
-  } catch (error) {
-    console.error('Failed to create WebSocket connection:', error);
+  } catch (e) {
+    console.error('[WS] Failed to create connection', e);
     return null;
   }
 };
 
-// Error handling wrapper
+// ---- Error Helpers -------------------------------------------------------- //
+
+/**
+ * Extract a human-readable message from an Axios error.
+ * Callers can still use this for local inline error display.
+ */
 export const handleApiError = (error: any): string => {
   if (error.response) {
-    // Server responded with error
-    return error.response.data?.detail || error.response.statusText;
-  } else if (error.request) {
-    // Request made but no response
-    return 'Unable to connect to server';
-  } else {
-    // Something else happened
-    return error.message || 'An error occurred';
+    return error.response.data?.detail ?? error.response.statusText;
   }
+  if (error.request) {
+    return 'Unable to connect to server';
+  }
+  return error.message ?? 'An unexpected error occurred';
 };

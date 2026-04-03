@@ -1,6 +1,6 @@
-import axios from 'axios';
+import { apiClient } from './client';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+// ---- Types ---------------------------------------------------------------- //
 
 export interface Trade {
   id: number;
@@ -58,61 +58,63 @@ export interface JournalEntry {
   updated_at: string;
 }
 
+// ---- API calls ------------------------------------------------------------ //
+
 export const journalApi = {
-  getTrades: async (symbol?: string, status?: string) => {
-    const params = new URLSearchParams();
-    if (symbol) params.append('symbol', symbol);
-    if (status) params.append('status', status);
-    const response = await axios.get<Trade[]>(`${API_BASE_URL}/journal/trades?${params.toString()}`);
+  getTrades: async (symbol?: string, status?: string): Promise<Trade[]> => {
+    const response = await apiClient.get<Trade[]>('/journal/trades', {
+      params: { symbol, status },
+    });
     return response.data;
   },
 
-  getTrade: async (tradeId: number) => {
-    const response = await axios.get<Trade>(`${API_BASE_URL}/journal/trades/${tradeId}`);
+  getTrade: async (tradeId: number): Promise<Trade> => {
+    const response = await apiClient.get<Trade>(`/journal/trades/${tradeId}`);
     return response.data;
   },
 
-  createTrade: async (trade: any) => {
-    const response = await axios.post<Trade>(`${API_BASE_URL}/journal/trades`, trade);
+  createTrade: async (trade: any): Promise<Trade> => {
+    const response = await apiClient.post<Trade>('/journal/trades', trade);
     return response.data;
   },
 
-  updateTrade: async (tradeId: number, data: any) => {
-    const response = await axios.patch<Trade>(`${API_BASE_URL}/journal/trades/${tradeId}`, data);
+  updateTrade: async (tradeId: number, data: any): Promise<Trade> => {
+    const response = await apiClient.patch<Trade>(`/journal/trades/${tradeId}`, data);
     return response.data;
   },
 
-  getStats: async () => {
-    const response = await axios.get<TradeStats>(`${API_BASE_URL}/journal/stats`);
+  getStats: async (): Promise<TradeStats> => {
+    const response = await apiClient.get<TradeStats>('/journal/stats');
     return response.data;
   },
 
-  importTrades: async (file: File, broker: string) => {
+  importTrades: async (file: File, broker: string): Promise<any> => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await axios.post(`${API_BASE_URL}/journal/import?broker=${broker}`, formData, {
+    const response = await apiClient.post(`/journal/import`, formData, {
+      params: { broker },
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
-  getEntries: async () => {
-    const response = await axios.get<JournalEntry[]>(`${API_BASE_URL}/journal/entries`);
+  getEntries: async (): Promise<JournalEntry[]> => {
+    const response = await apiClient.get<JournalEntry[]>('/journal/entries');
     return response.data;
   },
 
-  createEntry: async (data: any) => {
-    const response = await axios.post<JournalEntry>(`${API_BASE_URL}/journal/entries`, data);
+  createEntry: async (data: any): Promise<JournalEntry> => {
+    const response = await apiClient.post<JournalEntry>('/journal/entries', data);
     return response.data;
   },
 
-  getTags: async () => {
-    const response = await axios.get<Tag[]>(`${API_BASE_URL}/journal/tags`);
+  getTags: async (): Promise<Tag[]> => {
+    const response = await apiClient.get<Tag[]>('/journal/tags');
     return response.data;
   },
 
-  createTag: async (data: any) => {
-    const response = await axios.post<Tag>(`${API_BASE_URL}/journal/tags`, data);
+  createTag: async (data: any): Promise<Tag> => {
+    const response = await apiClient.post<Tag>('/journal/tags', data);
     return response.data;
   },
 };

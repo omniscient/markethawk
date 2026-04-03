@@ -34,7 +34,16 @@ class Settings:
     APP_NAME: str = "Stock Scanner API"
     APP_VERSION: str = "1.0.0"
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
-    
+
+    # Environment: "development" returns full stack traces to clients.
+    # "production" hides internals and only returns error_id.
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
+
+    # Error Tracking
+    # SEQ_URL: base URL for the Seq container (no trailing slash).
+    # Set to an empty string or "disabled" to fall back to stdout-only logging.
+    SEQ_URL: str = os.getenv("SEQ_URL", "http://seq:5341")
+
     # CORS
     CORS_ORIGINS: list = ["*"]
 

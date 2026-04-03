@@ -27,7 +27,8 @@ services:
       DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       REDIS_URL: redis://redis:6379/0
-      ENVIRONMENT: development
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SEQ_URL: http://seq:5341
       WATCHFILES_FORCE_POLLING: "true"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
@@ -82,6 +83,8 @@ services:
       DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SEQ_URL: http://seq:5341
     depends_on:
       - postgres
       - redis
@@ -101,6 +104,8 @@ services:
       DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SEQ_URL: http://seq:5341
     depends_on:
       - postgres
       - redis
@@ -144,12 +149,29 @@ services:
     networks:
       - stockscanner-network
 
+  # Seq for centralized structured error logging
+  seq:
+    image: datalust/seq:latest
+    container_name: stockscanner-seq
+    environment:
+      ACCEPT_EULA: Y
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+    ports:
+      - "5380:80"        # UI Port (Web Interface)
+      - "5341:5341"      # Ingestion Port (API)
+    volumes:
+      - seq_data:/data
+    networks:
+      - stockscanner-network
+
 volumes:
   postgres_data:
   redis_data:
   pgadmin_data:
+  seq_data:
 
 
 networks:
   stockscanner-network:
     driver: bridge
+

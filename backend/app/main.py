@@ -5,11 +5,15 @@ FastAPI-based REST API for stock scanning and alert system
 
 import logging
 import os
+import traceback
+import hashlib
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.core.error_tracking import ErrorTrackerFactory
 from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router
 from app.core.celery_app import celery_app as celery
 from app.services.websocket_manager import websocket_manager
@@ -106,6 +110,39 @@ def create_app() -> FastAPI:
     app.include_router(live_data_router)
     app.include_router(journal_router)
     app.include_router(system_router)
+
+    # Global Exception Handler
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        tb_string = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        
+        # Hash traceback to generate deterministic Error ID
+        error_hash = hashlib.md5(tb_string.encode('utf-8')).hexdigest()[:8]
+        error_id = f"ERR-{error_hash}"
+        
+        # Send to Tracking System (Seq)
+        tracker = ErrorTrackerFactory.get_tracker()
+        tracker.log_error(error_id, exc, tb_string, str(request.url.path))
+        
+        # In Development mode, return stack trace. In Prod, just the error ID.
+        if settings.ENVIRONMENT.lower() in ("development", "debug"):
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "message": "Internal Server Error",
+                    "error_id": error_id,
+                    "detail": str(exc),
+                    "stack_trace": tb_string
+                }
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "message": "Internal Server Error",
+                    "error_id": error_id
+                }
+            )
 
     # Startup event
     @app.on_event("startup")

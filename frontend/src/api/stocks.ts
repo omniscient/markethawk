@@ -1,13 +1,6 @@
-import axios from 'axios';
+import { apiClient } from './client';
 
-const API_BASE_URL = '/api';
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+// ---- Types ---------------------------------------------------------------- //
 
 export interface StockDetailConsolidated {
   ticker: string;
@@ -29,14 +22,20 @@ export interface StockDetailConsolidated {
   last_updated: string;
 }
 
-export const fetchStockDetails = async (ticker: string) : Promise<StockDetailConsolidated> => {
+// ---- API calls ------------------------------------------------------------ //
+
+export const fetchStockDetails = async (ticker: string): Promise<StockDetailConsolidated> => {
   const response = await apiClient.get(`/stocks/details/${ticker}`);
   return response.data;
 };
 
-export const refreshStockData = async (ticker: string, timespan: string = 'day', period?: string): Promise<any> => {
+export const refreshStockData = async (
+  ticker: string,
+  timespan: string = 'day',
+  period?: string,
+): Promise<any> => {
   const response = await apiClient.post(`/stocks/refresh/${ticker}`, null, {
-    params: { timespan, period }
+    params: { timespan, period },
   });
   return response.data;
 };

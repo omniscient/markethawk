@@ -1,6 +1,6 @@
-import axios from 'axios';
+import { apiClient } from './client';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// ---- Types ---------------------------------------------------------------- //
 
 export interface SystemInfo {
   name: string;
@@ -9,12 +9,21 @@ export interface SystemInfo {
   log_level: string;
 }
 
+export interface StorageStats {
+  scanner: { bytes: number; formatted: string };
+  historical: { bytes: number; formatted: string };
+  settings: { bytes: number; formatted: string };
+  total: { bytes: number; formatted: string };
+}
+
+// ---- API calls ------------------------------------------------------------ //
+
 export const getSystemInfo = async (): Promise<SystemInfo> => {
-  const response = await axios.get(`${API_BASE_URL}/api/system/info`);
+  const response = await apiClient.get('/system/info');
   return response.data;
 };
 
-export const getStorageStats = async () => {
-  const response = await axios.get(`${API_BASE_URL}/api/system/storage`);
+export const getStorageStats = async (): Promise<StorageStats> => {
+  const response = await apiClient.get('/system/storage');
   return response.data;
 };
