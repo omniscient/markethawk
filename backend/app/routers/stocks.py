@@ -62,7 +62,9 @@ async def get_historical_data(
                 else:
                     # Convert to ISO format with Z
                     record["Date"] = record[date_col].isoformat()
-                    if not record["Date"].endswith('Z') and '+' not in record["Date"]:
+                    # Only append Z if it's naive (no offset '+', '-', or 'Z' suffix after time 'T')
+                    time_part = record["Date"].split('T')[1] if 'T' in record["Date"] else ""
+                    if time_part and not any(c in time_part for c in ['Z', '+', '-']):
                         record["Date"] += 'Z'
             
             for key in ["Open", "High", "Low", "Close", "Volume", "open", "high", "low", "close", "volume", "vwap_intraday"]:

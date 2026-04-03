@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import pytz
 
 class ChartIndicatorsService:
     @staticmethod
@@ -19,7 +18,6 @@ class ChartIndicatorsService:
             df.index = df.index.tz_convert('America/New_York')
 
         date_col = df.index.date
-        time_index = df.index.time
         
         # Calculate daily volume / cumulative volume
         df['TodayVolume'] = df.groupby(date_col)['Volume'].cumsum()
@@ -31,22 +29,8 @@ class ChartIndicatorsService:
         df['cum_C_V'] = (df['Close'] * df['Volume']).groupby(date_col).cumsum()
         df['vwap_intraday'] = df['cum_C_V'] / df['TodayVolume']
         
-        # Rolling indicators
-        # Note: AFL Ref(x, -1) means shift(1). Ref(MA(V, 5), 5) in AFL implies 
-        # looking at the MA(V, 5) from 5 bars ago?? Wait... 
-        # AFL Ref(array, amount) where amount > 0 means look FORWARD?
-        # Actually in AFL, negative amount means look backwards. But wait, in AmiBroker:
-        # Ref(array, period) -> period parameter is how many bars to look forward/backward. 
-        # Wait, Ref(C, -1) is yesterday's close. Ref(MA(V, 5), 5)? That might be an error in the original AFL or it means looking 5 bars forward?! No, AmiBroker `ref(ATR(3),3)` means look forward if positive?
-        # Wait, if that is positive, we cannot look forward in real-time. Let's look at the script:
-        # Ref(ATR(3), 3)? Or could it be they meant Ref(C, -5) since some use Ref(..., -5)?
-        # Let's check AmiBroker docs: Ref(ARRAY, period). period > 0 looks into the future. period < 0 looks into the past.
-        # BUT maybe the user wrote it thinking it was positive backwards? "Ref(ATR(3),3)". "ref(ATR(2),5)". Wait, if you look into the future, it's repainting! Is it a repainting indicator??
-        # Or maybe the user meant SMA of volume shifted back? "shift" in pandas. Let me use backward shifts if they meant delayed?
-        # Let me assume `Ref(MA(V, 5), 5)` means `shift(5)`. Wait, if they meant backwards, they would write `Ref(MA(V, 5), -5)`. In AFL, if they wrote `5`, it actually repaints using future bars. "swipe = ... AND L <= Ref(L, -1)... AND ATR(1) > marketAtrSwipeFactor*ref(ATR(3),3)". 
-        # If it repaints, it can't be used real time. The user probably meant `Ref(MA(V, 5), -5)`! Let's assume they made a typo and meant past lookback, so using `shift(period)`.
-        
         df['Vol_MA_5'] = df['Volume'].rolling(5).mean()
+        # AFL Ref(MA(V, 5), 5) - we use backward shift (past bar lookback) for non-repainting logic
         df['fastVolumeAverage'] = df['Vol_MA_5'].shift(5)
         
         def calculate_atr(period):
@@ -75,16 +59,18 @@ class ChartIndicatorsService:
         df['isHighestVolumeOfDay'] = df['Volume'] > df['HHV_Vol_Today']
         
         # Conditions based on time exactly as AFL
-        # Time conditions
+        # TimeNum() in AFL = HHMMSS as an integer (e.g. 9:30:00 -> 93000)
+        # We replicate this with: hour*10000 + minute*100 + second
         hour = df.index.hour
         minute = df.index.minute
-        time_num = hour * 10000 + minute * 100
+        second = df.index.second
+        time_num = hour * 10000 + minute * 100 + second
         
         df['isMarketHours'] = (time_num >= 93000) & (time_num <= 160000)
         df['isGhostPrint'] = (time_num >= 75900) & (time_num <= 81500)
         df['isOpenOrClose'] = ((time_num >= 93000) & (time_num <= 93500)) | ((time_num >= 155900) & (time_num <= 160500))
         
-        df['isMinimumVolumePerCandle'] = df['Volume'] >= 200 # 20,000 shares if V is in 100s, but here Volume is actual. Wait, if V is actual, 200 might mean 20,000? Let's use 200 as in script.
+        # Market hour conditions
         df['isMinimumVolumeAverage'] = df['TodayVolume'] >= 10000
         
         df['Ref_V_1'] = df['Volume'].shift(1)
@@ -98,9 +84,7 @@ class ChartIndicatorsService:
         marketAtrFlushFactor = 2
         marketAtrSwipeFactor = 2
         
-        # Note: AFL ref(ATR(3),3) we'll assume is shift(3). Actually, let's look at standard AmiBroker usage.
-        # Ref(ATR(3), -3) is 3 bars ago. Ref(ATR(3), 3) is 3 bars ahead (repainted).
-        # We will use shift(3) meaning 3 bars BEFORE (past), because that's what's realistic for a backtest or live trading.
+        # AFL Ref(ATR(N), N) - implemented as past lookback shift(N) for non-repainting behaviour
         df['swipe'] = (~df['isRefVolumeZero']) & df['isMinimumVolumeAverage'] & (df['Volume'] > marketVolumeFactor * df['fastVolumeAverage']) & (df['ATR_1'] > marketAtrSwipeFactor * df['ATR_3'].shift(3)) & (df['High'] >= df['High'].shift(1)) & (df['High'] >= df['HHV_30'])
         
         df['flush'] = (~df['isRefVolumeZero']) & df['isMinimumVolumeAverage'] & (df['Volume'] > marketVolumeFactor * df['fastVolumeAverage']) & (df['ATR_1'] > marketAtrFlushFactor * df['ATR_2'].shift(5)) & (df['Low'] <= df['Low'].shift(1)) & (df['Low'] <= df['LLV_30'])
@@ -130,8 +114,27 @@ class ChartIndicatorsService:
             df['isHighVolTri']
         ]
         choices = ['swipe', 'flush', 'high_vol']
-        df['marker_type'] = np.select(conditions, choices, default=None)
-        # convert numpy "None" or "nan" string to actual python None
-        df['marker_type'] = df['marker_type'].replace('nan', None)
+        # np.select with default=None returns the string '0' or 'None' in some numpy versions.
+        # Use default='' and then convert to None for clean JSON serialization.
+        result = np.select(conditions, choices, default='')
+        df['marker_type'] = pd.array(result, dtype=object)
+        df['marker_type'] = df['marker_type'].where(df['marker_type'] != '', other=None)
+        
+        # Drop intermediate calculation columns to keep payload slim
+        cols_to_drop = [
+            'cum_C_V', 'TodayVolume', 'Vol_MA_5', 'fastVolumeAverage',
+            'ATR_1', 'ATR_2', 'ATR_3', 'ATR_10',
+            'HHV_30', 'LLV_30', 'HHV_10', 'LLV_10',
+            'HHV_Vol_Today', 'isHighestVolumeOfDay',
+            'isMarketHours', 'isGhostPrint', 'isOpenOrClose',
+            'isMinimumVolumePerCandle', 'isMinimumVolumeAverage',
+            'Ref_V_1', 'Ref_V_2', 'Ref_V_3', 'Ref_V_4', 'isRefVolumeZero',
+            'swipe', 'flush', 'isMarketSwipe', 'isMarketFlush',
+            'isPreMarketSwipe', 'isPreMarketFlush',
+            'shouldPrintDownTriangle', 'shouldPrintUpTriangle', 'isHighVolTri',
+        ]
+        df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
+        # Convert back to UTC for standard serialization
+        df.index = df.index.tz_convert('UTC')
         
         return df
