@@ -1,5 +1,9 @@
 """
-Stock Data Service - Polygon.io integration for stock data.
+Stock Data Service - provider-agnostic stock data layer.
+
+All external data access is routed through DataProviderFactory so the
+underlying vendor (Polygon, IBKR, etc.) can be swapped without touching
+this file or any router that depends on it.
 """
 
 import logging
@@ -7,19 +11,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 import pandas as pd
-from polygon import RESTClient
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
-from app.core.config import settings
 from app.models.stock_aggregate import StockAggregate
-
-
-# Initialize Polygon client
-polygon_client: Optional[RESTClient] = (
-    RESTClient(settings.POLYGON_API_KEY) if settings.POLYGON_API_KEY else None
-)
+from app.providers import DataProviderFactory
 
 
 class StockDataService:
@@ -27,10 +24,11 @@ class StockDataService:
 
     @staticmethod
     async def get_historical_data(ticker: str, period: str = "30d") -> pd.DataFrame:
-        """Get historical stock data from Polygon.io."""
+        """Get historical stock data via the Massive (Polygon) provider."""
         try:
-            if not polygon_client:
-                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
+            massive = DataProviderFactory.get("massive")
+            if not massive.is_available():
+                logging.error("Massive provider not available - check POLYGON_API_KEY")
                 return pd.DataFrame()
 
             # Convert period to days
@@ -38,13 +36,12 @@ class StockDataService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
 
-            # Fetch daily aggregates from Polygon
-            aggs = polygon_client.get_aggs(
-                ticker=ticker.upper(),
-                multiplier=1,
+            aggs = await massive.get_historical_bars(
+                symbol=ticker.upper(),
                 timespan="day",
-                from_=start_date.strftime("%Y-%m-%d"),
-                to=end_date.strftime("%Y-%m-%d"),
+                multiplier=1,
+                from_date=start_date.strftime("%Y-%m-%d"),
+                to_date=end_date.strftime("%Y-%m-%d"),
                 limit=50000,
             )
 
@@ -52,18 +49,17 @@ class StockDataService:
                 return pd.DataFrame()
 
             # Convert to DataFrame
-            data = []
-            for agg in aggs:
-                data.append(
-                    {
-                        "Date": datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc),
-                        "Open": agg.open,
-                        "High": agg.high,
-                        "Low": agg.low,
-                        "Close": agg.close,
-                        "Volume": agg.volume,
-                    }
-                )
+            data = [
+                {
+                    "Date": row["timestamp"],
+                    "Open": row["open"],
+                    "High": row["high"],
+                    "Low": row["low"],
+                    "Close": row["close"],
+                    "Volume": row["volume"],
+                }
+                for row in aggs
+            ]
 
             df = pd.DataFrame(data)
             df.set_index("Date", inplace=True)
@@ -75,31 +71,34 @@ class StockDataService:
 
     @staticmethod
     async def get_pre_market_data(ticker: str) -> Dict[str, Any]:
-        """Get pre-market data from Polygon.io."""
+        """Get pre-market/extended-hours data via the Massive (Polygon) provider."""
         try:
-            if not polygon_client:
-                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
+            massive = DataProviderFactory.get("massive")
+            if not massive.is_available():
+                logging.error("Massive provider not available - check POLYGON_API_KEY")
                 return {}
 
             today = datetime.now()
 
             # Fetch minute-level data for extended hours
-            aggs = polygon_client.get_aggs(
-                ticker=ticker.upper(),
-                multiplier=1,
+            aggs = await massive.get_historical_bars(
+                symbol=ticker.upper(),
                 timespan="minute",
-                from_=today.strftime("%Y-%m-%d"),
-                to=today.strftime("%Y-%m-%d"),
+                multiplier=1,
+                from_date=today.strftime("%Y-%m-%d"),
+                to_date=today.strftime("%Y-%m-%d"),
                 limit=50000,
             )
 
             if not aggs:
                 return {}
 
-            # Filter for extended hours (Pre-market: 4:00 AM - 9:30 AM AND After-market: 4:00 PM - 8:00 PM ET)
+            # Filter for extended hours
             extended_data = []
-            for agg in aggs:
-                agg_time = datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc)
+            for row in aggs:
+                agg_time = row["timestamp"]
+                if agg_time.tzinfo is None:
+                    agg_time = agg_time.replace(tzinfo=timezone.utc)
                 hour = agg_time.hour
                 minute = agg_time.minute
 
@@ -107,19 +106,19 @@ class StockDataService:
                 is_pre = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
                 # After-market: 4:00 PM to 8:00 PM
                 is_after = (hour >= 16 and hour < 20)
-                
+
                 if is_pre or is_after:
-                    extended_data.append(agg)
+                    extended_data.append(row)
 
             if not extended_data:
                 return {}
 
             return {
-                "pre_market_volume": sum(agg.volume for agg in extended_data),
-                "pre_market_high": max(agg.high for agg in extended_data),
-                "pre_market_low": min(agg.low for agg in extended_data),
-                "pre_market_open": extended_data[0].open if extended_data else None,
-                "pre_market_close": extended_data[-1].close if extended_data else None,
+                "pre_market_volume": sum(r["volume"] for r in extended_data),
+                "pre_market_high": max(r["high"] for r in extended_data),
+                "pre_market_low": min(r["low"] for r in extended_data),
+                "pre_market_open": extended_data[0]["open"] if extended_data else None,
+                "pre_market_close": extended_data[-1]["close"] if extended_data else None,
             }
 
         except Exception as e:
@@ -128,23 +127,23 @@ class StockDataService:
 
     @staticmethod
     async def get_stock_info(ticker: str) -> Dict[str, Any]:
-        """Get stock details from Polygon.io."""
+        """Get stock details from the Massive (Polygon) provider."""
         try:
-            if not polygon_client:
-                logging.error("Polygon client not initialized - check POLYGON_API_KEY")
+            massive = DataProviderFactory.get("massive")
+            if not massive.is_available():
+                logging.error("Massive provider not available - check POLYGON_API_KEY")
                 return {}
 
-            details = polygon_client.get_ticker_details(ticker.upper())
-
+            details = await massive.get_ticker_details(ticker.upper())
             if not details:
                 return {}
 
             return {
-                "longName": details.name,
-                "shortName": details.name,
-                "sector": getattr(details, "sic_description", "") or "",
-                "industry": getattr(details, "sic_description", "") or "",
-                "marketCap": getattr(details, "market_cap", None),
+                "longName": details.get("name"),
+                "shortName": details.get("name"),
+                "sector": details.get("sector", ""),
+                "industry": details.get("industry", ""),
+                "marketCap": details.get("market_cap"),
                 "currentPrice": None,  # Will be fetched from latest quote if needed
             }
 
@@ -377,41 +376,31 @@ class StockDataService:
         to_date: str,
         adjusted: bool = True,
         sort: str = "asc",
-        limit: int = 50000
+        limit: int = 50000,
+        provider: str = "massive",
     ) -> list[Dict[str, Any]]:
-        """Fetch aggregates from Polygon.io."""
+        """
+        Fetch OHLCV bars via the configured data provider.
+
+        Defaults to the 'massive' (Polygon) provider for backwards compat.
+        Pass provider='ibkr' to route through Interactive Brokers instead.
+        """
         try:
-            if not polygon_client:
-                logging.error("Polygon client not initialized")
+            p = DataProviderFactory.get(provider)
+            if not p.is_available():
+                logging.error(f"Provider '{provider}' is not available.")
                 return []
 
-            aggs = polygon_client.get_aggs(
-                ticker=ticker.upper(),
-                multiplier=multiplier,
+            return await p.get_historical_bars(
+                symbol=ticker.upper(),
                 timespan=timespan,
-                from_=from_date,
-                to=to_date,
+                multiplier=multiplier,
+                from_date=from_date,
+                to_date=to_date,
                 adjusted=adjusted,
                 sort=sort,
                 limit=limit,
             )
-
-            if not aggs:
-                return []
-
-            return [
-                {
-                    "timestamp": datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc),
-                    "open": agg.open,
-                    "high": agg.high,
-                    "low": agg.low,
-                    "close": agg.close,
-                    "volume": agg.volume,
-                    "vwap": getattr(agg, "vwap", None),
-                    "transactions": getattr(agg, "transactions", None)
-                }
-                for agg in aggs
-            ]
 
         except Exception as e:
             logging.error(f"Error fetching aggregates for {ticker}: {e}")
@@ -428,13 +417,15 @@ class StockDataService:
         Filter by volume and return top movers by absolute percentage change.
         """
         try:
-            if not polygon_client:
-                logging.error("Polygon client not initialized")
+            from app.providers.massive import MassiveDataProvider
+            massive = DataProviderFactory.get("massive")
+            if not massive.is_available():
+                logging.error("Massive (Polygon) provider not available")
                 return []
 
-            # Using get_snapshot_all for stocks
-            # This returns a list of snapshots for all tickers
-            snapshots = polygon_client.get_snapshot_all(market_type="stocks")
+            # get_snapshot_all is Polygon-specific — access via the concrete provider
+            assert isinstance(massive, MassiveDataProvider)
+            snapshots = await massive.get_snapshot_all(market_type="stocks")
 
             if not snapshots:
                 logging.warning("No snapshots returned from Polygon")

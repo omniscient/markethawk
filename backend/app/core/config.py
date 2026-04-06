@@ -47,6 +47,18 @@ class Settings:
     # CORS
     CORS_ORIGINS: list = ["*"]
 
+    # ── Interactive Brokers (IBKR) ─────────────────────────────────────
+    # Host/port for TWS or IB Gateway:
+    #   TWS live:    127.0.0.1:7496
+    #   TWS paper:   127.0.0.1:7497
+    #   Gateway live: 127.0.0.1:4001
+    #   Gateway paper: 127.0.0.1:4002
+    IBKR_HOST: str = os.getenv("IBKR_HOST", "127.0.0.1")
+    IBKR_PORT: int = int(os.getenv("IBKR_PORT", "7496"))
+    # Each API connection needs a unique clientId.
+    # Keep this different from any other apps connecting to TWS simultaneously.
+    IBKR_CLIENT_ID: int = int(os.getenv("IBKR_CLIENT_ID", "10"))
+
 
 @lru_cache()
 def get_settings() -> Settings:

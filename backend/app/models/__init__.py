@@ -15,6 +15,9 @@ from app.models.news_article import NewsArticle
 from app.models.news_preference import NewsPreference
 from app.models.trade import Tag, Trade, TradeExecution, JournalEntry
 from app.models.stock_split import StockSplit
+from app.models.futures_aggregate import FuturesAggregate
+from app.models.futures_rollover import FuturesRollover
+from app.models.futures_contract import FuturesContract
 
 __all__ = [
     "StockUniverse",
@@ -32,4 +35,7 @@ __all__ = [
     "TradeExecution",
     "JournalEntry",
     "StockSplit",
+    "FuturesAggregate",
+    "FuturesRollover",
+    "FuturesContract",
 ]

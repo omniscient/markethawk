@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.core.error_tracking import ErrorTrackerFactory
-from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router
+from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router, futures_router
 from app.core.celery_app import celery_app as celery
 from app.services.websocket_manager import websocket_manager
 
@@ -110,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(live_data_router)
     app.include_router(journal_router)
     app.include_router(system_router)
+    app.include_router(futures_router)
 
     # Global Exception Handler
     @app.exception_handler(Exception)
