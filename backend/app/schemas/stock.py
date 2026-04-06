@@ -16,6 +16,8 @@ class MonitoredStockResponse(BaseModel):
     market_cap: Optional[float]
     added_date: date
     is_active: bool
+    asset_class: str = "stocks"
+    data_source: str = "massive"
 
     class Config:
         from_attributes = True

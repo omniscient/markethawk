@@ -25,7 +25,7 @@ Adding a new provider
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from app.providers.base import BaseDataProvider
 
@@ -72,7 +72,20 @@ class DataProviderFactory:
     @classmethod
     def get_available(cls) -> List[str]:
         """Return names of all providers that are configured and reachable."""
-        return [name for name, p in cls._providers.items() if p.is_available()]
+        return [name for name, p in cls._providers.items() if p.is_available()[0]]
+
+    @classmethod
+    def get_all_with_classes(cls) -> List[Dict[str, Any]]:
+        """Return all registered providers along with their supported asset classes and availability."""
+        return [
+            {
+                "name": name, 
+                "classes": p.supported_asset_classes,
+                "available": p.is_available()[0],
+                "status_message": p.is_available()[1]
+            }
+            for name, p in cls._providers.items()
+        ]
 
     @classmethod
     def all(cls) -> Dict[str, BaseDataProvider]:

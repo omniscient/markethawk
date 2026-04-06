@@ -114,6 +114,7 @@ export interface MonitoredStock {
   market_cap?: number;
   added_date: string;
   is_active: boolean;
+  asset_class?: string;
 }
 
 export interface RefreshUniverseResponse {
@@ -230,7 +231,7 @@ export const stopSync = async (): Promise<any> => {
   return response.data;
 };
 
-export const refreshUniverseStocks = async (id: number): Promise<RefreshUniverseResponse> => {
+export const refreshUniverse = async (id: number): Promise<RefreshUniverseResponse> => {
   const response = await apiClient.post(`/universe/${id}/refresh`);
   return response.data;
 };
@@ -276,6 +277,20 @@ export const fetchHistoricalData = async (
   const response = await apiClient.get(`/stocks/historical/${ticker}`, {
     params: { period, timespan, multiplier },
   });
+  return response.data;
+};
+
+// ---- Providers ------------------------------------------------------------ //
+
+export interface DataProvider {
+  name: string;
+  classes: string[];
+  available: boolean;
+  status_message?: string;
+}
+
+export const fetchProviders = async (): Promise<{ available: DataProvider[] }> => {
+  const response = await apiClient.get('/futures/providers');
   return response.data;
 };
 

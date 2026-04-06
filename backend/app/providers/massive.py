@@ -49,8 +49,16 @@ class MassiveDataProvider(BaseDataProvider):
     def name(self) -> str:
         return "massive"
 
-    def is_available(self) -> bool:
-        return self._client is not None
+    @property
+    def supported_asset_classes(self) -> List[str]:
+        return ["stocks"]
+
+    def is_available(self) -> tuple[bool, str]:
+        if not settings.POLYGON_API_KEY:
+            return False, "Missing POLYGON_API_KEY"
+        if not self._client:
+            return False, "Polygon client failed to initialize"
+        return True, "Ready"
 
     async def get_historical_bars(
         self,

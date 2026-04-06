@@ -162,7 +162,7 @@ const Universes: React.FC = () => {
                 </div>
                 {/* New Stats */}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Stock Count:</span>
+                                            <span className="text-gray-400">Instrument Count:</span>
                   <span className="text-financial-light">
                     {universe.ticker_count || 0}
                   </span>

@@ -17,7 +17,9 @@ class StockUniverseTicker(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     universe_id = Column(Integer, index=True, nullable=False)
-    ticker = Column(String(10), nullable=False)
+    ticker = Column(String(50), nullable=False)
+    asset_class = Column(String(50), default="stocks", nullable=False)
+    data_source = Column(String(50), default="massive", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Unique constraint or just index to prevent dupes?

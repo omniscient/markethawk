@@ -143,9 +143,17 @@ class IBKRDataProvider(BaseDataProvider):
     def name(self) -> str:
         return "ibkr"
 
-    def is_available(self) -> bool:
+    @property
+    def supported_asset_classes(self) -> List[str]:
+        return ["futures"]
+
+    def is_available(self) -> tuple[bool, str]:
         """True if ib_insync is installed and IBKR config is present."""
-        return IB_INSYNC_AVAILABLE and bool(settings.IBKR_HOST)
+        if not IB_INSYNC_AVAILABLE:
+            return False, "Missing 'ib-insync' library"
+        if not settings.IBKR_HOST:
+            return False, "Missing IBKR_HOST"
+        return True, "Ready"
 
     async def get_historical_bars(
         self,

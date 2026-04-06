@@ -204,7 +204,7 @@ async def sync_daily_metrics(
 
 
 @router.post("/{universe_id}/refresh")
-async def refresh_universe_stocks(
+async def refresh_universe(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
@@ -236,6 +236,8 @@ async def refresh_universe_stocks(
             universe_id=universe_id,
             added_date=datetime.now().date(),
             is_active=True,
+            asset_class=res.get("asset_class", "stocks"),
+            data_source=res.get("data_source", "massive"),
             company_name=res["name"],
             sector=res["sector"],
             market_cap=res["market_cap"],
@@ -255,6 +257,8 @@ async def refresh_universe_stocks(
         stock_ticker = StockUniverseTicker(
             universe_id=universe_id,
             ticker=res["ticker"],
+            asset_class=res.get("asset_class", "stocks"),
+            data_source=res.get("data_source", "massive"),
             created_at=datetime.utcnow()
         )
         db.add(stock_ticker)
@@ -267,7 +271,7 @@ async def refresh_universe_stocks(
         "status": "completed",
         "scanned": "ALL",  # We scanned the whole DB effectively
         "added": added_count,
-        "message": f"Successfully refreshed universe. Added {added_count} stocks from Discovery Engine.",
+        "message": f"Successfully refreshed universe. Added {added_count} assets from Discovery Engine.",
     }
 
 

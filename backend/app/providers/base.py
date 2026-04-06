@@ -25,13 +25,19 @@ class BaseDataProvider(ABC):
         """Human-readable provider name (e.g. 'massive', 'ibkr')."""
         ...
 
+    @property
     @abstractmethod
-    def is_available(self) -> bool:
+    def supported_asset_classes(self) -> List[str]:
+        """List of asset classes supported (e.g. ['stocks'], ['futures'])."""
+        ...
+
+    @abstractmethod
+    def is_available(self) -> tuple[bool, str]:
         """
-        Return True if the provider is configured and can accept requests.
+        Return (available_bool, status_message).
         Called by the factory before routing requests.
         """
-        ...
+        return True, "Ready"
 
     # ------------------------------------------------------------------ #
     #  Market Data                                                         #

@@ -149,5 +149,5 @@ async def trigger_download(
 
 @router.get("/providers")
 async def list_providers():
-    """List available data providers currently configured."""
-    return {"available": DataProviderFactory.get_available()}
+    """List all known data providers and their supported asset classes."""
+    return {"available": DataProviderFactory.get_all_with_classes()}

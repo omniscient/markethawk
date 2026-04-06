@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import { RefreshCw, TrendingUp, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
-import { StockUniverse, MonitoredStock, refreshUniverseStocks, fetchUniverseStocks } from '../api/scanner';
+import { StockUniverse, MonitoredStock, refreshUniverse, fetchUniverseStocks } from '../api/scanner';
 
 type SortField = 'ticker' | 'company_name' | 'sector' | 'market_cap';
 type SortDirection = 'asc' | 'desc';
@@ -33,7 +33,7 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
 
     // Refresh mutation
     const refreshMutation = useMutation({
-        mutationFn: () => refreshUniverseStocks(universe!.id),
+        mutationFn: () => refreshUniverse(universe!.id),
         onSuccess: () => {
             refetchStocks();
             queryClient.invalidateQueries({ queryKey: ['universeStocks', universe?.id] });
@@ -131,7 +131,7 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
                         onClick={() => refreshMutation.mutate()}
                         disabled={refreshMutation.isPending}
                     >
-                        {refreshMutation.isPending ? 'Refreshing...' : 'Refresh Stocks'}
+                        {refreshMutation.isPending ? 'Refreshing...' : 'Refresh Universe'}
                     </Button>
 
                     <Button variant="secondary" onClick={onClose}>Close</Button>
@@ -257,11 +257,16 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
                                     <tbody className="divide-y divide-gray-700">
                                         {filteredAndSortedStocks.map((stock: MonitoredStock) => (
                                             <tr key={stock.id} className="hover:bg-gray-700/30 transition-colors">
-                                                <td className="px-4 py-2 text-financial-blue font-semibold">{stock.ticker}</td>
+                                                <td className="px-4 py-2 text-financial-blue font-semibold">
+                                                    {stock.ticker}
+                                                    {stock.asset_class === 'futures' && (
+                                                        <span className="ml-2 text-[10px] bg-financial-blue/20 text-financial-blue px-1.5 py-0.5 rounded uppercase">FUT</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-2 text-financial-light">{stock.company_name || 'N/A'}</td>
                                                 <td className="px-4 py-2 text-gray-400">{stock.sector || 'N/A'}</td>
                                                 <td className="px-4 py-2 text-right text-financial-light">
-                                                    {formatMarketCap(stock.market_cap)}
+                                                    {stock.asset_class === 'futures' ? 'N/A' : formatMarketCap(stock.market_cap)}
                                                 </td>
                                             </tr>
                                         ))}
@@ -278,7 +283,7 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
                     ) : (
                         <div className="text-center py-8 bg-gray-800 rounded-lg border border-gray-700">
                             <p className="text-gray-400 mb-2">No stocks in this universe yet.</p>
-                            <p className="text-gray-500 text-sm">Click "Refresh Stocks" to scan for matching stocks.</p>
+                            <p className="text-gray-500 text-sm">Click "Refresh Universe" to scan for matching assets.</p>
                         </div>
                     )}
                 </div>
