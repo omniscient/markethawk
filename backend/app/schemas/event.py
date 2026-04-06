@@ -1,38 +1,49 @@
 """
-Volume Event Pydantic schemas.
+Scanner Event Pydantic schemas.
 """
 
-from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from pydantic import BaseModel, Field
+from typing import Dict, Any, Optional, List
 from datetime import datetime, date
 import uuid
 
 
-class VolumeEventResponse(BaseModel):
-    """Schema for volume event API responses."""
+class ScannerEventResponse(BaseModel):
+    """Full detailed schema for scanner event API responses."""
     id: int
     uuid: uuid.UUID
     ticker: str
     event_date: date
-    event_type: str
-    pre_market_volume: float
-    avg_volume_20d: float
-    relative_volume: float
-    volume_spike_ratio: float
+    scanner_type: str
+    
+    summary: Optional[str] = None
+    severity: Optional[str] = "medium"
+    
+    previous_close: Optional[float] = None
     opening_price: Optional[float] = None
     closing_price: Optional[float] = None
-    regular_high: Optional[float] = None
-    regular_low: Optional[float] = None
-    post_market_high: Optional[float] = None
-    post_market_low: Optional[float] = None
-    total_day_high: Optional[float] = None
-    total_day_low: Optional[float] = None
-    fade_from_high_pct: Optional[float] = None
-    day_range_pct: Optional[float] = None
-    gap_pct: Optional[float] = None
-    price_gap_pct: Optional[float] = None
-    criteria_met: Dict[str, Any]
+    
+    indicators: Dict[str, Any] = Field(default_factory=dict)
+    criteria_met: Dict[str, Any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict, alias="metadata_")
+    
     created_at: datetime
+    updated_at: datetime
 
+    class Config:
+        from_attributes = True
+        populate_by_name = True
+
+
+class ScannerEventSummary(BaseModel):
+    """Minimal schema for list views of scanner events."""
+    id: int
+    uuid: uuid.UUID
+    ticker: str
+    event_date: date
+    scanner_type: str
+    summary: Optional[str] = None
+    severity: Optional[str] = "medium"
+    
     class Config:
         from_attributes = True

@@ -31,19 +31,26 @@ export const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status >= 500) {
-      const data = error.response.data;
+    // 5xx errors or network errors with no response
+    const status = error.response?.status;
+    const isNetworkError = !error.response;
+
+    if (status >= 500 || isNetworkError || status === undefined) {
+      const data = error.response?.data;
+      const isJson = error.response?.headers?.['content-type']?.includes('application/json');
 
       // Fire global event that GlobalErrorToast listens to
       window.dispatchEvent(
         new CustomEvent('server-error', {
           detail: {
             message:
-              data?.message ?? 'An unexpected server error occurred.',
-            error_id: data?.error_id ?? null,
+              (isJson && data?.message) ? data.message : 
+              isNetworkError ? 'Network error or server timeout. Please check your connection or dashboard status.' :
+              'An unexpected server error occurred.',
+            error_id: (isJson && data?.error_id) ? data.error_id : null,
             // In dev mode the backend also returns stack_trace + detail
-            detail: data?.detail ?? null,
-            stack_trace: data?.stack_trace ?? null,
+            detail: (isJson && data?.detail) ? data.detail : null,
+            stack_trace: (isJson && data?.stack_trace) ? data.stack_trace : null,
           },
         }),
       );

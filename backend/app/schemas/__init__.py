@@ -15,7 +15,7 @@ from app.schemas.scanner import (
     PreMarketMoversResponse, 
     PreMarketMover
 )
-from app.schemas.event import VolumeEventResponse
+from app.schemas.event import ScannerEventResponse, ScannerEventSummary
 from app.schemas.stock import MonitoredStockResponse
 
 __all__ = [
@@ -26,7 +26,8 @@ __all__ = [
     "ScannerRunResponse",
     "ScannerStatsResponse",
     "ScannerConfigResponse",
-    "VolumeEventResponse",
+    "ScannerEventResponse",
+    "ScannerEventSummary",
     "MonitoredStockResponse",
     "PreMarketMoversResponse",
     "PreMarketMover",

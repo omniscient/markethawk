@@ -47,14 +47,14 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const recentEvents = scannerResults?.slice(0, 10) || [];
+  const recentEvents = scannerResults || [];
   const recentAlerts = (scannerResults?.slice(0, 5) || []).map((event: any) => ({
     id: event.uuid || String(event.id),
     ticker: event.ticker,
-    type: event.event_type === 'volume_spike' ? 'volume_spike' : 'price_movement',
-    message: `${event.ticker} triggered a ${event.event_type || 'scanner'} alert with ${(event.relative_volume || 0).toFixed(1)}x relative volume.`,
+    type: event.severity === 'high' ? 'volume_spike' : 'news', // Default icons for now
+    message: event.summary || `${event.ticker} triggered a ${event.scanner_type} alert`,
     timestamp: event.created_at || event.event_date || new Date().toISOString(),
-    severity: (event.relative_volume || 0) > 5 ? 'high' : ((event.relative_volume || 0) > 3 ? 'medium' : 'low'),
+    severity: event.severity || 'low',
   }));
   const totalEvents = scannerResults?.length || 0;
   const todayEvents = scannerResults?.filter(

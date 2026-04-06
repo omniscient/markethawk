@@ -114,15 +114,22 @@ def create_app() -> FastAPI:
     # Global Exception Handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        tb_string = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        # Fallback error ID just in case
+        error_id = "ERR-UNKNOWN"
+        tb_string = ""
         
-        # Hash traceback to generate deterministic Error ID
-        error_hash = hashlib.md5(tb_string.encode('utf-8')).hexdigest()[:8]
-        error_id = f"ERR-{error_hash}"
-        
-        # Send to Tracking System (Seq)
-        tracker = ErrorTrackerFactory.get_tracker()
-        tracker.log_error(error_id, exc, tb_string, str(request.url.path))
+        try:
+            tb_string = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            
+            # Hash traceback to generate deterministic Error ID
+            error_hash = hashlib.md5(tb_string.encode('utf-8')).hexdigest()[:8]
+            error_id = f"ERR-{error_hash}"
+            
+            # Send to Tracking System (Seq) - handled internally as background task
+            tracker = ErrorTrackerFactory.get_tracker()
+            tracker.log_error(error_id, exc, tb_string, str(request.url.path))
+        except Exception as handler_exc:
+            logging.error(f"Error in global_exception_handler: {handler_exc}")
         
         # In Development mode, return stack trace. In Prod, just the error ID.
         if settings.ENVIRONMENT.lower() in ("development", "debug"):

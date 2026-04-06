@@ -53,7 +53,7 @@ const Scanner: React.FC = () => {
     queryKey: ['scannerResults', selectedUniverse, selectedConfig, sortBy, sortOrder],
     queryFn: () => fetchScannerResults({
       universe_id: selectedUniverse,
-      event_type: selectedConfig === 'pre_market_volume_spike' ? 'pre_market_volume_spike' : 'liquidity_hunt',
+      scanner_type: selectedConfig,
       sort_by: sortBy,
       sort_order: sortOrder,
       limit: 100
@@ -195,7 +195,7 @@ const Scanner: React.FC = () => {
                 <span className="text-gray-400">Last Run</span>
                 <span className="text-financial-light">
                   {(() => {
-                    const currentConf = configs?.find(c => c.scanner_type === (selectedConfig === 'pre_market_volume_spike' ? 'pre_market_volume_spike' : 'liquidity_hunt'));
+                    const currentConf = configs?.find(c => c.scanner_type === selectedConfig);
                     return currentConf?.last_run 
                       ? formatDistanceToNow(new Date(currentConf.last_run), { addSuffix: true })
                       : 'Never';
@@ -206,7 +206,7 @@ const Scanner: React.FC = () => {
                 <span className="text-gray-400">Next Run</span>
                 <span className="text-financial-light">
                   {(() => {
-                    const currentConf = configs?.find(c => c.scanner_type === (selectedConfig === 'pre_market_volume_spike' ? 'pre_market_volume_spike' : 'liquidity_hunt'));
+                    const currentConf = configs?.find(c => c.scanner_type === selectedConfig);
                     return currentConf?.next_run 
                       ? formatDistanceToNow(new Date(currentConf.next_run), { addSuffix: true })
                       : 'Not scheduled';

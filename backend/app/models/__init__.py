@@ -5,7 +5,7 @@ SQLAlchemy models package.
 from app.models.stock_universe import StockUniverse
 from app.models.monitored_stock import MonitoredStock
 from app.models.stock_universe_ticker import StockUniverseTicker
-from app.models.volume_event import VolumeEvent
+from app.models.scanner_event import ScannerEvent
 from app.models.scanner_config import ScannerConfig
 from app.models.scanner_run import ScannerRun
 from app.models.ticker_reference import TickerReference
@@ -19,7 +19,7 @@ from app.models.stock_split import StockSplit
 __all__ = [
     "StockUniverse",
     "MonitoredStock",
-    "VolumeEvent",
+    "ScannerEvent",
     "ScannerConfig",
     "ScannerRun",
     "TickerReference",

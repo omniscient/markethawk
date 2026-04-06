@@ -8,13 +8,17 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import cast
+from sqlalchemy.dialects.postgresql import JSONB
+import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.models import MonitoredStock, VolumeEvent, ScannerConfig, ScannerRun
+from app.models import MonitoredStock, ScannerEvent, ScannerConfig, ScannerRun
 from app.schemas import (
     ScannerRunRequest, 
     ScannerRunResponse, 
-    VolumeEventResponse, 
+    ScannerEventResponse,
+    ScannerEventSummary, 
     ScannerStatsResponse,
     ScannerConfigResponse,
     PreMarketMoversResponse,
@@ -134,10 +138,11 @@ async def get_scanner_history(
     ]
 
 
-@router.get("/results", response_model=List[VolumeEventResponse])
+@router.get("/results", response_model=List[ScannerEventResponse])
 async def get_scanner_results(
     ticker: Optional[str] = None,
-    event_type: Optional[str] = None,
+    scanner_type: Optional[str] = None,
+    event_type: Optional[str] = None, # Alias for backward compat
     universe_id: Optional[int] = None,
     sort_by: Optional[str] = "created_at",
     sort_order: Optional[str] = "desc",
@@ -146,37 +151,39 @@ async def get_scanner_results(
     db: Session = Depends(get_db),
 ):
     """Get scanner results with filtering."""
-    query = db.query(VolumeEvent)
+    query = db.query(ScannerEvent)
 
     if ticker:
-        query = query.filter(VolumeEvent.ticker == ticker.upper())
+        query = query.filter(ScannerEvent.ticker == ticker.upper())
 
-    if event_type:
-        query = query.filter(VolumeEvent.event_type == event_type)
+    # Support both scanner_type and the legacy event_type param
+    stype = scanner_type or event_type
+    if stype:
+        query = query.filter(ScannerEvent.scanner_type == stype)
 
     if universe_id:
         query = query.join(
             MonitoredStock, 
-            (VolumeEvent.ticker == MonitoredStock.ticker) & 
+            (ScannerEvent.ticker == MonitoredStock.ticker) & 
             (MonitoredStock.universe_id == universe_id)
         )
 
     # Sorting logic
     try:
         if sort_by:
-            # Map frontend names to model fields if necessary
-            # For now, assume they match or handle specifically
-            sort_attr = getattr(VolumeEvent, sort_by, VolumeEvent.created_at)
+            # Handle metadata mapping if needed (e.g., frontend sends a legacy col name)
+            # For now, we prefer sorting by fixed columns. 
+            # If they want to sort by indicators, we'd need -> JSON logic.
+            sort_attr = getattr(ScannerEvent, sort_by, ScannerEvent.created_at)
             
             if sort_order.lower() == "desc":
                 query = query.order_by(sort_attr.desc())
             else:
                 query = query.order_by(sort_attr.asc())
         else:
-            query = query.order_by(VolumeEvent.created_at.desc())
+            query = query.order_by(ScannerEvent.created_at.desc())
     except Exception:
-        # Fallback to default sorting if attribute is invalid
-        query = query.order_by(VolumeEvent.created_at.desc())
+        query = query.order_by(ScannerEvent.created_at.desc())
 
     results = (
         query.limit(limit).offset(offset).all()
@@ -194,13 +201,13 @@ async def get_scanner_stats(
     from datetime import datetime, timedelta
 
     # Total events
-    total_events = db.query(func.count(VolumeEvent.id)).scalar() or 0
+    total_events = db.query(func.count(ScannerEvent.id)).scalar() or 0
 
     # Today's events
     today = datetime.now().date()
     today_events = (
-        db.query(func.count(VolumeEvent.id))
-        .filter(VolumeEvent.event_date == today)
+        db.query(func.count(ScannerEvent.id))
+        .filter(ScannerEvent.event_date == today)
         .scalar()
         or 0
     )
@@ -208,16 +215,21 @@ async def get_scanner_stats(
     # Active alerts (last 24 hours)
     last_24h = datetime.utcnow() - timedelta(hours=24)
     active_alerts = (
-        db.query(func.count(VolumeEvent.id))
-        .filter(VolumeEvent.created_at >= last_24h)
+        db.query(func.count(ScannerEvent.id))
+        .filter(ScannerEvent.created_at >= last_24h)
         .scalar()
         or 0
     )
 
-    # Average volume spike ratio (of all events or recent ones)
+    # Average volume spike ratio (specifically for volume scanners)
+    # We use cast for JSON access in Postgres
     avg_spike = (
-        db.query(func.avg(VolumeEvent.volume_spike_ratio)).scalar() or 0.0
+        db.query(func.avg(sa.cast(ScannerEvent.indicators['volume_spike_ratio'].astext, sa.Numeric)))
+        .filter(ScannerEvent.scanner_type.in_(['pre_market_volume_spike', 'liquidity_hunt']))
+        .scalar()
     )
+    if avg_spike is None:
+        avg_spike = 0.0
 
     return ScannerStatsResponse(
         activeAlerts=active_alerts,
@@ -231,21 +243,23 @@ async def get_scanner_stats(
 async def get_edge_stats(
     period: str = "monthly",
     ticker: Optional[str] = None,
+    scanner_type: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Get aggregated statistical edge data."""
     from app.services.stats import StatsService
-    return StatsService.get_edge_stats(db, ticker=ticker, period=period)
+    return StatsService.get_edge_stats(db, ticker=ticker, period=period, scanner_type=scanner_type)
 
 
 @router.get("/edge-distribution")
 async def get_edge_distribution(
     ticker: Optional[str] = None,
+    scanner_type: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """Get distribution data for scatter plots."""
     from app.services.stats import StatsService
-    return StatsService.get_distribution_data(db, ticker=ticker)
+    return StatsService.get_distribution_data(db, ticker=ticker, scanner_type=scanner_type)
 
 
 @router.get("/configs", response_model=List[ScannerConfigResponse])

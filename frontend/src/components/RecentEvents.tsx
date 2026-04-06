@@ -1,26 +1,16 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Activity, ChevronUp, ChevronDown } from 'lucide-react';
+import { TrendingUp, Activity, AlertCircle, Info, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
-
-interface Event {
-  id: string;
-  ticker: string;
-  event_date: string;
-  event_type: string;
-  relative_volume: number;
-  volume_spike_ratio: number;
-  price_gap_pct: number;
-  criteria_met: Record<string, any>;
-}
+import { ScannerEvent } from '../api/scanner';
 
 interface RecentEventsProps {
-  events: Event[];
+  events: ScannerEvent[];
   maxItems?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   onSort?: (column: string) => void;
-  onEventClick?: (event: Event) => void;
+  onEventClick?: (event: ScannerEvent) => void;
 }
 
 const RecentEvents: React.FC<RecentEventsProps> = ({ 
@@ -42,62 +32,51 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
     );
   }
 
+  const getSeverityStyles = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'medium':
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'low':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      default:
+        return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return <ShieldAlert className="h-3 w-3 mr-1" />;
+      case 'medium':
+        return <AlertCircle className="h-3 w-3 mr-1" />;
+      default:
+        return <Info className="h-3 w-3 mr-1" />;
+    }
+  };
+
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-gray-400 border-b border-gray-700">
-        <SortableGridHeader 
-          label="Ticker" 
-          sortKey="ticker" 
-          currentSort={sortBy} 
-          currentOrder={sortOrder} 
-          onSort={onSort} 
-          className="col-span-2"
-        />
-        <SortableGridHeader 
-          label="Date" 
-          sortKey="event_date" 
-          currentSort={sortBy} 
-          currentOrder={sortOrder} 
-          onSort={onSort} 
-          className="col-span-2"
-        />
-        <SortableGridHeader 
-          label="Volume Spike" 
-          sortKey="volume_spike_ratio" 
-          currentSort={sortBy} 
-          currentOrder={sortOrder} 
-          onSort={onSort} 
-          className="col-span-2"
-        />
-        <SortableGridHeader 
-          label="Rel Volume" 
-          sortKey="relative_volume" 
-          currentSort={sortBy} 
-          currentOrder={sortOrder} 
-          onSort={onSort} 
-          className="col-span-2"
-        />
-        <SortableGridHeader 
-          label="Gap %" 
-          sortKey="price_gap_pct" 
-          currentSort={sortBy} 
-          currentOrder={sortOrder} 
-          onSort={onSort} 
-          className="col-span-2"
-        />
-        <div className="col-span-2">Status</div>
+        <div className="col-span-2">Ticker</div>
+        <div className="col-span-2">Date</div>
+        <div className="col-span-5">Summary</div>
+        <div className="col-span-2">Severity</div>
+        <div className="col-span-1">Details</div>
       </div>
 
       {displayEvents.map((event) => (
         <div
           key={event.id}
           onClick={() => onEventClick?.(event)}
-          className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
+          className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-800/50 rounded-lg hover:bg-gray-700/50 border border-gray-700/50 transition-all cursor-pointer items-center"
         >
           <div className="col-span-2">
             <Link 
               to={`/stock/${event.ticker}`}
-              className="font-medium text-financial-blue hover:text-blue-400 transition-colors"
+              className="font-bold text-financial-blue hover:text-blue-400 transition-colors"
+              onClick={(e) => e.stopPropagation()}
             >
               {event.ticker}
             </Link>
@@ -107,88 +86,30 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
             {format(new Date(event.event_date.includes('T') ? event.event_date : `${event.event_date}T00:00:00`), 'MMM d')}
           </div>
 
-          <div className="col-span-2">
-            <div className="flex items-center space-x-1">
-              <TrendingUp className="h-4 w-4 text-positive" />
-              <span className="text-positive font-medium">
-                {event.volume_spike_ratio ?? 0}x
-              </span>
-            </div>
+          <div className="col-span-5">
+            <p className="text-sm text-gray-200 truncate" title={event.summary}>
+              {event.summary || `${event.scanner_type.replace(/_/g, ' ')} detected`}
+            </p>
           </div>
 
           <div className="col-span-2">
-            <span className="text-financial-light font-medium">
-              {(event.relative_volume ?? 0).toFixed(1)}x
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getSeverityStyles(event.severity)}`}>
+              {getSeverityIcon(event.severity)}
+              {event.severity}
             </span>
           </div>
 
-          <div className="col-span-2">
-            {(event.price_gap_pct ?? 0) > 0 ? (
-              <div className="flex items-center space-x-1">
-                <TrendingUp className="h-4 w-4 text-positive" />
-                <span className="text-positive font-medium">
-                  +{(event.price_gap_pct ?? 0).toFixed(1)}%
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-1">
-                <TrendingDown className="h-4 w-4 text-negative" />
-                <span className="text-negative font-medium">
-                  {(event.price_gap_pct ?? 0).toFixed(1)}%
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="col-span-2">
-            <span className={`px-2 py-1 rounded text-xs font-medium ${Object.values(event.criteria_met || {}).every(Boolean)
-                ? 'bg-green-500/20 text-green-400'
-                : 'bg-yellow-500/20 text-yellow-400'
+          <div className="col-span-1 text-right">
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${Object.values(event.criteria_met || {}).every(Boolean)
+                ? 'text-positive'
+                : 'text-yellow-400'
               }`}>
-              {Object.values(event.criteria_met || {}).every(Boolean) ? 'All Met' : 'Partial'}
+              {Object.values(event.criteria_met || {}).filter(Boolean).length}/
+              {Object.values(event.criteria_met || {}).length}
             </span>
           </div>
         </div>
       ))}
-    </div>
-  );
-};
-
-interface SortableGridHeaderProps {
-  label: string;
-  sortKey: string;
-  currentSort?: string;
-  currentOrder?: 'asc' | 'desc';
-  onSort?: (key: string) => void;
-  className?: string;
-}
-
-const SortableGridHeader: React.FC<SortableGridHeaderProps> = ({ 
-  label, 
-  sortKey, 
-  currentSort, 
-  currentOrder, 
-  onSort,
-  className = ""
-}) => {
-  const isActive = currentSort === sortKey;
-  
-  return (
-    <div 
-      className={`${className} cursor-pointer hover:text-financial-light transition-colors group select-none`}
-      onClick={() => onSort?.(sortKey)}
-    >
-      <div className="flex items-center space-x-1">
-        <span>{label}</span>
-        <div className="flex flex-col">
-          <ChevronUp 
-            className={`h-2.5 w-2.5 -mb-0.5 ${isActive && currentOrder === 'asc' ? 'text-financial-blue' : 'text-gray-600 group-hover:text-gray-400'}`} 
-          />
-          <ChevronDown 
-            className={`h-2.5 w-2.5 ${isActive && currentOrder === 'desc' ? 'text-financial-blue' : 'text-gray-600 group-hover:text-gray-400'}`} 
-          />
-        </div>
-      </div>
     </div>
   );
 };

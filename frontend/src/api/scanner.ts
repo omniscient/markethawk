@@ -2,25 +2,30 @@ import { apiClient } from './client';
 
 // ---- Types ---------------------------------------------------------------- //
 
-export interface VolumeEvent {
+export interface ScannerEvent {
   id: number;
   uuid: string;
   ticker: string;
   event_date: string;
-  event_type: string;
-  pre_market_volume: number;
-  avg_volume_20d: number;
-  relative_volume: number;
-  volume_spike_ratio: number;
-  price_gap_pct: number;
+  scanner_type: string;
+  
+  summary?: string;
+  severity: 'low' | 'medium' | 'high';
+  
+  previous_close?: number;
+  opening_price?: number;
+  closing_price?: number;
+  
+  indicators: Record<string, any>;
   criteria_met: Record<string, any>;
-  outstanding_shares?: number;
-  float_rotation_pct?: number;
-  catalyst_tags?: string[];
-  catalyst_summary?: string;
-  recent_split_date?: string;
+  metadata: Record<string, any>;
+  
   created_at: string;
+  updated_at: string;
 }
+
+// Backward compatibility alias during transition
+export type VolumeEvent = ScannerEvent;
 
 export interface ScannerConfig {
   id: number;
@@ -64,7 +69,7 @@ export interface ScannerRunResponse {
   events_detected: number;
   execution_time_ms: number;
   scanner_type: string;
-  events?: VolumeEvent[];
+  events?: ScannerEvent[];
   error_message?: string;
   created_at?: string;
 }
@@ -132,13 +137,14 @@ export interface SyncAggregatesOptions {
 
 export const fetchScannerResults = async (params?: {
   ticker?: string;
-  event_type?: string;
+  scanner_type?: string;
+  event_type?: string; // Kept for backward compatibility with existing component states
   universe_id?: number | null;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
-}): Promise<VolumeEvent[]> => {
+}): Promise<ScannerEvent[]> => {
   const response = await apiClient.get('/scanner/results', { params });
   return response.data;
 };

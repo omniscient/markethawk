@@ -150,10 +150,10 @@ const StockDetailPage: React.FC = () => {
     id: String(e.id),
     ticker: e.ticker,
     event_date: e.event_date,
-    event_type: e.event_type,
-    relative_volume: e.relative_volume,
-    volume_spike_ratio: e.volume_spike_ratio,
-    price_gap_pct: e.price_gap_pct,
+    scanner_type: e.scanner_type,
+    summary: e.summary,
+    severity: e.severity,
+    indicators: e.indicators,
     criteria_met: e.criteria_met
   }));
   
@@ -405,10 +405,10 @@ const StockDetailPage: React.FC = () => {
           <Card title="Trader Plan Checklist" icon={Globe as any}>
             <div className="space-y-3">
               {[
-                { label: 'Verify Liquidity Hunt Event', status: scannerResults && scannerResults.some(e => e.event_type === 'liquidity_hunt') },
+                { label: 'Scanner Alert Detected', status: events.length > 0 },
                 { label: 'Check Extended Hours Volume', status: (details.pre_market.pre_market_volume || 0) > 100000 },
                 { label: 'Confirm Sector Strength', status: true },
-                { label: 'Identify Key Levels', status: !!details.pre_market.pre_market_high },
+                { label: 'Review Catalyst Summary', status: scannerResults && scannerResults.some((e: any) => e.metadata?.catalyst_summary) },
               ].map((item, idx) => (
                 <div key={idx} className="flex items-center space-x-3 p-3 bg-gray-800/50 rounded-lg">
                   <div className={`h-2 w-2 rounded-full ${item.status ? 'bg-positive' : 'bg-gray-600'}`}></div>

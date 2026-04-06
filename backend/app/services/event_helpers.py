@@ -1,0 +1,56 @@
+"""
+Event helpers for generating scanner-specific summaries and severities.
+"""
+
+from typing import Dict, Any, Callable
+
+
+# Summary generators for each scanner type
+SUMMARY_GENERATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
+    "pre_market_volume_spike": lambda ind: f"{ind.get('volume_spike_ratio', 0):.1f}x volume spike, {ind.get('gap_pct', 0):+.1f}% gap",
+    "liquidity_hunt": lambda ind: f"Liquidity hunt, {ind.get('relative_volume', 0):.1f}x RVOL, {ind.get('gap_pct', 0):+.1f}% gap",
+    "oversold_bounce": lambda ind: f"RSI cross ({ind.get('rsi_2', 0):.0f}/{ind.get('rsi_5', 0):.0f}), ATR ${ind.get('atr_target', 0):.2f}",
+}
+
+# Severity calculators for each scanner type
+SEVERITY_CALCULATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
+    "pre_market_volume_spike": lambda ind: (
+        "high" if ind.get('volume_spike_ratio', 0) > 5 
+        else "medium" if ind.get('volume_spike_ratio', 0) > 3 
+        else "low"
+    ),
+    "liquidity_hunt": lambda ind: (
+        "high" if ind.get('relative_volume', 0) > 4 
+        else "medium" if ind.get('relative_volume', 0) > 2 
+        else "low"
+    ),
+    "oversold_bounce": lambda ind: (
+        "high" if ind.get('rsi_2', 100) < 10 
+        else "medium"
+    ),
+}
+
+
+def generate_event_summary(scanner_type: str, indicators: Dict[str, Any]) -> str:
+    """Generate a human-readable summary for a scanner event."""
+    generator = SUMMARY_GENERATORS.get(scanner_type)
+    if generator:
+        try:
+            return generator(indicators)
+        except Exception:
+            pass
+    
+    # Fallback summary
+    return f"Detected {scanner_type.replace('_', ' ')} logic"
+
+
+def compute_event_severity(scanner_type: str, indicators: Dict[str, Any]) -> str:
+    """Compute the severity level for a scanner event."""
+    calculator = SEVERITY_CALCULATORS.get(scanner_type)
+    if calculator:
+        try:
+            return calculator(indicators)
+        except Exception:
+            pass
+    
+    return "medium"
