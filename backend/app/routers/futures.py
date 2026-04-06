@@ -124,10 +124,11 @@ async def trigger_download(
     and detect rollovers.
     """
     ibkr = DataProviderFactory.get_or_none("ibkr")
-    if not ibkr or not ibkr.is_available():
+    available = ibkr.is_available() if ibkr else (False, "IBKR provider not registered")
+    if not ibkr or not available[0]:
         raise HTTPException(
-            status_code=503, 
-            detail="IBKR provider is not available. Please check TWS connection."
+            status_code=503,
+            detail=f"IBKR provider is not available: {available[1]}",
         )
 
     # Note: Because the download can take a long time, we run it in the background

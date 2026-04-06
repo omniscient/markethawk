@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -257,8 +258,14 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
                                     <tbody className="divide-y divide-gray-700">
                                         {filteredAndSortedStocks.map((stock: MonitoredStock) => (
                                             <tr key={stock.id} className="hover:bg-gray-700/30 transition-colors">
-                                                <td className="px-4 py-2 text-financial-blue font-semibold">
-                                                    {stock.ticker}
+                                                <td className="px-4 py-2 font-semibold">
+                                                    <Link
+                                                        to={`/stock/${stock.ticker}`}
+                                                        onClick={onClose}
+                                                        className="text-financial-blue hover:text-blue-400 hover:underline transition-colors"
+                                                    >
+                                                        {stock.ticker}
+                                                    </Link>
                                                     {stock.asset_class === 'futures' && (
                                                         <span className="ml-2 text-[10px] bg-financial-blue/20 text-financial-blue px-1.5 py-0.5 rounded uppercase">FUT</span>
                                                     )}

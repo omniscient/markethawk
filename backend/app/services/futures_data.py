@@ -93,8 +93,9 @@ class FuturesDataService:
         Returns the list of contracts found.
         """
         ibkr = DataProviderFactory.get("ibkr")
-        if not ibkr.is_available():
-            raise RuntimeError("IBKR provider is not available — is TWS running?")
+        available, reason = ibkr.is_available()
+        if not available:
+            raise RuntimeError(f"IBKR provider is not available: {reason}")
 
         logger.info(f"FuturesDataService: Syncing contract catalog for {symbol} ({exchange})...")
         contracts = await ibkr.get_futures_contracts(
@@ -164,6 +165,8 @@ class FuturesDataService:
         timespan: str = "day",
         multiplier: int = 1,
         force_refresh: bool = False,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Download bars for a single contract month from IBKR and store them.
@@ -171,8 +174,9 @@ class FuturesDataService:
         Returns a status dict with counts.
         """
         ibkr = DataProviderFactory.get("ibkr")
-        if not ibkr.is_available():
-            return {"status": "error", "message": "IBKR provider unavailable"}
+        available, reason = ibkr.is_available()
+        if not available:
+            return {"status": "error", "message": f"IBKR provider unavailable: {reason}"}
 
         # Check if already downloaded (unless forced)
         catalog_entry = (
@@ -184,7 +188,11 @@ class FuturesDataService:
             .first()
         )
 
-        if catalog_entry and catalog_entry.data_downloaded and not force_refresh:
+        # Skip only on full-history runs where the contract is already fully downloaded.
+        # When a specific date range is requested we always re-fetch that window so
+        # that incremental syncs pick up bars added since the last full download.
+        targeted = bool(from_date or to_date)
+        if catalog_entry and catalog_entry.data_downloaded and not force_refresh and not targeted:
             return {
                 "status": "skipped",
                 "message": f"{symbol} {contract_month} already downloaded",
@@ -205,15 +213,24 @@ class FuturesDataService:
         except ValueError:
             return {"status": "error", "message": f"Invalid contract_month: {contract_month}"}
 
-        to_date = min(expiry_dt, now).strftime("%Y-%m-%d")
+        # Upper bound: caller override, capped at min(expiry, now)
+        natural_to = min(expiry_dt, now)
+        if to_date:
+            caller_to = datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            effective_to = min(caller_to, natural_to)
+        else:
+            effective_to = natural_to
+        to_date = effective_to.strftime("%Y-%m-%d")
 
-        # Start from max lookback or contract start (whichever is more recent)
-        from_dt = now - timedelta(days=MAX_HISTORY_YEARS * 365)
-        # Also cap to ~2 years before expiry for expired contracts (IBKR limit)
-        if expiry_dt < now:
-            ibkr_limit = expiry_dt - timedelta(days=730)  # 2 years before expiry
-            from_dt = max(from_dt, ibkr_limit)
-        from_date = from_dt.strftime("%Y-%m-%d")
+        # Lower bound: caller override, or full lookback capped by IBKR's 2-year limit
+        if from_date:
+            from_date = from_date  # use as-is; caller is responsible for reasonable range
+        else:
+            from_dt = now - timedelta(days=MAX_HISTORY_YEARS * 365)
+            if expiry_dt < now:
+                ibkr_limit = expiry_dt - timedelta(days=730)
+                from_dt = max(from_dt, ibkr_limit)
+            from_date = from_dt.strftime("%Y-%m-%d")
 
         # Fetch from IBKR
         bars = await ibkr.get_futures_bars(
@@ -318,6 +335,8 @@ class FuturesDataService:
         timespan: str = "day",
         multiplier: int = 1,
         force_refresh: bool = False,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
         progress_callback=None,
     ) -> Dict[str, Any]:
         """
@@ -358,6 +377,40 @@ class FuturesDataService:
                 "message": f"No contracts found for {symbol} on {exchange}",
             }
 
+        # When a date range is requested, keep only contracts that:
+        #   1. Haven't expired before from_date (expiry >= from_date)
+        #   2. Aren't so far in the future they have no data yet
+        #      (expiry <= to_date + 180 days covers front 2 active months)
+        if from_date:
+            now_utc = datetime.now(timezone.utc)
+            from_dt_filter = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            to_dt_filter = (
+                datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                if to_date else now_utc
+            )
+            max_expiry = to_dt_filter + timedelta(days=180)
+
+            contracts = [
+                c for c in contracts
+                if (
+                    datetime.strptime(c.contract_month, "%Y%m%d").replace(tzinfo=timezone.utc)
+                    >= from_dt_filter
+                    and
+                    datetime.strptime(c.contract_month, "%Y%m%d").replace(tzinfo=timezone.utc)
+                    <= max_expiry
+                )
+            ]
+            logger.info(
+                f"FuturesDataService: {len(contracts)} contract(s) overlap "
+                f"{from_date} → {to_date or 'now'} (after date filter)."
+            )
+
+        if not contracts:
+            return {
+                "status": "error",
+                "message": f"No contracts for {symbol} overlap the requested date range.",
+            }
+
         total = len(contracts)
         results = []
 
@@ -375,6 +428,8 @@ class FuturesDataService:
                 timespan=timespan,
                 multiplier=multiplier,
                 force_refresh=force_refresh,
+                from_date=from_date,
+                to_date=to_date,
             )
             results.append(result)
 

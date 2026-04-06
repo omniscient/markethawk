@@ -87,12 +87,14 @@ async def list_stock_universes(
 ):
     from sqlalchemy import func
     from app.models import StockAggregate, StockUniverseTicker
+    from app.models.futures_aggregate import FuturesAggregate
 
     """List all stock universes."""
     universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
 
     # Enrich with stats
     # Optimization: Could use a single complex query, but loop is clearer for now given <50 universes
+
     results = []
     for universe in universes:
         # 1. Ticker Count
@@ -102,23 +104,60 @@ async def list_stock_universes(
             .scalar()
         )
 
-        # 2. Aggregates Stats
-        # Get all tickers in this universe
-        # Subquery or fetch?
-        # Let's do a join: count(StockAggregate) join StockUniverseTicker
-        
-        agg_stats = (
-            db.query(
-                func.count(StockAggregate.id),
-                func.min(StockAggregate.timestamp),
-                func.max(StockAggregate.timestamp)
+        # 2. Aggregate Stats — split by asset class so futures bars (FuturesAggregate)
+        #    and stock bars (StockAggregate) are both counted.
+        futures_tickers = [
+            row.ticker
+            for row in db.query(StockUniverseTicker.ticker)
+            .filter(
+                StockUniverseTicker.universe_id == universe.id,
+                StockUniverseTicker.asset_class == "futures",
             )
-            .join(StockUniverseTicker, StockAggregate.ticker == StockUniverseTicker.ticker)
-            .filter(StockUniverseTicker.universe_id == universe.id)
-            .first()
-        )
-        
-        count_aggs, min_date, max_date = agg_stats if agg_stats else (0, None, None)
+            .all()
+        ]
+        stock_tickers = [
+            row.ticker
+            for row in db.query(StockUniverseTicker.ticker)
+            .filter(
+                StockUniverseTicker.universe_id == universe.id,
+                StockUniverseTicker.asset_class != "futures",
+            )
+            .all()
+        ]
+
+        count_aggs = 0
+        min_date = None
+        max_date = None
+
+        if stock_tickers:
+            stock_stats = (
+                db.query(
+                    func.count(StockAggregate.id),
+                    func.min(StockAggregate.timestamp),
+                    func.max(StockAggregate.timestamp),
+                )
+                .filter(StockAggregate.ticker.in_(stock_tickers))
+                .first()
+            )
+            if stock_stats and stock_stats[0]:
+                count_aggs += stock_stats[0]
+                min_date = stock_stats[1] if min_date is None else min(min_date, stock_stats[1]) if stock_stats[1] else min_date
+                max_date = stock_stats[2] if max_date is None else max(max_date, stock_stats[2]) if stock_stats[2] else max_date
+
+        if futures_tickers:
+            futures_stats = (
+                db.query(
+                    func.count(FuturesAggregate.id),
+                    func.min(FuturesAggregate.timestamp),
+                    func.max(FuturesAggregate.timestamp),
+                )
+                .filter(FuturesAggregate.symbol.in_(futures_tickers))
+                .first()
+            )
+            if futures_stats and futures_stats[0]:
+                count_aggs += futures_stats[0]
+                min_date = futures_stats[1] if min_date is None else min(min_date, futures_stats[1]) if futures_stats[1] else min_date
+                max_date = futures_stats[2] if max_date is None else max(max_date, futures_stats[2]) if futures_stats[2] else max_date
 
         # Convert to Pydantic model with extra fields
         universe_data = StockUniverseResponse.from_orm(universe)
@@ -307,8 +346,11 @@ async def sync_universe_aggregates(
 ):
     """
     Trigger backfill of aggregates for all stocks in the universe.
+    Stocks use the Polygon (Massive) provider; futures use IBKR via FuturesDataService.
     """
-    # 1. Get stocks in universe
+    from app.tasks import sync_stock_aggregates, sync_futures_aggregates
+    from app.services.futures_data import SYMBOL_EXCHANGE_MAP
+
     stocks = (
         db.query(MonitoredStock)
         .filter(
@@ -317,28 +359,61 @@ async def sync_universe_aggregates(
         )
         .all()
     )
-    
+
     if not stocks:
-         return {"status": "skipped", "message": "No active stocks in this universe."}
-         
-    # 2. Schedule tasks
-    from app.tasks import sync_stock_aggregates
-    
-    count = 0
+        return {"status": "skipped", "message": "No active stocks in this universe."}
+
+    stock_count = 0
+    futures_count = 0
+    queued_futures: set = set()
+
     for stock in stocks:
-        sync_stock_aggregates.delay(
-            ticker=stock.ticker,
-            from_date=from_date,
-            to_date=to_date,
-            multiplier=multiplier,
-            timespan=timespan,
-            adjusted=adjusted,
-            sort=sort,
-            limit=limit
-        )
-        count += 1
-        
+        if stock.asset_class == "futures":
+            symbol = stock.ticker
+            if symbol in queued_futures:
+                continue
+
+            # Resolve exchange: stored metadata → known symbol map → skip
+            metadata = stock.stock_metadata or {}
+            exchange = metadata.get("primary_exchange")
+            if not exchange or exchange == "Unknown":
+                exchange = SYMBOL_EXCHANGE_MAP.get(symbol)
+            if not exchange:
+                logger.warning(
+                    f"Universe {universe_id}: cannot determine exchange for futures "
+                    f"symbol '{symbol}' — skipping aggregate sync."
+                )
+                continue
+
+            sync_futures_aggregates.delay(
+                symbol=symbol,
+                exchange=exchange,
+                timespan=timespan,
+                multiplier=multiplier,
+                from_date=from_date,
+                to_date=to_date,
+            )
+            queued_futures.add(symbol)
+            futures_count += 1
+        else:
+            sync_stock_aggregates.delay(
+                ticker=stock.ticker,
+                from_date=from_date,
+                to_date=to_date,
+                multiplier=multiplier,
+                timespan=timespan,
+                adjusted=adjusted,
+                sort=sort,
+                limit=limit,
+            )
+            stock_count += 1
+
+    parts = []
+    if stock_count:
+        parts.append(f"{stock_count} stocks ({from_date} to {to_date})")
+    if futures_count:
+        parts.append(f"{futures_count} futures symbol(s) via IBKR")
     return {
-        "status": "accepted", 
-        "message": f"Scheduled aggregate sync for {count} stocks ({from_date} to {to_date})."
+        "status": "accepted",
+        "message": f"Scheduled aggregate sync for {', '.join(parts)}.",
     }

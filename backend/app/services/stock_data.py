@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
 from app.models.stock_aggregate import StockAggregate
+from app.models.futures_aggregate import FuturesAggregate
 from app.providers import DataProviderFactory
 
 
@@ -207,6 +208,65 @@ class StockDataService:
             
         except Exception as e:
             logging.error(f"Error fetching historical data from DB for {ticker}: {e}")
+            return pd.DataFrame()
+
+    @staticmethod
+    async def get_futures_historical_from_db(
+        db: Session,
+        symbol: str,
+        period: str = "30d",
+        timespan: str = "minute",
+        multiplier: int = 1,
+    ) -> pd.DataFrame:
+        """Fetch futures bars from FuturesAggregate, stitching all contract months."""
+        try:
+            days = 30
+            if period.endswith("d"):
+                days = int(period[:-1])
+            elif period.endswith("y"):
+                days = int(period[:-1]) * 365
+            elif period.endswith("w"):
+                days = int(period[:-1]) * 7
+            elif period.isdigit():
+                days = int(period)
+
+            start_date = datetime.now() - timedelta(days=days)
+
+            results = (
+                db.query(FuturesAggregate)
+                .filter(
+                    FuturesAggregate.symbol == symbol,
+                    FuturesAggregate.timespan == timespan,
+                    FuturesAggregate.multiplier == multiplier,
+                    FuturesAggregate.timestamp >= start_date,
+                )
+                .order_by(FuturesAggregate.timestamp.asc())
+                .all()
+            )
+
+            if not results:
+                return pd.DataFrame()
+
+            data = [
+                {
+                    "Date": r.timestamp,
+                    "Open": float(r.open),
+                    "High": float(r.high),
+                    "Low": float(r.low),
+                    "Close": float(r.close),
+                    "Volume": int(r.volume),
+                    "vwap": float(r.vwap) if r.vwap else None,
+                    "contract_month": r.contract_month,
+                }
+                for r in results
+            ]
+
+            df = pd.DataFrame(data)
+            df.set_index("Date", inplace=True)
+            return df
+
+        except Exception as e:
+            logging.error(f"Error fetching futures historical data for {symbol}: {e}")
             return pd.DataFrame()
 
     @staticmethod

@@ -229,14 +229,9 @@ class IBKRDataProvider(BaseDataProvider):
 
         try:
             details: List[ContractDetails] = await asyncio.wait_for(
-                asyncio.gather(
-                    asyncio.get_event_loop().run_in_executor(
-                        None, lambda: ib.reqContractDetails(template)
-                    )
-                ),
+                ib.reqContractDetailsAsync(template),
                 timeout=30,
             )
-            details = details[0]  # unwrap gather result
         except Exception as e:
             logger.error(f"IBKRDataProvider: get_futures_contracts failed for {symbol}: {e}")
             return []
@@ -317,7 +312,7 @@ class IBKRDataProvider(BaseDataProvider):
 
         # Qualify to get conId and full details
         try:
-            qualified = ib.qualifyContracts(contract)
+            qualified = await ib.qualifyContractsAsync(contract)
             if not qualified:
                 logger.warning(
                     f"IBKRDataProvider: Could not qualify {symbol} {contract_month}"
@@ -456,15 +451,18 @@ class IBKRDataProvider(BaseDataProvider):
                     f"IBKRDataProvider: reqHistoricalData "
                     f"end={end_str} duration={max_duration} barSize={bar_size}"
                 )
-                bars = ib.reqHistoricalData(
-                    contract,
-                    endDateTime=end_str,
-                    durationStr=max_duration,
-                    barSizeSetting=bar_size,
-                    whatToShow=what_to_show,
-                    useRTH=use_rth,
-                    formatDate=1,  # Return datetime objects
-                    keepUpToDate=False,
+                bars = await asyncio.wait_for(
+                    ib.reqHistoricalDataAsync(
+                        contract,
+                        endDateTime=end_str,
+                        durationStr=max_duration,
+                        barSizeSetting=bar_size,
+                        whatToShow=what_to_show,
+                        useRTH=use_rth,
+                        formatDate=1,
+                        keepUpToDate=False,
+                    ),
+                    timeout=60,
                 )
             except Exception as e:
                 logger.error(f"IBKRDataProvider: reqHistoricalData failed: {e}")

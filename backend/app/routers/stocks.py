@@ -14,6 +14,21 @@ from typing import Optional
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
 
+def _is_futures_ticker(db: Session, ticker: str) -> bool:
+    """Return True if this ticker is tracked as a futures asset class."""
+    from app.models import MonitoredStock
+    return (
+        db.query(MonitoredStock.id)
+        .filter(
+            MonitoredStock.ticker == ticker,
+            MonitoredStock.asset_class == "futures",
+            MonitoredStock.is_active == True,
+        )
+        .first()
+        is not None
+    )
+
+
 @router.get("/historical/{ticker}")
 async def get_historical_data(
     ticker: str,
@@ -25,13 +40,21 @@ async def get_historical_data(
     """Get historical stock data from DB, fallback to Polygon."""
     ticker = ticker.upper()
     try:
-        # 1. Always trigger an incremental refresh to ensure data is up to date
-        await StockDataService.refresh_stock_data(db, ticker, timespan, multiplier, period=period)
+        is_futures = _is_futures_ticker(db, ticker)
 
-        # 2. Fetch from DB (it will now have the latest sync)
-        data = await StockDataService.get_historical_from_db(
-            db, ticker, period, timespan, multiplier
-        )
+        if is_futures:
+            # Futures bars live in FuturesAggregate — skip Polygon refresh
+            data = await StockDataService.get_futures_historical_from_db(
+                db, ticker, period, timespan, multiplier
+            )
+        else:
+            # 1. Always trigger an incremental refresh to ensure data is up to date
+            await StockDataService.refresh_stock_data(db, ticker, timespan, multiplier, period=period)
+
+            # 2. Fetch from DB (it will now have the latest sync)
+            data = await StockDataService.get_historical_from_db(
+                db, ticker, period, timespan, multiplier
+            )
 
         if data.empty:
             return {
@@ -104,9 +127,8 @@ async def refresh_stock_data(
     """Trigger a refresh of stock data from Polygon to DB."""
     try:
         ticker = ticker.upper()
-        # If period is provided, the service could potentially use it, 
-        # but for now StockDataService.refresh_stock_data will handle it via its internal target_start logic
-        # if period indicates we need more than it thinks.
+        if _is_futures_ticker(db, ticker):
+            return {"status": "skipped", "message": "Futures data is synced via IBKR, not Polygon."}
         result = await StockDataService.refresh_stock_data(
             db, ticker, timespan, multiplier, full_history, period
         )
@@ -124,19 +146,63 @@ async def get_stock_detail_consolidated(
     """Get consolidated stock detail for the frontend detail page."""
     ticker = ticker.upper()
     try:
+        if _is_futures_ticker(db, ticker):
+            # Return cached info from MonitoredStock — no Polygon calls for futures
+            from app.models import MonitoredStock
+            from app.models.futures_aggregate import FuturesAggregate
+            from sqlalchemy import func
+
+            stock = (
+                db.query(MonitoredStock)
+                .filter(
+                    MonitoredStock.ticker == ticker,
+                    MonitoredStock.asset_class == "futures",
+                    MonitoredStock.is_active == True,
+                )
+                .first()
+            )
+
+            latest_close = (
+                db.query(FuturesAggregate.close)
+                .filter(FuturesAggregate.symbol == ticker)
+                .order_by(FuturesAggregate.timestamp.desc())
+                .limit(1)
+                .scalar()
+            )
+
+            return {
+                "ticker": ticker,
+                "info": {
+                    "longName": (stock.company_name if stock else None) or ticker,
+                    "shortName": ticker,
+                    "sector": (stock.sector if stock else None) or "Futures",
+                    "industry": "Futures",
+                    "marketCap": None,
+                },
+                "pre_market": {
+                    "pre_market_volume": 0,
+                    "pre_market_high": None,
+                    "pre_market_low": None,
+                    "pre_market_open": None,
+                    "pre_market_close": None,
+                },
+                "latest_price": float(latest_close) if latest_close else None,
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+            }
+
         # 1. Fundamental Info
         info = await StockDataService.get_stock_info(ticker)
-        
+
         # 2. Pre-market / Extended Hours data
         pre_market = await StockDataService.get_pre_market_data(ticker)
-        
+
         # 3. Latest aggregates for summary (e.g. today's close if available)
         # Fetching last 1 day minute data to get a accurate "current" or "close" price
         today = datetime.now().strftime("%Y-%m-%d")
         minute_aggs = await StockDataService.get_aggregates(
             ticker, 1, "minute", today, today, limit=1
         )
-        
+
         latest_price = None
         if minute_aggs:
             latest_price = minute_aggs[-1]["close"]

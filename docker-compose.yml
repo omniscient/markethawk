@@ -31,6 +31,9 @@ services:
       SEQ_URL: http://seq:5341
       WATCHFILES_FORCE_POLLING: "true"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      IBKR_HOST: ${IBKR_HOST:-host.docker.internal}
+      IBKR_PORT: ${IBKR_PORT:-7496}
+      IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
     ports:
       - "8000:8000"
     depends_on:
@@ -78,13 +81,17 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: stockscanner-celery
-    command: celery -A app.main.celery worker --loglevel=info
+    command: python -m watchfiles --filter python 'celery -A app.main.celery worker --loglevel=info' /app/app
     environment:
       DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
+      WATCHFILES_FORCE_POLLING: "true"
+      IBKR_HOST: ${IBKR_HOST:-host.docker.internal}
+      IBKR_PORT: ${IBKR_PORT:-7496}
+      IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
     depends_on:
       - postgres
       - redis

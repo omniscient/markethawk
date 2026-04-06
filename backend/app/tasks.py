@@ -470,6 +470,58 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
 
 
 @celery_app.task(bind=True, max_retries=3)
+def sync_futures_aggregates(
+    self,
+    symbol: str,
+    exchange: str,
+    timespan: str = "day",
+    multiplier: int = 1,
+    force: bool = False,
+    from_date: str = None,
+    to_date: str = None,
+):
+    """
+    Download historical futures data from IBKR for one root symbol.
+    When from_date/to_date are provided only contracts overlapping that range
+    are downloaded, keeping the job fast for short backfills.
+    """
+    from app.services.futures_data import FuturesDataService
+
+    db: Session = SessionLocal()
+    try:
+        logger.info(
+            f"📊 Starting futures aggregate sync for {symbol} ({exchange})"
+            + (f" [{from_date} → {to_date}]" if from_date else "")
+        )
+
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        result = loop.run_until_complete(
+            FuturesDataService.download_full_history(
+                db=db,
+                symbol=symbol,
+                exchange=exchange,
+                timespan=timespan,
+                multiplier=multiplier,
+                force_refresh=force,
+                from_date=from_date,
+                to_date=to_date,
+            )
+        )
+        logger.info(f"✅ Futures sync complete for {symbol}: {result}")
+
+    except Exception as e:
+        logger.error(f"❌ Error syncing futures aggregates for {symbol}: {e}")
+        db.rollback()
+        raise self.retry(exc=e, countdown=60)
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True, max_retries=3)
 def sync_stock_splits(self):
     """
     Celery task to fetch recent stock splits from Polygon.io.
