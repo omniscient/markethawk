@@ -11,6 +11,7 @@ Key IBKR pacing rules enforced here:
 
 import asyncio
 import logging
+import os
 import time
 from collections import deque
 from datetime import datetime, timezone, timedelta
@@ -312,13 +313,21 @@ class IBKRDataProvider(BaseDataProvider):
 
         # Qualify to get conId and full details
         try:
-            qualified = await ib.qualifyContractsAsync(contract)
+            qualified = await asyncio.wait_for(
+                ib.qualifyContractsAsync(contract),
+                timeout=30,
+            )
             if not qualified:
                 logger.warning(
                     f"IBKRDataProvider: Could not qualify {symbol} {contract_month}"
                 )
                 return []
             contract = qualified[0]
+        except asyncio.TimeoutError:
+            logger.error(
+                f"IBKRDataProvider: qualify timed out for {symbol} {contract_month}"
+            )
+            return []
         except Exception as e:
             logger.error(
                 f"IBKRDataProvider: qualify failed for {symbol} {contract_month}: {e}"
@@ -346,19 +355,37 @@ class IBKRDataProvider(BaseDataProvider):
         if self._ib and self._ib.isConnected():
             return True
 
+        # Use a per-process client ID so parallel Celery workers don't conflict.
+        # Base ID (default 10) + (PID mod 50) gives IDs in range [base, base+49].
+        client_id = settings.IBKR_CLIENT_ID + (os.getpid() % 50)
+
         self._ib = IB()
         try:
             await self._ib.connectAsync(
                 host=settings.IBKR_HOST,
                 port=settings.IBKR_PORT,
-                clientId=settings.IBKR_CLIENT_ID,
+                clientId=client_id,
                 timeout=20,
             )
+            # Give ib_insync a moment to receive and process any immediate error
+            # events such as error 326 ("client id already in use"), which cause
+            # TWS to close the connection right after the handshake.
+            await asyncio.sleep(0.5)
+
+            if not self._ib.isConnected():
+                logger.error(
+                    f"IBKRDataProvider: TWS rejected connection "
+                    f"(clientId={client_id} may already be in use by another session)."
+                )
+                self._ib = None
+                self._connected = False
+                return False
+
             self._connected = True
             logger.info(
                 f"IBKRDataProvider: Connected to TWS at "
                 f"{settings.IBKR_HOST}:{settings.IBKR_PORT} "
-                f"(clientId={settings.IBKR_CLIENT_ID})"
+                f"(clientId={client_id})"
             )
             return True
         except Exception as e:
@@ -441,16 +468,25 @@ class IBKRDataProvider(BaseDataProvider):
         chunk_end = end_dt
         seen_timestamps = set()
 
+        chunk_num = 0
         while chunk_end > start_dt:
             await self._pacing.wait()
 
+            # Ensure we still have a live connection before each chunk
+            ib = await self._get_connection()
+            if not ib:
+                logger.error("IBKRDataProvider: lost connection during chunked download, aborting.")
+                break
+
+            chunk_num += 1
             end_str = chunk_end.strftime("%Y%m%d %H:%M:%S UTC")
+            logger.info(
+                f"IBKRDataProvider: chunk {chunk_num} — end={end_str} "
+                f"duration={max_duration} barSize={bar_size} "
+                f"(collected {len(all_bars)} bars so far)"
+            )
 
             try:
-                logger.debug(
-                    f"IBKRDataProvider: reqHistoricalData "
-                    f"end={end_str} duration={max_duration} barSize={bar_size}"
-                )
                 bars = await asyncio.wait_for(
                     ib.reqHistoricalDataAsync(
                         contract,
@@ -459,16 +495,29 @@ class IBKRDataProvider(BaseDataProvider):
                         barSizeSetting=bar_size,
                         whatToShow=what_to_show,
                         useRTH=use_rth,
-                        formatDate=1,
+                        formatDate=2,  # Unix UTC timestamps — avoids exchange-timezone ambiguity
                         keepUpToDate=False,
                     ),
-                    timeout=60,
+                    timeout=120,
                 )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"IBKRDataProvider: chunk {chunk_num} timed out (120s) — "
+                    f"stopping download with {len(all_bars)} bars collected."
+                )
+                break
             except Exception as e:
-                logger.error(f"IBKRDataProvider: reqHistoricalData failed: {e}")
+                logger.error(
+                    f"IBKRDataProvider: reqHistoricalData failed on chunk {chunk_num}: {e} — "
+                    f"stopping with {len(all_bars)} bars collected."
+                )
                 break
 
             if not bars:
+                logger.info(
+                    f"IBKRDataProvider: no bars returned for chunk {chunk_num} "
+                    f"(end={end_str}), reached start of available data."
+                )
                 break
 
             # Convert to standard format
@@ -514,15 +563,31 @@ class IBKRDataProvider(BaseDataProvider):
 
     @staticmethod
     def _bar_date_to_utc(bar_date) -> datetime:
-        """Convert an ib_insync bar date (string or datetime) to UTC datetime."""
+        """
+        Convert an ib_insync bar date to a UTC-aware datetime.
+
+        With formatDate=2, ib_insync sets bar.date to either:
+          - An integer Unix timestamp
+          - A timezone-aware datetime (UTC)
+          - A naive datetime (treat as UTC)
+        With formatDate=1 (legacy), it's a local-time string — we no longer use
+        that mode, but handle it as a fallback just in case.
+        """
+        # Integer Unix timestamp (formatDate=2)
+        if isinstance(bar_date, (int, float)):
+            return datetime.fromtimestamp(bar_date, tz=timezone.utc)
+
         if isinstance(bar_date, datetime):
             if bar_date.tzinfo is None:
+                # ib_insync already decoded the Unix ts into a naive UTC datetime
                 return bar_date.replace(tzinfo=timezone.utc)
             return bar_date.astimezone(timezone.utc)
-        # String format: "YYYYMMDD" for daily, "YYYY-MM-DD HH:MM:SS" for intraday
-        for fmt in ("%Y%m%d", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+
+        # String fallback (formatDate=1 legacy or date-only daily bars)
+        s = str(bar_date).strip()
+        for fmt in ("%Y%m%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y%m%d", "%Y-%m-%d"):
             try:
-                dt = datetime.strptime(str(bar_date), fmt)
+                dt = datetime.strptime(s, fmt)
                 return dt.replace(tzinfo=timezone.utc)
             except ValueError:
                 continue

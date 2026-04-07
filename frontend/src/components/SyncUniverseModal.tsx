@@ -9,7 +9,7 @@ interface SyncUniverseModalProps {
     isOpen: boolean;
     onClose: () => void;
     universe: StockUniverse | null;
-    onSyncStarted?: () => void;
+    onSyncStarted?: (universeId: number) => void;
 }
 
 const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
@@ -18,18 +18,45 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
     universe,
     onSyncStarted
 }) => {
+    const today = new Date().toISOString().split('T')[0];
+
+    // If the universe has a max_aggregate_date, default from_date to the day after it
+    // so the user can easily do an incremental "sync missing data" refresh.
+    const defaultFromDate = React.useMemo(() => {
+        if (universe?.max_aggregate_date) {
+            const next = new Date(universe.max_aggregate_date);
+            next.setDate(next.getDate() + 1);
+            return next.toISOString().split('T')[0];
+        }
+        return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    }, [universe?.max_aggregate_date]);
+
+    const defaultTimespan = universe?.available_timespans?.[0] ?? 'minute';
+
     // Default sync options
     const [syncOptions, setSyncOptions] = React.useState<SyncAggregatesOptions>({
-        from_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        to_date: new Date().toISOString().split('T')[0],
+        from_date: defaultFromDate,
+        to_date: today,
         multiplier: 1,
-        timespan: 'minute',
+        timespan: defaultTimespan,
         adjusted: true,
         sort: 'asc',
         limit: 50000
     });
 
+    // Re-sync defaults when universe changes (e.g. opening for a different universe)
+    React.useEffect(() => {
+        setSyncOptions(prev => ({
+            ...prev,
+            from_date: defaultFromDate,
+            timespan: defaultTimespan,
+            to_date: today,
+        }));
+        setSyncError(null);
+    }, [universe?.id]);
+
     const queryClient = useQueryClient();
+    const [syncError, setSyncError] = React.useState<string | null>(null);
 
     // Sync mutation
     const syncMutation = useMutation({
@@ -38,12 +65,15 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
             return syncUniverseAggregates(universe.id, syncOptions);
         },
         onSuccess: (data) => {
-            // Invalidate the universes query so the list refreshes with updated stats
             queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
-            // Notify parent to start polling for background task results
-            onSyncStarted?.();
+            if (universe) onSyncStarted?.(universe.id);
             onClose();
-        }
+        },
+        onError: (error: any) => {
+            const msg = error?.response?.data?.detail ?? error?.message ?? 'Failed to start sync';
+            setSyncError(msg);
+            queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
+        },
     });
 
     if (!universe) return null;
@@ -68,10 +98,26 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
             }
         >
             <div className="space-y-4">
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4">
+                {syncError && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
+                        {syncError}
+                    </div>
+                )}
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4 space-y-1">
                     <p className="text-sm text-blue-400">
-                        This will schedule a background task to fetch aggregate data from Polygon.io for all stocks in this universe.
+                        Schedules a background task to fetch aggregate data for all instruments in this universe.
                     </p>
+                    {universe.max_aggregate_date && (
+                        <p className="text-xs text-gray-400">
+                            Last recorded data: <span className="text-financial-light font-medium">
+                                {new Date(universe.max_aggregate_date).toLocaleDateString()}
+                            </span>
+                            {universe.available_timespans && universe.available_timespans.length > 0 && (
+                                <> &nbsp;·&nbsp; Timespans: <span className="text-financial-light font-medium">{universe.available_timespans.join(', ')}</span></>
+                            )}
+                            &nbsp;— <span className="text-green-400">from_date pre-filled to sync only missing data.</span>
+                        </p>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

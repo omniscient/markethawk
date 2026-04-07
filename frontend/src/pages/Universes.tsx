@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Database,
@@ -8,7 +8,9 @@ import {
   Eye,
   Filter,
   Search,
-  DownloadCloud
+  DownloadCloud,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 // Components
@@ -20,7 +22,7 @@ import SyncUniverseModal from '../components/SyncUniverseModal';
 import { StockUniverse } from '../api/scanner';
 
 // API functions
-import { fetchStockUniverses, deleteStockUniverse } from '../api/scanner';
+import { fetchStockUniverses, deleteStockUniverse, fetchUniverseSyncStatus, syncMissingAggregates } from '../api/scanner';
 
 const Universes: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,28 +30,82 @@ const Universes: React.FC = () => {
   const [editingUniverse, setEditingUniverse] = useState<StockUniverse | null>(null);
   const [selectedUniverse, setSelectedUniverse] = useState<StockUniverse | null>(null);
   const [syncingUniverse, setSyncingUniverse] = useState<StockUniverse | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  const pollingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Map of universeId → sync progress info
+  const [syncingIds, setSyncingIds] = useState<Record<number, { pending: number; total: number }>>({});
   const queryClient = useQueryClient();
 
-  // Start polling after a sync is triggered so the UI updates as background tasks complete
-  const handleSyncStarted = useCallback(() => {
-    setIsPolling(true);
-    // Stop polling after 2 minutes
-    if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
-    pollingTimerRef.current = setTimeout(() => setIsPolling(false), 2 * 60 * 1000);
+  // Called by SyncUniverseModal when tasks are queued
+  const handleSyncStarted = useCallback((universeId: number) => {
+    setSyncingIds(prev => ({ ...prev, [universeId]: { pending: 1, total: 1 } }));
   }, []);
 
-  // Clean up timer on unmount
+  // Poll sync status for all active syncs every 5 seconds
   useEffect(() => {
-    return () => {
-      if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current);
-    };
-  }, []);
+    const ids = Object.keys(syncingIds).map(Number);
+    if (ids.length === 0) return;
+
+    const interval = setInterval(async () => {
+      const completed: number[] = [];
+      const updates: Record<number, { pending: number; total: number }> = {};
+
+      await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const status = await fetchUniverseSyncStatus(id);
+            if (!status.is_syncing) {
+              completed.push(id);
+            } else {
+              // Timeout: if tasks are still "syncing" after 20 min assume stuck/failed
+              const stale = status.started_at
+                ? Date.now() - new Date(status.started_at).getTime() > 20 * 60 * 1000
+                : false;
+              if (stale) {
+                completed.push(id);
+              } else {
+                updates[id] = { pending: status.pending, total: status.total };
+              }
+            }
+          } catch {
+            completed.push(id); // treat error as done
+          }
+        })
+      );
+
+      if (completed.length > 0) {
+        setSyncingIds(prev => {
+          const next = { ...prev };
+          completed.forEach(id => delete next[id]);
+          return next;
+        });
+        queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
+      }
+
+      if (Object.keys(updates).length > 0) {
+        setSyncingIds(prev => ({ ...prev, ...updates }));
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [syncingIds, queryClient]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteStockUniverse,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
+    },
+  });
+
+  const catchUpMutation = useMutation({
+    mutationFn: (id: number) => syncMissingAggregates(id),
+    onSuccess: (data, id) => {
+      if (data.status === 'accepted') {
+        handleSyncStarted(id);
+      } else {
+        // skipped / no data — still refresh stats
+        queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
+      }
+    },
+    onError: () => {
       queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
     },
   });
@@ -60,11 +116,9 @@ const Universes: React.FC = () => {
     }
   };
 
-  // Fetch stock universes (polls every 10s while a sync is in progress)
   const { data: universes, isLoading } = useQuery({
     queryKey: ['stockUniverses'],
     queryFn: fetchStockUniverses,
-    refetchInterval: isPolling ? 10_000 : false,
   });
 
   const filteredUniverses = universes?.filter(universe =>
@@ -126,21 +180,32 @@ const Universes: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredUniverses?.map((universe) => (
-            <Card key={universe.id} className="hover:border-financial-blue/50 transition-colors">
+          {filteredUniverses?.map((universe) => {
+            const sync = syncingIds[universe.id];
+            const isSyncing = !!sync;
+            return (
+            <Card key={universe.id} className={`hover:border-financial-blue/50 transition-colors ${isSyncing ? 'border-yellow-500/40' : ''}`}>
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-2">
-                  <Database className="h-5 w-5 text-financial-blue" />
+                  <Database className={`h-5 w-5 ${isSyncing ? 'text-yellow-400' : 'text-financial-blue'}`} />
                   <h3 className="text-lg font-semibold text-financial-light">
                     {universe.name}
                   </h3>
                 </div>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${universe.is_active
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-gray-500/20 text-gray-400'
-                  }`}>
-                  {universe.is_active ? 'Active' : 'Inactive'}
-                </span>
+                <div className="flex items-center gap-2">
+                  {isSyncing && (
+                    <span className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      {sync.total > 1 ? `${sync.pending}/${sync.total}` : 'Syncing'}
+                    </span>
+                  )}
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${universe.is_active
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-gray-500/20 text-gray-400'
+                    }`}>
+                    {universe.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
 
               <p className="text-gray-400 text-sm mb-4">
@@ -185,6 +250,18 @@ const Universes: React.FC = () => {
                     {universe.max_aggregate_date ? new Date(universe.max_aggregate_date).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
+                {universe.available_timespans && universe.available_timespans.length > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Timespans:</span>
+                    <span className="flex gap-1">
+                      {universe.available_timespans.map(ts => (
+                        <span key={ts} className="px-1.5 py-0.5 bg-financial-blue/20 text-financial-blue rounded text-[10px] font-mono uppercase">
+                          {ts}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -193,9 +270,22 @@ const Universes: React.FC = () => {
                   size="sm"
                   icon={DownloadCloud}
                   onClick={() => setSyncingUniverse(universe)}
+                  disabled={isSyncing}
                 >
                   <span className="hidden xl:inline">Sync</span>
                 </Button>
+                {(universe.aggregate_count ?? 0) > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={catchUpMutation.isPending && catchUpMutation.variables === universe.id ? Loader2 : RefreshCw}
+                    onClick={() => catchUpMutation.mutate(universe.id)}
+                    disabled={isSyncing || catchUpMutation.isPending}
+                    title="Fetch missing bars for all recorded timespans up to today"
+                  >
+                    <span className="hidden xl:inline">Catch Up</span>
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"
@@ -226,7 +316,8 @@ const Universes: React.FC = () => {
                 </Button>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -271,7 +362,7 @@ const Universes: React.FC = () => {
         isOpen={!!syncingUniverse}
         onClose={() => setSyncingUniverse(null)}
         universe={syncingUniverse}
-        onSyncStarted={handleSyncStarted}
+        onSyncStarted={(id) => handleSyncStarted(id)}
       />
     </div>
   );

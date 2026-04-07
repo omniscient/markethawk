@@ -3,7 +3,7 @@ Universe router - CRUD operations for stock universes.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import StockUniverse, MonitoredStock, StockUniverseTicker
+from app.models.stock_aggregate import StockAggregate
 from app.schemas import (
     StockUniverseCreate,
     StockUniverseUpdate,
@@ -86,7 +87,6 @@ async def list_stock_universes(
     db: Session = Depends(get_db),
 ):
     from sqlalchemy import func
-    from app.models import StockAggregate, StockUniverseTicker
     from app.models.futures_aggregate import FuturesAggregate
 
     """List all stock universes."""
@@ -159,13 +159,29 @@ async def list_stock_universes(
                 min_date = futures_stats[1] if min_date is None else min(min_date, futures_stats[1]) if futures_stats[1] else min_date
                 max_date = futures_stats[2] if max_date is None else max(max_date, futures_stats[2]) if futures_stats[2] else max_date
 
+        # 3. Available timespans — distinct (timespan, multiplier) pairs across both tables
+        timespans_set = set()
+        if stock_tickers:
+            for row in db.query(StockAggregate.timespan, StockAggregate.multiplier).filter(
+                StockAggregate.ticker.in_(stock_tickers)
+            ).distinct().all():
+                label = f"{row.multiplier}{row.timespan}" if row.multiplier > 1 else row.timespan
+                timespans_set.add(label)
+        if futures_tickers:
+            for row in db.query(FuturesAggregate.timespan, FuturesAggregate.multiplier).filter(
+                FuturesAggregate.symbol.in_(futures_tickers)
+            ).distinct().all():
+                label = f"{row.multiplier}{row.timespan}" if row.multiplier > 1 else row.timespan
+                timespans_set.add(label)
+
         # Convert to Pydantic model with extra fields
         universe_data = StockUniverseResponse.from_orm(universe)
         universe_data.ticker_count = ticker_count or 0
         universe_data.aggregate_count = count_aggs or 0
         universe_data.min_aggregate_date = min_date
         universe_data.max_aggregate_date = max_date
-        
+        universe_data.available_timespans = sorted(timespans_set)
+
         results.append(universe_data)
 
     return results
@@ -314,6 +330,169 @@ async def refresh_universe(
     }
 
 
+@router.post("/{universe_id}/sync-missing")
+async def sync_missing_aggregates(
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    For every (timespan, multiplier) already recorded in this universe,
+    queue a sync from the last stored bar up to today.
+    Handles all timespans (minute, hour, day, etc.) in one click.
+    """
+    import json
+    import redis as redis_lib
+    from app.tasks import sync_stock_aggregates, sync_futures_aggregates
+    from app.services.futures_data import SYMBOL_EXCHANGE_MAP
+    from app.models.futures_aggregate import FuturesAggregate
+    from app.core.config import settings
+    from sqlalchemy import func
+
+    stocks = (
+        db.query(MonitoredStock)
+        .filter(MonitoredStock.universe_id == universe_id, MonitoredStock.is_active == True)
+        .all()
+    )
+    if not stocks:
+        return {"status": "skipped", "message": "No active stocks in this universe."}
+
+    now_utc = datetime.utcnow()
+    today = now_utc.strftime("%Y-%m-%d")
+    stock_tickers  = [s.ticker for s in stocks if s.asset_class != "futures"]
+    futures_stocks = [s for s in stocks if s.asset_class == "futures"]
+    futures_tickers = list({s.ticker for s in futures_stocks})
+
+    task_ids: list = []
+    summary: list = []
+
+    # --- Stocks: group by (timespan, multiplier), get per-group max timestamp ---
+    if stock_tickers:
+        combos = (
+            db.query(
+                StockAggregate.timespan,
+                StockAggregate.multiplier,
+                func.max(StockAggregate.timestamp).label("max_ts"),
+            )
+            .filter(StockAggregate.ticker.in_(stock_tickers))
+            .group_by(StockAggregate.timespan, StockAggregate.multiplier)
+            .all()
+        )
+        for combo in combos:
+            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=7))
+            # Only skip if from_dt is genuinely in the future (nothing new can exist yet)
+            if from_dt > now_utc:
+                summary.append(f"{combo.timespan}×{combo.multiplier}: already up to date")
+                continue
+            from_date = from_dt.strftime("%Y-%m-%d")
+            for ticker in stock_tickers:
+                r = sync_stock_aggregates.delay(
+                    ticker=ticker,
+                    from_date=from_date,
+                    to_date=today,
+                    multiplier=combo.multiplier,
+                    timespan=combo.timespan,
+                )
+                task_ids.append(r.id)
+            summary.append(f"{combo.timespan}×{combo.multiplier}: {len(stock_tickers)} stocks from {from_date}")
+
+    # --- Futures: same logic against FuturesAggregate ---
+    if futures_tickers:
+        combos = (
+            db.query(
+                FuturesAggregate.timespan,
+                FuturesAggregate.multiplier,
+                func.max(FuturesAggregate.timestamp).label("max_ts"),
+            )
+            .filter(FuturesAggregate.symbol.in_(futures_tickers))
+            .group_by(FuturesAggregate.timespan, FuturesAggregate.multiplier)
+            .all()
+        )
+        stock_map = {s.ticker: s for s in futures_stocks}
+        for combo in combos:
+            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=7))
+            if from_dt > now_utc:
+                summary.append(f"{combo.timespan}×{combo.multiplier} futures: already up to date")
+                continue
+            from_date = from_dt.strftime("%Y-%m-%d")
+            for symbol in futures_tickers:
+                s = stock_map.get(symbol)
+                metadata = (s.stock_metadata or {}) if s else {}
+                exchange = metadata.get("primary_exchange")
+                if not exchange or exchange == "Unknown":
+                    exchange = SYMBOL_EXCHANGE_MAP.get(symbol)
+                if not exchange:
+                    logger.warning(f"sync-missing: no exchange for {symbol}, skipping")
+                    continue
+                r = sync_futures_aggregates.delay(
+                    symbol=symbol,
+                    exchange=exchange,
+                    timespan=combo.timespan,
+                    multiplier=combo.multiplier,
+                    from_date=from_date,
+                    to_date=today,
+                )
+                task_ids.append(r.id)
+            summary.append(f"{combo.timespan}×{combo.multiplier}: {len(futures_tickers)} futures from {from_date}")
+
+    if not task_ids:
+        return {"status": "skipped", "message": "No existing aggregate data found to extend — use Sync to do an initial download first."}
+
+    # Store in Redis for sync-status polling
+    try:
+        r = redis_lib.from_url(settings.REDIS_URL)
+        r.setex(
+            f"universe:{universe_id}:sync",
+            14400,
+            json.dumps({"task_ids": task_ids, "total": len(task_ids), "started_at": datetime.utcnow().isoformat()}),
+        )
+    except Exception as e:
+        logger.warning(f"Could not store sync-missing status in Redis: {e}")
+
+    return {"status": "accepted", "queued": len(task_ids), "summary": summary}
+
+
+@router.get("/{universe_id}/sync-status")
+async def get_universe_sync_status(universe_id: int):
+    """
+    Return the current sync progress for a universe.
+    Reads task IDs stored by sync-aggregates and checks Celery task states.
+    """
+    import json
+    import redis as redis_lib
+    from celery.result import AsyncResult
+    from app.core.celery_app import celery_app
+    from app.core.config import settings
+
+    r = redis_lib.from_url(settings.REDIS_URL)
+    raw = r.get(f"universe:{universe_id}:sync")
+    if not raw:
+        return {"is_syncing": False, "pending": 0, "success": 0, "failed": 0, "total": 0}
+
+    data = json.loads(raw)
+    task_ids = data.get("task_ids", [])
+
+    states = [AsyncResult(tid, app=celery_app).state for tid in task_ids]
+    pending = sum(1 for s in states if s in ("PENDING", "STARTED", "RETRY"))
+    success = sum(1 for s in states if s == "SUCCESS")
+    failed  = sum(1 for s in states if s in ("FAILURE", "REVOKED"))
+
+    is_syncing = pending > 0
+    if not is_syncing:
+        r.delete(f"universe:{universe_id}:sync")
+
+    return {
+        "is_syncing": is_syncing,
+        "total": len(task_ids),
+        "pending": pending,
+        "success": success,
+        "failed": failed,
+        "started_at": data.get("started_at"),
+        "timespan": data.get("timespan"),
+        "from_date": data.get("from_date"),
+        "to_date": data.get("to_date"),
+    }
+
+
 @router.get("/{universe_id}/stocks", response_model=List[MonitoredStockResponse])
 async def get_universe_stocks(
     universe_id: int,
@@ -363,9 +542,14 @@ async def sync_universe_aggregates(
     if not stocks:
         return {"status": "skipped", "message": "No active stocks in this universe."}
 
+    import json
+    import redis as redis_lib
+    from app.core.config import settings
+
     stock_count = 0
     futures_count = 0
     queued_futures: set = set()
+    task_ids: list = []
 
     for stock in stocks:
         if stock.asset_class == "futures":
@@ -385,7 +569,7 @@ async def sync_universe_aggregates(
                 )
                 continue
 
-            sync_futures_aggregates.delay(
+            result = sync_futures_aggregates.delay(
                 symbol=symbol,
                 exchange=exchange,
                 timespan=timespan,
@@ -393,10 +577,11 @@ async def sync_universe_aggregates(
                 from_date=from_date,
                 to_date=to_date,
             )
+            task_ids.append(result.id)
             queued_futures.add(symbol)
             futures_count += 1
         else:
-            sync_stock_aggregates.delay(
+            result = sync_stock_aggregates.delay(
                 ticker=stock.ticker,
                 from_date=from_date,
                 to_date=to_date,
@@ -406,7 +591,26 @@ async def sync_universe_aggregates(
                 sort=sort,
                 limit=limit,
             )
+            task_ids.append(result.id)
             stock_count += 1
+
+    # Store task IDs in Redis so the frontend can poll sync progress
+    try:
+        r = redis_lib.from_url(settings.REDIS_URL)
+        r.setex(
+            f"universe:{universe_id}:sync",
+            14400,  # 4-hour TTL
+            json.dumps({
+                "task_ids": task_ids,
+                "total": len(task_ids),
+                "started_at": datetime.utcnow().isoformat(),
+                "timespan": timespan,
+                "from_date": from_date,
+                "to_date": to_date,
+            }),
+        )
+    except Exception as e:
+        logger.warning(f"Could not store sync status in Redis: {e}")
 
     parts = []
     if stock_count:
@@ -415,5 +619,6 @@ async def sync_universe_aggregates(
         parts.append(f"{futures_count} futures symbol(s) via IBKR")
     return {
         "status": "accepted",
+        "queued": len(task_ids),
         "message": f"Scheduled aggregate sync for {', '.join(parts)}.",
     }

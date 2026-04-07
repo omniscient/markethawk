@@ -104,6 +104,12 @@ class FuturesDataService:
             include_expired=True,
         )
 
+        if not contracts:
+            raise RuntimeError(
+                f"IBKR returned no contracts for {symbol} on {exchange}. "
+                "TWS may be unreachable or the symbol/exchange is incorrect."
+            )
+
         # Apply 10-year limit
         cutoff = datetime.now(timezone.utc) - timedelta(days=MAX_HISTORY_YEARS * 365)
 
@@ -253,7 +259,7 @@ class FuturesDataService:
                 "added": 0,
             }
 
-        # Store bars — deduplicate against existing records
+        # Load existing timestamps once for deduplication
         existing_ts = set(
             r[0]
             for r in db.query(FuturesAggregate.timestamp).filter(
@@ -264,12 +270,28 @@ class FuturesDataService:
             ).all()
         )
 
-        new_records = []
+        # Insert in batches of 5000 to preserve progress on large downloads
+        BATCH_SIZE = 5000
+        total_added = 0
+        batch = []
+
+        def _flush_batch():
+            nonlocal total_added
+            if batch:
+                db.bulk_save_objects(batch)
+                db.commit()
+                total_added += len(batch)
+                logger.info(
+                    f"FuturesDataService: Committed {len(batch)} bars for "
+                    f"{symbol} {contract_month} (total so far: {total_added})."
+                )
+                batch.clear()
+
         for bar in bars:
-            ts = bar["timestamp"].replace(tzinfo=None)  # store as naive UTC in DB
+            ts = bar["timestamp"].replace(tzinfo=None)
             if ts in existing_ts:
                 continue
-            new_records.append(
+            batch.append(
                 FuturesAggregate(
                     symbol=symbol,
                     contract_month=contract_month,
@@ -288,19 +310,27 @@ class FuturesDataService:
                 )
             )
             existing_ts.add(ts)
+            if len(batch) >= BATCH_SIZE:
+                _flush_batch()
 
-        if new_records:
-            db.bulk_save_objects(new_records)
+        _flush_batch()  # flush remainder
 
         # Update catalog entry
         if catalog_entry:
             catalog_entry.data_downloaded = True
-            if new_records:
-                ts_list = [r.timestamp for r in new_records]
-                catalog_entry.first_bar_date = min(ts_list)
-                catalog_entry.last_bar_date = max(ts_list)
+            if total_added:
+                all_saved_ts = (
+                    db.query(func.min(FuturesAggregate.timestamp), func.max(FuturesAggregate.timestamp))
+                    .filter(
+                        FuturesAggregate.symbol == symbol,
+                        FuturesAggregate.contract_month == contract_month,
+                    )
+                    .first()
+                )
+                if all_saved_ts:
+                    catalog_entry.first_bar_date = all_saved_ts[0]
+                    catalog_entry.last_bar_date = all_saved_ts[1]
         else:
-            # Create a catalog entry if it doesn't exist yet
             db.add(FuturesContract(
                 symbol=symbol,
                 exchange=exchange.upper(),
@@ -308,21 +338,18 @@ class FuturesDataService:
                 expiry_date=expiry_dt.date(),
                 is_expired=(expiry_dt < now),
                 data_downloaded=True,
-                first_bar_date=min(r.timestamp for r in new_records) if new_records else None,
-                last_bar_date=max(r.timestamp for r in new_records) if new_records else None,
             ))
 
         db.commit()
 
         logger.info(
-            f"FuturesDataService: Saved {len(new_records)} bars for "
-            f"{symbol} {contract_month}."
+            f"FuturesDataService: Saved {total_added} bars for {symbol} {contract_month}."
         )
         return {
             "status": "success",
             "symbol": symbol,
             "contract_month": contract_month,
-            "added": len(new_records),
+            "added": total_added,
             "from_date": from_date,
             "to_date": to_date,
         }
@@ -377,10 +404,12 @@ class FuturesDataService:
                 "message": f"No contracts found for {symbol} on {exchange}",
             }
 
-        # When a date range is requested, keep only contracts that:
-        #   1. Haven't expired before from_date (expiry >= from_date)
-        #   2. Aren't so far in the future they have no data yet
-        #      (expiry <= to_date + 180 days covers front 2 active months)
+        # When a date range is requested keep contracts that were plausibly
+        # trading during it:
+        #   • Expiry >= from_date - 90 days  (covers the front-month at range start)
+        #   • Expiry <= to_date + 180 days   (excludes far-future contracts)
+        # The -90 day look-back ensures we don't miss the contract that was the
+        # front-month at the very beginning of the requested range.
         if from_date:
             now_utc = datetime.now(timezone.utc)
             from_dt_filter = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -388,20 +417,21 @@ class FuturesDataService:
                 datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                 if to_date else now_utc
             )
+            min_expiry = from_dt_filter - timedelta(days=90)
             max_expiry = to_dt_filter + timedelta(days=180)
 
             contracts = [
                 c for c in contracts
                 if (
                     datetime.strptime(c.contract_month, "%Y%m%d").replace(tzinfo=timezone.utc)
-                    >= from_dt_filter
+                    >= min_expiry
                     and
                     datetime.strptime(c.contract_month, "%Y%m%d").replace(tzinfo=timezone.utc)
                     <= max_expiry
                 )
             ]
             logger.info(
-                f"FuturesDataService: {len(contracts)} contract(s) overlap "
+                f"FuturesDataService: {len(contracts)} contract(s) in window "
                 f"{from_date} → {to_date or 'now'} (after date filter)."
             )
 
@@ -448,7 +478,19 @@ class FuturesDataService:
             multiplier=multiplier,
         )
 
-        total_added = sum(r.get("added", 0) for r in results)
+        # Step 4: Gap-fill pass — re-download any holes left by truncated downloads
+        # or back-month contracts with limited IBKR history.
+        gap_result = await FuturesDataService.fill_data_gaps(
+            db=db,
+            symbol=symbol,
+            exchange=exchange,
+            timespan=timespan,
+            multiplier=multiplier,
+            from_date=from_date,
+            to_date=to_date,
+        )
+
+        total_added = sum(r.get("added", 0) for r in results) + gap_result.get("bars_added", 0)
         total_skipped = sum(1 for r in results if r.get("status") == "skipped")
         total_errors = sum(1 for r in results if r.get("status") == "error")
 
@@ -461,9 +503,148 @@ class FuturesDataService:
             "contracts_with_errors": total_errors,
             "bars_added": total_added,
             "rollovers_detected": rollover_count,
+            "gaps_found": gap_result.get("gaps_found", 0),
+            "gaps_filled": gap_result.get("gaps_filled", 0),
         }
         logger.info(f"FuturesDataService: Full download complete. {summary}")
         return summary
+
+    # ------------------------------------------------------------------ #
+    #  Gap Detection & Fill                                                #
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    async def fill_data_gaps(
+        db: Session,
+        symbol: str,
+        exchange: str,
+        timespan: str = "minute",
+        multiplier: int = 1,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        min_gap_hours: int = 80,
+    ) -> Dict[str, Any]:
+        """
+        Scan for time gaps in stored bars and attempt to fill them by
+        re-downloading the gap period from whichever contract covers it.
+
+        Strategy for each gap [gap_start, gap_end]:
+          1. Try every contract whose expiry falls WITHIN the gap window
+             (i.e., it was the front-month during that period).
+          2. Also try the contract that expired just before the gap — it may
+             still have late-life bars for the period.
+          3. Stop as soon as any contract yields new bars for that window.
+
+        min_gap_hours: gaps shorter than this are ignored.
+          NQ trades ~23 h/day Sun–Fri with a ~1 h maintenance break, so
+          80 h (≈3.5 days) safely skips weekends without false positives.
+        """
+        base_query = (
+            db.query(FuturesAggregate.timestamp, FuturesAggregate.contract_month)
+            .filter(
+                FuturesAggregate.symbol == symbol,
+                FuturesAggregate.timespan == timespan,
+                FuturesAggregate.multiplier == multiplier,
+            )
+        )
+        if from_date:
+            base_query = base_query.filter(
+                FuturesAggregate.timestamp >= datetime.strptime(from_date, "%Y-%m-%d")
+            )
+        if to_date:
+            base_query = base_query.filter(
+                FuturesAggregate.timestamp <= datetime.strptime(to_date, "%Y-%m-%d")
+            )
+
+        rows = base_query.order_by(FuturesAggregate.timestamp.asc()).all()
+
+        if len(rows) < 2:
+            return {"gaps_found": 0, "gaps_filled": 0, "bars_added": 0}
+
+        # Detect gaps
+        gaps: List[Tuple[datetime, datetime]] = []
+        for i in range(1, len(rows)):
+            delta = rows[i][0] - rows[i - 1][0]
+            if delta.total_seconds() > min_gap_hours * 3600:
+                gaps.append((rows[i - 1][0], rows[i][0]))
+
+        if not gaps:
+            return {"gaps_found": 0, "gaps_filled": 0, "bars_added": 0}
+
+        logger.info(
+            f"FuturesDataService: {len(gaps)} gap(s) detected for {symbol} "
+            f"({timespan}×{multiplier}) — attempting to fill..."
+        )
+
+        # Load all known contracts for this symbol, sorted chronologically
+        all_contracts = (
+            db.query(FuturesContract)
+            .filter(FuturesContract.symbol == symbol)
+            .order_by(FuturesContract.contract_month.asc())
+            .all()
+        )
+
+        total_added = 0
+        gaps_filled = 0
+
+        for gap_start, gap_end in gaps:
+            gap_start_str = gap_start.strftime("%Y-%m-%d")
+            gap_end_str   = gap_end.strftime("%Y-%m-%d")
+            logger.info(
+                f"FuturesDataService: Filling gap {gap_start_str} → {gap_end_str} "
+                f"({(gap_end - gap_start).days}d) for {symbol}..."
+            )
+
+            # Build ordered candidate list:
+            #   • Contracts that expire during or after the gap start
+            #     (front-month or next-month at that time), nearest first
+            #   • Followed by the contract that expired just before the gap
+            #     (may still have late-life bars right up to its expiry)
+            candidates = sorted(
+                [c for c in all_contracts
+                 if datetime.strptime(c.contract_month, "%Y%m%d") >= gap_start],
+                key=lambda c: c.contract_month,
+            )[:3]
+
+            just_expired = sorted(
+                [c for c in all_contracts
+                 if datetime.strptime(c.contract_month, "%Y%m%d") < gap_start],
+                key=lambda c: c.contract_month,
+                reverse=True,
+            )[:1]
+
+            for contract in (candidates + just_expired):
+                result = await FuturesDataService.download_contract(
+                    db=db,
+                    symbol=symbol,
+                    exchange=exchange,
+                    contract_month=contract.contract_month,
+                    timespan=timespan,
+                    multiplier=multiplier,
+                    force_refresh=False,
+                    from_date=gap_start_str,
+                    to_date=gap_end_str,
+                )
+                added = result.get("added", 0)
+                if added > 0:
+                    total_added += added
+                    gaps_filled += 1
+                    logger.info(
+                        f"FuturesDataService: Gap filled using {contract.contract_month}: "
+                        f"added {added} bars."
+                    )
+                    break
+            else:
+                logger.warning(
+                    f"FuturesDataService: Could not fill gap {gap_start_str} → "
+                    f"{gap_end_str} — no contract had data for this window."
+                )
+
+        return {
+            "gaps_found": len(gaps),
+            "gaps_filled": gaps_filled,
+            "bars_added": total_added,
+        }
 
     # ------------------------------------------------------------------ #
     #  Rollover Detection                                                  #

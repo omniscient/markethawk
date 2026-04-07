@@ -148,6 +148,45 @@ async def trigger_download(
         "note": "Check server logs for progress. Large histories can take several minutes."
     }
 
+@router.post("/fill-gaps/{symbol}")
+async def fill_futures_gaps(
+    symbol: str,
+    background_tasks: BackgroundTasks,
+    timespan: str = "minute",
+    multiplier: int = 1,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Detect and fill time gaps in stored futures bars for a symbol.
+    Runs in the background; check logs for progress.
+    """
+    from app.tasks import celery_app
+    from app.services.futures_data import SYMBOL_EXCHANGE_MAP
+
+    symbol = symbol.upper()
+    exchange = SYMBOL_EXCHANGE_MAP.get(symbol)
+    if not exchange:
+        raise HTTPException(status_code=400, detail=f"Unknown symbol '{symbol}'. Add it to SYMBOL_EXCHANGE_MAP.")
+
+    async def _run():
+        result = await FuturesDataService.fill_data_gaps(
+            db=db,
+            symbol=symbol,
+            exchange=exchange,
+            timespan=timespan,
+            multiplier=multiplier,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        import logging
+        logging.getLogger(__name__).info(f"fill-gaps result for {symbol}: {result}")
+
+    background_tasks.add_task(_run)
+    return {"status": "accepted", "message": f"Gap-fill started for {symbol} ({timespan}×{multiplier}) in background."}
+
+
 @router.get("/providers")
 async def list_providers():
     """List all known data providers and their supported asset classes."""

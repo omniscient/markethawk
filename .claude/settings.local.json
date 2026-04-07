@@ -10,7 +10,8 @@
       "Bash(python:*)",
       "Bash(docker-compose build:*)",
       "Bash(docker-compose up:*)",
-      "Bash(docker-compose exec:*)"
+      "Bash(docker-compose exec:*)",
+      "Bash(python3:*)"
     ]
   }
 }

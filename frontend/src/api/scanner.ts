@@ -53,6 +53,19 @@ export interface StockUniverse {
   aggregate_count?: number;
   min_aggregate_date?: string;
   max_aggregate_date?: string;
+  available_timespans?: string[];
+}
+
+export interface UniverseSyncStatus {
+  is_syncing: boolean;
+  total: number;
+  pending: number;
+  success: number;
+  failed: number;
+  started_at?: string;
+  timespan?: string;
+  from_date?: string;
+  to_date?: string;
 }
 
 export interface ScannerRunRequest {
@@ -238,6 +251,16 @@ export const refreshUniverse = async (id: number): Promise<RefreshUniverseRespon
 
 export const fetchUniverseStocks = async (id: number): Promise<MonitoredStock[]> => {
   const response = await apiClient.get(`/universe/${id}/stocks`);
+  return response.data;
+};
+
+export const syncMissingAggregates = async (id: number): Promise<{ status: string; queued?: number; message?: string; summary?: string[] }> => {
+  const response = await apiClient.post(`/universe/${id}/sync-missing`);
+  return response.data;
+};
+
+export const fetchUniverseSyncStatus = async (id: number): Promise<UniverseSyncStatus> => {
+  const response = await apiClient.get(`/universe/${id}/sync-status`);
   return response.data;
 };
 

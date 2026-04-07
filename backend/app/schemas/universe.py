@@ -3,7 +3,7 @@ Stock Universe Pydantic schemas.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import uuid
 
@@ -36,6 +36,7 @@ class StockUniverseResponse(BaseModel):
     aggregate_count: Optional[int] = 0
     min_aggregate_date: Optional[datetime] = None
     max_aggregate_date: Optional[datetime] = None
+    available_timespans: Optional[List[str]] = []
 
     class Config:
         from_attributes = True
