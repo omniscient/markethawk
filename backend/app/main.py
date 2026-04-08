@@ -155,14 +155,58 @@ def create_app() -> FastAPI:
     # Startup event
     @app.on_event("startup")
     async def startup_event():
-        """Initialize database tables."""
+        """Initialize database tables and cleanup orphaned states."""
+        from app.core.database import SessionLocal
+        from app.models.universe_quality_report import UniverseQualityReport
+        import redis.asyncio as aioredis
+        
         try:
             Base.metadata.create_all(bind=engine)
             logging.info("Database tables initialized")
+            
+            # Reset orphaned tasks in DB
+            db = SessionLocal()
+            try:
+                reports = db.query(UniverseQualityReport).filter(
+                    (UniverseQualityReport.status.in_(["pending", "running"])) |
+                    (UniverseQualityReport.normalization_status.in_(["pending", "running"]))
+                ).all()
+                for report in reports:
+                    if report.status in ["pending", "running"]:
+                        report.status = "error"
+                        report.error_message = "Process interrupted by server restart."
+                    if report.normalization_status in ["pending", "running"]:
+                        report.normalization_status = "error"
+                if reports:
+                    db.commit()
+                    logging.info(f"Reset {len(reports)} orphaned quality reports to error state.")
+            except Exception as dbe:
+                logging.error(f"Error resetting orphaned DB tasks: {dbe}")
+            finally:
+                db.close()
+                
         except Exception as e:
             logging.error(f"Failed to initialize database tables: {e}")
             logging.warning("Application starting without verified DB connection")
-        
+            
+        # Optional: cleanup orphaned Redis sync keys if we want to ensure clean slate
+        try:
+            r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+            cursor = '0'
+            keys_deleted = 0
+            while True:
+                cursor, keys = await r.scan(cursor=cursor, match="universe:*:sync", count=100)
+                if keys:
+                    await r.delete(*keys)
+                    keys_deleted += len(keys)
+                if cursor == 0 or cursor == '0' or str(cursor) == '0':
+                    break
+            if keys_deleted > 0:
+                logging.info(f"Cleared {keys_deleted} orphaned sync tracking keys from Redis.")
+            await r.close()
+        except Exception as re:
+            logging.error(f"Failed to clean up Redis sync keys on startup: {re}")
+            
         # Start Polygon WebSocket Manager
         websocket_manager.start()
         logging.info("Stock WebSocket Manager started")
