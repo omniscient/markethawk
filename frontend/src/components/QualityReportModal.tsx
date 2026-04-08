@@ -122,9 +122,9 @@ function NormalizationProgressPanel({
 
 function CoverageBreakdown({ detail, coveragePct }: { detail: CoverageDetail; coveragePct: number }) {
   const [showAll, setShowAll] = useState(false);
-  const { p90_bars_per_day, full_day_count, stub_day_count, partial_day_count, partial_days } = detail;
-  const totalDays = full_day_count + stub_day_count + partial_day_count;
+  const { p90_bars_per_day, full_day_count, stub_day_count, partial_day_count, holiday_day_count, partial_days } = detail;
   const visiblePartials = showAll ? partial_days : partial_days.slice(0, 5);
+  const shortfallPct = 100 - coveragePct;
 
   return (
     <div className="mt-2 space-y-2">
@@ -134,7 +134,7 @@ function CoverageBreakdown({ detail, coveragePct }: { detail: CoverageDetail; co
           (baseline: {p90_bars_per_day.toLocaleString()} bars/day P90)
         </span>
       </p>
-      <div className="flex gap-4 text-xs">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
         <span className="text-green-400">
           ✓ {full_day_count} full day{full_day_count !== 1 ? 's' : ''}
           <span className="text-gray-600 ml-1">(≥ {p90_bars_per_day.toLocaleString()} bars)</span>
@@ -142,25 +142,41 @@ function CoverageBreakdown({ detail, coveragePct }: { detail: CoverageDetail; co
         {partial_day_count > 0 && (
           <span className="text-yellow-400">
             ◑ {partial_day_count} partial day{partial_day_count !== 1 ? 's' : ''}
-            <span className="text-gray-600 ml-1">(cause shortfall)</span>
+            <span className="text-gray-600 ml-1">(unexplained — cause shortfall)</span>
           </span>
         )}
         {stub_day_count > 0 && (
           <span className="text-gray-500">
             ○ {stub_day_count} stub day{stub_day_count !== 1 ? 's' : ''}
-            <span className="text-gray-600 ml-1">(Sunday opens / holidays, not penalised)</span>
+            <span className="text-gray-600 ml-1">(Sunday opens / organic short sessions)</span>
+          </span>
+        )}
+        {(holiday_day_count ?? 0) > 0 && (
+          <span className="text-blue-400">
+            ✦ {holiday_day_count} holiday day{holiday_day_count !== 1 ? 's' : ''}
+            <span className="text-gray-600 ml-1">(market calendar — not penalised)</span>
           </span>
         )}
       </div>
-      {partial_day_count === 0 && stub_day_count > 0 && (
+
+      {/* All-clear message when there are no unexplained partials */}
+      {partial_day_count === 0 && shortfallPct > 0 && (
         <p className="text-xs text-gray-500 italic">
-          All {stub_day_count} sub-session dates (e.g. Sunday UTC opens) are treated as stubs — no coverage penalty applied. The remaining {(100 - coveragePct).toFixed(1)}% gap may be rounding.
+          All shortened sessions are accounted for
+          {stub_day_count > 0 && holiday_day_count > 0
+            ? ` (${stub_day_count} stub + ${holiday_day_count} holiday)`
+            : stub_day_count > 0 ? ` (${stub_day_count} stub day${stub_day_count !== 1 ? 's' : ''})`
+            : ` (${holiday_day_count} holiday day${holiday_day_count !== 1 ? 's' : ''})`}
+          . The {shortfallPct.toFixed(1)}% gap is within expected market-calendar variance.
         </p>
       )}
+
+      {/* List unexplained partial days */}
       {partial_days.length > 0 && (
         <div>
           <p className="text-xs text-gray-500 mb-1">
-            Dates with partial bar counts (worst first{partial_days.length < partial_day_count ? `, showing top ${partial_days.length}` : ''}):
+            Unexplained partial days — consider re-syncing these dates (worst first
+            {partial_days.length < partial_day_count ? `, showing top ${partial_days.length}` : ''}):
           </p>
           <div className="grid gap-0.5">
             {visiblePartials.map((pd) => (

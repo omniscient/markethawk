@@ -61,7 +61,12 @@ def _count_weekdays_between(d1, d2) -> int:
     return count
 
 
-def _estimate_expected_bars(timestamps: List[datetime], timespan: str, multiplier: int):
+def _estimate_expected_bars(
+    timestamps: List[datetime],
+    timespan: str,
+    multiplier: int,
+    holiday_map: Optional[Dict] = None,
+):
     """
     Empirical P90 approach: group by date, take the 90th-percentile bar count
     per active day, multiply by number of active days.  Self-calibrates to
@@ -73,14 +78,18 @@ def _estimate_expected_bars(timestamps: List[datetime], timespan: str, multiplie
       • Sunday opens: the CME session starts at 18:00 ET Sunday but the UTC
         date only captures 1–2 hours of bars before rolling to Monday.
         (EST: 23:00–23:59 UTC = 60 bars; EDT: 22:00–23:59 UTC = 120 bars)
-      • Holidays / early closes.
-
-    These are not data gaps — the bars present are the only bars that exist
-    for that date.  Counting them as shortfalls against P90 produces a large
-    phantom coverage deficit.
 
     Fix: for any date whose bar count is < 50 % of P90 ("stub day"), set
     expected = actual.  Full days still use P90 as the yardstick.
+
+    Holiday-calendar correction
+    ───────────────────────────
+    holiday_map maps date → event_type ('full_close' | 'early_close' | 'late_open').
+      full_close  — market was closed; any bars present are anomalous.
+                    The date is excluded from the expected calculation entirely
+                    so it does not create a phantom coverage shortfall.
+      early_close / late_open — abbreviated session; whatever bars are present
+                    are correct.  Treated like a stub (actual = expected).
 
     Returns (expected_bars, coverage_detail) where coverage_detail explains
     how the expected count was computed (useful for UI explanation).
@@ -90,6 +99,7 @@ def _estimate_expected_bars(timestamps: List[datetime], timespan: str, multiplie
         "full_day_count": 0,
         "stub_day_count": 0,
         "partial_day_count": 0,
+        "holiday_day_count": 0,
         "partial_days": [],
     }
     if not timestamps:
@@ -107,14 +117,31 @@ def _estimate_expected_bars(timestamps: List[datetime], timespan: str, multiplie
 
     full_days = 0
     stub_days = 0
+    holiday_days = 0
     partial_days: List[Dict] = []
     expected = 0
 
     for d, cnt in by_date.items():
-        if cnt < stub_threshold:
+        holiday_type = holiday_map.get(d) if holiday_map else None
+
+        if holiday_type == "full_close":
+            # Market was fully closed — skip entirely; any bars are anomalous
+            holiday_days += 1
+
+        elif holiday_type in ("early_close", "late_open"):
+            # Abbreviated session — whatever bars exist are correct, no penalty
+            expected += cnt
+            holiday_days += 1
+
+        elif cnt < stub_threshold:
+            # Organic stub (Sunday open boundary, single-day holiday without a
+            # calendar entry, etc.) — actual = expected, no penalty
             expected += cnt
             stub_days += 1
+
         elif cnt < p90:
+            # Partial day — below the P90 baseline without a known explanation;
+            # this is a genuine coverage shortfall
             expected += p90
             partial_days.append({
                 "date": str(d),
@@ -122,6 +149,7 @@ def _estimate_expected_bars(timestamps: List[datetime], timespan: str, multiplie
                 "expected_bars": p90,
                 "shortfall": p90 - cnt,
             })
+
         else:
             expected += p90
             full_days += 1
@@ -134,6 +162,7 @@ def _estimate_expected_bars(timestamps: List[datetime], timespan: str, multiplie
         "full_day_count": full_days,
         "stub_day_count": stub_days,
         "partial_day_count": len(partial_days),
+        "holiday_day_count": holiday_days,
         "partial_days": partial_days[:30],
     }
 
@@ -199,6 +228,7 @@ def _analyze_ticker_timespan(
     timespan: str,
     multiplier: int,
     is_futures: bool,
+    exchange: str = "NYSE",
 ) -> Dict:
     from app.models.stock_aggregate import StockAggregate
     from app.models.futures_aggregate import FuturesAggregate
@@ -267,8 +297,26 @@ def _analyze_ticker_timespan(
     timestamps = [r.timestamp for r in rows]
     actual_bars = len(rows)
 
+    # ── Holiday calendar ──────────────────────────────────────────────────────
+    from app.models.market_holiday import MarketHoliday
+    try:
+        min_date = timestamps[0].date()
+        max_date = timestamps[-1].date()
+        holiday_rows = (
+            db.query(MarketHoliday)
+            .filter(
+                MarketHoliday.exchange == exchange,
+                MarketHoliday.date >= min_date,
+                MarketHoliday.date <= max_date,
+            )
+            .all()
+        )
+        holiday_map = {h.date: h.event_type for h in holiday_rows}
+    except Exception:
+        holiday_map = {}
+
     # ── Coverage ──────────────────────────────────────────────────────────────
-    expected_bars, coverage_detail = _estimate_expected_bars(timestamps, timespan, multiplier)
+    expected_bars, coverage_detail = _estimate_expected_bars(timestamps, timespan, multiplier, holiday_map)
     coverage_pct = min(100.0, (actual_bars / expected_bars * 100) if expected_bars > 0 else 100.0)
 
     # ── Integrity ─────────────────────────────────────────────────────────────
@@ -354,6 +402,17 @@ class DataQualityService:
             ticker = ticker_obj.ticker
             is_futures = ticker in futures_set
 
+            # Resolve exchange for holiday-calendar lookup
+            if is_futures:
+                exch_row = (
+                    db.query(FuturesAggregate.exchange)
+                    .filter(FuturesAggregate.symbol == ticker)
+                    .first()
+                )
+                exchange = exch_row.exchange.upper() if exch_row else "CME"
+            else:
+                exchange = "NYSE"
+
             # Discover which (timespan, multiplier) combos exist for this ticker
             if is_futures:
                 combos = (
@@ -399,7 +458,8 @@ class DataQualityService:
             for combo in combos:
                 try:
                     result = _analyze_ticker_timespan(
-                        db, ticker, combo.timespan, combo.multiplier, is_futures
+                        db, ticker, combo.timespan, combo.multiplier, is_futures,
+                        exchange=exchange,
                     )
                     ticker_results.append(result)
                 except Exception as e:

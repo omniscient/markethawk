@@ -283,6 +283,7 @@ export interface CoverageDetail {
   full_day_count: number;
   stub_day_count: number;
   partial_day_count: number;
+  holiday_day_count: number;
   partial_days: CoveragePartialDay[];
 }
 
