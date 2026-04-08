@@ -357,6 +357,14 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
     }
   }, [report?.status]);
 
+  // If we open the modal and the backend says normalization is actively running,
+  // we "adopt" it so the progress UI shows up instead of staying hidden.
+  React.useEffect(() => {
+    if (report?.normalization_status === 'pending' || report?.normalization_status === 'running') {
+      setNormalizationTriggered(true);
+    }
+  }, [report?.normalization_status]);
+
   const deleteMutation = useMutation({
     mutationFn: (row: QualityTickerResult) =>
       deleteTickerAggregates(universe!.id, {

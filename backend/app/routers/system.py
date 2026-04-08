@@ -3,12 +3,17 @@ System-level information and status router.
 """
 
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
+import asyncio
+import json
+import redis.asyncio as aioredis
 
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
+from app.models.universe_quality_report import UniverseQualityReport
+from app.models.stock_universe import StockUniverse
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 logger = logging.getLogger(__name__)
@@ -115,3 +120,90 @@ async def get_app_info():
         "data_mode": "delayed" if settings.POLYGON_DELAYED else "live",
         "log_level": settings.LOG_LEVEL
     }
+
+@router.websocket("/ws/tasks")
+async def system_tasks_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint that aggregates and pushes active system tasks 
+    (data syncing, analysis, normalization) to clients every 2 seconds.
+    """
+    from app.core.config import settings
+    await websocket.accept()
+    
+    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    
+    try:
+        while True:
+            active_tasks = []
+            
+            # 1. Check Redis for active syncs
+            sync_keys = []
+            cursor = '0'
+            while True:
+                cursor, keys = await redis_client.scan(cursor=cursor, match="universe:*:sync", count=100)
+                sync_keys.extend(keys)
+                if cursor == 0 or cursor == '0' or str(cursor) == '0':
+                    break
+                    
+            db = SessionLocal()
+            try:
+                for key in sync_keys:
+                    parts = key.split(":")
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        uid = int(parts[1])
+                        universe = db.query(StockUniverse).filter(StockUniverse.id == uid).first()
+                        name = universe.name if universe else f"Universe {uid}"
+                        
+                        raw = await redis_client.get(key)
+                        if raw:
+                            data = json.loads(raw)
+                            # Assume if key exists and hasn't been deleted, it's syncing
+                            active_tasks.append({
+                                "id": f"sync_{uid}",
+                                "type": "sync",
+                                "title": f"Syncing Data: {name}",
+                                "status": "running"
+                            })
+                
+                # 2. Check DB for quality and normalization tasks
+                quality_reports = db.query(UniverseQualityReport).filter(
+                    (UniverseQualityReport.status.in_(["pending", "running"])) |
+                    (UniverseQualityReport.normalization_status.in_(["pending", "running"]))
+                ).all()
+                
+                for report in quality_reports:
+                    universe = db.query(StockUniverse).filter(StockUniverse.id == report.universe_id).first()
+                    name = universe.name if universe else f"Universe {report.universe_id}"
+                    
+                    if report.status in ["pending", "running"]:
+                        active_tasks.append({
+                            "id": f"qa_{report.universe_id}",
+                            "type": "analysis",
+                            "title": f"Quality Analysis: {name}",
+                            "status": report.status
+                        })
+                        
+                    if report.normalization_status in ["pending", "running"]:
+                        active_tasks.append({
+                            "id": f"norm_{report.universe_id}",
+                            "type": "normalization",
+                            "title": f"Normalizing Data: {name}",
+                            "status": report.normalization_status
+                        })
+                        
+            except Exception as e:
+                logger.error(f"Error querying active tasks for WS: {e}")
+            finally:
+                db.close()
+                
+            await websocket.send_json({"tasks": active_tasks})
+            
+            # Re-poll every 2.5 seconds
+            await asyncio.sleep(2.5)
+            
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.error(f"System tasks websocket error: {e}")
+    finally:
+        await redis_client.close()

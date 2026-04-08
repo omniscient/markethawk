@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getSystemInfo } from '../api/system';
+import SystemActivityMonitor from './SystemActivityMonitor';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -92,7 +93,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Menu className="h-6 w-6" />
           </button>
           
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-6 ml-auto">
+            <SystemActivityMonitor />
             <div className="flex items-center text-xs space-x-2 px-2 py-1 bg-gray-800 rounded-full border border-gray-700">
               <span className="text-gray-500 uppercase font-bold tracking-tighter">Plan:</span>
               <span className={`font-bold ${systemInfo?.data_mode === 'live' ? 'text-positive' : 'text-warning'}`}>
