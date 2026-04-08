@@ -88,6 +88,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       WATCHFILES_FORCE_POLLING: "true"
       IBKR_HOST: ${IBKR_HOST:-host.docker.internal}
       IBKR_PORT: ${IBKR_PORT:-7496}
@@ -113,6 +114,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
     depends_on:
       - postgres
       - redis

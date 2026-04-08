@@ -218,8 +218,16 @@ class StockDataService:
         timespan: str = "minute",
         multiplier: int = 1,
     ) -> pd.DataFrame:
-        """Fetch futures bars from FuturesAggregate, stitching all contract months."""
+        """
+        Fetch futures bars for the chart using the rollover-based continuous series.
+
+        Delegates to FuturesDataService.get_continuous_series so that only the
+        front-month contract is returned for each timestamp — prevents double
+        data lines when the next contract has been downloaded ahead of its roll.
+        """
         try:
+            from app.services.futures_data import FuturesDataService
+
             days = 30
             if period.endswith("d"):
                 days = int(period[:-1])
@@ -230,38 +238,29 @@ class StockDataService:
             elif period.isdigit():
                 days = int(period)
 
-            start_date = datetime.now() - timedelta(days=days)
+            from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
-            results = (
-                db.query(FuturesAggregate)
-                .filter(
-                    FuturesAggregate.symbol == symbol,
-                    FuturesAggregate.timespan == timespan,
-                    FuturesAggregate.multiplier == multiplier,
-                    FuturesAggregate.timestamp >= start_date,
-                )
-                .order_by(FuturesAggregate.timestamp.asc())
-                .all()
+            df = FuturesDataService.get_continuous_series(
+                db=db,
+                symbol=symbol,
+                timespan=timespan,
+                multiplier=multiplier,
+                from_date=from_date,
             )
 
-            if not results:
+            if df.empty:
                 return pd.DataFrame()
 
-            data = [
-                {
-                    "Date": r.timestamp,
-                    "Open": float(r.open),
-                    "High": float(r.high),
-                    "Low": float(r.low),
-                    "Close": float(r.close),
-                    "Volume": int(r.volume),
-                    "vwap": float(r.vwap) if r.vwap else None,
-                    "contract_month": r.contract_month,
-                }
-                for r in results
-            ]
-
-            df = pd.DataFrame(data)
+            # Rename columns to match the format expected by the chart endpoint
+            df = df.rename(columns={
+                "timestamp": "Date",
+                "open": "Open",
+                "high": "High",
+                "low": "Low",
+                "close": "Close",
+                "volume": "Volume",
+                "vwap": "vwap",
+            })
             df.set_index("Date", inplace=True)
             return df
 
