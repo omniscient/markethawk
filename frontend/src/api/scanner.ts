@@ -357,8 +357,8 @@ export const triggerQualityAnalysis = async (id: number): Promise<{ status: stri
   return response.data;
 };
 
-export const triggerNormalization = async (id: number): Promise<{ status: string; resume: boolean; message: string }> => {
-  const response = await apiClient.post(`/universe/${id}/normalize`);
+export const triggerNormalization = async (id: number, target_tickers?: string[]): Promise<{ status: string; resume: boolean; message: string }> => {
+  const response = await apiClient.post(`/universe/${id}/normalize`, target_tickers ? { target_tickers } : {});
   return response.data;
 };
 

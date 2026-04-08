@@ -580,7 +580,7 @@ def analyze_universe_quality(self, universe_id: int):
 
 
 @celery_app.task(bind=True, max_retries=0)
-def normalize_universe_quality(self, universe_id: int, resume: bool = False):
+def normalize_universe_quality(self, universe_id: int, resume: bool = False, target_tickers: list = None):
     """
     Fix all data-quality issues for a universe so every ticker reaches an A grade.
 
@@ -631,6 +631,7 @@ def normalize_universe_quality(self, universe_id: int, resume: bool = False):
             universe_id=universe_id,
             quality_report=quality_report,
             normalization_data=checkpoint,
+            target_tickers=target_tickers,
         )
 
         # Save final state

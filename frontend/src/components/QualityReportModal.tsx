@@ -321,6 +321,8 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
   const [sortKey, setSortKey] = useState<SortKey>('grade');
   const [sortAsc, setSortAsc] = useState(true);
   const [gradeFilter, setGradeFilter] = useState<string>('all');
+  const [timespanFilter, setTimespanFilter] = useState<string>('all');
+  const [minScore, setMinScore] = useState<number>(0);
   const [pendingDelete, setPendingDelete] = useState<QualityTickerResult | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   // Optimistically removed tickers (by symbol), cleared when re-analysis completes
@@ -395,11 +397,17 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
   });
 
   const normalizeMutation = useMutation({
-    mutationFn: () => triggerNormalization(universe!.id),
+    mutationFn: () => {
+      // Send ONLY the tickers that are currently visible (filtered)
+      const targetTickers = sorted.map(t => t.ticker);
+      return triggerNormalization(universe!.id, targetTickers);
+    },
     onSuccess: () => {
       setNormalizationTriggered(true);
       queryClient.invalidateQueries({ queryKey: ['qualityReport', universe?.id] });
       setGradeFilter('all');
+      setTimespanFilter('all');
+      setMinScore(0);
     },
   });
 
@@ -420,6 +428,8 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
 
   const sorted = [...tickers]
     .filter((t) => gradeFilter === 'all' || t.grade === gradeFilter)
+    .filter((t) => timespanFilter === 'all' || (t.multiplier === 1 ? t.timespan : `${t.multiplier}${t.timespan}`) === timespanFilter)
+    .filter((t) => t.coverage_pct >= minScore)
     .filter((t) => !removedTickers.has(t.ticker))
     .sort((a, b) => {
       let av: any = a[sortKey];
@@ -456,6 +466,8 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
       setPendingDelete(null);
       setDeleteError(null);
       setGradeFilter('all');
+      setTimespanFilter('all');
+      setMinScore(0);
       setSortKey('grade');
       setSortAsc(true);
       // We don't reset removedTickers or normalizationTriggered here
@@ -594,6 +606,70 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
               </div>
             </div>
 
+            {/* ── Filters ── */}
+            <div className="flex flex-wrap items-center gap-6 px-1 py-1">
+              {/* Timespan filter */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold ml-0.5">Timespans</span>
+                <div className="flex gap-1 bg-gray-900/40 p-1 rounded-lg border border-gray-800">
+                  <button
+                    onClick={() => setTimespanFilter('all')}
+                    className={`px-3 py-1 text-xs rounded transition-all ${
+                      timespanFilter === 'all' ? 'bg-financial-blue text-white shadow-lg shadow-financial-blue/20' : 'text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {rd.timespans_analyzed.map((ts) => (
+                    <button
+                      key={ts}
+                      onClick={() => setTimespanFilter(ts)}
+                      className={`px-3 py-1 text-xs rounded transition-all ${
+                        timespanFilter === ts ? 'bg-financial-blue text-white shadow-lg shadow-financial-blue/20' : 'text-gray-400 hover:text-gray-200'
+                      }`}
+                    >
+                      {ts}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Score Slider */}
+              <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+                <div className="flex justify-between items-end ml-0.5">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">Min Coverage Score</span>
+                  <span className={`text-xs font-mono font-bold ${minScore > 90 ? 'text-green-400' : minScore > 70 ? 'text-yellow-400' : 'text-financial-blue'}`}>
+                    {minScore}%
+                  </span>
+                </div>
+                <div className="relative flex items-center h-8">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={minScore}
+                    onChange={(e) => setMinScore(parseInt(e.target.value))}
+                    className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-financial-blue hover:accent-financial-blue/80 transition-all"
+                  />
+                  {/* Tick marks */}
+                  <div className="absolute top-6 left-0 w-full flex justify-between px-0.5 pointer-events-none">
+                     {[0, 25, 50, 75, 100].map(v => (
+                       <span key={v} className="text-[8px] text-gray-600 font-mono">{v}</span>
+                     ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Summary */}
+              <div className="flex-shrink-0 bg-gray-900/40 px-3 py-2.5 rounded-lg border border-gray-800 flex flex-col items-center">
+                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold mb-0.5">Active Selection</span>
+                <span className="text-sm font-mono text-financial-light font-bold">
+                  {sorted.length} <span className="text-[10px] text-gray-500 font-normal">of {tickers.length}</span>
+                </span>
+              </div>
+            </div>
+
             {/* ── Ticker table ── */}
             <div className="overflow-auto max-h-96 rounded border border-gray-700">
               <table className="w-full text-sm border-collapse">
@@ -618,7 +694,7 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
                   {sorted.length === 0 && (
                     <tr>
                       <td colSpan={10} className="px-3 py-8 text-center text-gray-500 text-sm">
-                        No results for grade filter "{gradeFilter}"
+                        No results match the current filters
                       </td>
                     </tr>
                   )}

@@ -344,6 +344,7 @@ class NormalizationService:
         universe_id: int,
         quality_report: Dict[str, Any],
         normalization_data: Optional[Dict] = None,
+        target_tickers: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Synchronous entry point called from the Celery task.
@@ -358,7 +359,7 @@ class NormalizationService:
         try:
             return loop.run_until_complete(
                 NormalizationService._run_async(
-                    db, universe_id, quality_report, normalization_data or {}
+                    db, universe_id, quality_report, normalization_data or {}, target_tickers
                 )
             )
         finally:
@@ -370,6 +371,7 @@ class NormalizationService:
         universe_id: int,
         quality_report: Dict[str, Any],
         checkpoint: Dict,
+        target_tickers: Optional[List[str]] = None,
     ) -> Dict:
         tickers: List[Dict] = quality_report.get("tickers", [])
 
@@ -378,6 +380,9 @@ class NormalizationService:
             t for t in tickers
             if not (t.get("actual_bars", 0) == 0 and t.get("grade") == "F" and not t.get("gaps"))
         ]
+
+        if target_tickers is not None:
+            workload = [t for t in workload if t.get("ticker") in target_tickers]
 
         processed: List[str] = checkpoint.get("processed_combos", [])
         processed_set = set(processed)

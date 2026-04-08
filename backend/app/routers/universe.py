@@ -887,9 +887,14 @@ async def get_quality_report(
     }
 
 
+class NormalizeRequest(BaseModel):
+    target_tickers: Optional[List[str]] = None
+
+
 @router.post("/{universe_id}/normalize")
 async def trigger_normalization(
     universe_id: int,
+    request: Optional[NormalizeRequest] = None,
     db: Session = Depends(get_db),
 ):
     """
@@ -930,7 +935,9 @@ async def trigger_normalization(
         report.normalization_data = None
     db.commit()
 
-    normalize_universe_quality.delay(universe_id, resume=resume)
+    target_tickers = request.target_tickers if request else None
+
+    normalize_universe_quality.delay(universe_id, resume=resume, target_tickers=target_tickers)
 
     return {
         "status": "accepted",
