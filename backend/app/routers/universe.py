@@ -4,9 +4,10 @@ Universe router - CRUD operations for stock universes.
 
 import logging
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -21,6 +22,15 @@ from app.schemas import (
 from app.services import StockDataService
 
 router = APIRouter(prefix="/api/universe", tags=["universe"])
+
+
+class ExportAggregatesRequest(BaseModel):
+    tickers: List[str]
+    timespan: str = "day"
+    multiplier: int = 1
+    from_date: Optional[str] = None
+    to_date: Optional[str] = None
+    zip_format: str = "per_ticker"  # "per_ticker" | "single_csv"
 
 # Common stocks for scanning (Mock "All Stocks" source)
 # In production, this would be replaced by a real market screener API
@@ -493,6 +503,145 @@ async def get_universe_sync_status(universe_id: int):
     }
 
 
+@router.post("/{universe_id}/export-aggregates")
+async def export_universe_aggregates(
+    universe_id: int,
+    request: "ExportAggregatesRequest",
+    db: Session = Depends(get_db),
+):
+    """
+    Stream a ZIP file containing aggregate (OHLCV) data for the requested tickers.
+
+    zip_format:
+      "per_ticker" — one CSV per ticker inside the ZIP
+      "single_csv" — all tickers combined into one CSV (ticker column added)
+    """
+    import io
+    import csv
+    import zipfile
+    from fastapi.responses import StreamingResponse
+    from app.models.futures_aggregate import FuturesAggregate
+    from sqlalchemy import and_
+
+    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+    if not universe:
+        raise HTTPException(status_code=404, detail="Universe not found")
+
+    tickers = request.tickers
+    if not tickers:
+        raise HTTPException(status_code=400, detail="No tickers selected")
+
+    # Determine which requested tickers are futures vs stocks
+    futures_set = {
+        row.ticker
+        for row in db.query(StockUniverseTicker.ticker)
+        .filter(
+            StockUniverseTicker.universe_id == universe_id,
+            StockUniverseTicker.ticker.in_(tickers),
+            StockUniverseTicker.asset_class == "futures",
+        )
+        .all()
+    }
+    stock_tickers   = [t for t in tickers if t not in futures_set]
+    futures_tickers = [t for t in tickers if t in futures_set]
+
+    def _date_filter(model, ts_col, from_date, to_date):
+        filters = []
+        if from_date:
+            filters.append(ts_col >= datetime.strptime(from_date, "%Y-%m-%d"))
+        if to_date:
+            # inclusive end-of-day
+            filters.append(ts_col < datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1))
+        return filters
+
+    STOCK_COLS   = ["timestamp", "open", "high", "low", "close", "volume", "vwap", "transactions"]
+    FUTURES_COLS = ["timestamp", "open", "high", "low", "close", "volume", "vwap", "transactions", "contract_month"]
+
+    def _rows_for_stock(ticker):
+        from app.models.stock_aggregate import StockAggregate
+        q = db.query(StockAggregate).filter(
+            StockAggregate.ticker == ticker,
+            StockAggregate.timespan == request.timespan,
+            StockAggregate.multiplier == request.multiplier,
+            *_date_filter(StockAggregate, StockAggregate.timestamp, request.from_date, request.to_date),
+        ).order_by(StockAggregate.timestamp.asc())
+        for row in q:
+            yield {
+                "timestamp": row.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "open":  float(row.open),
+                "high":  float(row.high),
+                "low":   float(row.low),
+                "close": float(row.close),
+                "volume": int(row.volume),
+                "vwap":  float(row.vwap) if row.vwap is not None else "",
+                "transactions": row.transactions if row.transactions is not None else "",
+            }
+
+    def _rows_for_futures(symbol):
+        q = db.query(FuturesAggregate).filter(
+            FuturesAggregate.symbol == symbol,
+            FuturesAggregate.timespan == request.timespan,
+            FuturesAggregate.multiplier == request.multiplier,
+            *_date_filter(FuturesAggregate, FuturesAggregate.timestamp, request.from_date, request.to_date),
+        ).order_by(FuturesAggregate.timestamp.asc())
+        for row in q:
+            yield {
+                "timestamp": row.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "open":  float(row.open),
+                "high":  float(row.high),
+                "low":   float(row.low),
+                "close": float(row.close),
+                "volume": int(row.volume),
+                "vwap":  float(row.vwap) if row.vwap is not None else "",
+                "transactions": row.transactions if row.transactions is not None else "",
+                "contract_month": row.contract_month,
+            }
+
+    def _write_csv(writer, fieldnames, rows, include_ticker=None):
+        for row in rows:
+            if include_ticker:
+                row = {"ticker": include_ticker, **row}
+            writer.writerow(row)
+
+    safe_name = universe.name.replace(" ", "_")
+    zip_filename = f"{safe_name}_export.zip"
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        if request.zip_format == "single_csv":
+            csv_buf = io.StringIO()
+            all_cols = ["ticker"] + STOCK_COLS  # futures get same columns (contract_month appended)
+            writer = csv.DictWriter(csv_buf, fieldnames=["ticker"] + FUTURES_COLS, extrasaction="ignore")
+            writer.writeheader()
+            for ticker in stock_tickers:
+                _write_csv(writer, STOCK_COLS, _rows_for_stock(ticker), include_ticker=ticker)
+            for symbol in futures_tickers:
+                _write_csv(writer, FUTURES_COLS, _rows_for_futures(symbol), include_ticker=symbol)
+            zf.writestr(f"{safe_name}/{safe_name}_aggregates.csv", csv_buf.getvalue())
+        else:
+            # per-ticker
+            for ticker in stock_tickers:
+                csv_buf = io.StringIO()
+                writer = csv.DictWriter(csv_buf, fieldnames=STOCK_COLS)
+                writer.writeheader()
+                _write_csv(writer, STOCK_COLS, _rows_for_stock(ticker))
+                zf.writestr(f"{safe_name}/{ticker}.csv", csv_buf.getvalue())
+            for symbol in futures_tickers:
+                csv_buf = io.StringIO()
+                writer = csv.DictWriter(csv_buf, fieldnames=FUTURES_COLS)
+                writer.writeheader()
+                _write_csv(writer, FUTURES_COLS, _rows_for_futures(symbol))
+                zf.writestr(f"{safe_name}/{symbol}.csv", csv_buf.getvalue())
+
+    buf.seek(0)
+
+    return StreamingResponse(
+        iter([buf.read()]),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_filename}"'},
+    )
+
+
 @router.get("/{universe_id}/stocks", response_model=List[MonitoredStockResponse])
 async def get_universe_stocks(
     universe_id: int,
@@ -621,4 +770,164 @@ async def sync_universe_aggregates(
         "status": "accepted",
         "queued": len(task_ids),
         "message": f"Scheduled aggregate sync for {', '.join(parts)}.",
+    }
+
+
+# ── Data Quality ─────────────────────────────────────────────────────────────
+
+@router.post("/{universe_id}/analyze-quality")
+async def trigger_quality_analysis(
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Queue a background data-quality analysis for the universe.
+    Returns immediately; poll GET .../quality-report for results.
+    """
+    from app.tasks import analyze_universe_quality
+    from app.models.universe_quality_report import UniverseQualityReport
+
+    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+    if not universe:
+        raise HTTPException(status_code=404, detail="Universe not found")
+
+    # Upsert a "pending" record so the frontend can show a spinner immediately
+    report = db.query(UniverseQualityReport).filter(
+        UniverseQualityReport.universe_id == universe_id
+    ).first()
+    if not report:
+        report = UniverseQualityReport(universe_id=universe_id)
+        db.add(report)
+    report.status = "pending"
+    report.started_at = datetime.utcnow()
+    db.commit()
+
+    analyze_universe_quality.delay(universe_id)
+
+    return {"status": "accepted", "message": "Quality analysis queued."}
+
+
+class DeleteAggregatesRequest(BaseModel):
+    ticker: str
+    timespan: str
+    multiplier: int
+    asset_class: str  # "stocks" | "futures"
+
+
+@router.delete("/{universe_id}/aggregates")
+async def delete_ticker_aggregates(
+    universe_id: int,
+    request: DeleteAggregatesRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Hard-delete all aggregate bars for a specific ticker / timespan / multiplier
+    combination within a universe.
+    """
+    from app.models.futures_aggregate import FuturesAggregate
+
+    if request.asset_class == "futures":
+        deleted = (
+            db.query(FuturesAggregate)
+            .filter(
+                FuturesAggregate.symbol == request.ticker,
+                FuturesAggregate.timespan == request.timespan,
+                FuturesAggregate.multiplier == request.multiplier,
+            )
+            .delete(synchronize_session=False)
+        )
+    else:
+        deleted = (
+            db.query(StockAggregate)
+            .filter(
+                StockAggregate.ticker == request.ticker,
+                StockAggregate.timespan == request.timespan,
+                StockAggregate.multiplier == request.multiplier,
+            )
+            .delete(synchronize_session=False)
+        )
+
+    db.commit()
+    return {"deleted": deleted, "ticker": request.ticker, "timespan": request.timespan, "multiplier": request.multiplier}
+
+
+@router.get("/{universe_id}/quality-report")
+async def get_quality_report(
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return the latest quality report for a universe (or null if none exists)."""
+    from app.models.universe_quality_report import UniverseQualityReport
+
+    report = db.query(UniverseQualityReport).filter(
+        UniverseQualityReport.universe_id == universe_id
+    ).first()
+
+    if not report:
+        return None
+
+    return {
+        "universe_id": universe_id,
+        "status": report.status,
+        "overall_grade": report.overall_grade,
+        "overall_score": float(report.overall_score) if report.overall_score is not None else None,
+        "ticker_count": report.ticker_count,
+        "started_at": report.started_at.isoformat() if report.started_at else None,
+        "generated_at": report.generated_at.isoformat() if report.generated_at else None,
+        "report_data": report.report_data,
+        "error_message": report.error_message,
+        "normalization_status": report.normalization_status,
+        "normalization_data": report.normalization_data,
+    }
+
+
+@router.post("/{universe_id}/normalize")
+async def trigger_normalization(
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Start (or resume) a normalization run that fills all data-quality gaps
+    so every ticker in the universe reaches an A grade.
+
+    If a previous run was interrupted (normalization_status='running' or 'error'
+    with partial progress), the task resumes from the last checkpoint automatically.
+    Returns immediately; poll GET .../quality-report for normalization_status.
+    """
+    from app.tasks import normalize_universe_quality
+    from app.models.universe_quality_report import UniverseQualityReport
+
+    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+    if not universe:
+        raise HTTPException(status_code=404, detail="Universe not found")
+
+    report = db.query(UniverseQualityReport).filter(
+        UniverseQualityReport.universe_id == universe_id
+    ).first()
+
+    if not report or not report.report_data:
+        raise HTTPException(
+            status_code=400,
+            detail="No quality analysis found. Run 'Analyse' first.",
+        )
+
+    # Determine whether to resume (keep processed_combos checkpoint) or start fresh
+    resume = bool(
+        report.normalization_status in ("running", "error")
+        and report.normalization_data
+        and report.normalization_data.get("processed_combos")
+    )
+
+    # Mark as pending so the frontend shows a spinner immediately
+    report.normalization_status = "pending"
+    if not resume:
+        report.normalization_data = None
+    db.commit()
+
+    normalize_universe_quality.delay(universe_id, resume=resume)
+
+    return {
+        "status": "accepted",
+        "resume": resume,
+        "message": "Normalization queued." + (" Resuming from checkpoint." if resume else ""),
     }

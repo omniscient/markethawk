@@ -1,0 +1,450 @@
+"""
+Data Quality Service.
+
+Analyses the completeness, integrity, and continuity of aggregate (OHLCV) bars
+stored for a universe.  Results are persisted in UniverseQualityReport.
+
+Scoring dimensions
+──────────────────
+  Coverage    60% — what fraction of expected bars are present
+  Integrity   30% — what fraction of bars pass OHLCV sanity checks
+  Continuity  10% — absence of intra-session data gaps
+
+Grade scale
+───────────
+  A  95–100   production-ready
+  B  85–94    minor gaps, usable
+  C  70–84    significant gaps, use with caution
+  D  50–69    major holes, scanner results unreliable
+  F  <50      severely incomplete
+"""
+
+import logging
+from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
+
+# Maximum number of gap entries kept in the stored report per ticker (saves space)
+MAX_GAPS_STORED = 50
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _score_to_grade(score: float) -> str:
+    if score >= 95:
+        return "A"
+    if score >= 85:
+        return "B"
+    if score >= 70:
+        return "C"
+    if score >= 50:
+        return "D"
+    return "F"
+
+
+def _grade_color(grade: str) -> str:
+    return {"A": "green", "B": "green", "C": "yellow", "D": "orange", "F": "red"}.get(grade, "gray")
+
+
+def _count_weekdays_between(d1, d2) -> int:
+    """Count weekdays (Mon–Fri) strictly between two dates."""
+    count = 0
+    current = d1 + timedelta(days=1)
+    while current < d2:
+        if current.weekday() < 5:
+            count += 1
+        current += timedelta(days=1)
+    return count
+
+
+def _estimate_expected_bars(timestamps: List[datetime], timespan: str, multiplier: int):
+    """
+    Empirical P90 approach: group by date, take the 90th-percentile bar count
+    per active day, multiply by number of active days.  Self-calibrates to
+    whatever session type was originally requested (pre-market, full day, etc.).
+
+    Stub-day correction
+    ───────────────────
+    Some calendar dates naturally hold far fewer bars than a full session:
+      • Sunday opens: the CME session starts at 18:00 ET Sunday but the UTC
+        date only captures 1–2 hours of bars before rolling to Monday.
+        (EST: 23:00–23:59 UTC = 60 bars; EDT: 22:00–23:59 UTC = 120 bars)
+      • Holidays / early closes.
+
+    These are not data gaps — the bars present are the only bars that exist
+    for that date.  Counting them as shortfalls against P90 produces a large
+    phantom coverage deficit.
+
+    Fix: for any date whose bar count is < 50 % of P90 ("stub day"), set
+    expected = actual.  Full days still use P90 as the yardstick.
+
+    Returns (expected_bars, coverage_detail) where coverage_detail explains
+    how the expected count was computed (useful for UI explanation).
+    """
+    empty_detail: Dict[str, Any] = {
+        "p90_bars_per_day": 0,
+        "full_day_count": 0,
+        "stub_day_count": 0,
+        "partial_day_count": 0,
+        "partial_days": [],
+    }
+    if not timestamps:
+        return 0, empty_detail
+
+    by_date: Dict[Any, int] = defaultdict(int)
+    for ts in timestamps:
+        by_date[ts.date()] += 1
+
+    counts = sorted(by_date.values())
+    p90_idx = min(int(len(counts) * 0.90), len(counts) - 1)
+    p90 = counts[p90_idx]
+
+    stub_threshold = p90 * 0.5
+
+    full_days = 0
+    stub_days = 0
+    partial_days: List[Dict] = []
+    expected = 0
+
+    for d, cnt in by_date.items():
+        if cnt < stub_threshold:
+            expected += cnt
+            stub_days += 1
+        elif cnt < p90:
+            expected += p90
+            partial_days.append({
+                "date": str(d),
+                "actual_bars": cnt,
+                "expected_bars": p90,
+                "shortfall": p90 - cnt,
+            })
+        else:
+            expected += p90
+            full_days += 1
+
+    # Sort partial days worst-first and cap stored list to save space
+    partial_days.sort(key=lambda x: x["shortfall"], reverse=True)
+
+    detail: Dict[str, Any] = {
+        "p90_bars_per_day": p90,
+        "full_day_count": full_days,
+        "stub_day_count": stub_days,
+        "partial_day_count": len(partial_days),
+        "partial_days": partial_days[:30],
+    }
+
+    return expected, detail
+
+
+def _detect_gaps(timestamps: List[datetime], timespan: str, multiplier: int) -> List[Dict]:
+    """
+    Return a list of data gaps.
+
+    A gap is a consecutive-timestamp pair where:
+      • the elapsed time exceeds 5 × the expected bar interval, AND
+      • more than 1 weekday falls between the two timestamps
+        (this filters out weekends and single-day holidays naturally).
+    """
+    if len(timestamps) < 2:
+        return []
+
+    expected_seconds = {
+        "minute": 60,
+        "hour": 3600,
+        "day": 86400,
+        "week": 604800,
+        "month": 2592000,
+    }.get(timespan, 60) * multiplier
+
+    threshold_seconds = expected_seconds * 5
+
+    gaps = []
+    for i in range(1, len(timestamps)):
+        prev = timestamps[i - 1]
+        curr = timestamps[i]
+        diff_seconds = (curr - prev).total_seconds()
+
+        if diff_seconds < threshold_seconds:
+            continue
+
+        # Calendar-day span: if ≤ 3 it could be a weekend+holiday — check weekdays
+        calendar_days = (curr.date() - prev.date()).days
+        if calendar_days <= 3:
+            weekdays = _count_weekdays_between(prev.date(), curr.date())
+            if weekdays <= 1:
+                continue  # normal weekend / single holiday
+
+        missing_bars = max(0, int(diff_seconds / expected_seconds) - 1)
+        gaps.append(
+            {
+                "from": prev,
+                "to": curr,
+                "duration_hours": round(diff_seconds / 3600, 1),
+                "missing_bars": missing_bars,
+            }
+        )
+
+    return gaps
+
+
+# ── per-ticker analysis ───────────────────────────────────────────────────────
+
+def _analyze_ticker_timespan(
+    db: Session,
+    ticker: str,
+    timespan: str,
+    multiplier: int,
+    is_futures: bool,
+) -> Dict:
+    from app.models.stock_aggregate import StockAggregate
+    from app.models.futures_aggregate import FuturesAggregate
+
+    if is_futures:
+        rows = (
+            db.query(
+                FuturesAggregate.timestamp,
+                FuturesAggregate.open,
+                FuturesAggregate.high,
+                FuturesAggregate.low,
+                FuturesAggregate.close,
+                FuturesAggregate.volume,
+            )
+            .filter(
+                FuturesAggregate.symbol == ticker,
+                FuturesAggregate.timespan == timespan,
+                FuturesAggregate.multiplier == multiplier,
+            )
+            .order_by(FuturesAggregate.timestamp.asc())
+            .all()
+        )
+    else:
+        rows = (
+            db.query(
+                StockAggregate.timestamp,
+                StockAggregate.open,
+                StockAggregate.high,
+                StockAggregate.low,
+                StockAggregate.close,
+                StockAggregate.volume,
+            )
+            .filter(
+                StockAggregate.ticker == ticker,
+                StockAggregate.timespan == timespan,
+                StockAggregate.multiplier == multiplier,
+            )
+            .order_by(StockAggregate.timestamp.asc())
+            .all()
+        )
+
+    empty_result = {
+        "ticker": ticker,
+        "asset_class": "futures" if is_futures else "stocks",
+        "timespan": timespan,
+        "multiplier": multiplier,
+        "grade": "F",
+        "score": 0.0,
+        "actual_bars": 0,
+        "expected_bars": 0,
+        "coverage_pct": 0.0,
+        "integrity_pct": 100.0,
+        "continuity_score": 100.0,
+        "gap_count": 0,
+        "bad_bar_count": 0,
+        "duplicate_count": 0,
+        "first_bar": None,
+        "last_bar": None,
+        "gaps": [],
+        "coverage_detail": None,
+    }
+
+    if not rows:
+        return empty_result
+
+    timestamps = [r.timestamp for r in rows]
+    actual_bars = len(rows)
+
+    # ── Coverage ──────────────────────────────────────────────────────────────
+    expected_bars, coverage_detail = _estimate_expected_bars(timestamps, timespan, multiplier)
+    coverage_pct = min(100.0, (actual_bars / expected_bars * 100) if expected_bars > 0 else 100.0)
+
+    # ── Integrity ─────────────────────────────────────────────────────────────
+    bad_bars = 0
+    for r in rows:
+        h = float(r.high)
+        l = float(r.low)
+        o = float(r.open)
+        c = float(r.close)
+        if h < l or h < o or h < c or l > o or l > c or o <= 0 or c <= 0 or h <= 0 or l <= 0:
+            bad_bars += 1
+    integrity_pct = ((actual_bars - bad_bars) / actual_bars * 100) if actual_bars > 0 else 100.0
+
+    # ── Continuity ────────────────────────────────────────────────────────────
+    gaps = _detect_gaps(timestamps, timespan, multiplier)
+    gap_count = len(gaps)
+    # 5-point penalty per gap, floor at 0
+    continuity_score = max(0.0, 100.0 - gap_count * 5)
+
+    # ── Duplicates ────────────────────────────────────────────────────────────
+    duplicate_count = actual_bars - len(set(timestamps))
+
+    # ── Overall ───────────────────────────────────────────────────────────────
+    score = coverage_pct * 0.60 + integrity_pct * 0.30 + continuity_score * 0.10
+    grade = _score_to_grade(score)
+
+    return {
+        "ticker": ticker,
+        "asset_class": "futures" if is_futures else "stocks",
+        "timespan": timespan,
+        "multiplier": multiplier,
+        "grade": grade,
+        "score": round(score, 1),
+        "actual_bars": actual_bars,
+        "expected_bars": expected_bars,
+        "coverage_pct": round(coverage_pct, 1),
+        "integrity_pct": round(integrity_pct, 1),
+        "continuity_score": round(continuity_score, 1),
+        "gap_count": gap_count,
+        "bad_bar_count": bad_bars,
+        "duplicate_count": duplicate_count,
+        "first_bar": timestamps[0].isoformat() if timestamps else None,
+        "last_bar": timestamps[-1].isoformat() if timestamps else None,
+        "gaps": [
+            {
+                "from": g["from"].isoformat(),
+                "to": g["to"].isoformat(),
+                "duration_hours": g["duration_hours"],
+                "missing_bars": g["missing_bars"],
+            }
+            for g in gaps[:MAX_GAPS_STORED]
+        ],
+        "coverage_detail": coverage_detail,
+    }
+
+
+# ── main entry point ──────────────────────────────────────────────────────────
+
+class DataQualityService:
+
+    @staticmethod
+    def analyze_universe(db: Session, universe_id: int) -> Dict:
+        """
+        Run a full quality analysis for every ticker × timespan combination
+        in the universe.  Returns the complete report dict (also persisted by
+        the caller / Celery task).
+        """
+        from app.models.stock_universe_ticker import StockUniverseTicker
+        from app.models.stock_aggregate import StockAggregate
+        from app.models.futures_aggregate import FuturesAggregate
+
+        tickers = (
+            db.query(StockUniverseTicker)
+            .filter(StockUniverseTicker.universe_id == universe_id)
+            .all()
+        )
+
+        futures_set = {t.ticker for t in tickers if t.asset_class == "futures"}
+
+        ticker_results: List[Dict] = []
+
+        for ticker_obj in tickers:
+            ticker = ticker_obj.ticker
+            is_futures = ticker in futures_set
+
+            # Discover which (timespan, multiplier) combos exist for this ticker
+            if is_futures:
+                combos = (
+                    db.query(FuturesAggregate.timespan, FuturesAggregate.multiplier)
+                    .filter(FuturesAggregate.symbol == ticker)
+                    .distinct()
+                    .all()
+                )
+            else:
+                combos = (
+                    db.query(StockAggregate.timespan, StockAggregate.multiplier)
+                    .filter(StockAggregate.ticker == ticker)
+                    .distinct()
+                    .all()
+                )
+
+            if not combos:
+                # Ticker has no data at all — F grade
+                ticker_results.append(
+                    {
+                        "ticker": ticker,
+                        "asset_class": "futures" if is_futures else "stocks",
+                        "timespan": None,
+                        "multiplier": None,
+                        "grade": "F",
+                        "score": 0.0,
+                        "actual_bars": 0,
+                        "expected_bars": 0,
+                        "coverage_pct": 0.0,
+                        "integrity_pct": 100.0,
+                        "continuity_score": 100.0,
+                        "gap_count": 0,
+                        "bad_bar_count": 0,
+                        "duplicate_count": 0,
+                        "first_bar": None,
+                        "last_bar": None,
+                        "gaps": [],
+                        "coverage_detail": None,
+                    }
+                )
+                continue
+
+            for combo in combos:
+                try:
+                    result = _analyze_ticker_timespan(
+                        db, ticker, combo.timespan, combo.multiplier, is_futures
+                    )
+                    ticker_results.append(result)
+                except Exception as e:
+                    logger.error(
+                        f"DataQualityService: error analysing {ticker} "
+                        f"{combo.timespan}×{combo.multiplier}: {e}"
+                    )
+
+        # ── Universe-level aggregation ────────────────────────────────────────
+        # Weight by actual bar count so large tickers drive the score more
+        total_weight = sum(r["actual_bars"] for r in ticker_results if r.get("actual_bars"))
+        if total_weight > 0:
+            overall_score = (
+                sum(r["score"] * r["actual_bars"] for r in ticker_results if r.get("actual_bars"))
+                / total_weight
+            )
+        elif ticker_results:
+            # All tickers have 0 bars → F
+            overall_score = 0.0
+        else:
+            overall_score = 0.0
+
+        overall_grade = _score_to_grade(overall_score)
+
+        timespans_analyzed = sorted(
+            {
+                f"{r['multiplier']}{r['timespan']}" if r.get("multiplier", 1) != 1 else r["timespan"]
+                for r in ticker_results
+                if r.get("timespan")
+            }
+        )
+
+        # Grade distribution
+        grade_dist = defaultdict(int)
+        for r in ticker_results:
+            grade_dist[r["grade"]] += 1
+
+        return {
+            "status": "complete",
+            "overall_score": round(overall_score, 1),
+            "overall_grade": overall_grade,
+            "generated_at": datetime.utcnow().isoformat(),
+            "ticker_count": len(set(t.ticker for t in tickers)),
+            "analyzed_count": len(ticker_results),
+            "timespans_analyzed": timespans_analyzed,
+            "grade_distribution": dict(grade_dist),
+            "tickers": ticker_results,
+        }

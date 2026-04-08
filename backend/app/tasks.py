@@ -322,7 +322,8 @@ def sync_stock_aggregates(
                 vwap=agg['vwap'],
                 transactions=agg['transactions'],
                 is_pre_market=is_pre_market,
-                is_after_market=is_after_market
+                is_after_market=is_after_market,
+                provider='polygon',
             )
             new_records.append(record)
             
@@ -517,6 +518,153 @@ def sync_futures_aggregates(
         logger.error(f"❌ Error syncing futures aggregates for {symbol}: {e}")
         db.rollback()
         raise self.retry(exc=e, countdown=60)
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True, max_retries=0)
+def analyze_universe_quality(self, universe_id: int):
+    """
+    Run a full data-quality analysis for a universe and persist the result.
+    """
+    from app.models.universe_quality_report import UniverseQualityReport
+    from app.services.data_quality import DataQualityService
+
+    db: Session = SessionLocal()
+    try:
+        logger.info(f"🔍 Starting quality analysis for universe {universe_id}")
+
+        # Mark as running
+        report = db.query(UniverseQualityReport).filter(
+            UniverseQualityReport.universe_id == universe_id
+        ).first()
+        if not report:
+            report = UniverseQualityReport(universe_id=universe_id)
+            db.add(report)
+        report.status = "running"
+        report.started_at = datetime.utcnow()
+        report.error_message = None
+        db.commit()
+
+        result = DataQualityService.analyze_universe(db, universe_id)
+
+        report.status = "complete"
+        report.overall_grade = result["overall_grade"]
+        report.overall_score = result["overall_score"]
+        report.ticker_count = result["ticker_count"]
+        report.generated_at = datetime.utcnow()
+        report.report_data = result
+        db.commit()
+
+        logger.info(
+            f"✅ Quality analysis complete for universe {universe_id}: "
+            f"grade={result['overall_grade']} score={result['overall_score']}"
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Quality analysis failed for universe {universe_id}: {e}")
+        try:
+            report = db.query(UniverseQualityReport).filter(
+                UniverseQualityReport.universe_id == universe_id
+            ).first()
+            if report:
+                report.status = "error"
+                report.error_message = str(e)
+                db.commit()
+        except Exception:
+            pass
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+@celery_app.task(bind=True, max_retries=0)
+def normalize_universe_quality(self, universe_id: int, resume: bool = False):
+    """
+    Fix all data-quality issues for a universe so every ticker reaches an A grade.
+
+    Fixes applied per ticker×timespan combo:
+      1. Dedup duplicate timestamps
+      2. Fill gaps detected by the quality analyser
+      3. Back-fill stale tails to today
+
+    The task is resumable: pass resume=True to continue from a previous
+    interrupted run.  Progress is checkpointed after every combo.
+
+    After all fixes are applied the quality analyser is re-run automatically
+    so the report reflects the improvements.
+    """
+    from app.models.universe_quality_report import UniverseQualityReport
+    from app.services.normalization import NormalizationService
+
+    db: Session = SessionLocal()
+    try:
+        logger.info(f"🔧 Starting normalization for universe {universe_id} (resume={resume})")
+
+        report = db.query(UniverseQualityReport).filter(
+            UniverseQualityReport.universe_id == universe_id
+        ).first()
+
+        if not report or not report.report_data:
+            logger.error(f"No quality report found for universe {universe_id}. Run analysis first.")
+            raise RuntimeError("Quality analysis must be run before normalization.")
+
+        # Load checkpoint for resume, or start fresh
+        checkpoint = {}
+        if resume and report.normalization_data:
+            checkpoint = dict(report.normalization_data)
+            logger.info(
+                f"Resuming from checkpoint: "
+                f"{len(checkpoint.get('processed_combos', []))} combos already done"
+            )
+
+        # Mark as running
+        report.normalization_status = "running"
+        report.normalization_data = {**checkpoint, "status": "running"}
+        db.commit()
+
+        quality_report = dict(report.report_data)
+
+        final_data = NormalizationService.run(
+            db=db,
+            universe_id=universe_id,
+            quality_report=quality_report,
+            normalization_data=checkpoint,
+        )
+
+        # Save final state
+        report = db.query(UniverseQualityReport).filter(
+            UniverseQualityReport.universe_id == universe_id
+        ).first()
+        report.normalization_status = "complete"
+        report.normalization_data = final_data
+        db.commit()
+
+        logger.info(
+            f"✅ Normalization complete for universe {universe_id}: "
+            f"{final_data.get('fixes_applied')}"
+        )
+
+        # Automatically re-run quality analysis so the modal shows updated grades
+        analyze_universe_quality.delay(universe_id)
+
+    except Exception as e:
+        logger.error(f"❌ Normalization failed for universe {universe_id}: {e}")
+        try:
+            report = db.query(UniverseQualityReport).filter(
+                UniverseQualityReport.universe_id == universe_id
+            ).first()
+            if report:
+                report.normalization_status = "error"
+                existing = dict(report.normalization_data) if report.normalization_data else {}
+                existing["error"] = str(e)
+                report.normalization_data = existing
+                db.commit()
+        except Exception:
+            pass
+        db.rollback()
+        raise
     finally:
         db.close()
 

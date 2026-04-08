@@ -264,6 +264,129 @@ export const fetchUniverseSyncStatus = async (id: number): Promise<UniverseSyncS
   return response.data;
 };
 
+export interface QualityGapEntry {
+  from: string;
+  to: string;
+  duration_hours: number;
+  missing_bars: number;
+}
+
+export interface CoveragePartialDay {
+  date: string;
+  actual_bars: number;
+  expected_bars: number;
+  shortfall: number;
+}
+
+export interface CoverageDetail {
+  p90_bars_per_day: number;
+  full_day_count: number;
+  stub_day_count: number;
+  partial_day_count: number;
+  partial_days: CoveragePartialDay[];
+}
+
+export interface QualityTickerResult {
+  ticker: string;
+  asset_class: string;
+  timespan: string | null;
+  multiplier: number | null;
+  grade: string;
+  score: number;
+  actual_bars: number;
+  expected_bars: number;
+  coverage_pct: number;
+  integrity_pct: number;
+  continuity_score: number;
+  gap_count: number;
+  bad_bar_count: number;
+  duplicate_count: number;
+  first_bar: string | null;
+  last_bar: string | null;
+  gaps: QualityGapEntry[];
+  coverage_detail: CoverageDetail | null;
+}
+
+export interface NormalizationProgress {
+  status: 'pending' | 'running' | 'complete' | 'error';
+  total_combos: number;
+  processed_combos: string[];
+  fixes_applied: {
+    deduped: number;
+    gaps_filled: number;
+    backfilled: number;
+    [key: string]: number;
+  };
+  errors: { combo: string; fix: string; error: string }[];
+}
+
+export interface QualityReport {
+  universe_id: number;
+  status: 'pending' | 'running' | 'complete' | 'error';
+  overall_grade: string | null;
+  overall_score: number | null;
+  ticker_count: number | null;
+  started_at: string | null;
+  generated_at: string | null;
+  error_message: string | null;
+  report_data: {
+    overall_score: number;
+    overall_grade: string;
+    generated_at: string;
+    ticker_count: number;
+    analyzed_count: number;
+    timespans_analyzed: string[];
+    grade_distribution: Record<string, number>;
+    tickers: QualityTickerResult[];
+  } | null;
+  normalization_status: 'pending' | 'running' | 'complete' | 'error' | null;
+  normalization_data: NormalizationProgress | null;
+}
+
+export const deleteTickerAggregates = async (
+  universeId: number,
+  payload: { ticker: string; timespan: string; multiplier: number; asset_class: string },
+): Promise<{ deleted: number }> => {
+  const response = await apiClient.delete(`/universe/${universeId}/aggregates`, { data: payload });
+  return response.data;
+};
+
+export const triggerQualityAnalysis = async (id: number): Promise<{ status: string; message: string }> => {
+  const response = await apiClient.post(`/universe/${id}/analyze-quality`);
+  return response.data;
+};
+
+export const triggerNormalization = async (id: number): Promise<{ status: string; resume: boolean; message: string }> => {
+  const response = await apiClient.post(`/universe/${id}/normalize`);
+  return response.data;
+};
+
+export const fetchQualityReport = async (id: number): Promise<QualityReport | null> => {
+  const response = await apiClient.get(`/universe/${id}/quality-report`);
+  return response.data;
+};
+
+export interface ExportAggregatesOptions {
+  tickers: string[];
+  timespan: string;
+  multiplier: number;
+  from_date?: string;
+  to_date?: string;
+  zip_format: 'per_ticker' | 'single_csv';
+}
+
+export const exportUniverseAggregates = async (
+  id: number,
+  options: ExportAggregatesOptions,
+): Promise<Blob> => {
+  const response = await apiClient.post(
+    `/universe/${id}/export-aggregates`,
+    options,
+    { responseType: 'blob' },
+  );
+  return response.data;
+};
+
 export const syncUniverseAggregates = async (
   id: number,
   options: SyncAggregatesOptions,

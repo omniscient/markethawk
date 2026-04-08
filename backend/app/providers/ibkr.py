@@ -449,11 +449,20 @@ class IBKRDataProvider(BaseDataProvider):
         if not ib:
             return []
 
-        # Determine target date range
+        # Determine target date range.
+        # to_date is a YYYY-MM-DD string, so parse it as end-of-day (23:59:59 UTC)
+        # rather than midnight — otherwise "today" would cap at 00:00 UTC and miss
+        # the whole current day's bars.  Always cap at now so we don't ask for
+        # future data.
+        now_utc = datetime.now(timezone.utc)
         end_dt = (
-            datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            min(
+                datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                + timedelta(days=1, seconds=-1),
+                now_utc,
+            )
             if to_date
-            else datetime.now(timezone.utc)
+            else now_utc
         )
         start_dt = (
             datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -467,6 +476,27 @@ class IBKRDataProvider(BaseDataProvider):
         all_bars: List[Dict[str, Any]] = []
         chunk_end = end_dt
         seen_timestamps = set()
+
+        # How far to step back when a chunk returns no bars.
+        # Derived from max_duration so we always make forward progress.
+        _DURATION_STEP: Dict[str, timedelta] = {
+            "1800 S": timedelta(minutes=30),
+            "7200 S": timedelta(hours=2),
+            "1 D":    timedelta(days=1),
+            "2 D":    timedelta(days=2),
+            "1 W":    timedelta(weeks=1),
+            "2 W":    timedelta(weeks=2),
+            "1 M":    timedelta(days=30),
+            "1 Y":    timedelta(days=365),
+            "5 Y":    timedelta(days=365 * 5),
+            "10 Y":   timedelta(days=365 * 10),
+        }
+        empty_step = _DURATION_STEP.get(max_duration, timedelta(days=1))
+        # Allow this many consecutive empty chunks before giving up.
+        # A single empty chunk is common (weekend, holiday, maintenance window)
+        # so we skip rather than abort.
+        MAX_CONSECUTIVE_EMPTY = 5
+        consecutive_empty = 0
 
         chunk_num = 0
         while chunk_end > start_dt:
@@ -514,11 +544,21 @@ class IBKRDataProvider(BaseDataProvider):
                 break
 
             if not bars:
+                consecutive_empty += 1
                 logger.info(
-                    f"IBKRDataProvider: no bars returned for chunk {chunk_num} "
-                    f"(end={end_str}), reached start of available data."
+                    f"IBKRDataProvider: no bars for chunk {chunk_num} (end={end_str}) — "
+                    f"stepping back ({consecutive_empty}/{MAX_CONSECUTIVE_EMPTY} consecutive empty)."
                 )
-                break
+                if consecutive_empty >= MAX_CONSECUTIVE_EMPTY:
+                    logger.info(
+                        f"IBKRDataProvider: {MAX_CONSECUTIVE_EMPTY} consecutive empty chunks — "
+                        "reached start of available data."
+                    )
+                    break
+                chunk_end = chunk_end - empty_step
+                continue
+
+            consecutive_empty = 0  # reset on any non-empty chunk
 
             # Convert to standard format
             new_bars = []
@@ -543,6 +583,8 @@ class IBKRDataProvider(BaseDataProvider):
                 )
 
             if not new_bars:
+                # Bars came back but all were duplicates or before start_dt —
+                # we've overlapped with already-collected data; stop.
                 break
 
             all_bars.extend(new_bars)

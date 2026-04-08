@@ -11,6 +11,8 @@ import {
   DownloadCloud,
   RefreshCw,
   Loader2,
+  FileDown,
+  ShieldCheck,
 } from 'lucide-react';
 
 // Components
@@ -19,7 +21,9 @@ import Button from '../components/ui/Button';
 import UniverseFormModal from '../components/UniverseFormModal';
 import UniverseDetailsModal from '../components/UniverseDetailsModal';
 import SyncUniverseModal from '../components/SyncUniverseModal';
-import { StockUniverse } from '../api/scanner';
+import ExportUniverseModal from '../components/ExportUniverseModal';
+import QualityReportModal from '../components/QualityReportModal';
+import { StockUniverse, QualityReport, fetchQualityReport, triggerQualityAnalysis } from '../api/scanner';
 
 // API functions
 import { fetchStockUniverses, deleteStockUniverse, fetchUniverseSyncStatus, syncMissingAggregates } from '../api/scanner';
@@ -30,6 +34,8 @@ const Universes: React.FC = () => {
   const [editingUniverse, setEditingUniverse] = useState<StockUniverse | null>(null);
   const [selectedUniverse, setSelectedUniverse] = useState<StockUniverse | null>(null);
   const [syncingUniverse, setSyncingUniverse] = useState<StockUniverse | null>(null);
+  const [exportingUniverse, setExportingUniverse] = useState<StockUniverse | null>(null);
+  const [qualityUniverse, setQualityUniverse] = useState<StockUniverse | null>(null);
   // Map of universeId → sync progress info
   const [syncingIds, setSyncingIds] = useState<Record<number, { pending: number; total: number }>>({});
   const queryClient = useQueryClient();
@@ -121,6 +127,27 @@ const Universes: React.FC = () => {
     queryFn: fetchStockUniverses,
   });
 
+  // Fetch quality reports for all loaded universes
+  const qualityQueries = useQuery({
+    queryKey: ['qualityReportsSummary', universes?.map(u => u.id)],
+    queryFn: async () => {
+      if (!universes) return {};
+      const entries = await Promise.all(
+        universes.map(async (u) => {
+          try {
+            const r = await fetchQualityReport(u.id);
+            return [u.id, r] as [number, QualityReport | null];
+          } catch {
+            return [u.id, null] as [number, null];
+          }
+        })
+      );
+      return Object.fromEntries(entries) as Record<number, QualityReport | null>;
+    },
+    enabled: !!universes && universes.length > 0,
+    staleTime: 30_000,
+  });
+
   const filteredUniverses = universes?.filter(universe =>
     universe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     universe.description?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -183,6 +210,15 @@ const Universes: React.FC = () => {
           {filteredUniverses?.map((universe) => {
             const sync = syncingIds[universe.id];
             const isSyncing = !!sync;
+            const qualityReport = qualityQueries.data?.[universe.id];
+            const grade = qualityReport?.overall_grade;
+            const GRADE_CARD_STYLES: Record<string, string> = {
+              A: 'bg-green-500/20 text-green-400 border-green-500/30',
+              B: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+              C: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+              D: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+              F: 'bg-red-500/20 text-red-400 border-red-500/30',
+            };
             return (
             <Card key={universe.id} className={`hover:border-financial-blue/50 transition-colors ${isSyncing ? 'border-yellow-500/40' : ''}`}>
               <div className="flex items-start justify-between mb-4">
@@ -199,6 +235,20 @@ const Universes: React.FC = () => {
                       {sync.total > 1 ? `${sync.pending}/${sync.total}` : 'Syncing'}
                     </span>
                   )}
+                  {/* Quality grade badge */}
+                  {qualityReport?.status === 'pending' || qualityReport?.status === 'running' ? (
+                    <span className="flex items-center gap-1 px-2 py-1 rounded border text-xs font-mono bg-gray-700/40 text-gray-400 border-gray-600">
+                      <Loader2 className="h-3 w-3 animate-spin" /> …
+                    </span>
+                  ) : grade ? (
+                    <button
+                      onClick={() => setQualityUniverse(universe)}
+                      className={`px-2 py-1 rounded border text-xs font-bold font-mono transition-opacity hover:opacity-80 ${GRADE_CARD_STYLES[grade] ?? 'bg-gray-700/40 text-gray-400 border-gray-600'}`}
+                      title={`Data quality grade — click to view report`}
+                    >
+                      {grade}
+                    </button>
+                  ) : null}
                   <span className={`px-2 py-1 rounded text-xs font-medium ${universe.is_active
                     ? 'bg-green-500/20 text-green-400'
                     : 'bg-gray-500/20 text-gray-400'
@@ -286,6 +336,17 @@ const Universes: React.FC = () => {
                     <span className="hidden xl:inline">Catch Up</span>
                   </Button>
                 )}
+                {(universe.aggregate_count ?? 0) > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={FileDown}
+                    onClick={() => setExportingUniverse(universe)}
+                    title="Export aggregate data"
+                  >
+                    <span className="hidden xl:inline">Export</span>
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   size="sm"
@@ -304,6 +365,15 @@ const Universes: React.FC = () => {
                 >
                   <Edit className="h-4 w-4 xl:mr-2" />
                   <span className="hidden xl:inline">Edit</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={ShieldCheck}
+                  onClick={() => setQualityUniverse(universe)}
+                  title="Analyse data quality"
+                >
+                  <span className="hidden xl:inline">Quality</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -363,6 +433,18 @@ const Universes: React.FC = () => {
         onClose={() => setSyncingUniverse(null)}
         universe={syncingUniverse}
         onSyncStarted={(id) => handleSyncStarted(id)}
+      />
+
+      <ExportUniverseModal
+        isOpen={!!exportingUniverse}
+        onClose={() => setExportingUniverse(null)}
+        universe={exportingUniverse}
+      />
+
+      <QualityReportModal
+        isOpen={!!qualityUniverse}
+        onClose={() => setQualityUniverse(null)}
+        universe={qualityUniverse}
       />
     </div>
   );

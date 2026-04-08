@@ -403,7 +403,8 @@ class StockDataService:
                     vwap=agg['vwap'],
                     transactions=agg['transactions'],
                     is_pre_market=is_pre_market,
-                    is_after_market=is_after_market
+                    is_after_market=is_after_market,
+                    provider='polygon',
                 )
                 new_records.append(record)
                 existing_ts.add(ts) # Prevent duplicates within the same batch

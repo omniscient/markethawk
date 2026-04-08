@@ -30,7 +30,9 @@ class StockAggregate(Base):
     
     is_pre_market = Column(Boolean, default=False, index=True)
     is_after_market = Column(Boolean, default=False, index=True)
-    
+
+    provider = Column(String(50), default='polygon', nullable=True)  # data source: 'polygon', 'ibkr', etc.
+
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Composite index for efficient querying by ticker and time

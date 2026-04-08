@@ -18,6 +18,7 @@ from app.models.stock_split import StockSplit
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.futures_rollover import FuturesRollover
 from app.models.futures_contract import FuturesContract
+from app.models.universe_quality_report import UniverseQualityReport
 
 __all__ = [
     "StockUniverse",
@@ -38,4 +39,5 @@ __all__ = [
     "FuturesAggregate",
     "FuturesRollover",
     "FuturesContract",
+    "UniverseQualityReport",
 ]

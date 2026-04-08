@@ -12,6 +12,7 @@ interface ButtonProps {
   fullWidth?: boolean;
   className?: string;
   type?: 'button' | 'submit' | 'reset';
+  title?: string;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -24,7 +25,8 @@ const Button: React.FC<ButtonProps> = ({
   disabled = false,
   fullWidth = false,
   className = '',
-  type = 'button'
+  type = 'button',
+  title,
 }) => {
   const baseClasses = 'inline-flex items-center justify-center font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-financial-dark';
 
@@ -50,6 +52,7 @@ const Button: React.FC<ButtonProps> = ({
       onClick={onClick}
       disabled={disabled || loading}
       className={classes}
+      title={title}
     >
       {loading && (
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>

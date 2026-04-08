@@ -219,10 +219,14 @@ class FuturesDataService:
         except ValueError:
             return {"status": "error", "message": f"Invalid contract_month: {contract_month}"}
 
-        # Upper bound: caller override, capped at min(expiry, now)
+        # Upper bound: caller override, capped at min(expiry, now).
+        # Parse to_date as end-of-day so we don't cut off the requested day's bars.
         natural_to = min(expiry_dt, now)
         if to_date:
-            caller_to = datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            caller_to = (
+                datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                + timedelta(days=1, seconds=-1)
+            )
             effective_to = min(caller_to, natural_to)
         else:
             effective_to = natural_to
