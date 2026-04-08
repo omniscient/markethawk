@@ -346,8 +346,8 @@ export interface QualityReport {
 
 export const deleteTickerAggregates = async (
   universeId: number,
-  payload: { ticker: string; timespan: string; multiplier: number; asset_class: string },
-): Promise<{ deleted: number }> => {
+  payload: { ticker: string; asset_class: string; timespan?: string | null; multiplier?: number | null },
+): Promise<{ deleted_bars: number; removed_from_universe: boolean }> => {
   const response = await apiClient.delete(`/universe/${universeId}/aggregates`, { data: payload });
   return response.data;
 };

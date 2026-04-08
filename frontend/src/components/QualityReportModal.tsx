@@ -261,7 +261,7 @@ function TickerRow({ result, onDelete }: { result: QualityTickerResult; onDelete
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(result); }}
             className="p-1 text-gray-600 hover:text-red-400 transition-colors rounded"
-            title="Delete aggregate data"
+            title="Remove ticker from universe"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -322,8 +322,9 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
   const [sortAsc, setSortAsc] = useState(true);
   const [gradeFilter, setGradeFilter] = useState<string>('all');
   const [pendingDelete, setPendingDelete] = useState<QualityTickerResult | null>(null);
-  // Optimistically removed rows (ticker-timespan-multiplier key), cleared when re-analysis completes
-  const [deletedKeys, setDeletedKeys] = useState<Set<string>>(new Set());
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Optimistically removed tickers (by symbol), cleared when re-analysis completes
+  const [removedTickers, setRemovedTickers] = useState<Set<string>>(new Set());
   // True only while normalization was triggered in THIS modal session — resets on close
   const [normalizationTriggered, setNormalizationTriggered] = useState(false);
 
@@ -349,10 +350,10 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
     return () => clearInterval(timer);
   }, [report?.status, report?.normalization_status, normalizationTriggered, universe?.id, isOpen, queryClient]);
 
-  // Once a fresh analysis completes, clear the optimistic deleted-keys set
+  // Once a fresh analysis completes, clear the optimistic removed-tickers set
   React.useEffect(() => {
-    if (report?.status === 'complete' && deletedKeys.size > 0) {
-      setDeletedKeys(new Set());
+    if (report?.status === 'complete' && removedTickers.size > 0) {
+      setRemovedTickers(new Set());
     }
   }, [report?.status]);
 
@@ -360,20 +361,18 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
     mutationFn: (row: QualityTickerResult) =>
       deleteTickerAggregates(universe!.id, {
         ticker: row.ticker,
-        timespan: row.timespan!,
-        multiplier: row.multiplier!,
         asset_class: row.asset_class,
+        // omit timespan/multiplier so ALL bars are removed
       }),
     onSuccess: (_data, row) => {
-      // Optimistically hide the deleted row immediately
-      const key = `${row.ticker}-${row.timespan}-${row.multiplier}`;
-      setDeletedKeys((prev) => new Set([...prev, key]));
+      setDeleteError(null);
+      setRemovedTickers((prev) => new Set([...prev, row.ticker]));
       setPendingDelete(null);
-      // Trigger a fresh quality analysis so the stored report reflects the deletion
-      triggerQualityAnalysis(universe!.id).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['qualityReport', universe?.id] });
-        queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
-      });
+      queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Delete failed';
+      setDeleteError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     },
   });
 
@@ -383,6 +382,7 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
       // Immediate refetch so the pending state shows without waiting for the next poll cycle
       queryClient.invalidateQueries({ queryKey: ['qualityReport', universe?.id] });
       queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
+      setGradeFilter('all');
     },
   });
 
@@ -391,6 +391,7 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
     onSuccess: () => {
       setNormalizationTriggered(true);
       queryClient.invalidateQueries({ queryKey: ['qualityReport', universe?.id] });
+      setGradeFilter('all');
     },
   });
 
@@ -411,7 +412,7 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
 
   const sorted = [...tickers]
     .filter((t) => gradeFilter === 'all' || t.grade === gradeFilter)
-    .filter((t) => !deletedKeys.has(`${t.ticker}-${t.timespan}-${t.multiplier}`))
+    .filter((t) => !removedTickers.has(t.ticker))
     .sort((a, b) => {
       let av: any = a[sortKey];
       let bv: any = b[sortKey];
@@ -441,17 +442,24 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
 
   const rd = report?.report_data;
 
-  // Reset all transient state when modal closes
+  // Reset transient state when modal closes
   React.useEffect(() => {
     if (!isOpen) {
       setPendingDelete(null);
-      setDeletedKeys(new Set());
-      setNormalizationTriggered(false);
+      setDeleteError(null);
       setGradeFilter('all');
       setSortKey('grade');
       setSortAsc(true);
+      // We don't reset removedTickers or normalizationTriggered here
+      // so if they reopen the same modal, it retains its optimistic state.
     }
   }, [isOpen]);
+
+  // Reset deep state when universe changes
+  React.useEffect(() => {
+    setRemovedTickers(new Set());
+    setNormalizationTriggered(false);
+  }, [universe?.id]);
 
   if (!universe) return null;
 
@@ -514,6 +522,13 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
             status={report?.normalization_status ?? (normalizeMutation.isPending ? 'pending' : null)}
             data={report?.normalization_data ?? null}
           />
+        )}
+
+        {removedTickers.size > 0 && !isAnalyzing && !isBusy && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-sm text-yellow-500 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span>Local changes made (ticker deleted). Re-analyse to update the full report.</span>
+          </div>
         )}
 
         {!report && !isLoading && !isAnalyzing && (
@@ -610,20 +625,20 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
               <div className="flex items-start gap-3 mb-4">
                 <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-financial-light font-semibold">Delete aggregate data?</p>
+                  <p className="text-financial-light font-semibold">Remove ticker from universe?</p>
                   <p className="text-sm text-gray-400 mt-1">
-                    This will permanently delete all{' '}
-                    <span className="font-mono text-financial-light">
-                      {pendingDelete.multiplier !== 1 ? pendingDelete.multiplier : ''}{pendingDelete.timespan}
-                    </span>{' '}
-                    bars for{' '}
-                    <span className="font-mono text-financial-light">{pendingDelete.ticker}</span>.
+                    This will permanently delete{' '}
+                    <span className="font-mono text-financial-light">{pendingDelete.ticker}</span>'s
+                    aggregate data (all timespans) and remove it from this universe.
                     This cannot be undone.
                   </p>
                 </div>
               </div>
+              {deleteError && (
+                <p className="text-xs text-red-400 mb-3">{deleteError}</p>
+              )}
               <div className="flex justify-end gap-2">
-                <Button variant="secondary" onClick={() => setPendingDelete(null)} disabled={deleteMutation.isPending}>
+                <Button variant="secondary" onClick={() => { setPendingDelete(null); setDeleteError(null); }} disabled={deleteMutation.isPending}>
                   Cancel
                 </Button>
                 <Button

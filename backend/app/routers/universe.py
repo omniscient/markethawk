@@ -809,9 +809,10 @@ async def trigger_quality_analysis(
 
 class DeleteAggregatesRequest(BaseModel):
     ticker: str
-    timespan: str
-    multiplier: int
     asset_class: str  # "stocks" | "futures"
+    # Optional: if omitted, ALL timespans for the ticker are deleted
+    timespan: Optional[str] = None
+    multiplier: Optional[int] = None
 
 
 @router.delete("/{universe_id}/aggregates")
@@ -821,34 +822,39 @@ async def delete_ticker_aggregates(
     db: Session = Depends(get_db),
 ):
     """
-    Hard-delete all aggregate bars for a specific ticker / timespan / multiplier
-    combination within a universe.
+    Delete aggregate bars for a ticker and remove it from the universe.
+
+    If timespan/multiplier are provided, only that specific combination is
+    deleted.  If omitted, ALL bars for the ticker are removed.
+    The ticker is always removed from StockUniverseTicker.
     """
     from app.models.futures_aggregate import FuturesAggregate
 
     if request.asset_class == "futures":
-        deleted = (
-            db.query(FuturesAggregate)
-            .filter(
-                FuturesAggregate.symbol == request.ticker,
+        q = db.query(FuturesAggregate).filter(FuturesAggregate.symbol == request.ticker)
+        if request.timespan is not None:
+            q = q.filter(
                 FuturesAggregate.timespan == request.timespan,
                 FuturesAggregate.multiplier == request.multiplier,
             )
-            .delete(synchronize_session=False)
-        )
+        deleted = q.delete(synchronize_session=False)
     else:
-        deleted = (
-            db.query(StockAggregate)
-            .filter(
-                StockAggregate.ticker == request.ticker,
+        q = db.query(StockAggregate).filter(StockAggregate.ticker == request.ticker)
+        if request.timespan is not None:
+            q = q.filter(
                 StockAggregate.timespan == request.timespan,
                 StockAggregate.multiplier == request.multiplier,
             )
-            .delete(synchronize_session=False)
-        )
+        deleted = q.delete(synchronize_session=False)
+
+    # Always remove from universe membership
+    db.query(StockUniverseTicker).filter(
+        StockUniverseTicker.universe_id == universe_id,
+        StockUniverseTicker.ticker == request.ticker,
+    ).delete(synchronize_session=False)
 
     db.commit()
-    return {"deleted": deleted, "ticker": request.ticker, "timespan": request.timespan, "multiplier": request.multiplier}
+    return {"deleted_bars": deleted, "ticker": request.ticker, "removed_from_universe": True}
 
 
 @router.get("/{universe_id}/quality-report")
