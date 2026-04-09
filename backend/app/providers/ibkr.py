@@ -347,52 +347,66 @@ class IBKRDataProvider(BaseDataProvider):
     #  Connection management                                               #
     # ------------------------------------------------------------------ #
 
-    async def connect(self) -> bool:
-        """Explicitly connect to TWS/Gateway."""
+    async def connect(self, max_retries: int = 6) -> bool:
+        """
+        Connect to IB Gateway / TWS with exponential backoff.
+
+        Retries are important when running IB Gateway in Docker — the container
+        takes ~45–60 s to start up and log in before it accepts socket connections.
+        Retry schedule (seconds): 5, 10, 20, 40, 60, 60 (capped).
+        """
         if not IB_INSYNC_AVAILABLE:
             return False
 
         if self._ib and self._ib.isConnected():
             return True
 
-        # Use a per-process client ID so parallel Celery workers don't conflict.
-        # Base ID (default 10) + (PID mod 50) gives IDs in range [base, base+49].
+        # Per-process client ID so parallel Celery workers don't conflict.
         client_id = settings.IBKR_CLIENT_ID + (os.getpid() % 50)
 
-        self._ib = IB()
-        try:
-            await self._ib.connectAsync(
-                host=settings.IBKR_HOST,
-                port=settings.IBKR_PORT,
-                clientId=client_id,
-                timeout=20,
-            )
-            # Give ib_insync a moment to receive and process any immediate error
-            # events such as error 326 ("client id already in use"), which cause
-            # TWS to close the connection right after the handshake.
-            await asyncio.sleep(0.5)
-
-            if not self._ib.isConnected():
-                logger.error(
-                    f"IBKRDataProvider: TWS rejected connection "
-                    f"(clientId={client_id} may already be in use by another session)."
+        for attempt in range(max_retries):
+            self._ib = IB()
+            try:
+                await self._ib.connectAsync(
+                    host=settings.IBKR_HOST,
+                    port=settings.IBKR_PORT,
+                    clientId=client_id,
+                    timeout=20,
                 )
+                # Brief pause so ib_insync can process immediate error events
+                # (e.g. error 326 "client id already in use").
+                await asyncio.sleep(0.5)
+
+                if not self._ib.isConnected():
+                    raise ConnectionError(
+                        f"clientId={client_id} rejected — may already be in use"
+                    )
+
+                self._connected = True
+                logger.info(
+                    f"IBKRDataProvider: Connected to IB Gateway at "
+                    f"{settings.IBKR_HOST}:{settings.IBKR_PORT} "
+                    f"(clientId={client_id}, attempt={attempt + 1})"
+                )
+                return True
+
+            except Exception as e:
                 self._ib = None
                 self._connected = False
-                return False
+                delay = min(5 * (2 ** attempt), 60)   # 5 10 20 40 60 60 …
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        f"IBKRDataProvider: Connection attempt {attempt + 1}/{max_retries} "
+                        f"failed ({e}). Retrying in {delay}s…"
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(
+                        f"IBKRDataProvider: All {max_retries} connection attempts failed. "
+                        f"Last error: {e}"
+                    )
 
-            self._connected = True
-            logger.info(
-                f"IBKRDataProvider: Connected to TWS at "
-                f"{settings.IBKR_HOST}:{settings.IBKR_PORT} "
-                f"(clientId={client_id})"
-            )
-            return True
-        except Exception as e:
-            logger.error(f"IBKRDataProvider: Connection failed: {e}")
-            self._ib = None
-            self._connected = False
-            return False
+        return False
 
     def disconnect(self):
         """Disconnect from TWS/Gateway."""

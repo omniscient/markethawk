@@ -453,8 +453,8 @@ export const fetchStorageStats = async (): Promise<StorageStats> => {
 /** Create a raw WebSocket for real-time scanner updates. */
 export const createScannerWebSocket = (): WebSocket | null => {
   try {
-    const wsBase = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000';
-    const ws = new WebSocket(`${wsBase}/ws/scanner`);
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws/scanner`);
     ws.onopen = () => console.log('[WS] Scanner connected');
     ws.onclose = () => console.log('[WS] Scanner disconnected');
     ws.onerror = (e) => console.error('[WS] Scanner error', e);

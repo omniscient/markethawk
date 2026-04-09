@@ -17,6 +17,37 @@ services:
     networks:
       - stockscanner-network
 
+  # IB Gateway — headless Interactive Brokers connection
+  # Logs in automatically using IBC; exposes the TWS socket API on port 4002 (paper).
+  # First-time startup takes ~45–60 s while IBC authenticates with IBKR servers.
+  ib-gateway:
+    image: ghcr.io/gnzsnz/ib-gateway:stable
+    container_name: stockscanner-ibgateway
+    restart: always
+    environment:
+      TWS_USERID: ${IB_USERNAME}
+      TWS_PASSWORD: ${IB_PASSWORD}
+      TRADING_MODE: ${IB_TRADING_MODE:-paper}
+      TWS_SETTINGS_PATH: /home/ibgateway/Jts
+      GATEWAY_OR_TWS: gateway
+      RELOGIN_AFTER_2AM: "yes"
+      AUTO_RESTART_TIME: "11:59 PM"
+      TWOFA_TIMEOUT_ACTION: restart
+      READ_ONLY_API: ${IB_READ_ONLY:-yes}   # safety: no order submission via API
+    ports:
+      - "4002:4002"   # paper trading socket
+      - "4001:4001"   # live trading socket (unused until needed)
+    volumes:
+      - ib_gateway_settings:/home/ibgateway/Jts
+    networks:
+      - stockscanner-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "4002"]
+      interval: 10s
+      timeout: 5s
+      retries: 18          # allow up to 3 min for initial login
+      start_period: 60s
+
   # Backend API
   backend:
     build:
@@ -31,14 +62,15 @@ services:
       SEQ_URL: http://seq:5341
       WATCHFILES_FORCE_POLLING: "true"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      IBKR_HOST: ${IBKR_HOST:-host.docker.internal}
-      IBKR_PORT: ${IBKR_PORT:-7496}
+      IBKR_HOST: ${IBKR_HOST:-ib-gateway}
+      IBKR_PORT: ${IBKR_PORT:-4002}
       IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
     ports:
       - "8000:8000"
     depends_on:
       - postgres
       - redis
+      - ib-gateway
     volumes:
       - ./backend:/app
     networks:
@@ -90,12 +122,13 @@ services:
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       WATCHFILES_FORCE_POLLING: "true"
-      IBKR_HOST: ${IBKR_HOST:-host.docker.internal}
-      IBKR_PORT: ${IBKR_PORT:-7496}
+      IBKR_HOST: ${IBKR_HOST:-ib-gateway}
+      IBKR_PORT: ${IBKR_PORT:-4002}
       IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
     depends_on:
       - postgres
       - redis
+      - ib-gateway
     volumes:
       - ./backend:/app
     networks:
@@ -178,6 +211,7 @@ volumes:
   redis_data:
   pgadmin_data:
   seq_data:
+  ib_gateway_settings:
 
 
 networks:

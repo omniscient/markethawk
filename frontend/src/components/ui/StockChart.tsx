@@ -221,208 +221,106 @@ const StockChart: React.FC<StockChartProps> = ({
     // Or: { event_date: string, relative_volume: number }
     
     if (type === 'candlestick') {
-      const formattedData: CandlestickData[] = data
-        .filter(d => d.Date && d.Open != null)
-        .map(d => {
-          // Normalize time: YYYY-MM-DD for daily, Unix timestamp for intraday
-          let timeValue: Time;
-          if (timespan === 'day') {
-            timeValue = d.Date.split('T')[0] as Time;
-          } else {
-            // Robust ISO parsing for intraday
-            const dt = new Date(d.Date);
-            let timestamp = dt.getTime() / 1000;
-            
-            // Align historical timestamps to the chart's timespan
-            if (timespan === 'hour') {
-              timestamp = Math.floor(timestamp / 3600) * 3600;
-            } else if (timespan === 'minute') {
-              timestamp = Math.floor(timestamp / 60) * 60;
-            }
-            
-            timeValue = toLocalTime(timestamp) as Time;
-          }
+      // Single-pass transformation: compute the time value once per bar and build
+      // all three series (candles, volume, vwap) together.
+      // The previous approach mapped + sorted + O(N²)-deduped three times separately.
+      const candleData: CandlestickData[] = [];
+      const volumeData: { time: Time; value: number; color: string }[] = [];
+      const vwapData: { time: Time; value: number }[] = [];
+      const seenTimes = new Set<number | string>();
 
-          return {
+      for (const d of data) {
+        if (!d.Date || d.Open == null) continue;
+
+        let timeValue: Time;
+        if (timespan === 'day') {
+          timeValue = d.Date.split('T')[0] as Time;
+        } else {
+          let ts = new Date(d.Date).getTime() / 1000;
+          if (timespan === 'hour') ts = Math.floor(ts / 3600) * 3600;
+          else if (timespan === 'minute') ts = Math.floor(ts / 60) * 60;
+          timeValue = toLocalTime(ts) as Time;
+        }
+
+        // O(1) dedup — skip bars whose time was already seen
+        const key = timeValue as number | string;
+        if (seenTimes.has(key)) continue;
+        seenTimes.add(key);
+
+        candleData.push({ time: timeValue, open: d.Open, high: d.High, low: d.Low, close: d.Close });
+
+        if (d.Volume != null) {
+          volumeData.push({
             time: timeValue,
-            open: d.Open,
-            high: d.High,
-            low: d.Low,
-            close: d.Close,
-          };
-        })
-        .sort((a, b) => {
-          if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
-          return String(a.time).localeCompare(String(b.time));
-        });
-
-      // Deduplicate by time (lightweight-charts requirement)
-      const uniqueFormattedData = formattedData.filter((item, index, self) =>
-        index === self.findIndex((t) => t.time === item.time)
-      );
-
-      seriesRef.current.setData(uniqueFormattedData);
-
-      if (volumeSeriesRef.current) {
-        const volumeData = data
-          .filter(d => d.Date && d.Volume != null)
-          .map(d => {
-            let timeValue: Time;
-            if (timespan === 'day') {
-              timeValue = d.Date.split('T')[0] as Time;
-            } else {
-              const dt = new Date(d.Date);
-              let timestamp = dt.getTime() / 1000;
-              if (timespan === 'hour') {
-                timestamp = Math.floor(timestamp / 3600) * 3600;
-              } else if (timespan === 'minute') {
-                timestamp = Math.floor(timestamp / 60) * 60;
-              }
-              timeValue = toLocalTime(timestamp) as Time;
-            }
-            return {
-              time: timeValue,
-              value: d.Volume,
-              color: d.Close >= d.Open ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
-            };
-          })
-          .sort((a, b) => {
-            if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
-            return String(a.time).localeCompare(String(b.time));
+            value: d.Volume,
+            color: d.Close >= d.Open ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
           });
-        
-        // Deduplicate volume by time
-        const uniqueVolumeData = volumeData.filter((item, index, self) =>
-          index === self.findIndex((t) => t.time === item.time)
-        );
+        }
 
-        volumeSeriesRef.current.setData(uniqueVolumeData);
+        if (d.vwap_intraday != null) {
+          vwapData.push({ time: timeValue, value: d.vwap_intraday });
+        }
       }
 
-      if (vwapSeriesRef.current) {
-        const vwapData = data
-          .filter(d => d.Date && d.vwap_intraday != null)
-          .map(d => {
-            let timeValue: Time;
-            if (timespan === 'day') {
-              timeValue = d.Date.split('T')[0] as Time;
-            } else {
-              const dt = new Date(d.Date);
-              let timestamp = dt.getTime() / 1000;
-              if (timespan === 'hour') {
-                timestamp = Math.floor(timestamp / 3600) * 3600;
-              } else if (timespan === 'minute') {
-                timestamp = Math.floor(timestamp / 60) * 60;
-              }
-              timeValue = toLocalTime(timestamp) as Time;
-            }
-            return {
-              time: timeValue,
-              value: d.vwap_intraday,
-            };
-          })
-          .sort((a, b) => {
-            if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
-            return String(a.time).localeCompare(String(b.time));
-          });
-        
-        const uniqueVwapData = vwapData.filter((item, index, self) =>
-          index === self.findIndex((t) => t.time === item.time)
-        );
+      // Data arrives sorted from the backend — no client-side sort needed.
+      seriesRef.current.setData(candleData);
+      volumeSeriesRef.current?.setData(volumeData);
+      vwapSeriesRef.current?.setData(vwapData);
 
-        vwapSeriesRef.current.setData(uniqueVwapData);
-      }
-
-      // Add markers for scanner events and inline indicators
+      // Markers — events + inline indicators
       let allMarkers: any[] = [];
-      
+
       if (events && events.length > 0) {
-        const eventsMarkers = events
-          .filter(e => e.event_date)
-          .map(e => {
-            let timeValue: Time;
-            if (timespan === 'day') {
-              timeValue = e.event_date.split('T')[0] as Time;
-            } else {
-              const dt = new Date(e.event_date);
-              let timestamp = dt.getTime() / 1000;
-              if (timespan === 'hour') {
-                timestamp = Math.floor(timestamp / 3600) * 3600;
-              } else if (timespan === 'minute') {
-                timestamp = Math.floor(timestamp / 60) * 60;
-              }
-              timeValue = toLocalTime(timestamp) as Time;
-            }
-            return {
-              time: timeValue,
-              position: 'belowBar' as const,
-              color: '#fbbf24', // yellow-400
-              shape: 'circle' as const,
-              size: 1,
-              text: '', // No text as requested
-            };
-          });
-          allMarkers = [...allMarkers, ...eventsMarkers];
-      }
-      
-      // Map inline backend indicators (swipe, flush, high_vol) 
-      const indicatorMarkers = data
-        .filter(d => d.Date && d.marker_type != null)
-        .map(d => {
+        for (const e of events) {
+          if (!e.event_date) continue;
           let timeValue: Time;
           if (timespan === 'day') {
-            timeValue = d.Date.split('T')[0] as Time;
+            timeValue = e.event_date.split('T')[0] as Time;
           } else {
-            const dt = new Date(d.Date);
-            let timestamp = dt.getTime() / 1000;
-            if (timespan === 'hour') {
-              timestamp = Math.floor(timestamp / 3600) * 3600;
-            } else if (timespan === 'minute') {
-              timestamp = Math.floor(timestamp / 60) * 60;
-            }
-            timeValue = toLocalTime(timestamp) as Time;
+            let ts = new Date(e.event_date).getTime() / 1000;
+            if (timespan === 'hour') ts = Math.floor(ts / 3600) * 3600;
+            else if (timespan === 'minute') ts = Math.floor(ts / 60) * 60;
+            timeValue = toLocalTime(ts) as Time;
           }
-          
-          let color = '#fbbf24';
-          let shape: 'circle' | 'square' | 'arrowUp' | 'arrowDown' = 'arrowUp';
-          let position: 'aboveBar' | 'belowBar' | 'inBar' = 'belowBar';
-          
-          if (d.marker_type === 'swipe') {
-            color = '#ef4444'; // red
-            shape = 'arrowDown';
-            position = 'aboveBar';
-          } else if (d.marker_type === 'flush') {
-            color = '#10b981'; // green
-            shape = 'arrowUp';
-            position = 'belowBar';
-          }
-           
-          return {
-            time: timeValue,
-            position: position,
-            color: color,
-            shape: shape,
-            size: 1,
-            text: '',
-          };
-        });
-      
-      allMarkers = [...allMarkers, ...indicatorMarkers];
+          allMarkers.push({ time: timeValue, position: 'belowBar' as const, color: '#fbbf24', shape: 'circle' as const, size: 1, text: '' });
+        }
+      }
 
-      if (allMarkers.length > 0 && markersPluginRef.current) {
-        allMarkers.sort((a, b) => {
-            if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
-            return String(a.time).localeCompare(String(b.time));
-          });
-        
-        // Filter markers to only those that have a corresponding candle in the current data
-        const dataTimes = new Set(uniqueFormattedData.map(d => String(d.time)));
-        const validMarkers = allMarkers.filter(m => dataTimes.has(m.time as string));
-        
-        // Use v5 createSeriesMarkers plugin API
-        markersPluginRef.current.setMarkers(validMarkers);
-      } else if (markersPluginRef.current) {
-        markersPluginRef.current.setMarkers([]);
+      for (const d of data) {
+        if (!d.Date || d.marker_type == null) continue;
+        let timeValue: Time;
+        if (timespan === 'day') {
+          timeValue = d.Date.split('T')[0] as Time;
+        } else {
+          let ts = new Date(d.Date).getTime() / 1000;
+          if (timespan === 'hour') ts = Math.floor(ts / 3600) * 3600;
+          else if (timespan === 'minute') ts = Math.floor(ts / 60) * 60;
+          timeValue = toLocalTime(ts) as Time;
+        }
+        const isSwipe = d.marker_type === 'swipe';
+        const isFlush = d.marker_type === 'flush';
+        allMarkers.push({
+          time: timeValue,
+          position: isSwipe ? 'aboveBar' : 'belowBar' as const,
+          color: isSwipe ? '#ef4444' : '#10b981',
+          shape: isSwipe ? 'arrowDown' : 'arrowUp' as const,
+          size: 1,
+          text: '',
+        });
+      }
+
+      if (markersPluginRef.current) {
+        if (allMarkers.length > 0) {
+          allMarkers.sort((a, b) =>
+            typeof a.time === 'number' && typeof b.time === 'number'
+              ? a.time - b.time
+              : String(a.time).localeCompare(String(b.time))
+          );
+          const validMarkers = allMarkers.filter(m => seenTimes.has(m.time as any));
+          markersPluginRef.current.setMarkers(validMarkers);
+        } else {
+          markersPluginRef.current.setMarkers([]);
+        }
       }
     } else {
       const xKey = data[0].event_date ? 'event_date' : 'Date';

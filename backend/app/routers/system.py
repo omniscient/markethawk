@@ -145,36 +145,123 @@ async def system_tasks_websocket(websocket: WebSocket):
                 if cursor == 0 or cursor == '0' or str(cursor) == '0':
                     break
                     
+            from datetime import datetime, timezone
+            from celery.result import AsyncResult
+            from app.core.celery_app import celery_app
+
             db = SessionLocal()
             try:
                 for key in sync_keys:
                     parts = key.split(":")
                     if len(parts) >= 2 and parts[1].isdigit():
                         uid = int(parts[1])
+
+                        raw = await redis_client.get(key)
+                        if not raw:
+                            continue
+                        data = json.loads(raw)
+
+                        # Stale check: if started >4h ago, the key is a leftover — clean it up.
+                        # AsyncResult returns "PENDING" for expired results, making done tasks
+                        # look like they're still running. The 4h window covers all realistic syncs.
+                        started_at_str = data.get("started_at")
+                        if started_at_str:
+                            try:
+                                started_at = datetime.fromisoformat(started_at_str).replace(tzinfo=timezone.utc)
+                                age_hours = (datetime.now(timezone.utc) - started_at).total_seconds() / 3600
+                                if age_hours > 4:
+                                    await redis_client.delete(key)
+                                    continue
+                            except (ValueError, TypeError):
+                                pass
+
+                        # Check actual Celery task states.
+                        task_ids = data.get("task_ids", [])
+                        pending = sum(
+                            1 for tid in task_ids
+                            if AsyncResult(tid, app=celery_app).state in ("PENDING", "STARTED", "RETRY")
+                        )
+                        if pending == 0:
+                            # All tasks done — delete the key so it stops showing up.
+                            await redis_client.delete(key)
+                            continue
+
                         universe = db.query(StockUniverse).filter(StockUniverse.id == uid).first()
                         name = universe.name if universe else f"Universe {uid}"
-                        
-                        raw = await redis_client.get(key)
-                        if raw:
-                            data = json.loads(raw)
-                            # Assume if key exists and hasn't been deleted, it's syncing
-                            active_tasks.append({
-                                "id": f"sync_{uid}",
-                                "type": "sync",
-                                "title": f"Syncing Data: {name}",
-                                "status": "running"
-                            })
+                        active_tasks.append({
+                            "id": f"sync_{uid}",
+                            "type": "sync",
+                            "title": f"Syncing Data: {name}",
+                            "status": "running"
+                        })
                 
-                # 2. Check DB for quality and normalization tasks
+                # 1.5. Check Redis for active ticker syncs
+                ticker_sync_keys = []
+                cursor = '0'
+                while True:
+                    cursor, keys = await redis_client.scan(cursor=cursor, match="ticker:*:sync", count=100)
+                    ticker_sync_keys.extend(keys)
+                    if cursor == 0 or cursor == '0' or str(cursor) == '0':
+                        break
+                
+                for key in ticker_sync_keys:
+                    parts = key.split(":")
+                    if len(parts) >= 2:
+                        ticker = parts[1]
+                        raw = await redis_client.get(key)
+                        if not raw:
+                            continue
+                        try:
+                            tdata = json.loads(raw)
+                            ts_str = tdata.get("started_at")
+                            if ts_str:
+                                ts = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+                                if (datetime.now(timezone.utc) - ts).total_seconds() / 3600 > 4:
+                                    await redis_client.delete(key)
+                                    continue
+                            tids = tdata.get("task_ids", [])
+                            if tids:
+                                tpending = sum(
+                                    1 for tid in tids
+                                    if AsyncResult(tid, app=celery_app).state in ("PENDING", "STARTED", "RETRY")
+                                )
+                                if tpending == 0:
+                                    await redis_client.delete(key)
+                                    continue
+                        except (ValueError, TypeError, AttributeError):
+                            pass
+                        active_tasks.append({
+                            "id": f"sync_ticker_{ticker}",
+                            "type": "sync",
+                            "title": f"Syncing Data: {ticker}",
+                            "status": "running"
+                        })
+                
+                # 2. Check DB for quality and normalization tasks.
+                # Auto-reset rows that have been stuck in pending/running for >4 hours
+                # (worker crash without updating status).
+                stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - __import__('datetime').timedelta(hours=4)
                 quality_reports = db.query(UniverseQualityReport).filter(
                     (UniverseQualityReport.status.in_(["pending", "running"])) |
                     (UniverseQualityReport.normalization_status.in_(["pending", "running"]))
                 ).all()
-                
+
                 for report in quality_reports:
+                    is_stale = report.started_at and report.started_at < stale_cutoff
+
+                    if is_stale:
+                        # Reset stuck rows so they don't show up forever
+                        if report.status in ("pending", "running"):
+                            report.status = "failed"
+                        if report.normalization_status in ("pending", "running"):
+                            report.normalization_status = "failed"
+                        db.add(report)
+                        db.commit()
+                        continue
+
                     universe = db.query(StockUniverse).filter(StockUniverse.id == report.universe_id).first()
                     name = universe.name if universe else f"Universe {report.universe_id}"
-                    
+
                     if report.status in ["pending", "running"]:
                         active_tasks.append({
                             "id": f"qa_{report.universe_id}",
@@ -182,7 +269,7 @@ async def system_tasks_websocket(websocket: WebSocket):
                             "title": f"Quality Analysis: {name}",
                             "status": report.status
                         })
-                        
+
                     if report.normalization_status in ["pending", "running"]:
                         active_tasks.append({
                             "id": f"norm_{report.universe_id}",

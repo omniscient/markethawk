@@ -27,7 +27,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 import pandas as pd
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from app.core.config import settings
 from app.models.futures_aggregate import FuturesAggregate
@@ -803,43 +803,44 @@ class FuturesDataService:
             else None
         )
 
-        # 5. Fetch and concatenate bars for each slice
+        # 5. Fetch and concatenate bars for each slice.
+        # Use raw SQL to return tuples instead of full ORM objects — much faster
+        # for large intraday datasets (e.g. 30D of 1M NQ = ~29K rows).
         frames = []
         for slice_start, slice_end, contract_month in slices:
-            query = db.query(FuturesAggregate).filter(
-                FuturesAggregate.symbol == symbol,
-                FuturesAggregate.contract_month == contract_month,
-                FuturesAggregate.timespan == timespan,
-                FuturesAggregate.multiplier == multiplier,
-            )
-            if slice_start:
-                query = query.filter(FuturesAggregate.timestamp >= slice_start)
-            if slice_end:
-                query = query.filter(FuturesAggregate.timestamp < slice_end)
-            if from_dt:
-                query = query.filter(FuturesAggregate.timestamp >= from_dt)
-            if to_dt:
-                query = query.filter(FuturesAggregate.timestamp <= to_dt)
+            # Build date bounds for this slice, merging global from/to filters
+            ts_start = max(filter(None, [slice_start, from_dt]), default=None)
+            ts_end   = min(filter(None, [slice_end,   to_dt  ]), default=None) if (slice_end or to_dt) else None
 
-            rows = query.order_by(FuturesAggregate.timestamp.asc()).all()
+            params: dict = {
+                "symbol": symbol,
+                "contract_month": contract_month,
+                "timespan": timespan,
+                "multiplier": multiplier,
+            }
+            clauses = [
+                "symbol = :symbol",
+                "contract_month = :contract_month",
+                "timespan = :timespan",
+                "multiplier = :multiplier",
+            ]
+            if ts_start:
+                clauses.append("timestamp >= :ts_start")
+                params["ts_start"] = ts_start
+            if ts_end:
+                clauses.append("timestamp < :ts_end")
+                params["ts_end"] = ts_end
+
+            sql = text(
+                f"SELECT timestamp, open, high, low, close, volume, vwap, contract_month "
+                f"FROM futures_aggregates WHERE {' AND '.join(clauses)} "
+                f"ORDER BY timestamp ASC"
+            )
+            rows = db.execute(sql, params).fetchall()
             if not rows:
                 continue
 
-            chunk = pd.DataFrame(
-                [
-                    {
-                        "timestamp": r.timestamp,
-                        "open": float(r.open),
-                        "high": float(r.high),
-                        "low": float(r.low),
-                        "close": float(r.close),
-                        "volume": int(r.volume),
-                        "vwap": float(r.vwap) if r.vwap else None,
-                        "contract_month": r.contract_month,
-                    }
-                    for r in rows
-                ]
-            )
+            chunk = pd.DataFrame(rows, columns=["timestamp", "open", "high", "low", "close", "volume", "vwap", "contract_month"])
             frames.append(chunk)
 
         if not frames:

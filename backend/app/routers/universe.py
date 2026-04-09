@@ -469,6 +469,7 @@ async def get_universe_sync_status(universe_id: int):
     """
     import json
     import redis as redis_lib
+    from datetime import timezone
     from celery.result import AsyncResult
     from app.core.celery_app import celery_app
     from app.core.config import settings
@@ -480,8 +481,24 @@ async def get_universe_sync_status(universe_id: int):
 
     data = json.loads(raw)
     task_ids = data.get("task_ids", [])
+    started_at_str = data.get("started_at")
+
+    # If the sync key is older than 4 hours, consider it stale and clear it.
+    # Celery task results expire from the result backend (default 24h), after which
+    # AsyncResult.state returns "PENDING" for completed tasks — making them look stuck.
+    if started_at_str:
+        try:
+            started_at = datetime.fromisoformat(started_at_str).replace(tzinfo=timezone.utc)
+            age_hours = (datetime.now(timezone.utc) - started_at).total_seconds() / 3600
+            if age_hours > 4:
+                r.delete(f"universe:{universe_id}:sync")
+                return {"is_syncing": False, "pending": 0, "success": 0, "failed": 0, "total": 0}
+        except (ValueError, TypeError):
+            pass
 
     states = [AsyncResult(tid, app=celery_app).state for tid in task_ids]
+    # "PENDING" from AsyncResult can mean either "waiting to run" or "result expired/unknown".
+    # Only treat as truly pending if the task was submitted recently (within the stale window above).
     pending = sum(1 for s in states if s in ("PENDING", "STARTED", "RETRY"))
     success = sum(1 for s in states if s == "SUCCESS")
     failed  = sum(1 for s in states if s in ("FAILURE", "REVOKED"))
@@ -496,7 +513,7 @@ async def get_universe_sync_status(universe_id: int):
         "pending": pending,
         "success": success,
         "failed": failed,
-        "started_at": data.get("started_at"),
+        "started_at": started_at_str,
         "timespan": data.get("timespan"),
         "from_date": data.get("from_date"),
         "to_date": data.get("to_date"),

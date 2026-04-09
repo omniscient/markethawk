@@ -10,7 +10,8 @@ import {
   Info, 
   Zap,
   BarChart2,
-  Newspaper
+  Newspaper,
+  RefreshCw
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -22,7 +23,7 @@ import RecentEvents from '../components/RecentEvents';
 import NewsFeed from '../components/NewsFeed';
 
 // API
-import { fetchStockDetails, refreshStockData } from '../api/stocks';
+import { fetchStockDetails, refreshStockData, syncMissingStockAggregates } from '../api/stocks';
 import { fetchScannerResults, fetchHistoricalData } from '../api/scanner';
 import { fetchRecentNews } from '../api/news';
 import { getSystemInfo } from '../api/system';
@@ -37,6 +38,7 @@ const StockDetailPage: React.FC = () => {
     (localStorage.getItem('stock_detail_ws_res') as 'minute' | 'second') || 'minute'
   );
   const [highlightDate, setHighlightDate] = React.useState<string | undefined>(undefined);
+  const [catchingUp, setCatchingUp] = React.useState(false);
   const queryClient = useQueryClient();
 
   // 0. Refresh Data Mechanism
@@ -47,6 +49,15 @@ const StockDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: [ 'stockDetails', symbol ] });
     }
   });
+  
+  const catchUpMutation = useMutation({
+    mutationFn: (sym: string) => syncMissingStockAggregates(sym),
+    onSuccess: () => {
+      setCatchingUp(true);
+      queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
+    },
+    onError: () => setCatchingUp(false),
+  });
 
   // Save settings to localStorage
   React.useEffect(() => {
@@ -55,9 +66,12 @@ const StockDetailPage: React.FC = () => {
     localStorage.setItem('stock_detail_ws_res', wsResolution);
   }, [period, timespan, wsResolution]);
 
-  // Initial Refresh on Mount
+  // Background refresh on mount — fires after the page renders from cache/DB.
+  // Uses a ref to avoid re-triggering if the component re-renders before the effect runs.
+  const didRefreshRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (symbol) {
+    if (symbol && didRefreshRef.current !== symbol) {
+      didRefreshRef.current = symbol;
       refreshMutation.mutate(symbol);
     }
   }, [symbol]);
@@ -84,6 +98,7 @@ const StockDetailPage: React.FC = () => {
     queryKey: ['stockDetails', symbol],
     queryFn: () => fetchStockDetails(symbol),
     enabled: !!symbol,
+    staleTime: 60_000,        // don't refetch within 1 min of navigating back
   });
 
   // 2. Historical Data (Variable Period)
@@ -91,13 +106,22 @@ const StockDetailPage: React.FC = () => {
     queryKey: ['historicalData', symbol, period, timespan],
     queryFn: () => fetchHistoricalData(symbol, period, timespan),
     enabled: !!symbol,
+    staleTime: 30_000,
   });
 
-  // 3. Scanner History
-  const { data: scannerResults, isLoading: loadingScanner } = useQuery({
+  // Clear the catch-up indicator once the re-fetch triggered by onSuccess completes
+  React.useEffect(() => {
+    if (catchingUp && !fetchingHistorical) {
+      setCatchingUp(false);
+    }
+  }, [fetchingHistorical]);
+
+  // 3. Scanner History — does NOT block page render (no loadingScanner in gate below)
+  const { data: scannerResults } = useQuery({
     queryKey: ['scannerResults', { ticker: symbol }],
     queryFn: () => fetchScannerResults({ ticker: symbol, limit: 10 }),
     enabled: !!symbol,
+    staleTime: 120_000,       // scanner history is slow and rarely changes
   });
 
   // 4. Live Data Subscription
@@ -115,7 +139,9 @@ const StockDetailPage: React.FC = () => {
     return new Date();
   }, [liveData, details?.last_updated]);
 
-  if (loadingDetails || loadingHistorical || loadingScanner) {
+  // Only block on details — the header/price paints immediately and is the LCP element.
+  // The chart renders an inline skeleton while historicalData is still loading.
+  if (loadingDetails) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-financial-blue"></div>
@@ -128,8 +154,8 @@ const StockDetailPage: React.FC = () => {
       <div className="p-8 text-center bg-gray-900 rounded-xl border border-gray-800">
         <h2 className="text-2xl font-bold text-financial-light mb-4">Stock Not Found</h2>
         <p className="text-gray-400 mb-6">We couldn't find any data for {symbol}.</p>
-        <Link 
-          to="/" 
+        <Link
+          to="/"
           className="inline-flex items-center px-4 py-2 bg-financial-blue text-white rounded-lg hover:bg-blue-600 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -140,12 +166,12 @@ const StockDetailPage: React.FC = () => {
   }
 
   const historicalData = historicalResponse?.data || [];
-  
+
   // Safely extract results array if wrapped in an object or from a paginated response
-  const resultsArray = Array.isArray(scannerResults) 
-    ? scannerResults 
+  const resultsArray = Array.isArray(scannerResults)
+    ? scannerResults
     : (scannerResults as any)?.data || (scannerResults as any)?.results || [];
-    
+
   const events = resultsArray.map((e: any) => ({
     id: String(e.id),
     ticker: e.ticker,
@@ -156,7 +182,7 @@ const StockDetailPage: React.FC = () => {
     indicators: e.indicators,
     criteria_met: e.criteria_met
   }));
-  
+
   // Use live data if available, otherwise fallback to details or historical
   const currentPrice = liveData ? liveData.c : (details.latest_price || (historicalData.length > 0 ? historicalData[historicalData.length - 1].Close : 0));
   const latestPrice = currentPrice;
@@ -200,14 +226,14 @@ const StockDetailPage: React.FC = () => {
 
   const onTimespanChange = (ts: string) => {
     setTimespan(ts);
-    // Evaluates refresh immediately with the new target timeframe
-    refreshMutation.mutate(symbol); 
+    // Invalidate the query so React Query fetches from DB with the new params.
+    // Only go back to Polygon if the DB has no data for this combination.
+    queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
   };
 
   const onPeriodChange = (p: string) => {
     setPeriod(p);
-    // Period changes also trigger a refresh check to ensure we have enough history
-    refreshMutation.mutate(symbol);
+    queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
   };
 
   return (
@@ -311,6 +337,20 @@ const StockDetailPage: React.FC = () => {
                     </button>
                   ))}
                 </div>
+                
+                <button
+                  onClick={() => catchUpMutation.mutate(symbol)}
+                  disabled={catchingUp || catchUpMutation.isPending || historicalData.length === 0}
+                  className={`flex items-center space-x-2 px-3 py-1 text-xs font-bold rounded-md border transition-all ${
+                    historicalData.length > 0
+                      ? 'bg-financial-blue/10 border-financial-blue/30 text-financial-blue hover:bg-financial-blue hover:text-white'
+                      : 'bg-gray-800 border-gray-700 text-gray-600 cursor-not-allowed'
+                  }`}
+                  title={historicalData.length === 0 ? "No data to catch up" : "Fetch missing history since last stored bar"}
+                >
+                  <RefreshCw className={`h-3 w-3 ${catchingUp || catchUpMutation.isPending ? 'animate-spin' : ''}`} />
+                  <span>{catchingUp ? 'Syncing…' : 'Catch Up'}</span>
+                </button>
               </div>
             </div>
           }

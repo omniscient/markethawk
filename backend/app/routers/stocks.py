@@ -37,21 +37,16 @@ async def get_historical_data(
     multiplier: int = 1,
     db: Session = Depends(get_db),
 ):
-    """Get historical stock data from DB, fallback to Polygon."""
+    """Get historical stock data from DB. The frontend triggers a background refresh separately."""
     ticker = ticker.upper()
     try:
         is_futures = _is_futures_ticker(db, ticker)
 
         if is_futures:
-            # Futures bars live in FuturesAggregate — skip Polygon refresh
             data = await StockDataService.get_futures_historical_from_db(
                 db, ticker, period, timespan, multiplier
             )
         else:
-            # 1. Always trigger an incremental refresh to ensure data is up to date
-            await StockDataService.refresh_stock_data(db, ticker, timespan, multiplier, period=period)
-
-            # 2. Fetch from DB (it will now have the latest sync)
             data = await StockDataService.get_historical_from_db(
                 db, ticker, period, timespan, multiplier
             )
@@ -66,45 +61,47 @@ async def get_historical_data(
                 "data": [],
             }
 
-        # 3. Add indicators if intraday
-        if timespan in ["minute", "hour"]:
+        # Add indicators only for intraday views with a manageable row count.
+        # For large datasets (e.g. 30D × 1M of futures trading 23h/day = ~29K bars),
+        # per-bar markers aren't visible at that zoom level anyway.
+        INDICATOR_ROW_LIMIT = 3000
+        if timespan in ["minute", "hour"] and len(data) <= INDICATOR_ROW_LIMIT:
             from app.services.chart_indicators import ChartIndicatorsService
             data = ChartIndicatorsService.add_indicators(data, is_intraday=True)
 
-        # Convert to JSON-serializable format
-        data_dict = data.reset_index().to_dict("records")
-        for record in data_dict:
-            # Handle both Date and timestamp columns
-            date_col = "Date" if "Date" in record else "timestamp"
-            if date_col in record and record[date_col]:
-                if isinstance(record[date_col], str):
-                    if not record[date_col].endswith('Z') and 'T' in record[date_col]:
-                        record["Date"] = record[date_col] + 'Z'
-                    else:
-                        record["Date"] = record[date_col]
-                else:
-                    # Convert to ISO format with Z
-                    record["Date"] = record[date_col].isoformat()
-                    # Only append Z if it's naive (no offset '+', '-', or 'Z' suffix after time 'T')
-                    time_part = record["Date"].split('T')[1] if 'T' in record["Date"] else ""
-                    if time_part and not any(c in time_part for c in ['Z', '+', '-']):
-                        record["Date"] += 'Z'
-            
-            for key in ["Open", "High", "Low", "Close", "Volume", "open", "high", "low", "close", "volume", "vwap_intraday"]:
-                if key in record:
-                    record[key] = float(record[key]) if pd.notna(record[key]) else None
-            
-            # handle marker_type None substitution handled above but check pd.isna
-            if "marker_type" in record and pd.isna(record["marker_type"]):
-                record["marker_type"] = None
+        # Vectorized serialization — avoid per-row Python loops over large DataFrames.
+        data = data.reset_index()
+        date_col = "Date" if "Date" in data.columns else "timestamp"
+
+        # Normalize timestamp column to UTC ISO-8601 strings in one pass
+        ts = pd.to_datetime(data[date_col], utc=True)
+        data["Date"] = ts.dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if date_col != "Date":
+            data = data.drop(columns=[date_col])
+
+        # Coerce numeric columns (handles NaN → None via where)
+        num_cols = [c for c in ["Open", "High", "Low", "Close", "Volume",
+                                 "open", "high", "low", "close", "volume", "vwap_intraday"]
+                    if c in data.columns]
+        data[num_cols] = data[num_cols].apply(pd.to_numeric, errors="coerce")
+
+        # marker_type: keep None where blank/NaN
+        if "marker_type" in data.columns:
+            data["marker_type"] = data["marker_type"].where(
+                data["marker_type"].notna() & (data["marker_type"] != ""), other=None
+            )
+
+        # Use pandas JSON serializer (C-level, much faster than to_dict for large frames)
+        import json
+        records = json.loads(data.to_json(orient="records", date_format="iso"))
 
         return {
             "ticker": ticker,
             "period": period,
             "timespan": timespan,
             "multiplier": multiplier,
-            "data_points": len(data_dict),
-            "data": data_dict,
+            "data_points": len(records),
+            "data": records,
         }
 
     except HTTPException:
@@ -144,7 +141,23 @@ async def get_stock_detail_consolidated(
     db: Session = Depends(get_db),
 ):
     """Get consolidated stock detail for the frontend detail page."""
+    import json
+    import redis as redis_lib
+    from app.core.config import settings
+
     ticker = ticker.upper()
+
+    # Cache in Redis for 60s — avoids 3 consecutive Polygon calls on every page visit.
+    _redis = None
+    cache_key = f"stock_detail:{ticker}"
+    try:
+        _redis = redis_lib.from_url(settings.REDIS_URL)
+        cached = _redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass  # Redis unavailable — fall through to live fetch
+
     try:
         if _is_futures_ticker(db, ticker):
             # Return cached info from MonitoredStock — no Polygon calls for futures
@@ -170,7 +183,7 @@ async def get_stock_detail_consolidated(
                 .scalar()
             )
 
-            return {
+            result = {
                 "ticker": ticker,
                 "info": {
                     "longName": (stock.company_name if stock else None) or ticker,
@@ -189,6 +202,12 @@ async def get_stock_detail_consolidated(
                 "latest_price": float(latest_close) if latest_close else None,
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             }
+            try:
+                if _redis:
+                    _redis.setex(cache_key, 60, json.dumps(result))
+            except Exception:
+                pass
+            return result
 
         # 1. Fundamental Info
         info = await StockDataService.get_stock_info(ticker)
@@ -207,12 +226,146 @@ async def get_stock_detail_consolidated(
         if minute_aggs:
             latest_price = minute_aggs[-1]["close"]
 
-        return {
+        result = {
             "ticker": ticker,
             "info": info,
             "pre_market": pre_market,
             "latest_price": latest_price,
             "last_updated": datetime.now(timezone.utc).isoformat()
         }
+        try:
+            if _redis:
+                _redis.setex(cache_key, 60, json.dumps(result))
+        except Exception:
+            pass
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stock details: {str(e)}")
+
+@router.post("/{ticker}/sync-missing")
+async def sync_missing_stock_aggregates(
+    ticker: str,
+    db: Session = Depends(get_db),
+):
+    """
+    For a specific ticker, identify all (timespan, multiplier) combos already 
+    in the database and queue a sync from the last stored bar up to today.
+    Uses the same pattern as Universe sync-missing, but for one instrument.
+    """
+    import json
+    import redis as redis_lib
+    from datetime import timedelta
+    from sqlalchemy import func
+    from app.tasks import sync_stock_aggregates, sync_futures_aggregates
+    from app.models.stock_aggregate import StockAggregate
+    from app.models.futures_aggregate import FuturesAggregate
+    from app.models import MonitoredStock
+    from app.core.config import settings
+    from app.services.futures_data import SYMBOL_EXCHANGE_MAP
+
+    ticker = ticker.upper()
+    is_futures = _is_futures_ticker(db, ticker)
+    
+    now_utc = datetime.utcnow()
+    today = now_utc.strftime("%Y-%m-%d")
+    
+    task_ids: list = []
+    summary: list = []
+
+    if is_futures:
+        # 1. Handle Futures
+        combos = (
+            db.query(
+                FuturesAggregate.timespan,
+                FuturesAggregate.multiplier,
+                func.max(FuturesAggregate.timestamp).label("max_ts"),
+            )
+            .filter(FuturesAggregate.symbol == ticker)
+            .group_by(FuturesAggregate.timespan, FuturesAggregate.multiplier)
+            .all()
+        )
+        
+        if not combos:
+            return {"status": "skipped", "message": "No existing aggregate data found for this futures symbol."}
+
+        # Find exchange for futures instrument
+        stock = db.query(MonitoredStock).filter(
+            MonitoredStock.ticker == ticker, 
+            MonitoredStock.asset_class == "futures",
+            MonitoredStock.is_active == True
+        ).first()
+        metadata = (stock.stock_metadata or {}) if stock else {}
+        exchange = metadata.get("primary_exchange")
+        if not exchange or exchange == "Unknown":
+            exchange = SYMBOL_EXCHANGE_MAP.get(ticker)
+            
+        if not exchange:
+            raise HTTPException(status_code=400, detail=f"Cannot determine exchange for futures symbol '{ticker}'")
+
+        for combo in combos:
+            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=7))
+            if from_dt > now_utc:
+                summary.append(f"{combo.timespan}×{combo.multiplier}: up to date")
+                continue
+            
+            from_date = from_dt.strftime("%Y-%m-%d")
+            r = sync_futures_aggregates.delay(
+                symbol=ticker,
+                exchange=exchange,
+                timespan=combo.timespan,
+                multiplier=combo.multiplier,
+                from_date=from_date,
+                to_date=today,
+            )
+            task_ids.append(r.id)
+            summary.append(f"{combo.timespan}×{combo.multiplier}: from {from_date}")
+            
+    else:
+        # 2. Handle Stocks
+        combos = (
+            db.query(
+                StockAggregate.timespan,
+                StockAggregate.multiplier,
+                func.max(StockAggregate.timestamp).label("max_ts"),
+            )
+            .filter(StockAggregate.ticker == ticker)
+            .group_by(StockAggregate.timespan, StockAggregate.multiplier)
+            .all()
+        )
+        
+        if not combos:
+            return {"status": "skipped", "message": "No existing aggregate data found for this stock."}
+
+        for combo in combos:
+            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=7))
+            if from_dt > now_utc:
+                summary.append(f"{combo.timespan}×{combo.multiplier}: up to date")
+                continue
+                
+            from_date = from_dt.strftime("%Y-%m-%d")
+            r = sync_stock_aggregates.delay(
+                ticker=ticker,
+                from_date=from_date,
+                to_date=today,
+                multiplier=combo.multiplier,
+                timespan=combo.timespan,
+            )
+            task_ids.append(r.id)
+            summary.append(f"{combo.timespan}×{combo.multiplier}: from {from_date}")
+
+    if not task_ids:
+         return {"status": "skipped", "message": "All timespans are already up to date.", "summary": summary}
+         
+    # Store in Redis for sync-status polling (compatible with SystemActivityMonitor)
+    try:
+        r = redis_lib.from_url(settings.REDIS_URL)
+        r.setex(
+            f"ticker:{ticker}:sync",
+            14400,
+            json.dumps({"task_ids": task_ids, "total": len(task_ids), "started_at": datetime.utcnow().isoformat()}),
+        )
+    except Exception as e:
+        # Log but don't fail the request 
+        print(f"REDIS ERROR: {e}")
+
+    return {"status": "accepted", "queued": len(task_ids), "summary": summary}

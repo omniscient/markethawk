@@ -39,3 +39,8 @@ export const refreshStockData = async (
   });
   return response.data;
 };
+
+export const syncMissingStockAggregates = async (ticker: string): Promise<any> => {
+  const response = await apiClient.post(`/stocks/${ticker}/sync-missing`);
+  return response.data;
+};
