@@ -162,17 +162,22 @@ class StockDataService:
     ) -> pd.DataFrame:
         """Fetch historical data from the local database."""
         try:
-            days = 30
-            if period.endswith("d"):
-                days = int(period[:-1])
-            elif period.endswith("y"):
-                days = int(period[:-1]) * 365
-            elif period.endswith("w"):
-                days = int(period[:-1]) * 7
-            elif period.isdigit():
-                days = int(period)
-
-            start_date = datetime.now() - timedelta(days=days)
+            if period == "all":
+                # For "all", we don't apply a start_date filter.
+                # The 1990 date is used as a fallback "earliest" date to keep the query structure simple,
+                # or we can dynamically build the query. Using an ancient date is safe.
+                start_date = datetime(1990, 1, 1)
+            else:
+                days = 30
+                if period.endswith("d"):
+                    days = int(period[:-1])
+                elif period.endswith("y"):
+                    days = int(period[:-1]) * 365
+                elif period.endswith("w"):
+                    days = int(period[:-1]) * 7
+                elif period.isdigit():
+                    days = int(period)
+                start_date = datetime.now() - timedelta(days=days)
 
             # Use raw SQL to return lightweight tuples instead of full ORM objects.
             # For large datasets (e.g. 30D of 1M bars) this is 3-5x faster than .all().
@@ -220,17 +225,19 @@ class StockDataService:
         try:
             from app.services.futures_data import FuturesDataService
 
-            days = 30
-            if period.endswith("d"):
-                days = int(period[:-1])
-            elif period.endswith("y"):
-                days = int(period[:-1]) * 365
-            elif period.endswith("w"):
-                days = int(period[:-1]) * 7
-            elif period.isdigit():
-                days = int(period)
-
-            from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+            if period == "all":
+                from_date = "1990-01-01"
+            else:
+                days = 30
+                if period.endswith("d"):
+                    days = int(period[:-1])
+                elif period.endswith("y"):
+                    days = int(period[:-1]) * 365
+                elif period.endswith("w"):
+                    days = int(period[:-1]) * 7
+                elif period.isdigit():
+                    days = int(period)
+                from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
 
             df = FuturesDataService.get_continuous_series(
                 db=db,

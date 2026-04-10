@@ -323,7 +323,7 @@ const StockDetailPage: React.FC = () => {
 
                 </div>
                 <div className="flex space-x-1 p-1 bg-gray-900 rounded-lg">
-                  {['30d', '90d', '1y', '2y'].map((p) => (
+                  {['30d', '90d', '1y', '2y', 'all'].map((p) => (
                     <button
                       key={p}
                       onClick={() => onPeriodChange(p)}
