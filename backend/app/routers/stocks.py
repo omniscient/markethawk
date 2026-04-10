@@ -86,47 +86,38 @@ async def get_historical_data(
         data = data.reset_index()
         date_col = "Date" if "Date" in data.columns else "timestamp"
 
-        # Normalize timestamp column to UTC ISO-8601 strings in one pass
-        ts = pd.to_datetime(data[date_col], utc=True)
-        data["Date"] = ts.dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-        if date_col != "Date":
-            data = data.drop(columns=[date_col])
-
-        # marker_type: keep None where blank/NaN
-        if "marker_type" in data.columns:
-            data["marker_type"] = data["marker_type"].where(
-                data["marker_type"].notna() & (data["marker_type"] != ""), other=None
-            )
-
-        # markers are already handled correctly for serialization
+        # COMPACT FORMAT OPTIMIZATION:
+        # 1. Convert Timestamps to Unix Epoch (seconds)
+        data["t"] = (pd.to_datetime(data[date_col], utc=True).astype('int64') // 10**9)
+        
+        # 2. Map other columns to short keys
+        mapping = {
+            "Open": "o", "High": "h", "Low": "l", "Close": "c", 
+            "Volume": "v", "vwap": "w", "transactions": "n",
+            "vwap_intraday": "wi", "marker_type": "mt", "contract_month": "cm"
+        }
+        
+        compact_data = {}
+        compact_data["t"] = data["t"].tolist()
+        
+        for col, short in mapping.items():
+            if col in data.columns:
+                if col == "marker_type":
+                    # marker_type: keep None where blank/NaN
+                    data[col] = data[col].where(data[col].notna() & (data[col] != ""), other=None)
+                
+                compact_data[short] = data[col].tolist()
 
         # PERFORMANCE OPTIMIZATION: 
-        # If columnar format requested or dataset is massive, pivot to columnar JSON.
-        # This reduces payload size by ~60% for large time series.
-        if format == "columnar" or len(data) > 50000:
-            # { "Date": [...], "Open": [...], ... }
-            columnar_data = data.to_dict(orient="list")
-            return ORJSONResponse({
-                "ticker": ticker,
-                "period": period,
-                "timespan": timespan,
-                "multiplier": multiplier,
-                "data_points": len(data),
-                "format": "columnar",
-                "data": columnar_data,
-            })
-
-        # Default row-oriented JSON: List[Dict]
-        # orjson is significantly faster than standard json for large lists of dicts
-        records = data.to_dict(orient="records")
+        # Always return columnar format for this endpoint as it's significantly more efficient.
         return ORJSONResponse({
             "ticker": ticker,
             "period": period,
             "timespan": timespan,
             "multiplier": multiplier,
-            "data_points": len(records),
-            "format": "row",
-            "data": records,
+            "data_points": len(data),
+            "format": "columnar_compact",
+            "data": compact_data,
         })
 
     except HTTPException:

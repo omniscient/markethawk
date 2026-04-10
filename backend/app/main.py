@@ -11,6 +11,7 @@ import hashlib
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.core.error_tracking import ErrorTrackerFactory
@@ -100,6 +101,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    # Gzip middleware for large payloads
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Include routers
     app.include_router(health_router)

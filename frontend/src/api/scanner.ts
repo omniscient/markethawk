@@ -428,8 +428,39 @@ export const fetchHistoricalData = async (
 
   const { data, format } = response.data;
   
-  // If the server sent columnar data to save bandwidth, reconstruct the row-oriented 
-  // array here so the Chart and other components don't need to change.
+  // 1. Handle the new globally-defaulted High Performance 'columnar_compact' format.
+  // Reconstructs the row-oriented array and restores full key names so components don't break.
+  if (format === 'columnar_compact' && !Array.isArray(data)) {
+    const mapping: Record<string, string> = {
+      t: 'Date', o: 'Open', h: 'High', l: 'Low', c: 'Close',
+      v: 'Volume', w: 'vwap', n: 'transactions', wi: 'vwap_intraday',
+      mt: 'marker_type', cm: 'contract_month'
+    };
+
+    const keys = Object.keys(data);
+    const rowCount = data[keys[0]]?.length || 0;
+    const records = new Array(rowCount);
+
+    for (let i = 0; i < rowCount; i++) {
+      const row: any = {};
+      for (const key of keys) {
+        const fullKey = mapping[key] || key;
+        let value = data[key][i];
+        
+        // Convert Unix timestamp (seconds) back to ISO string if it's the Date field
+        if (key === 't') {
+          value = new Date(value * 1000).toISOString();
+        }
+        
+        row[fullKey] = value;
+      }
+      records[i] = row;
+    }
+    
+    return { ...response.data, data: records };
+  }
+
+  // 2. Backward compatibility for the legacy 'columnar' format.
   if (format === 'columnar' && !Array.isArray(data)) {
     const keys = Object.keys(data);
     const rowCount = data[keys[0]]?.length || 0;
