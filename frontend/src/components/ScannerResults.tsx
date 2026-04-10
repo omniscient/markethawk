@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Card from './ui/Card';
+import Ticker from './Ticker';
 import { ScannerEvent } from '../api/scanner';
 
 interface ScannerResultsProps {
@@ -190,13 +191,11 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     {event.event_date}
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
-                    <Link 
-                      to={`/stock/${event.ticker}`}
-                      className="text-lg font-black text-financial-blue hover:text-blue-400 flex items-center"
-                    >
-                      {event.ticker}
-                      <Zap className="ml-1 h-3 w-3 text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </Link>
+                    <Ticker 
+                      ticker={event.ticker} 
+                      size="lg" 
+                      showIcon={true} 
+                    />
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
                     <span className="text-[10px] font-bold text-gray-500 uppercase border border-gray-700 px-1.5 py-0.5 rounded-md bg-gray-900/50">

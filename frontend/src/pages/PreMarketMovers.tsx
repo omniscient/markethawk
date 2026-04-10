@@ -12,6 +12,7 @@ import {
   Percent
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import Ticker from '../components/Ticker';
 import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import MetricCard from '../components/ui/MetricCard';
@@ -194,7 +195,7 @@ const PreMarketMovers: React.FC = () => {
                             <span className="text-financial-blue font-bold text-xs">{mover.ticker[0]}</span>
                           </div>
                           <div>
-                            <span className="text-financial-light font-bold block">{mover.ticker}</span>
+                            <Ticker ticker={mover.ticker} className="block" />
                             <span className="text-gray-500 text-xs truncate max-w-[150px] block">
                               {mover.market_cap ? `$${(mover.market_cap / 1e9).toFixed(1)}B` : ''} 
                               {mover.market_cap && mover.name ? ' • ' : ''}
@@ -236,13 +237,13 @@ const PreMarketMovers: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Link 
-                          to={`/stock/${mover.ticker}`}
-                          className="inline-flex items-center px-3 py-1.5 bg-gray-800 hover:bg-financial-blue text-gray-400 hover:text-white rounded-lg transition-all"
+                        <Ticker 
+                          ticker={mover.ticker}
+                          className="px-3 py-1.5 bg-gray-800 hover:bg-financial-blue text-gray-400 hover:text-white rounded-lg"
                         >
                           <span className="mr-2 text-sm">Analyze</span>
                           <ExternalLink className="h-4 w-4" />
-                        </Link>
+                        </Ticker>
                       </td>
                     </tr>
                   ))}

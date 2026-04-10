@@ -2,6 +2,7 @@ import React from 'react';
 import { TrendingUp, Activity, AlertCircle, Info, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
+import Ticker from './Ticker';
 import { ScannerEvent } from '../api/scanner';
 
 interface RecentEventsProps {
@@ -73,13 +74,7 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
           className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-800/50 rounded-lg hover:bg-gray-700/50 border border-gray-700/50 transition-all cursor-pointer items-center"
         >
           <div className="col-span-2">
-            <Link 
-              to={`/stock/${event.ticker}`}
-              className="font-bold text-financial-blue hover:text-blue-400 transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {event.ticker}
-            </Link>
+            <Ticker ticker={event.ticker} />
           </div>
 
           <div className="col-span-2 text-sm text-gray-400">

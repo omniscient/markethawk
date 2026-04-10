@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import { RefreshCw, TrendingUp, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import Ticker from './Ticker';
 import { StockUniverse, MonitoredStock, refreshUniverse, fetchUniverseStocks } from '../api/scanner';
 
 type SortField = 'ticker' | 'company_name' | 'sector' | 'market_cap';
@@ -259,16 +260,11 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
                                         {filteredAndSortedStocks.map((stock: MonitoredStock) => (
                                             <tr key={stock.id} className="hover:bg-gray-700/30 transition-colors">
                                                 <td className="px-4 py-2 font-semibold">
-                                                    <Link
-                                                        to={`/stock/${stock.ticker}`}
-                                                        onClick={onClose}
-                                                        className="text-financial-blue hover:text-blue-400 hover:underline transition-colors"
-                                                    >
-                                                        {stock.ticker}
-                                                    </Link>
-                                                    {stock.asset_class === 'futures' && (
-                                                        <span className="ml-2 text-[10px] bg-financial-blue/20 text-financial-blue px-1.5 py-0.5 rounded uppercase">FUT</span>
-                                                    )}
+                                                    <Ticker
+                                                        ticker={stock.ticker}
+                                                        assetClass={stock.asset_class}
+                                                        onClick={() => onClose()}
+                                                    />
                                                 </td>
                                                 <td className="px-4 py-2 text-financial-light">{stock.company_name || 'N/A'}</td>
                                                 <td className="px-4 py-2 text-gray-400">{stock.sector || 'N/A'}</td>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Bell, TrendingUp, TrendingDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
+import Ticker from './Ticker';
 
 interface Alert {
   id: string;
@@ -65,13 +66,8 @@ const AlertList: React.FC<AlertListProps> = ({ alerts, maxItems = 5 }) => {
             <div className="flex items-start space-x-3">
               <Icon className="h-4 w-4 mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">
-                  <Link 
-                    to={`/stock/${alert.ticker}`}
-                    className="text-financial-blue hover:text-blue-400 transition-colors"
-                  >
-                    {alert.ticker}
-                  </Link>
+                <p className="text-sm">
+                  <Ticker ticker={alert.ticker} size="sm" />
                 </p>
                 <p className="text-xs text-gray-300 mt-1">
                   {alert.message}
