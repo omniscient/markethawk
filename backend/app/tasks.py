@@ -298,20 +298,27 @@ def sync_stock_aggregates(
         
         # 3. Insert new data
         new_records = []
+        est_tz = ZoneInfo("America/New_York")
         for agg in aggs:
-            # Determine if pre-market (4:00 AM - 9:30 AM ET) or after-market (4:00 PM - 8:00 PM ET)
-            ts = agg['timestamp']
-            hour = ts.hour
-            minute = ts.minute
+            # Polgyon provides UTC timestamps. We need US/Eastern for session flagging.
+            ts_utc = agg['timestamp']
+            if ts_utc.tzinfo is None:
+                ts_utc = ts_utc.replace(tzinfo=timezone.utc)
             
-            # Pre-market: [4:00, 9:30)
+            ts_est = ts_utc.astimezone(est_tz)
+            
+            # Use US/Eastern fields for session determination
+            hour = ts_est.hour
+            minute = ts_est.minute
+            
+            # Pre-market: 4:00 AM to 9:29:59 AM ET
             is_pre_market = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
-            # After-market: [16:00, 20:00)
-            is_after_market = (hour >= 16 and hour < 20)
+            # After-market: 4:01 PM to 8:00 PM ET
+            is_after_market = (hour == 16 and minute >= 1) or (hour > 16 and hour < 20)
             
             record = StockAggregate(
                 ticker=ticker,
-                timestamp=ts,
+                timestamp=ts_utc.replace(tzinfo=None), # Store naive UTC in DB
                 multiplier=multiplier,
                 timespan=timespan,
                 open=agg['open'],

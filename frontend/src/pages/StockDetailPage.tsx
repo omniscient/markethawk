@@ -43,10 +43,13 @@ const StockDetailPage: React.FC = () => {
 
   // 0. Refresh Data Mechanism
   const refreshMutation = useMutation({
-    mutationFn: (sym: string) => refreshStockData(sym, timespan, period),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [ 'historicalData', symbol, period, timespan] });
-      queryClient.invalidateQueries({ queryKey: [ 'stockDetails', symbol ] });
+    mutationFn: (variables: { sym: string; timespan: string; period: string }) => 
+      refreshStockData(variables.sym, variables.timespan, variables.period),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['historicalData', variables.sym, variables.period, variables.timespan] 
+      });
+      queryClient.invalidateQueries({ queryKey: ['stockDetails', variables.sym] });
     }
   });
   
@@ -72,26 +75,11 @@ const StockDetailPage: React.FC = () => {
   React.useEffect(() => {
     if (symbol && didRefreshRef.current !== symbol) {
       didRefreshRef.current = symbol;
-      refreshMutation.mutate(symbol);
+      refreshMutation.mutate({ sym: symbol, timespan, period });
     }
   }, [symbol]);
 
-  // Synchronize timespan and period to avoid excessive data requests
-  React.useEffect(() => {
-    if (timespan === 'minute') {
-      if (period === '1y' || period === '2y' || period === '90d') {
-        setPeriod('30d');
-      }
-    } else if (timespan === 'hour') {
-      if (period === '1y' || period === '2y') {
-        setPeriod('90d');
-      }
-    } else if (timespan === 'day') {
-      if (period === '30d') {
-        setPeriod('1y');
-      }
-    }
-  }, [timespan]);
+  // Period synchronization logic now handled in onTimespanChange to reduce re-renders.
 
   // 1. Consolidated Details (Fundamentals, Pre-market)
   const { data: details, isLoading: loadingDetails } = useQuery({
@@ -123,7 +111,7 @@ const StockDetailPage: React.FC = () => {
   const autoRefreshAttempts = React.useRef<Set<string>>(new Set());
   
   React.useEffect(() => {
-    if (!symbol || loadingHistorical || fetchingHistorical || historicalData.length > 0) return;
+    if (!symbol || loadingHistorical || fetchingHistorical || historicalData.length > 0 || refreshMutation.isPending) return;
     
     const attemptKey = `${symbol}-${period}-${timespan}`;
     if (autoRefreshAttempts.current.has(attemptKey)) return;
@@ -131,8 +119,16 @@ const StockDetailPage: React.FC = () => {
     // If we reach here, we have no data and haven't tried an auto-refresh for this view yet
     console.log(`[StockDetail] No data found for ${attemptKey}, triggering auto-refresh...`);
     autoRefreshAttempts.current.add(attemptKey);
-    refreshMutation.mutate(symbol);
-  }, [symbol, period, timespan, historicalData.length, loadingHistorical, fetchingHistorical]);
+    
+    // Switch UI length to 30D as requested to avoid loading too much
+    if (period !== '30d') {
+      setPeriod('30d');
+      // Pre-emptively block the 30d attempt too
+      autoRefreshAttempts.current.add(`${symbol}-30d-${timespan}`);
+    }
+    
+    refreshMutation.mutate({ sym: symbol, timespan, period: '30d' });
+  }, [symbol, period, timespan, historicalData.length, loadingHistorical, fetchingHistorical, refreshMutation.isPending]);
 
   // 3. Scanner History — does NOT block page render (no loadingScanner in gate below)
   const { data: scannerResults } = useQuery({
@@ -237,20 +233,39 @@ const StockDetailPage: React.FC = () => {
     }
 
     if (isStale) {
-      refreshMutation.mutate(symbol);
+      refreshMutation.mutate({ sym: symbol, timespan: ts, period: p });
     }
   };
 
   const onTimespanChange = (ts: string) => {
+    // 1. Determine next period proactively to avoid multiple renders
+    let nextPeriod = period;
+    if (ts === 'minute') {
+      if (period === '1y' || period === '2y' || period === '90d') {
+        nextPeriod = '30d';
+      }
+    } else if (ts === 'hour') {
+      if (period === '1y' || period === '2y') {
+        nextPeriod = '90d';
+      }
+    } else if (ts === 'day') {
+      if (period === '30d') {
+        nextPeriod = '1y';
+      }
+    }
+
     setTimespan(ts);
-    // Invalidate the query so React Query fetches from DB with the new params.
-    // Only go back to Polygon if the DB has no data for this combination.
-    queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
+    if (nextPeriod !== period) {
+      setPeriod(nextPeriod);
+    }
+    
+    // Invalidate specific query to trigger fresh fetch from DB if needed
+    queryClient.invalidateQueries({ queryKey: ['historicalData', symbol, nextPeriod, ts] });
   };
 
   const onPeriodChange = (p: string) => {
     setPeriod(p);
-    queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
+    queryClient.invalidateQueries({ queryKey: ['historicalData', symbol, p, timespan] });
   };
 
   return (

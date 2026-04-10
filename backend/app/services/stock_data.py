@@ -414,7 +414,7 @@ class StockDataService:
                     provider='polygon',
                 )
                 new_records.append(record)
-                existing_ts.add(ts) # Prevent duplicates within the same batch
+                existing_ts.add(ts_naive) # Prevent duplicates within the same batch
             
             if new_records:
                 db.bulk_save_objects(new_records)
