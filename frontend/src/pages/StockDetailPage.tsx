@@ -109,12 +109,30 @@ const StockDetailPage: React.FC = () => {
     staleTime: 30_000,
   });
 
+  const historicalData = historicalResponse?.data || [];
+
   // Clear the catch-up indicator once the re-fetch triggered by onSuccess completes
   React.useEffect(() => {
     if (catchingUp && !fetchingHistorical) {
       setCatchingUp(false);
     }
   }, [fetchingHistorical]);
+
+  // AUTO-REFRESH LOGIC: Detect "No Data" and request history from Polygon
+  // We use a ref to track which (symbol, period, timespan) combos we've already tried to auto-refresh
+  const autoRefreshAttempts = React.useRef<Set<string>>(new Set());
+  
+  React.useEffect(() => {
+    if (!symbol || loadingHistorical || fetchingHistorical || historicalData.length > 0) return;
+    
+    const attemptKey = `${symbol}-${period}-${timespan}`;
+    if (autoRefreshAttempts.current.has(attemptKey)) return;
+
+    // If we reach here, we have no data and haven't tried an auto-refresh for this view yet
+    console.log(`[StockDetail] No data found for ${attemptKey}, triggering auto-refresh...`);
+    autoRefreshAttempts.current.add(attemptKey);
+    refreshMutation.mutate(symbol);
+  }, [symbol, period, timespan, historicalData.length, loadingHistorical, fetchingHistorical]);
 
   // 3. Scanner History — does NOT block page render (no loadingScanner in gate below)
   const { data: scannerResults } = useQuery({
@@ -165,7 +183,6 @@ const StockDetailPage: React.FC = () => {
     );
   }
 
-  const historicalData = historicalResponse?.data || [];
 
   // Safely extract results array if wrapped in an object or from a paginated response
   const resultsArray = Array.isArray(scannerResults)

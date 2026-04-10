@@ -37,6 +37,11 @@ export const refreshStockData = async (
   const response = await apiClient.post(`/stocks/refresh/${ticker}`, null, {
     params: { timespan, period },
   });
+  
+  if (response.data?.status === 'error') {
+    throw new Error(response.data.message || 'Error refreshing stock data');
+  }
+  
   return response.data;
 };
 

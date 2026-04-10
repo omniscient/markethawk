@@ -281,8 +281,9 @@ class StockDataService:
         Pokes the DB to find the last available date and fetches the delta.
         """
         try:
-            if not polygon_client:
-                return {"status": "error", "message": "Polygon client not initialized"}
+            massive = DataProviderFactory.get("massive")
+            if not massive.is_available():
+                return {"status": "error", "message": "Massive (Polygon) provider not available"}
 
             ticker = ticker.upper()
             

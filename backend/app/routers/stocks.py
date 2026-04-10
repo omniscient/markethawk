@@ -302,7 +302,14 @@ async def sync_missing_stock_aggregates(
         )
         
         if not combos:
-            return {"status": "skipped", "message": "No existing aggregate data found for this futures symbol."}
+            # Default to standard sync for new futures
+            from collections import namedtuple
+            Combo = namedtuple('Combo', ['timespan', 'multiplier', 'max_ts'])
+            combos = [
+                Combo('minute', 1, None),
+                Combo('day', 1, None)
+            ]
+            summary.append("Initial sync: no existing data found, defaulting to standard sets.")
 
         # Find exchange for futures instrument
         stock = db.query(MonitoredStock).filter(
@@ -319,7 +326,7 @@ async def sync_missing_stock_aggregates(
             raise HTTPException(status_code=400, detail=f"Cannot determine exchange for futures symbol '{ticker}'")
 
         for combo in combos:
-            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=7))
+            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=30))
             if from_dt > now_utc:
                 summary.append(f"{combo.timespan}×{combo.multiplier}: up to date")
                 continue
@@ -350,10 +357,17 @@ async def sync_missing_stock_aggregates(
         )
         
         if not combos:
-            return {"status": "skipped", "message": "No existing aggregate data found for this stock."}
+            # Default to standard sync for new stocks
+            from collections import namedtuple
+            Combo = namedtuple('Combo', ['timespan', 'multiplier', 'max_ts'])
+            combos = [
+                Combo('minute', 1, None),
+                Combo('day', 1, None)
+            ]
+            summary.append("Initial sync: no existing data found, defaulting to standard sets.")
 
         for combo in combos:
-            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=7))
+            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=30))
             if from_dt > now_utc:
                 summary.append(f"{combo.timespan}×{combo.multiplier}: up to date")
                 continue
