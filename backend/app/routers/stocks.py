@@ -64,6 +64,13 @@ async def get_historical_data(
                 "data": [],
             }
 
+        # Vectorized numeric coercion — must happen before indicators to prevent 500 errors
+        # orjson is also strict and fails on decimal.Decimal (standard with PG NUMERIC).
+        exclude_cols = ["Date", "marker_type", "contract_month"]
+        for col in data.columns:
+            if col not in exclude_cols:
+                data[col] = pd.to_numeric(data[col], errors="coerce")
+
         # Guardrail: Limit extremely large requests that could crash the browser
         MAX_DATAPOINTS = 500000 
         if len(data) > MAX_DATAPOINTS:
@@ -91,16 +98,7 @@ async def get_historical_data(
                 data["marker_type"].notna() & (data["marker_type"] != ""), other=None
             )
 
-        # Broad numeric coercion: identify and convert columns that might contain Decimal objects
-        # orjson is strict and fails on decimal.Decimal (common with PostgreSQL NUMERIC types).
-        exclude_cols = ["Date", "marker_type", "contract_month"]
-        for col in data.columns:
-            if col not in exclude_cols:
-                # Convert to numeric, leaving strings/complex types alone if they fail conversion
-                try:
-                    data[col] = pd.to_numeric(data[col], errors="coerce")
-                except Exception:
-                    pass
+        # markers are already handled correctly for serialization
 
         # PERFORMANCE OPTIMIZATION: 
         # If columnar format requested or dataset is massive, pivot to columnar JSON.
