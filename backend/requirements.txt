@@ -1,6 +1,7 @@
 # Web Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+orjson==3.9.10
 
 # Database
 sqlalchemy==2.0.23

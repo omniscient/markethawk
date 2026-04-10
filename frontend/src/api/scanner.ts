@@ -420,10 +420,32 @@ export const fetchHistoricalData = async (
   multiplier: number;
   data_points: number;
   data: any[];
+  format?: 'row' | 'columnar';
 }> => {
   const response = await apiClient.get(`/stocks/historical/${ticker}`, {
     params: { period, timespan, multiplier },
   });
+
+  const { data, format } = response.data;
+  
+  // If the server sent columnar data to save bandwidth, reconstruct the row-oriented 
+  // array here so the Chart and other components don't need to change.
+  if (format === 'columnar' && !Array.isArray(data)) {
+    const keys = Object.keys(data);
+    const rowCount = data[keys[0]]?.length || 0;
+    const records = new Array(rowCount);
+    
+    for (let i = 0; i < rowCount; i++) {
+       const row: any = {};
+       for (const key of keys) {
+         row[key] = data[key][i];
+       }
+       records[i] = row;
+    }
+    
+    return { ...response.data, data: records };
+  }
+
   return response.data;
 };
 

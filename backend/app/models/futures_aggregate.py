@@ -43,4 +43,6 @@ class FuturesAggregate(Base):
         Index("idx_fa_symbol_contract", "symbol", "contract_month"),
         # Query bars for a specific contract within a time range
         Index("idx_fa_contract_ts",     "symbol", "contract_month", "timestamp"),
+        # Optimized for continuous series assembly (fully covers the WHERE clause)
+        Index("idx_fa_continuous_series", "symbol", "contract_month", "timespan", "multiplier", "timestamp"),
     )

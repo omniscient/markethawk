@@ -831,8 +831,10 @@ class FuturesDataService:
                 clauses.append("timestamp < :ts_end")
                 params["ts_end"] = ts_end
 
+            # Optimization: Use the newly created composite index. 
+            # We already know the contract_month, so we don't need to select it again for every row.
             sql = text(
-                f"SELECT timestamp, open, high, low, close, volume, vwap, contract_month "
+                f"SELECT timestamp, open, high, low, close, volume, vwap "
                 f"FROM futures_aggregates WHERE {' AND '.join(clauses)} "
                 f"ORDER BY timestamp ASC"
             )
@@ -840,16 +842,24 @@ class FuturesDataService:
             if not rows:
                 continue
 
-            chunk = pd.DataFrame(rows, columns=["timestamp", "open", "high", "low", "close", "volume", "vwap", "contract_month"])
+            chunk = pd.DataFrame(rows, columns=["timestamp", "open", "high", "low", "close", "volume", "vwap"])
+            # Add contract_month once for the whole chunk instead of fetching it N times from DB
+            chunk["contract_month"] = contract_month
             frames.append(chunk)
 
         if not frames:
             return pd.DataFrame()
 
+        # Combine all slices. Since slices are chronological and queries are ORDER BY timestamp ASC,
+        # the resulting DataFrame will be mostly sorted already.
         df = pd.concat(frames, ignore_index=True)
-        df.sort_values("timestamp", inplace=True)
-        df.drop_duplicates(subset=["timestamp"], keep="last", inplace=True)
-        df.reset_index(drop=True, inplace=True)
+        
+        # Only perform expensive deduplication/sort if we have multiple frames (rollover points)
+        if len(frames) > 1:
+            df.sort_values("timestamp", inplace=True)
+            df.drop_duplicates(subset=["timestamp"], keep="last", inplace=True)
+            df.reset_index(drop=True, inplace=True)
+        
         return df
 
     # ------------------------------------------------------------------ #
