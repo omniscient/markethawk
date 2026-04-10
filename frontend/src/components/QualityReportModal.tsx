@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -223,7 +224,14 @@ function TickerRow({ result, onDelete }: { result: QualityTickerResult; onDelete
             {isExpandable
               ? (expanded ? <ChevronDown className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-500 flex-shrink-0" />)
               : <span className="w-3.5" />}
-            <span className="font-mono text-sm text-financial-light">{result.ticker}</span>
+            <Link
+              to={`/stock/${result.ticker}`}
+              className="font-mono text-sm text-financial-blue hover:text-blue-400 hover:underline transition-colors"
+              onClick={(e) => e.stopPropagation()}
+              title={`View detail for ${result.ticker}`}
+            >
+              {result.ticker}
+            </Link>
             {result.asset_class !== 'stocks' && (
               <span className="px-1 py-0.5 text-[9px] rounded bg-financial-blue/20 text-financial-blue uppercase font-medium">
                 {result.asset_class}
