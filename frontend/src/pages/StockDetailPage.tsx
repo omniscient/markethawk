@@ -11,7 +11,9 @@ import {
   Zap,
   BarChart2,
   Newspaper,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -39,6 +41,7 @@ const StockDetailPage: React.FC = () => {
   );
   const [highlightDate, setHighlightDate] = React.useState<string | undefined>(undefined);
   const [catchingUp, setCatchingUp] = React.useState(false);
+  const [showST, setShowST] = React.useState(localStorage.getItem('show_double_st') === 'true');
   const queryClient = useQueryClient();
 
   // 0. Refresh Data Mechanism
@@ -67,7 +70,8 @@ const StockDetailPage: React.FC = () => {
     localStorage.setItem('stock_detail_period', period);
     localStorage.setItem('stock_detail_timespan', timespan);
     localStorage.setItem('stock_detail_ws_res', wsResolution);
-  }, [period, timespan, wsResolution]);
+    localStorage.setItem('show_double_st', String(showST));
+  }, [period, timespan, wsResolution, showST]);
 
   // Background refresh on mount — fires after the page renders from cache/DB.
   // Uses a ref to avoid re-triggering if the component re-renders before the effect runs.
@@ -383,6 +387,19 @@ const StockDetailPage: React.FC = () => {
                   <RefreshCw className={`h-3 w-3 ${catchingUp || catchUpMutation.isPending ? 'animate-spin' : ''}`} />
                   <span>{catchingUp ? 'Syncing…' : 'Catch Up'}</span>
                 </button>
+
+                <button
+                  onClick={() => setShowST(!showST)}
+                  className={`flex items-center space-x-2 px-3 py-1 text-xs font-bold rounded-md border transition-all ${
+                    showST
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500 hover:text-white shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                      : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700'
+                  }`}
+                  title="Toggle Double SuperTrend ATR Indicator"
+                >
+                  {showST ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                  <span>ST ATR</span>
+                </button>
               </div>
             </div>
           }
@@ -404,6 +421,7 @@ const StockDetailPage: React.FC = () => {
                 highlightDate={highlightDate}
                 symbol={symbol}
                 liveData={liveData}
+                showDoubleSuperTrend={showST}
               />
             )}
           </Card>

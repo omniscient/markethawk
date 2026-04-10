@@ -14,6 +14,7 @@ import {
   HistogramSeries,
   createSeriesMarkers
 } from 'lightweight-charts';
+import { calculateDoubleSuperTrend } from '../../utils/indicators';
 
 interface StockChartProps {
   data: any[];
@@ -45,6 +46,7 @@ interface StockChartProps {
     wickUpColor?: string;
     wickDownColor?: string;
   };
+  showDoubleSuperTrend?: boolean;
 }
 
 const StockChart: React.FC<StockChartProps> = ({
@@ -56,7 +58,8 @@ const StockChart: React.FC<StockChartProps> = ({
   highlightDate,
   symbol,
   liveData,
-  colors = {}
+  colors = {},
+  showDoubleSuperTrend = false
 }) => {
   // Helper to shift UTC timestamps to match the browser's local time labels
   const toLocalTime = (utcSeconds: number): number => {
@@ -76,6 +79,9 @@ const StockChart: React.FC<StockChartProps> = ({
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const vwapSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const stLine1SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const stLine2SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const stCloudSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const markersPluginRef = useRef<any | null>(null);
   const prevDataLengthRef = useRef<number>(0);
   const currentBarRef = useRef<{
@@ -176,6 +182,38 @@ const StockChart: React.FC<StockChartProps> = ({
         priceLineVisible: false,
       });
       vwapSeriesRef.current = vwapSeries;
+      
+      // Add Double SuperTrend Series (only visible if toggled)
+      const stLine1 = chart.addSeries(LineSeries, {
+        color: '#10b981',
+        lineWidth: 1,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        visible: showDoubleSuperTrend,
+      });
+      stLine1SeriesRef.current = stLine1;
+
+      const stLine2 = chart.addSeries(LineSeries, {
+        color: '#10b981',
+        lineWidth: 1,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+        priceLineVisible: false,
+        visible: showDoubleSuperTrend,
+      });
+      stLine2SeriesRef.current = stLine2;
+
+      const stCloud = chart.addSeries(CandlestickSeries, {
+        upColor: 'rgba(16, 185, 129, 0.2)',
+        downColor: 'rgba(239, 68, 68, 0.2)',
+        borderVisible: false,
+        wickVisible: false,
+        visible: showDoubleSuperTrend,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      stCloudSeriesRef.current = stCloud;
 
     } else if (type === 'area') {
       const areaSeries = chart.addSeries(AreaSeries, {
@@ -211,7 +249,7 @@ const StockChart: React.FC<StockChartProps> = ({
       }
       chart.remove();
     };
-  }, [type, height, background, text, upColor, downColor]);
+  }, [type, height, background, text, upColor, downColor, showDoubleSuperTrend]);
 
   useEffect(() => {
     if (!seriesRef.current || !data.length) return;
@@ -266,6 +304,45 @@ const StockChart: React.FC<StockChartProps> = ({
       seriesRef.current.setData(candleData);
       volumeSeriesRef.current?.setData(volumeData);
       vwapSeriesRef.current?.setData(vwapData);
+
+      // SuperTrend Calculation
+      if (showDoubleSuperTrend) {
+        // Use deduplicated candleData but map lowercase to uppercase keys for the indicator utility
+        const stInputData = candleData.map(c => ({
+          ...c,
+          High: c.high,
+          Low: c.low,
+          Open: c.open,
+          Close: c.close
+        }));
+
+        const stData = calculateDoubleSuperTrend(stInputData, 3, 12);
+        
+        const line1Data = stData.map(d => ({ time: d.time, value: d.tsl1 }));
+        const line2Data = stData.map(d => ({ time: d.time, value: d.tsl2 }));
+        const cloudData = stData.map(d => ({
+          time: d.time,
+          open: d.tsl1,
+          close: d.tsl2,
+          high: Math.max(d.tsl1, d.tsl2),
+          low: Math.min(d.tsl1, d.tsl2),
+          // We can't set color per bar in CandleSeries easily without using color property in data
+          color: d.trend === 1 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+          borderColor: d.trend === 1 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+          wickColor: d.trend === 1 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+        }));
+        
+        // Update line colors based on trend for the last point or generally
+        const currentTrend = stData.length > 0 ? stData[stData.length - 1].trend : 1;
+        const trendColor = currentTrend === 1 ? '#10b981' : '#ef4444';
+        
+        stLine1SeriesRef.current?.applyOptions({ color: trendColor });
+        stLine2SeriesRef.current?.applyOptions({ color: trendColor });
+        
+        stLine1SeriesRef.current?.setData(line1Data);
+        stLine2SeriesRef.current?.setData(line2Data);
+        stCloudSeriesRef.current?.setData(cloudData as any);
+      }
 
       // Markers — events + inline indicators
       let allMarkers: any[] = [];
@@ -357,7 +434,7 @@ const StockChart: React.FC<StockChartProps> = ({
       chartRef.current?.timeScale().fitContent();
     }
     prevDataLengthRef.current = data.length;
-  }, [data, type, events, timespan, symbol]);
+  }, [data, type, events, timespan, symbol, showDoubleSuperTrend]);
 
   // Reset initialization flag when symbol or timespan changes to allow refitting
   useEffect(() => {

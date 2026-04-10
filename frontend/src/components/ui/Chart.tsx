@@ -27,6 +27,7 @@ interface ChartProps {
   showGrid?: boolean;
   showTooltip?: boolean;
   showLegend?: boolean;
+  showDoubleSuperTrend?: boolean;
 }
 
 const Chart: React.FC<ChartProps> = ({
@@ -43,7 +44,8 @@ const Chart: React.FC<ChartProps> = ({
   liveData,
   showGrid = true,
   showTooltip = true,
-  showLegend = false
+  showLegend = false,
+  showDoubleSuperTrend = false
 }) => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -73,6 +75,7 @@ const Chart: React.FC<ChartProps> = ({
             highlightDate={highlightDate}
             symbol={symbol}
             liveData={liveData}
+            showDoubleSuperTrend={showDoubleSuperTrend}
             colors={{
               background: 'transparent', // Let the card handle background
               upColor: '#10b981',
