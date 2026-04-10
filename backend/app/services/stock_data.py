@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 import pandas as pd
+import pytz
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
@@ -374,24 +375,31 @@ class StockDataService:
                 ).all()
             )
 
+            est_tz = pytz.timezone('US/Eastern')
             for agg in aggs:
-                # Ensure ts is naive for comparison with set and DB storage
-                ts = agg['timestamp'].replace(tzinfo=None)
+                # Polgyon provides UTC timestamps. We need US/Eastern for session flagging.
+                ts_utc = agg['timestamp']
+                if ts_utc.tzinfo is None:
+                    ts_utc = pytz.utc.localize(ts_utc)
                 
-                if ts in existing_ts:
+                ts_est = ts_utc.astimezone(est_tz)
+                ts_naive = ts_utc.replace(tzinfo=None) # Store naive UTC in DB
+                
+                if ts_naive in existing_ts:
                     continue
                 
-                # Extended hours logic
-                hour = ts.hour
-                minute = ts.minute
-                # US/Eastern check (approximate via UTC offset if needed, 
-                # but following the existing logic exactly)
+                # Extended hours logic (US/Eastern)
+                hour = ts_est.hour
+                minute = ts_est.minute
+                
+                # is_pre_market: 4:00 AM to 9:29:59 AM
                 is_pre_market = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
-                is_after_market = (hour >= 16 and hour < 20)
+                # is_after_market: 4:01 PM to 8:00 PM
+                is_after_market = (hour == 16 and minute >= 1) or (hour > 16 and hour < 20)
                 
                 record = StockAggregate(
                     ticker=ticker,
-                    timestamp=ts,
+                    timestamp=ts_naive,
                     multiplier=multiplier,
                     timespan=timespan,
                     open=agg['open'],

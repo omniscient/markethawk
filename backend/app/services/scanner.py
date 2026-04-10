@@ -245,22 +245,39 @@ class ScannerService:
                 
                 if len(hist_data) >= 5:
                     min_close, max_close = min(closes), max(closes)
-                    is_accumulating = (previous_close / min_close < 1.15) and (previous_close / max_close > 0.85)
+                    # Relaxed accumulation: within 25% of recent range
+                    is_accumulating = (previous_close / min_close < 1.25) and (previous_close / max_close > 0.75)
                     if len(volumes) >= 2:
                         avg_vol_2d = sum(volumes[:2]) / 2
+                        # User requirement: keep 80% threshold
                         is_significant_volume = pre_market_volume > (avg_vol_2d * 0.8)
 
-                # Criteria
+                # Criteria: 2% spike in extended hours
                 is_spike = pre_market_high > (previous_close * 1.02)
                 
+                # Check for "Retrace" (The "Hunt" part)
+                # If it's a hunt, we expect the gain to be short-lived.
+                # Use opening_price or pre_market_close to see if it held.
                 current_price = day_metrics["closing_price"] or day_metrics["pre_market_close"] or previous_close
                 gap_pct = (day_metrics["opening_price"] - previous_close) / previous_close * 100 if day_metrics["opening_price"] > 0 else 0
+                
+                # Retrace logic: The price should have given back at least 50% of the movement from pre-market high
+                # OR is currently less than 4% above previous close despite a large spike.
+                spike_amount = pre_market_high - previous_close
+                retrace_amount = pre_market_high - (day_metrics["opening_price"] or current_price)
+                is_retrace = False
+                if spike_amount > 0:
+                     retrace_ratio = retrace_amount / spike_amount
+                     is_retrace = retrace_ratio > 0.5 or (day_metrics["opening_price"] < previous_close * 1.04)
 
-                if is_spike and is_accumulating and is_significant_volume:
-                    avg_vol_20d = sum(volumes) / len(volumes) if len(volumes) > 0 else 1
+                if is_spike and is_accumulating and is_significant_volume and is_retrace:
+                    # Prevent division by zero or nonsensical defaults for RVOL
+                    avg_vol_20d = sum(volumes) / len(volumes) if len(volumes) > 0 else None
+                    if not avg_vol_20d or avg_vol_20d < 1000: # Ignore if extremely thin history
+                        continue
+                        
                     rel_vol = pre_market_volume / avg_vol_20d
                     
-                    current_price = day_metrics["closing_price"] or day_metrics["pre_market_close"] or previous_close
                     fade_from_high_pct = (day_metrics["regular_high"] - current_price) / day_metrics["regular_high"] * 100 if day_metrics["regular_high"] > 0 else 0
                     day_range_pct = (day_metrics["regular_high"] - day_metrics["regular_low"]) / day_metrics["regular_low"] * 100 if day_metrics["regular_low"] > 0 else 0
 
@@ -272,14 +289,16 @@ class ScannerService:
                         "pre_market_high": pre_market_high,
                         "gap_pct": round(gap_pct, 4),
                         "fade_from_high_pct": round(fade_from_high_pct, 4),
-                        "day_range_pct": round(day_range_pct, 4)
+                        "day_range_pct": round(day_range_pct, 4),
+                        "retrace_ratio": round(retrace_ratio, 2) if spike_amount > 0 else 0
                     }
 
                     criteria_met = {
                         "high_activity": True,
                         "price_spike": bool(is_spike),
                         "accumulation_phase": bool(is_accumulating),
-                        "significant_volume": bool(is_significant_volume)
+                        "significant_volume": bool(is_significant_volume),
+                        "retrace_fail": bool(is_retrace)
                     }
 
                     # Enrichment
