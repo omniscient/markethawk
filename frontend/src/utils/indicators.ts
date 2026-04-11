@@ -33,7 +33,7 @@ export function calculateDoubleSuperTrend(
     );
 
     // 2. Calculate ATR (RMA)
-    let atr = 0;
+    let atr: number;
     if (i === 0) {
       atr = tr;
     } else if (i < atrPeriod) {
