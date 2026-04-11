@@ -6,9 +6,9 @@ services:
     image: postgres:15-alpine
     container_name: stockscanner-db
     environment:
-      POSTGRES_DB: stockscanner
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: stockscanner123
+      POSTGRES_DB: ${POSTGRES_DB:-stockscanner}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile
     container_name: stockscanner-api
     environment:
-      DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
+      DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: ${ENVIRONMENT:-development}
@@ -115,7 +115,7 @@ services:
     container_name: stockscanner-celery
     command: python -m watchfiles --filter python 'celery -A app.main.celery worker --loglevel=info' /app/app
     environment:
-      DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
+      DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: ${ENVIRONMENT:-development}
@@ -142,7 +142,7 @@ services:
     container_name: stockscanner-beat
     command: celery -A app.main.celery beat --loglevel=info
     environment:
-      DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
+      DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: ${ENVIRONMENT:-development}
@@ -179,8 +179,8 @@ services:
     image: dpage/pgadmin4:latest
     container_name: stockscanner-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@stockscanner.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
       - "5050:80"
@@ -197,7 +197,7 @@ services:
     container_name: stockscanner-seq
     environment:
       ACCEPT_EULA: Y
-      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+      SEQ_FIRSTRUN_ADMINPASSWORDHASH: ${SEQ_ADMIN_PASSWORD_HASH}
     ports:
       - "5380:80"        # UI Port (Web Interface)
       - "5341:5341"      # Ingestion Port (API)
