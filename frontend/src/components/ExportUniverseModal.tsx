@@ -27,7 +27,7 @@ const ExportUniverseModal: React.FC<ExportUniverseModalProps> = ({ isOpen, onClo
   const defaultTo = useMemo(() => {
     if (universe?.max_aggregate_date) return universe.max_aggregate_date.split('T')[0];
     return today;
-  }, [universe?.max_aggregate_date]);
+  }, [universe?.max_aggregate_date, today]);
 
   // Parse the first available timespan label (e.g. "1minute" → { multiplier:1, timespan:"minute" })
   const defaultTimespan = useMemo(() => {
@@ -55,7 +55,7 @@ const ExportUniverseModal: React.FC<ExportUniverseModalProps> = ({ isOpen, onClo
     setToDate(defaultTo);
     setTimespan(defaultTimespan.timespan);
     setMultiplier(defaultTimespan.multiplier);
-  }, [universe?.id]);
+  }, [universe?.id, defaultFrom, defaultTo, defaultTimespan.timespan, defaultTimespan.multiplier]);
 
   const { data: stocks = [], isLoading: stocksLoading } = useQuery({
     queryKey: ['universeStocks', universe?.id],

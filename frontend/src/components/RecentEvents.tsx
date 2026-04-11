@@ -1,7 +1,6 @@
 import React from 'react';
-import { TrendingUp, Activity, AlertCircle, Info, ShieldAlert } from 'lucide-react';
+import { Activity, AlertCircle, Info, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
 import Ticker from './Ticker';
 import { ScannerEvent } from '../api/scanner';
 
@@ -10,16 +9,16 @@ interface RecentEventsProps {
   maxItems?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-  onSort?: (column: string) => void;
-  onEventClick?: (event: ScannerEvent) => void;
+  onSort?: (_column: string) => void;
+  onEventClick?: (_event: ScannerEvent) => void;
 }
 
-const RecentEvents: React.FC<RecentEventsProps> = ({ 
-  events, 
+const RecentEvents: React.FC<RecentEventsProps> = ({
+  events,
   maxItems = 10,
-  sortBy,
-  sortOrder,
-  onSort,
+  sortBy: _sortBy,
+  sortOrder: _sortOrder,
+  onSort: _onSort,
   onEventClick
 }) => {
   const displayEvents = events.slice(0, maxItems);

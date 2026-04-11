@@ -18,7 +18,7 @@ import ScannerConfig from '../components/ScannerConfig';
 import ScannerResults from '../components/ScannerResults';
 
 // API functions
-import { runScanner, fetchScannerConfigs, fetchStockUniverses, fetchScannerResults, fetchScannerHistory, StockUniverse } from '../api/scanner';
+import { runScanner, fetchScannerConfigs, fetchStockUniverses, fetchScannerResults, fetchScannerHistory } from '../api/scanner';
 
 const Scanner: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);

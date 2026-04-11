@@ -19,7 +19,6 @@ import { format } from 'date-fns';
 
 // Components
 import Card from '../components/ui/Card';
-import MetricCard from '../components/ui/MetricCard';
 import Chart from '../components/ui/Chart';
 import RecentEvents from '../components/RecentEvents';
 import NewsFeed from '../components/NewsFeed';
@@ -27,7 +26,6 @@ import NewsFeed from '../components/NewsFeed';
 // API
 import { fetchStockDetails, refreshStockData, syncMissingStockAggregates } from '../api/stocks';
 import { fetchScannerResults, fetchHistoricalData } from '../api/scanner';
-import { fetchRecentNews } from '../api/news';
 import { getSystemInfo } from '../api/system';
 import { useLiveStockData } from '../hooks/useLiveStockData';
 
@@ -81,7 +79,7 @@ const StockDetailPage: React.FC = () => {
       didRefreshRef.current = symbol;
       refreshMutation.mutate({ sym: symbol, timespan, period });
     }
-  }, [symbol]);
+  }, [symbol, period, timespan, refreshMutation]);
 
   // Period synchronization logic now handled in onTimespanChange to reduce re-renders.
 
@@ -108,7 +106,7 @@ const StockDetailPage: React.FC = () => {
     if (catchingUp && !fetchingHistorical) {
       setCatchingUp(false);
     }
-  }, [fetchingHistorical]);
+  }, [fetchingHistorical, catchingUp]);
 
   // AUTO-REFRESH LOGIC: Detect "No Data" and request history from Polygon
   // We use a ref to track which (symbol, period, timespan) combos we've already tried to auto-refresh
@@ -132,7 +130,7 @@ const StockDetailPage: React.FC = () => {
     }
     
     refreshMutation.mutate({ sym: symbol, timespan, period: '30d' });
-  }, [symbol, period, timespan, historicalData.length, loadingHistorical, fetchingHistorical, refreshMutation.isPending]);
+  }, [symbol, period, timespan, historicalData.length, loadingHistorical, fetchingHistorical, refreshMutation.isPending, refreshMutation]);
 
   // 3. Scanner History — does NOT block page render (no loadingScanner in gate below)
   const { data: scannerResults } = useQuery({
@@ -151,11 +149,11 @@ const StockDetailPage: React.FC = () => {
     queryFn: getSystemInfo
   });
 
-  const lastUpdatedTime = React.useMemo(() => {
-    if (liveData) return new Date(liveData.e);
-    if (details?.last_updated) return new Date(details.last_updated);
-    return new Date();
-  }, [liveData, details?.last_updated]);
+  const lastUpdatedTime = liveData
+    ? new Date(liveData.e)
+    : details?.last_updated
+      ? new Date(details.last_updated)
+      : null;
 
   // Only block on details — the header/price paints immediately and is the LCP element.
   // The chart renders an inline skeleton while historicalData is still loading.
@@ -213,7 +211,7 @@ const StockDetailPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleRefreshCheck = (newTimespan?: string, newPeriod?: string) => {
+  const _handleRefreshCheck = (newTimespan?: string, newPeriod?: string) => {
     if (refreshMutation.isPending) return;
 
     const ts = newTimespan || timespan;

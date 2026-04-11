@@ -95,7 +95,7 @@ const Settings: React.FC = () => {
       const res = await stopSync();
       // @ts-ignore
       alert(res.message);
-    } catch (e) {
+    } catch {
       alert('Failed to stop sync');
     } finally {
       setStopping(false);
@@ -109,7 +109,7 @@ const Settings: React.FC = () => {
       await syncFundamentals(crawlSpeed);
       const speedLabel = crawlSpeed < 1 ? 'FAST' : 'SLOW';
       alert(`Fundamental sync started in background (${speedLabel} mode: ${crawlSpeed}s delay)`);
-    } catch (e) {
+    } catch {
       alert('Failed to start sync');
     } finally {
       setSyncingFundamentals(false);
@@ -123,7 +123,7 @@ const Settings: React.FC = () => {
       await syncTickerDetails(crawlSpeed);
       const speedLabel = crawlSpeed < 1 ? 'FAST' : 'SLOW';
       alert(`Details crawler started (${speedLabel} mode: ${crawlSpeed}s delay)`);
-    } catch (e) {
+    } catch {
       alert('Failed to start details sync');
     } finally {
       setSyncingDetails(false);
@@ -135,7 +135,7 @@ const Settings: React.FC = () => {
       setSyncingMetrics(true);
       await syncMetrics();
       alert('Metrics update started in background');
-    } catch (e) {
+    } catch {
       alert('Failed to start update');
     } finally {
       setSyncingMetrics(false);

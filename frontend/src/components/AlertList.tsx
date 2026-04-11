@@ -1,7 +1,6 @@
 import React from 'react';
 import { Bell, TrendingUp, TrendingDown } from 'lucide-react';
 import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
 import Ticker from './Ticker';
 
 interface Alert {

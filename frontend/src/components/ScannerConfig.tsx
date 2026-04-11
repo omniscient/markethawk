@@ -6,8 +6,8 @@ interface ScannerConfigProps {
   universes: any[];
   selectedConfig: string;
   selectedUniverse: number | null;
-  onConfigChange: (config: string) => void;
-  onUniverseChange: (universeId: number | null) => void;
+  onConfigChange: (_config: string) => void;
+  onUniverseChange: (_universeId: number | null) => void;
   loading: boolean;
 }
 

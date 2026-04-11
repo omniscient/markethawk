@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import { RefreshCw, Loader2, ChevronDown, ChevronRight, AlertTriangle, Trash2, Wand2 } from 'lucide-react';
 import Ticker from './Ticker';
-import { StockUniverse, QualityReport, QualityTickerResult, CoverageDetail, NormalizationProgress, fetchQualityReport, triggerQualityAnalysis, triggerNormalization, deleteTickerAggregates } from '../api/scanner';
+import { StockUniverse, QualityTickerResult, CoverageDetail, NormalizationProgress, fetchQualityReport, triggerQualityAnalysis, triggerNormalization, deleteTickerAggregates } from '../api/scanner';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -311,6 +310,22 @@ function TickerRow({ result, onDelete }: { result: QualityTickerResult; onDelete
 
 type SortKey = 'ticker' | 'grade' | 'coverage_pct' | 'gap_count' | 'actual_bars';
 
+interface SortThProps {
+  label: string;
+  k: SortKey;
+  sortKey: SortKey;
+  sortAsc: boolean;
+  onSort: (k: SortKey) => void;
+}
+const SortTh = ({ label, k, sortKey, sortAsc, onSort }: SortThProps) => (
+  <th
+    className="px-3 py-2 text-left text-xs text-gray-400 font-medium cursor-pointer select-none hover:text-gray-200"
+    onClick={() => onSort(k)}
+  >
+    {label}{sortKey === k ? (sortAsc ? ' ↑' : ' ↓') : ''}
+  </th>
+);
+
 interface QualityReportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -351,14 +366,14 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
       queryClient.invalidateQueries({ queryKey: ['qualityReport', universe.id] });
     }, 2000);
     return () => clearInterval(timer);
-  }, [report?.status, report?.normalization_status, normalizationTriggered, universe?.id, isOpen, queryClient]);
+  }, [report?.status, report?.normalization_status, normalizationTriggered, universe, universe?.id, isOpen, queryClient]);
 
   // Once a fresh analysis completes, clear the optimistic removed-tickers set
   React.useEffect(() => {
     if (report?.status === 'complete' && removedTickers.size > 0) {
       setRemovedTickers(new Set());
     }
-  }, [report?.status]);
+  }, [report?.status, removedTickers]);
 
   // If we open the modal and the backend says normalization is actively running,
   // we "adopt" it so the progress UI shows up instead of staying hidden.
@@ -449,15 +464,6 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
     if (sortKey === key) setSortAsc((v) => !v);
     else { setSortKey(key); setSortAsc(true); }
   };
-
-  const SortTh = ({ label, k }: { label: string; k: SortKey }) => (
-    <th
-      className="px-3 py-2 text-left text-xs text-gray-400 font-medium cursor-pointer select-none hover:text-gray-200"
-      onClick={() => handleSort(k)}
-    >
-      {label}{sortKey === k ? (sortAsc ? ' ↑' : ' ↓') : ''}
-    </th>
-  );
 
   const rd = report?.report_data;
 
@@ -676,13 +682,13 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
               <table className="w-full text-sm border-collapse">
                 <thead className="bg-gray-800 sticky top-0">
                   <tr>
-                    <SortTh label="Ticker" k="ticker" />
+                    <SortTh label="Ticker" k="ticker" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
                     <th className="px-3 py-2 text-left text-xs text-gray-400 font-medium">Timespan</th>
-                    <SortTh label="Grade" k="grade" />
-                    <SortTh label="Coverage" k="coverage_pct" />
-                    <SortTh label="Gaps" k="gap_count" />
+                    <SortTh label="Grade" k="grade" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                    <SortTh label="Coverage" k="coverage_pct" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                    <SortTh label="Gaps" k="gap_count" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
                     <th className="px-3 py-2 text-right text-xs text-gray-400 font-medium">Bad bars</th>
-                    <SortTh label="Bars" k="actual_bars" />
+                    <SortTh label="Bars" k="actual_bars" sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
                     <th className="px-3 py-2 text-right text-xs text-gray-400 font-medium">First bar</th>
                     <th className="px-3 py-2 text-right text-xs text-gray-400 font-medium">Last bar</th>
                     <th className="px-3 py-2 w-8" />

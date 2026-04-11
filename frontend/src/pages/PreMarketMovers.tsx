@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Search, 
-  RefreshCw, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Search,
+  RefreshCw,
   ExternalLink,
   ChevronUp,
   ChevronDown,
   Volume2,
-  DollarSign,
-  Percent
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import Ticker from '../components/Ticker';
-import Layout from '../components/Layout';
 import Card from '../components/ui/Card';
 import MetricCard from '../components/ui/MetricCard';
 import { fetchPreMarketMovers, PreMarketMover } from '../api/scanner';

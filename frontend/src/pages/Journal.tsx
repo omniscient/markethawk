@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  BookOpen, 
-  Plus, 
-  Download, 
-  TrendingUp, 
-  TrendingDown, 
-  Target, 
+  BookOpen,
+  Plus,
+  Download,
+  TrendingUp,
+  TrendingDown,
+  Target,
   Activity,
   MessageSquare,
-  Tag as TagIcon,
   PlusCircle
 } from 'lucide-react';
 
@@ -20,7 +19,7 @@ import MetricCard from '../components/ui/MetricCard';
 import Modal from '../components/ui/Modal';
 
 // API
-import { journalApi, Trade, TradeStats } from '../api/journal';
+import { journalApi } from '../api/journal';
 
 const Journal: React.FC = () => {
   const queryClient = useQueryClient();
@@ -57,7 +56,7 @@ const Journal: React.FC = () => {
     queryFn: () => journalApi.getTrades(),
   });
 
-  const { data: stats, isLoading: loadingStats } = useQuery({
+  const { data: stats, isLoading: _loadingStats } = useQuery({
     queryKey: ['journalStats'],
     queryFn: journalApi.getStats,
   });

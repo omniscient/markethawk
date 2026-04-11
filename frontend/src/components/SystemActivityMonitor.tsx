@@ -11,7 +11,7 @@ interface SystemTask {
 export const SystemActivityMonitor: React.FC = () => {
   const [tasks, setTasks] = useState<SystemTask[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [_isConnected, setIsConnected] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

@@ -10,7 +10,6 @@ import {
   X,
   TrendingUp,
   BookOpen,
-  Info
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getSystemInfo } from '../api/system';

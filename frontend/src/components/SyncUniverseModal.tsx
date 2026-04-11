@@ -2,7 +2,7 @@ import React from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
-import { DownloadCloud, Calendar } from 'lucide-react';
+import { DownloadCloud } from 'lucide-react';
 import { StockUniverse, syncUniverseAggregates, SyncAggregatesOptions } from '../api/scanner';
 
 interface SyncUniverseModalProps {
@@ -22,16 +22,22 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
 
     // If the universe has a max_aggregate_date, default from_date to the day after it
     // so the user can easily do an incremental "sync missing data" refresh.
-    const defaultFromDate = React.useMemo(() => {
-        if (universe?.max_aggregate_date) {
-            const next = new Date(universe.max_aggregate_date);
-            next.setDate(next.getDate() + 1);
-            return next.toISOString().split('T')[0];
-        }
-        return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    }, [universe?.max_aggregate_date]);
+    const maxAggDate = universe?.max_aggregate_date;
+    let defaultFromDate: string;
+    if (maxAggDate) {
+        const next = new Date(maxAggDate);
+        next.setDate(next.getDate() + 1);
+        defaultFromDate = next.toISOString().split('T')[0];
+    } else {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        defaultFromDate = d.toISOString().split('T')[0];
+    }
 
     const defaultTimespan = universe?.available_timespans?.[0] ?? 'minute';
+
+    const queryClient = useQueryClient();
+    const [syncError, setSyncError] = React.useState<string | null>(null);
 
     // Default sync options
     const [syncOptions, setSyncOptions] = React.useState<SyncAggregatesOptions>({
@@ -53,10 +59,7 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
             to_date: today,
         }));
         setSyncError(null);
-    }, [universe?.id]);
-
-    const queryClient = useQueryClient();
-    const [syncError, setSyncError] = React.useState<string | null>(null);
+    }, [universe?.id, defaultFromDate, defaultTimespan, today]);
 
     // Sync mutation
     const syncMutation = useMutation({
@@ -64,7 +67,7 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
             if (!universe) throw new Error("No universe selected");
             return syncUniverseAggregates(universe.id, syncOptions);
         },
-        onSuccess: (data) => {
+        onSuccess: (_data) => {
             queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
             if (universe) onSyncStarted?.(universe.id);
             onClose();

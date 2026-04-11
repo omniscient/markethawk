@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -9,6 +8,21 @@ import { StockUniverse, MonitoredStock, refreshUniverse, fetchUniverseStocks } f
 
 type SortField = 'ticker' | 'company_name' | 'sector' | 'market_cap';
 type SortDirection = 'asc' | 'desc';
+
+interface SortIconProps {
+    field: SortField;
+    sortField: SortField;
+    sortDirection: SortDirection;
+}
+
+const SortIcon: React.FC<SortIconProps> = ({ field, sortField, sortDirection }) => {
+    if (sortField !== field) {
+        return <ChevronsUpDown className="h-3.5 w-3.5 text-gray-500 ml-1 inline-block" />;
+    }
+    return sortDirection === 'asc'
+        ? <ChevronUp className="h-3.5 w-3.5 text-financial-blue ml-1 inline-block" />
+        : <ChevronDown className="h-3.5 w-3.5 text-financial-blue ml-1 inline-block" />;
+};
 
 interface UniverseDetailsModalProps {
     isOpen: boolean;
@@ -99,15 +113,6 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
             setSortField(field);
             setSortDirection('asc');
         }
-    };
-
-    const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
-        if (sortField !== field) {
-            return <ChevronsUpDown className="h-3.5 w-3.5 text-gray-500 ml-1 inline-block" />;
-        }
-        return sortDirection === 'asc'
-            ? <ChevronUp className="h-3.5 w-3.5 text-financial-blue ml-1 inline-block" />
-            : <ChevronDown className="h-3.5 w-3.5 text-financial-blue ml-1 inline-block" />;
     };
 
     if (!universe) return null;
@@ -234,25 +239,25 @@ const UniverseDetailsModal: React.FC<UniverseDetailsModalProps> = ({
                                                 className="text-left px-4 py-2 text-gray-400 font-medium cursor-pointer select-none hover:text-financial-light transition-colors"
                                                 onClick={() => handleSort('ticker')}
                                             >
-                                                Ticker<SortIcon field="ticker" />
+                                                Ticker<SortIcon field="ticker" sortField={sortField} sortDirection={sortDirection} />
                                             </th>
                                             <th
                                                 className="text-left px-4 py-2 text-gray-400 font-medium cursor-pointer select-none hover:text-financial-light transition-colors"
                                                 onClick={() => handleSort('company_name')}
                                             >
-                                                Company<SortIcon field="company_name" />
+                                                Company<SortIcon field="company_name" sortField={sortField} sortDirection={sortDirection} />
                                             </th>
                                             <th
                                                 className="text-left px-4 py-2 text-gray-400 font-medium cursor-pointer select-none hover:text-financial-light transition-colors"
                                                 onClick={() => handleSort('sector')}
                                             >
-                                                Sector<SortIcon field="sector" />
+                                                Sector<SortIcon field="sector" sortField={sortField} sortDirection={sortDirection} />
                                             </th>
                                             <th
                                                 className="text-right px-4 py-2 text-gray-400 font-medium cursor-pointer select-none hover:text-financial-light transition-colors"
                                                 onClick={() => handleSort('market_cap')}
                                             >
-                                                Market Cap<SortIcon field="market_cap" />
+                                                Market Cap<SortIcon field="market_cap" sortField={sortField} sortDirection={sortDirection} />
                                             </th>
                                         </tr>
                                     </thead>

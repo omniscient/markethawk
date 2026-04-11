@@ -375,7 +375,7 @@ const StockChart: React.FC<StockChartProps> = ({
           timeValue = toLocalTime(ts) as Time;
         }
         const isSwipe = d.marker_type === 'swipe';
-        const isFlush = d.marker_type === 'flush';
+        const _isFlush = d.marker_type === 'flush';
         allMarkers.push({
           time: timeValue,
           position: isSwipe ? 'aboveBar' : 'belowBar' as const,

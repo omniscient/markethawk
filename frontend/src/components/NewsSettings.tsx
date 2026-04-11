@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Settings, Save, Plus, X } from 'lucide-react';
-import { fetchNewsPreferences, updateNewsPreferences, NewsPreference } from '../api/news';
+import { fetchNewsPreferences, updateNewsPreferences } from '../api/news';
 import { fetchStockUniverses } from '../api/scanner';
 
 const NewsSettings: React.FC = () => {
@@ -28,10 +28,11 @@ const NewsSettings: React.FC = () => {
     // Setup local state when data loads
     useEffect(() => {
         if (pref) {
-
-            setRefreshInterval(pref.refresh_interval_minutes || 5);
-            setTrackedTickers(pref.tracked_tickers || []);
-            setTrackedUniverses(pref.tracked_universes || []);
+            startTransition(() => {
+                setRefreshInterval(pref.refresh_interval_minutes || 5);
+                setTrackedTickers(pref.tracked_tickers || []);
+                setTrackedUniverses(pref.tracked_universes || []);
+            });
         }
     }, [pref]);
 

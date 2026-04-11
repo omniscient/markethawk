@@ -30,7 +30,13 @@
       "Bash(pip-audit)",
       "Bash(pip-audit --requirement \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\backend\\\\requirements.txt\")",
       "Bash(npm info:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(node -e \"const {createRequire}=require\\('module'\\);const r=createRequire\\(require\\('path'\\).resolve\\('C:/git/trading/OKComputer_Custom Stock Scanner System/frontend/node_modules/lucide-react/dist/cjs/lucide-react.js'\\)\\);const icons=['AlertCircle','ChevronDown','ChevronUp','ExternalLink','X','Bell','TrendingUp','TrendingDown','Download','Search','CheckSquare','Square','DownloadCloud','Calendar','LucideIcon','Newspaper','Clock','RefreshCw','Loader2','ChevronRight','AlertTriangle','Trash2','Wand2','Activity','ChevronsUpDown','Settings','Info','Save','Plus','ShieldAlert','Zap'];icons.forEach\\(i=>{try{if\\(!r[i]\\)console.log\\('MISSING:',i\\)}catch\\(e\\){console.log\\('ERROR:',i,e.message\\)}}\\)\")",
+      "Bash(npx eslint:*)",
+      "Bash(ls \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\frontend\"/*.cjs \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\frontend\"/*.js \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\frontend\"/*.ts)",
+      "Bash(node:*)"
     ]
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, startTransition } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -28,13 +28,23 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
         { name: 'ibkr', classes: ['futures'], available: true }
     ];
 
+    const resetForm = () => {
+        setName('');
+        setDescription('');
+        setCriteriaJson('{\n  "min_market_cap": 1000000000\n}');
+    };
+
     useEffect(() => {
         if (initialData) {
-            setName(initialData.name);
-            setDescription(initialData.description || '');
-            setCriteriaJson(JSON.stringify(initialData.criteria, null, 2));
+            startTransition(() => {
+                setName(initialData.name);
+                setDescription(initialData.description || '');
+                setCriteriaJson(JSON.stringify(initialData.criteria, null, 2));
+            });
         } else {
-            resetForm();
+            startTransition(() => {
+                resetForm();
+            });
         }
     }, [initialData, isOpen]);
 
@@ -56,12 +66,6 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
         },
     });
 
-    const resetForm = () => {
-        setName('');
-        setDescription('');
-        setCriteriaJson('{\n  "min_market_cap": 1000000000\n}');
-    };
-
     const handleSubmit = () => {
         try {
             const criteria = JSON.parse(criteriaJson);
@@ -82,7 +86,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                     criteria,
                 });
             }
-        } catch (e) {
+        } catch {
             alert('Invalid JSON in criteria');
         }
     };
@@ -175,7 +179,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                                 if (current.length === 0) current = ['stocks'];
                                                 c.asset_classes = current;
                                                 setCriteriaJson(JSON.stringify(c, null, 2));
-                                            } catch (err) {}
+                                            } catch { /* empty */ }
                                         }}
                                         className={`px-3 py-1 text-sm rounded border capitalize ${isActive ? 'bg-financial-blue text-white border-financial-blue' : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'}`}
                                     >
@@ -207,7 +211,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                                 const c = JSON.parse(criteriaJson);
                                                 c.data_source_futures = e.target.value;
                                                 setCriteriaJson(JSON.stringify(c, null, 2));
-                                            } catch (err) {}
+                                            } catch { /* empty */ }
                                         }}
                                     >
                                         {providers.filter((p: any) => p.classes?.includes('futures')).map((p: any) => (
@@ -232,7 +236,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                             const c = JSON.parse(criteriaJson);
                                             c.futures_symbols = e.target.value;
                                             setCriteriaJson(JSON.stringify(c, null, 2));
-                                        } catch (err) { }
+                                        } catch { /* empty */ }
                                     }}
                                 />
                             </div>
@@ -260,7 +264,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                                 const c = JSON.parse(criteriaJson);
                                                 c.data_source_stocks = e.target.value;
                                                 setCriteriaJson(JSON.stringify(c, null, 2));
-                                            } catch (err) {}
+                                            } catch { /* empty */ }
                                         }}
                                     >
                                         {providers.filter((p: any) => p.classes?.includes('stocks')).map((p: any) => (
@@ -284,7 +288,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                         const c = JSON.parse(criteriaJson);
                                         c.min_market_cap = parseFloat(e.target.value);
                                         setCriteriaJson(JSON.stringify(c, null, 2));
-                                    } catch (err) { }
+                                    } catch { /* empty */ }
                                 }}
                             />
                         </div>
@@ -299,7 +303,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                         const c = JSON.parse(criteriaJson);
                                         c.max_market_cap = parseFloat(e.target.value);
                                         setCriteriaJson(JSON.stringify(c, null, 2));
-                                    } catch (err) { }
+                                    } catch { /* empty */ }
                                 }}
                             />
                         </div>
@@ -314,7 +318,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                         const c = JSON.parse(criteriaJson);
                                         c.min_volume = parseFloat(e.target.value);
                                         setCriteriaJson(JSON.stringify(c, null, 2));
-                                    } catch (err) { }
+                                    } catch { /* empty */ }
                                 }}
                             />
                         </div>
@@ -345,7 +349,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                                     }
                                                     c.sector = s;
                                                     setCriteriaJson(JSON.stringify(c, null, 2));
-                                                } catch (err) { }
+                                                } catch { /* empty */ }
                                             }}
                                             className={`px-2 py-1 text-xs rounded border ${isSelected
                                                 ? 'bg-financial-blue text-white border-financial-blue'
@@ -390,7 +394,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                                     }
                                                     c.primary_exchange = e;
                                                     setCriteriaJson(JSON.stringify(c, null, 2));
-                                                } catch (err) { }
+                                                } catch { /* empty */ }
                                             }}
                                             className={`px-3 py-1 text-xs rounded border ${isSelected
                                                 ? 'bg-financial-blue text-white border-financial-blue'
@@ -416,7 +420,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                         const c = JSON.parse(criteriaJson);
                                         c.min_employees = parseFloat(e.target.value);
                                         setCriteriaJson(JSON.stringify(c, null, 2));
-                                    } catch (err) { }
+                                    } catch { /* empty */ }
                                 }}
                             />
                         </div>
@@ -431,7 +435,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                         const c = JSON.parse(criteriaJson);
                                         c.max_employees = parseFloat(e.target.value);
                                         setCriteriaJson(JSON.stringify(c, null, 2));
-                                    } catch (err) { }
+                                    } catch { /* empty */ }
                                 }}
                             />
                         </div>
@@ -448,7 +452,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                         const c = JSON.parse(criteriaJson);
                                         c.min_share_class_shares = parseFloat(e.target.value);
                                         setCriteriaJson(JSON.stringify(c, null, 2));
-                                    } catch (err) { }
+                                    } catch { /* empty */ }
                                 }}
                             />
                         </div>
@@ -463,7 +467,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                         const c = JSON.parse(criteriaJson);
                                         c.max_share_class_shares = parseFloat(e.target.value);
                                         setCriteriaJson(JSON.stringify(c, null, 2));
-                                    } catch (err) { }
+                                    } catch { /* empty */ }
                                 }}
                             />
                         </div>

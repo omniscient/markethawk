@@ -1,23 +1,19 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  BarChart2, 
-  TrendingUp, 
-  Filter, 
+import {
+  BarChart2,
+  TrendingUp,
   Calendar,
   Layers,
   Search,
   Target
 } from 'lucide-react';
-import { format } from 'date-fns';
 
 // Components
 import Card from '../components/ui/Card';
 import MetricCard from '../components/ui/MetricCard';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
+import {
+  XAxis,
   YAxis, 
   CartesianGrid, 
   Tooltip, 

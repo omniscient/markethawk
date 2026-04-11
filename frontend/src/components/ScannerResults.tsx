@@ -1,21 +1,12 @@
 import React, { useState } from 'react';
 import {
-  TrendingUp,
-  TrendingDown,
   Download,
   Eye,
   Filter,
   ChevronUp,
   ChevronDown,
   Search,
-  Activity,
-  Zap,
-  Clock,
-  ShieldAlert,
-  AlertCircle,
-  Info
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import Card from './ui/Card';
 import Ticker from './Ticker';
 import { ScannerEvent } from '../api/scanner';
@@ -263,7 +254,7 @@ interface SortableHeaderProps {
   sortKey: string;
   currentSort?: string;
   currentOrder?: 'asc' | 'desc';
-  onSort?: (key: string) => void;
+  onSort?: (_key: string) => void;
 }
 
 const SortableHeader: React.FC<SortableHeaderProps> = ({ 

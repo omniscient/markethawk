@@ -39,7 +39,7 @@ const CreateUniverseModal: React.FC<CreateUniverseModalProps> = ({ isOpen, onClo
                 description,
                 criteria,
             });
-        } catch (e) {
+        } catch {
             alert('Invalid JSON in criteria');
         }
     };
