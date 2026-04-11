@@ -1,7 +1,47 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Financial data visualization colors */
+  --color-financial-dark: #0f172a;
+  --color-financial-gray: #1e293b;
+  --color-financial-light: #f8fafc;
+  --color-financial-blue: #0ea5e9;
+  --color-financial-green: #10b981;
+  --color-financial-red: #ef4444;
+  --color-financial-yellow: #f59e0b;
+  --color-financial-purple: #8b5cf6;
+
+  /* Semantic colors */
+  --color-positive: #10b981;
+  --color-negative: #ef4444;
+  --color-neutral: #6b7280;
+  --color-accent: #0ea5e9;
+
+  /* Chart colors */
+  --color-chart-primary: #0ea5e9;
+  --color-chart-secondary: #8b5cf6;
+  --color-chart-tertiary: #f59e0b;
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Animations */
+  --animate-fade-in: fadeIn 0.5s ease-in-out;
+  --animate-slide-up: slideUp 0.3s ease-out;
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes fadeIn {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0%   { transform: translateY(10px); opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
+}
 
 @layer base {
   body {
