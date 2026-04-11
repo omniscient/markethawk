@@ -11,8 +11,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 import pandas as pd
-import pytz
-
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -25,7 +23,7 @@ class StockDataService:
     """Service for fetching stock data from Polygon.io."""
 
     @staticmethod
-    async def get_historical_data(ticker: str, period: str = "30d") -> pd.DataFrame:
+    def get_historical_data(ticker: str, period: str = "30d") -> pd.DataFrame:
         """Get historical stock data via the Massive (Polygon) provider."""
         try:
             massive = DataProviderFactory.get("massive")
@@ -38,7 +36,7 @@ class StockDataService:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
 
-            aggs = await massive.get_historical_bars(
+            aggs = massive.get_historical_bars(
                 symbol=ticker.upper(),
                 timespan="day",
                 multiplier=1,
@@ -72,7 +70,7 @@ class StockDataService:
             return pd.DataFrame()
 
     @staticmethod
-    async def get_pre_market_data(ticker: str) -> Dict[str, Any]:
+    def get_pre_market_data(ticker: str) -> Dict[str, Any]:
         """Get pre-market/extended-hours data via the Massive (Polygon) provider."""
         try:
             massive = DataProviderFactory.get("massive")
@@ -83,7 +81,7 @@ class StockDataService:
             today = datetime.now()
 
             # Fetch minute-level data for extended hours
-            aggs = await massive.get_historical_bars(
+            aggs = massive.get_historical_bars(
                 symbol=ticker.upper(),
                 timespan="minute",
                 multiplier=1,
@@ -96,19 +94,10 @@ class StockDataService:
                 return {}
 
             # Filter for extended hours
+            from app.utils.session import classify_session
             extended_data = []
             for row in aggs:
-                agg_time = row["timestamp"]
-                if agg_time.tzinfo is None:
-                    agg_time = agg_time.replace(tzinfo=timezone.utc)
-                hour = agg_time.hour
-                minute = agg_time.minute
-
-                # Pre-market: 4:00 AM to 9:30 AM
-                is_pre = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
-                # After-market: 4:00 PM to 8:00 PM
-                is_after = (hour >= 16 and hour < 20)
-
+                is_pre, is_after = classify_session(row["timestamp"])
                 if is_pre or is_after:
                     extended_data.append(row)
 
@@ -128,7 +117,7 @@ class StockDataService:
             return {}
 
     @staticmethod
-    async def get_stock_info(ticker: str) -> Dict[str, Any]:
+    def get_stock_info(ticker: str) -> Dict[str, Any]:
         """Get stock details from the Massive (Polygon) provider."""
         try:
             massive = DataProviderFactory.get("massive")
@@ -136,7 +125,7 @@ class StockDataService:
                 logging.error("Massive provider not available - check POLYGON_API_KEY")
                 return {}
 
-            details = await massive.get_ticker_details(ticker.upper())
+            details = massive.get_ticker_details(ticker.upper())
             if not details:
                 return {}
 
@@ -154,7 +143,7 @@ class StockDataService:
             return {}
 
     @staticmethod
-    async def get_historical_from_db(
+    def get_historical_from_db(
         db: Session,
         ticker: str,
         period: str = "30d",
@@ -209,7 +198,7 @@ class StockDataService:
             return pd.DataFrame()
 
     @staticmethod
-    async def get_futures_historical_from_db(
+    def get_futures_historical_from_db(
         db: Session,
         symbol: str,
         period: str = "30d",
@@ -269,7 +258,7 @@ class StockDataService:
             return pd.DataFrame()
 
     @staticmethod
-    async def refresh_stock_data(
+    def refresh_stock_data(
         db: Session,
         ticker: str,
         timespan: str = "day",
@@ -349,7 +338,7 @@ class StockDataService:
             
             # This is essentially what sync_stock_aggregates task does
             # We call the service method directly here for synchronous response
-            aggs = await StockDataService.get_aggregates(
+            aggs = StockDataService.get_aggregates(
                 ticker=ticker,
                 multiplier=multiplier,
                 timespan=timespan,
@@ -375,27 +364,15 @@ class StockDataService:
                 ).all()
             )
 
-            est_tz = pytz.timezone('US/Eastern')
+            from app.utils.session import classify_session
             for agg in aggs:
-                # Polgyon provides UTC timestamps. We need US/Eastern for session flagging.
                 ts_utc = agg['timestamp']
-                if ts_utc.tzinfo is None:
-                    ts_utc = pytz.utc.localize(ts_utc)
-                
-                ts_est = ts_utc.astimezone(est_tz)
-                ts_naive = ts_utc.replace(tzinfo=None) # Store naive UTC in DB
-                
+                ts_naive = ts_utc.replace(tzinfo=None)  # Store naive UTC in DB
+
                 if ts_naive in existing_ts:
                     continue
-                
-                # Extended hours logic (US/Eastern)
-                hour = ts_est.hour
-                minute = ts_est.minute
-                
-                # is_pre_market: 4:00 AM to 9:29:59 AM
-                is_pre_market = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
-                # is_after_market: 4:01 PM to 8:00 PM
-                is_after_market = (hour == 16 and minute >= 1) or (hour > 16 and hour < 20)
+
+                is_pre_market, is_after_market = classify_session(ts_utc)
                 
                 record = StockAggregate(
                     ticker=ticker,
@@ -436,7 +413,7 @@ class StockDataService:
             return {"status": "error", "message": str(e)}
 
     @staticmethod
-    async def get_aggregates(
+    def get_aggregates(
         ticker: str,
         multiplier: int,
         timespan: str,
@@ -459,7 +436,7 @@ class StockDataService:
                 logging.error(f"Provider '{provider}' is not available.")
                 return []
 
-            return await p.get_historical_bars(
+            return p.get_historical_bars(
                 symbol=ticker.upper(),
                 timespan=timespan,
                 multiplier=multiplier,
@@ -475,7 +452,7 @@ class StockDataService:
             return []
 
     @staticmethod
-    async def get_pre_market_movers(
+    def get_pre_market_movers(
         db: Optional[Session] = None,
         min_volume: int = 10000,
         limit: int = 100
@@ -493,7 +470,7 @@ class StockDataService:
 
             # get_snapshot_all is Polygon-specific — access via the concrete provider
             assert isinstance(massive, MassiveDataProvider)
-            snapshots = await massive.get_snapshot_all(market_type="stocks")
+            snapshots = massive.get_snapshot_all(market_type="stocks")
 
             if not snapshots:
                 logging.warning("No snapshots returned from Polygon")

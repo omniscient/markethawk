@@ -19,7 +19,10 @@
       "Bash(docker exec:*)",
       "Bash(npm run:*)",
       "Bash(curl:*)",
-      "Bash(docker-compose -f \"C:/git/trading/OKComputer_Custom Stock Scanner System/docker-compose.yml\" restart frontend)"
+      "Bash(docker-compose -f \"C:/git/trading/OKComputer_Custom Stock Scanner System/docker-compose.yml\" restart frontend)",
+      "Bash(wc:*)",
+      "Bash(npm audit:*)",
+      "Bash(grep -v \"^Found\\\\|^$\\\\|fixable\")"
     ]
   }
 }

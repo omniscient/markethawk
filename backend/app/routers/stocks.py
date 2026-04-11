@@ -32,7 +32,7 @@ def _is_futures_ticker(db: Session, ticker: str) -> bool:
 
 
 @router.get("/historical/{ticker}")
-async def get_historical_data(
+def get_historical_data(
     ticker: str,
     period: str = "30d",
     timespan: str = "day",
@@ -46,11 +46,11 @@ async def get_historical_data(
         is_futures = _is_futures_ticker(db, ticker)
 
         if is_futures:
-            data = await StockDataService.get_futures_historical_from_db(
+            data = StockDataService.get_futures_historical_from_db(
                 db, ticker, period, timespan, multiplier
             )
         else:
-            data = await StockDataService.get_historical_from_db(
+            data = StockDataService.get_historical_from_db(
                 db, ticker, period, timespan, multiplier
             )
 
@@ -129,7 +129,7 @@ async def get_historical_data(
 
 
 @router.post("/refresh/{ticker}")
-async def refresh_stock_data(
+def refresh_stock_data(
     ticker: str,
     timespan: str = "day",
     multiplier: int = 1,
@@ -142,7 +142,7 @@ async def refresh_stock_data(
         ticker = ticker.upper()
         if _is_futures_ticker(db, ticker):
             return {"status": "skipped", "message": "Futures data is synced via IBKR, not Polygon."}
-        result = await StockDataService.refresh_stock_data(
+        result = StockDataService.refresh_stock_data(
             db, ticker, timespan, multiplier, full_history, period
         )
         return result
@@ -152,7 +152,7 @@ async def refresh_stock_data(
 
 
 @router.get("/details/{ticker}")
-async def get_stock_detail_consolidated(
+def get_stock_detail_consolidated(
     ticker: str,
     db: Session = Depends(get_db),
 ):
@@ -226,15 +226,15 @@ async def get_stock_detail_consolidated(
             return result
 
         # 1. Fundamental Info
-        info = await StockDataService.get_stock_info(ticker)
+        info = StockDataService.get_stock_info(ticker)
 
         # 2. Pre-market / Extended Hours data
-        pre_market = await StockDataService.get_pre_market_data(ticker)
+        pre_market = StockDataService.get_pre_market_data(ticker)
 
         # 3. Latest aggregates for summary (e.g. today's close if available)
         # Fetching last 1 day minute data to get a accurate "current" or "close" price
         today = datetime.now().strftime("%Y-%m-%d")
-        minute_aggs = await StockDataService.get_aggregates(
+        minute_aggs = StockDataService.get_aggregates(
             ticker, 1, "minute", today, today, limit=1
         )
 
@@ -259,7 +259,7 @@ async def get_stock_detail_consolidated(
         raise HTTPException(status_code=500, detail=f"Error fetching stock details: {str(e)}")
 
 @router.post("/{ticker}/sync-missing")
-async def sync_missing_stock_aggregates(
+def sync_missing_stock_aggregates(
     ticker: str,
     db: Session = Depends(get_db),
 ):

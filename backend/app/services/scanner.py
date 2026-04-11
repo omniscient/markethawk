@@ -176,7 +176,7 @@ class ScannerService:
         return event_dict
 
     @staticmethod
-    async def run_liquidity_hunt_scan(
+    def run_liquidity_hunt_scan(
         tickers: List[str], db: Session
     ) -> List[Dict[str, Any]]:
         """
@@ -329,7 +329,7 @@ class ScannerService:
         return results
 
     @staticmethod
-    async def run_pre_market_scan(
+    def run_pre_market_scan(
         tickers: List[str], db: Session
     ) -> List[Dict[str, Any]]:
         """Run extended hours (pre+post) volume spike scanner."""
@@ -338,7 +338,7 @@ class ScannerService:
         for ticker in tickers:
             try:
                 # Get historical data
-                hist_data = await StockDataService.get_historical_data(ticker, "60d")
+                hist_data = StockDataService.get_historical_data(ticker, "60d")
                 if hist_data.empty: continue
 
                 # Calculate metrics
@@ -346,7 +346,7 @@ class ScannerService:
                 avg_volume_50d = hist_data["Volume"].rolling(50).mean().iloc[-1] if len(hist_data) >= 50 else None
 
                 # Get pre-market data
-                pre_market_data = await StockDataService.get_pre_market_data(ticker)
+                pre_market_data = StockDataService.get_pre_market_data(ticker)
                 if not pre_market_data: continue
 
                 pre_market_volume = pre_market_data.get("pre_market_volume", 0)
@@ -411,7 +411,7 @@ class ScannerService:
         return results
 
     @staticmethod
-    async def run_oversold_bounce_scan(
+    def run_oversold_bounce_scan(
         tickers: List[str], db: Session
     ) -> List[Dict[str, Any]]:
         """Run the Oversold Bounce (Dual RSI) scan."""
@@ -420,7 +420,7 @@ class ScannerService:
         
         for ticker in tickers:
             try:
-                hist_data = await StockDataService.get_historical_data(ticker, "60d")
+                hist_data = StockDataService.get_historical_data(ticker, "60d")
                 if hist_data.empty or len(hist_data) < 10: continue
                 
                 df = hist_data.copy()

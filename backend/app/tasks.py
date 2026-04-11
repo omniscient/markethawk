@@ -266,12 +266,7 @@ def sync_stock_aggregates(
         logger.info(f"📊 Syncing aggregates for {ticker} ({from_date} to {to_date})")
         
         # 1. Fetch data
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-             loop = asyncio.new_event_loop()
-             asyncio.set_event_loop(loop)
-             
-        aggs = loop.run_until_complete(StockDataService.get_aggregates(
+        aggs = StockDataService.get_aggregates(
             ticker=ticker,
             multiplier=multiplier,
             timespan=timespan,
@@ -280,7 +275,7 @@ def sync_stock_aggregates(
             adjusted=adjusted,
             sort=sort,
             limit=limit
-        ))
+        )
         
         if not aggs:
             logger.info(f"No aggregates found for {ticker}")
@@ -297,24 +292,11 @@ def sync_stock_aggregates(
         ).delete()
         
         # 3. Insert new data
+        from app.utils.session import classify_session
         new_records = []
-        est_tz = ZoneInfo("America/New_York")
         for agg in aggs:
-            # Polgyon provides UTC timestamps. We need US/Eastern for session flagging.
             ts_utc = agg['timestamp']
-            if ts_utc.tzinfo is None:
-                ts_utc = ts_utc.replace(tzinfo=timezone.utc)
-            
-            ts_est = ts_utc.astimezone(est_tz)
-            
-            # Use US/Eastern fields for session determination
-            hour = ts_est.hour
-            minute = ts_est.minute
-            
-            # Pre-market: 4:00 AM to 9:29:59 AM ET
-            is_pre_market = (hour >= 4 and hour < 9) or (hour == 9 and minute < 30)
-            # After-market: 4:01 PM to 8:00 PM ET
-            is_after_market = (hour == 16 and minute >= 1) or (hour > 16 and hour < 20)
+            is_pre_market, is_after_market = classify_session(ts_utc)
             
             record = StockAggregate(
                 ticker=ticker,

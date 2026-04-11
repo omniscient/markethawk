@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+
+logger = logging.getLogger(__name__)
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -42,7 +44,7 @@ COMMON_STOCKS = [
 
 
 @router.post("/create", response_model=StockUniverseResponse)
-async def create_stock_universe(
+def create_stock_universe(
     universe: StockUniverseCreate,
     db: Session = Depends(get_db),
 ):
@@ -56,7 +58,7 @@ async def create_stock_universe(
 
 
 @router.put("/{universe_id}", response_model=StockUniverseResponse)
-async def update_stock_universe(
+def update_stock_universe(
     universe_id: int,
     universe_update: StockUniverseUpdate,
     db: Session = Depends(get_db),
@@ -78,7 +80,7 @@ async def update_stock_universe(
 
 
 @router.delete("/{universe_id}")
-async def delete_stock_universe(
+def delete_stock_universe(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
@@ -93,7 +95,7 @@ async def delete_stock_universe(
 
 
 @router.get("/list", response_model=List[StockUniverseResponse])
-async def list_stock_universes(
+def list_stock_universes(
     db: Session = Depends(get_db),
 ):
     from sqlalchemy import func
@@ -201,7 +203,7 @@ from fastapi import BackgroundTasks
 from app.services.discovery_service import DiscoveryService
 
 @router.post("/sync/fundamentals")
-async def sync_fundamental_data(
+def sync_fundamental_data(
     background_tasks: BackgroundTasks,
     delay: float = 15.0, # Default to 15s (Free Tier)
     db: Session = Depends(get_db),
@@ -212,7 +214,7 @@ async def sync_fundamental_data(
     return {"status": "accepted", "message": f"Fundamental sync started in background (delay={delay}s)"}
 
 @router.post("/sync/details")
-async def sync_ticker_details(
+def sync_ticker_details(
     background_tasks: BackgroundTasks,
     delay: float = 15.0, # Default to 15s (Free Tier)
     resync: bool = False,
@@ -230,7 +232,7 @@ async def sync_ticker_details(
 
 
 @router.post("/sync/stop")
-async def stop_sync(
+def stop_sync(
     db: Session = Depends(get_db),
 ):
     """
@@ -258,7 +260,7 @@ async def stop_sync(
     }
 
 @router.post("/sync/metrics")
-async def sync_daily_metrics(
+def sync_daily_metrics(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
@@ -269,7 +271,7 @@ async def sync_daily_metrics(
 
 
 @router.post("/{universe_id}/refresh")
-async def refresh_universe(
+def refresh_universe(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
@@ -341,7 +343,7 @@ async def refresh_universe(
 
 
 @router.post("/{universe_id}/sync-missing")
-async def sync_missing_aggregates(
+def sync_missing_aggregates(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
@@ -462,7 +464,7 @@ async def sync_missing_aggregates(
 
 
 @router.get("/{universe_id}/sync-status")
-async def get_universe_sync_status(universe_id: int):
+def get_universe_sync_status(universe_id: int):
     """
     Return the current sync progress for a universe.
     Reads task IDs stored by sync-aggregates and checks Celery task states.
@@ -521,7 +523,7 @@ async def get_universe_sync_status(universe_id: int):
 
 
 @router.post("/{universe_id}/export-aggregates")
-async def export_universe_aggregates(
+def export_universe_aggregates(
     universe_id: int,
     request: "ExportAggregatesRequest",
     db: Session = Depends(get_db),
@@ -660,7 +662,7 @@ async def export_universe_aggregates(
 
 
 @router.get("/{universe_id}/stocks", response_model=List[MonitoredStockResponse])
-async def get_universe_stocks(
+def get_universe_stocks(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
@@ -677,7 +679,7 @@ async def get_universe_stocks(
 
 
 @router.post("/{universe_id}/sync-aggregates")
-async def sync_universe_aggregates(
+def sync_universe_aggregates(
     universe_id: int,
     background_tasks: BackgroundTasks,
     from_date: str,
@@ -793,7 +795,7 @@ async def sync_universe_aggregates(
 # ── Data Quality ─────────────────────────────────────────────────────────────
 
 @router.post("/{universe_id}/analyze-quality")
-async def trigger_quality_analysis(
+def trigger_quality_analysis(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
@@ -833,7 +835,7 @@ class DeleteAggregatesRequest(BaseModel):
 
 
 @router.delete("/{universe_id}/aggregates")
-async def delete_ticker_aggregates(
+def delete_ticker_aggregates(
     universe_id: int,
     request: DeleteAggregatesRequest,
     db: Session = Depends(get_db),
@@ -875,7 +877,7 @@ async def delete_ticker_aggregates(
 
 
 @router.get("/{universe_id}/quality-report")
-async def get_quality_report(
+def get_quality_report(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
@@ -909,7 +911,7 @@ class NormalizeRequest(BaseModel):
 
 
 @router.post("/{universe_id}/normalize")
-async def trigger_normalization(
+def trigger_normalization(
     universe_id: int,
     request: Optional[NormalizeRequest] = None,
     db: Session = Depends(get_db),

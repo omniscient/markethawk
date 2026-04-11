@@ -27,7 +27,7 @@ def format_bytes(size: int) -> str:
     return f"{size:.1f} PB"
 
 @router.get("/storage")
-async def get_storage_stats(db: Session = Depends(get_db)):
+def get_storage_stats(db: Session = Depends(get_db)):
     """
     Get storage usage statistics for major database tables.
     Returns sizes in bytes and formatted strings.
@@ -111,7 +111,7 @@ async def get_storage_stats(db: Session = Depends(get_db)):
         }
 
 @router.get("/info", response_model=Dict[str, Any])
-async def get_app_info():
+def get_app_info():
     """Get basic application information and configuration status."""
     from app.core.config import settings
     return {

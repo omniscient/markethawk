@@ -60,7 +60,7 @@ class MassiveDataProvider(BaseDataProvider):
             return False, "Polygon client failed to initialize"
         return True, "Ready"
 
-    async def get_historical_bars(
+    def get_historical_bars(
         self,
         symbol: str,
         timespan: str,
@@ -110,7 +110,7 @@ class MassiveDataProvider(BaseDataProvider):
             logger.error(f"MassiveDataProvider: Error fetching bars for {symbol}: {e}")
             return []
 
-    async def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
+    def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
         """Fetch fundamental / reference info from Polygon."""
         if not self._client:
             return {}
@@ -140,7 +140,7 @@ class MassiveDataProvider(BaseDataProvider):
         """Return the raw Polygon REST client for Polygon-specific operations."""
         return self._client
 
-    async def get_snapshot_all(self, market_type: str = "stocks"):
+    def get_snapshot_all(self, market_type: str = "stocks"):
         """Fetch a full market snapshot (Polygon-specific — used for pre-market movers)."""
         if not self._client:
             return []

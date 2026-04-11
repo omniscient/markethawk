@@ -144,7 +144,7 @@ async def _sync_stock_range(
     from_date: str,
     to_date: str,
     provider: str,
-) -> int:
+) -> int:  # noqa: RUF029  (async kept for uniform awaitable interface with _sync_futures_range)
     """
     Re-fetch and upsert stock bars for [from_date, to_date] (inclusive).
     Returns the number of rows inserted.
@@ -154,7 +154,7 @@ async def _sync_stock_range(
 
     logger.info(f"  sync_stock_range {ticker} {timespan}×{multiplier} {from_date}→{to_date} via {provider}")
 
-    aggs = await StockDataService.get_aggregates(
+    aggs = StockDataService.get_aggregates(
         ticker=ticker,
         multiplier=multiplier,
         timespan=timespan,
@@ -178,13 +178,12 @@ async def _sync_stock_range(
         StockAggregate.timestamp  <  end_dt,
     ).delete(synchronize_session=False)
 
+    from app.utils.session import classify_session
     records = []
     for agg in aggs:
-        ts = agg["timestamp"].replace(tzinfo=None)
-        h = ts.hour
-        m = ts.minute
-        is_pre  = (h >= 4 and h < 9) or (h == 9 and m < 30)
-        is_post = (h >= 16 and h < 20)
+        ts_utc = agg["timestamp"]
+        ts = ts_utc.replace(tzinfo=None)  # store naive UTC in DB
+        is_pre, is_post = classify_session(ts_utc)
         records.append(StockAggregate(
             ticker=ticker, timestamp=ts,
             multiplier=multiplier, timespan=timespan,

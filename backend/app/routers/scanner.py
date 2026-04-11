@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/scanner", tags=["scanner"])
 
 
 @router.post("/run", response_model=ScannerRunResponse)
-async def run_scanner(
+def run_scanner(
     request: ScannerRunRequest,
     db: Session = Depends(get_db),
 ):
@@ -73,11 +73,11 @@ async def run_scanner(
     # Run scanner
     try:
         if request.scanner_type == "liquidity_hunt":
-            results = await ScannerService.run_liquidity_hunt_scan(tickers, db)
+            results = ScannerService.run_liquidity_hunt_scan(tickers, db)
         elif request.scanner_type == "oversold_bounce":
-            results = await ScannerService.run_oversold_bounce_scan(tickers, db)
+            results = ScannerService.run_oversold_bounce_scan(tickers, db)
         else:
-            results = await ScannerService.run_pre_market_scan(tickers, db)
+            results = ScannerService.run_pre_market_scan(tickers, db)
         
         status = "completed"
         error_msg = None
@@ -110,7 +110,7 @@ async def run_scanner(
 
 
 @router.get("/history", response_model=List[ScannerRunResponse])
-async def get_scanner_history(
+def get_scanner_history(
     limit: int = 20,
     db: Session = Depends(get_db),
 ):
@@ -139,7 +139,7 @@ async def get_scanner_history(
 
 
 @router.get("/results", response_model=List[ScannerEventResponse])
-async def get_scanner_results(
+def get_scanner_results(
     ticker: Optional[str] = None,
     scanner_type: Optional[str] = None,
     event_type: Optional[str] = None, # Alias for backward compat
@@ -193,7 +193,7 @@ async def get_scanner_results(
 
 
 @router.get("/stats", response_model=ScannerStatsResponse)
-async def get_scanner_stats(
+def get_scanner_stats(
     db: Session = Depends(get_db),
 ):
     """Get scanner statistics for the dashboard."""
@@ -240,7 +240,7 @@ async def get_scanner_stats(
 
 
 @router.get("/edge-stats")
-async def get_edge_stats(
+def get_edge_stats(
     period: str = "monthly",
     ticker: Optional[str] = None,
     scanner_type: Optional[str] = None,
@@ -252,7 +252,7 @@ async def get_edge_stats(
 
 
 @router.get("/edge-distribution")
-async def get_edge_distribution(
+def get_edge_distribution(
     ticker: Optional[str] = None,
     scanner_type: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -263,7 +263,7 @@ async def get_edge_distribution(
 
 
 @router.get("/configs", response_model=List[ScannerConfigResponse])
-async def get_scanner_configs(
+def get_scanner_configs(
     db: Session = Depends(get_db),
 ):
     """Get all available scanner configurations."""
@@ -271,13 +271,13 @@ async def get_scanner_configs(
 
 
 @router.get("/movers/pre-market", response_model=PreMarketMoversResponse)
-async def get_pre_market_movers(
+def get_pre_market_movers(
     min_volume: int = 10000,
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
     """Get top pre-market movers."""
-    movers = await StockDataService.get_pre_market_movers(
+    movers = StockDataService.get_pre_market_movers(
         db=db,
         min_volume=min_volume,
         limit=limit

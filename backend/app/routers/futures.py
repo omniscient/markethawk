@@ -8,8 +8,7 @@ rollover schedules, and contract catalogs.
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Optional
-from datetime import datetime, timezone
-import json
+import pandas as pd
 
 from app.core.database import get_db
 from app.services.futures_data import FuturesDataService
@@ -19,7 +18,7 @@ router = APIRouter(prefix="/api/futures", tags=["futures"])
 
 
 @router.get("/history/{symbol}")
-async def get_futures_history(
+def get_futures_history(
     symbol: str,
     timespan: str = "day",
     multiplier: int = 1,
@@ -76,7 +75,7 @@ async def get_futures_history(
 
 
 @router.get("/contracts/{symbol}")
-async def get_futures_contracts(
+def get_futures_contracts(
     symbol: str,
     db: Session = Depends(get_db),
 ):
@@ -93,7 +92,7 @@ async def get_futures_contracts(
 
 
 @router.get("/rollovers/{symbol}")
-async def get_futures_rollovers(
+def get_futures_rollovers(
     symbol: str,
     db: Session = Depends(get_db),
 ):
@@ -110,7 +109,7 @@ async def get_futures_rollovers(
 
 
 @router.post("/download/{symbol}")
-async def trigger_download(
+def trigger_download(
     symbol: str,
     exchange: str,
     background_tasks: BackgroundTasks,
@@ -149,7 +148,7 @@ async def trigger_download(
     }
 
 @router.post("/fill-gaps/{symbol}")
-async def fill_futures_gaps(
+def fill_futures_gaps(
     symbol: str,
     background_tasks: BackgroundTasks,
     timespan: str = "minute",
@@ -188,6 +187,6 @@ async def fill_futures_gaps(
 
 
 @router.get("/providers")
-async def list_providers():
+def list_providers():
     """List all known data providers and their supported asset classes."""
     return {"available": DataProviderFactory.get_all_with_classes()}
