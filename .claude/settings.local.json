@@ -28,7 +28,9 @@
       "Bash(pip audit:*)",
       "Bash(pip install:*)",
       "Bash(pip-audit)",
-      "Bash(pip-audit --requirement \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\backend\\\\requirements.txt\")"
+      "Bash(pip-audit --requirement \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\backend\\\\requirements.txt\")",
+      "Bash(npm info:*)",
+      "Bash(npm install:*)"
     ]
   }
 }
