@@ -22,7 +22,13 @@
       "Bash(docker-compose -f \"C:/git/trading/OKComputer_Custom Stock Scanner System/docker-compose.yml\" restart frontend)",
       "Bash(wc:*)",
       "Bash(npm audit:*)",
-      "Bash(grep -v \"^Found\\\\|^$\\\\|fixable\")"
+      "Bash(grep -v \"^Found\\\\|^$\\\\|fixable\")",
+      "Bash(pip index:*)",
+      "Bash(pip show:*)",
+      "Bash(pip audit:*)",
+      "Bash(pip install:*)",
+      "Bash(pip-audit)",
+      "Bash(pip-audit --requirement \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\backend\\\\requirements.txt\")"
     ]
   }
 }

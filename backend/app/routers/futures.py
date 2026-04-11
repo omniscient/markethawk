@@ -5,6 +5,8 @@ Provides REST API endpoints for accessing futures historical data,
 rollover schedules, and contract catalogs.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -14,6 +16,7 @@ from app.core.database import get_db
 from app.services.futures_data import FuturesDataService
 from app.providers import DataProviderFactory
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/futures", tags=["futures"])
 
 
@@ -69,8 +72,7 @@ def get_futures_history(
         }
 
     except Exception as e:
-        import logging
-        logging.error(f"Error serving futures history for {symbol}: {e}", exc_info=True)
+        logger.error(f"Error serving futures history for {symbol}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
