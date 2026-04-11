@@ -303,7 +303,7 @@ def _plan_fixes(ticker_result: Dict[str, Any]) -> List[Dict[str, Any]]:
                    without a heavier scan; deleting the whole date is safe
                    because we replace with fresh data)
     """
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
     fixes: List[Dict] = []
 
     # 1. Fill detected gaps
@@ -327,7 +327,7 @@ def _plan_fixes(ticker_result: Dict[str, Any]) -> List[Dict[str, Any]]:
             fixes.append({
                 "type": "backfill",
                 "from": _to_date_str(last_bar),
-                "to":   _to_date_str(datetime.utcnow()),
+                "to":   _to_date_str(datetime.now(timezone.utc)),
             })
 
     return fixes

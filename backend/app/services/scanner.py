@@ -3,7 +3,8 @@ Scanner Service - Pre-market volume scanning logic.
 """
 
 import logging
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
+from app.utils.session import get_market_today
 from typing import Dict, Any, List
 
 import pandas as pd
@@ -361,7 +362,7 @@ class ScannerService:
 
                 if all(criteria_met.values()):
                     previous_close = float(hist_data["Close"].iloc[-1])
-                    event_date = datetime.now().date()
+                    event_date = get_market_today()
                     day_metrics = ScannerService.calculate_day_metrics(ticker, event_date, db)
                     
                     current_price = day_metrics["closing_price"] or day_metrics["pre_market_close"] or previous_close
@@ -416,7 +417,7 @@ class ScannerService:
     ) -> List[Dict[str, Any]]:
         """Run the Oversold Bounce (Dual RSI) scan."""
         results = []
-        event_date = datetime.now().date()
+        event_date = get_market_today()
         
         for ticker in tickers:
             try:

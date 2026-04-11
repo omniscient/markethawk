@@ -83,7 +83,7 @@ def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
                 # stmt.sector = t.get("type") # REMOVED: User confirmed this was wrong
                 
                 stmt.primary_exchange = t.get("primary_exchange")
-                stmt.last_updated = datetime.utcnow()
+                stmt.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
                 count += 1
                 
             except Exception as e:
@@ -162,7 +162,7 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
                         stmt.sector = None
                         
                     stmt.homepage_url = results.get("homepage_url")
-                    stmt.last_details_update = datetime.utcnow()
+                    stmt.last_details_update = datetime.now(timezone.utc).replace(tzinfo=None)
                     
                     db.commit()
                     logger.info(f"✅ Updated details for {ticker}")
@@ -173,7 +173,7 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
             db.query(TickerReference.ticker)
             .filter(
                 (TickerReference.last_details_update == None) | 
-                (TickerReference.last_details_update < datetime.utcnow().date())
+                (TickerReference.last_details_update < datetime.now(timezone.utc).date())
             )
             .order_by(TickerReference.last_updated.desc()) # Prioritize recently active
             .first()
@@ -231,7 +231,7 @@ def start_details_crawl(self, delay_seconds: float = 15.0, resync: bool = False)
             db.query(TickerReference.ticker)
             .filter(
                 (TickerReference.last_details_update == None) | 
-                (TickerReference.last_details_update < datetime.utcnow().date())
+                (TickerReference.last_details_update < datetime.now(timezone.utc).date())
             )
             .order_by(TickerReference.last_updated.desc())
             .first()
@@ -363,7 +363,7 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
             logger.info("No NewsPreference found. Skipping poll.")
             return
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         if not force and pref.last_polled_at:
             delta_minutes = (now - pref.last_polled_at).total_seconds() / 60.0
             if delta_minutes < pref.refresh_interval_minutes:
@@ -389,7 +389,7 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
             headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
             
             # Ensure we don't fetch archaic news
-            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            seven_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
             query_params["published_utc.gte"] = seven_days_ago.strftime("%Y-%m-%d")
 
             with httpx.Client(timeout=30.0) as client:
@@ -408,7 +408,7 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
                      continue 
                      
                 pub_utc = item.get("published_utc")
-                dt = datetime.strptime(pub_utc.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z") if pub_utc else datetime.utcnow()
+                dt = datetime.strptime(pub_utc.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z") if pub_utc else datetime.now(timezone.utc)
                 dt = dt.replace(tzinfo=None)
 
                 if dt < seven_days_ago:
@@ -531,7 +531,7 @@ def analyze_universe_quality(self, universe_id: int):
             report = UniverseQualityReport(universe_id=universe_id)
             db.add(report)
         report.status = "running"
-        report.started_at = datetime.utcnow()
+        report.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
         report.error_message = None
         db.commit()
 
@@ -541,7 +541,7 @@ def analyze_universe_quality(self, universe_id: int):
         report.overall_grade = result["overall_grade"]
         report.overall_score = result["overall_score"]
         report.ticker_count = result["ticker_count"]
-        report.generated_at = datetime.utcnow()
+        report.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         report.report_data = result
         db.commit()
 
@@ -667,7 +667,7 @@ def sync_stock_splits(self):
     """
     db: Session = SessionLocal()
     try:
-        six_months_ago = (datetime.utcnow() - timedelta(days=180)).strftime("%Y-%m-%d")
+        six_months_ago = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d")
         url = "https://api.polygon.io/v3/reference/splits"
         headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
         params = {

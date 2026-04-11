@@ -2,7 +2,7 @@
 MonitoredStock SQLAlchemy model.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Date, Boolean, JSON, Numeric
 from app.core.database import Base
 
@@ -26,5 +26,5 @@ class MonitoredStock(Base):
     asset_class = Column(String(50), default="stocks", index=True)
     data_source = Column(String(50), default="massive", index=True)
     stock_metadata = Column("metadata", JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

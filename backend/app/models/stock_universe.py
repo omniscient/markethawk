@@ -2,7 +2,7 @@
 StockUniverse SQLAlchemy model.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text, Uuid as UUID
 import uuid
 
@@ -19,6 +19,6 @@ class StockUniverse(Base):
     name = Column(String(100), nullable=False)
     description = Column(Text)
     criteria = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     is_active = Column(Boolean, default=True)

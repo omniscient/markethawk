@@ -2,7 +2,7 @@
 ScannerConfig SQLAlchemy model.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text, Uuid as UUID
 import uuid
 
@@ -25,5 +25,5 @@ class ScannerConfig(Base):
     run_frequency = Column(String(20))
     last_run = Column(DateTime)
     next_run = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 import pandas as pd
 from datetime import datetime, timezone
 
+from app.utils.session import get_market_today
 from app.core.database import get_db
 from app.services import StockDataService
 from typing import Optional, Union
@@ -233,7 +234,7 @@ def get_stock_detail_consolidated(
 
         # 3. Latest aggregates for summary (e.g. today's close if available)
         # Fetching last 1 day minute data to get a accurate "current" or "close" price
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = get_market_today().strftime("%Y-%m-%d")
         minute_aggs = StockDataService.get_aggregates(
             ticker, 1, "minute", today, today, limit=1
         )
@@ -282,7 +283,7 @@ def sync_missing_stock_aggregates(
     ticker = ticker.upper()
     is_futures = _is_futures_ticker(db, ticker)
     
-    now_utc = datetime.utcnow()
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     today = now_utc.strftime("%Y-%m-%d")
     
     task_ids: list = []
@@ -392,7 +393,7 @@ def sync_missing_stock_aggregates(
         r.setex(
             f"ticker:{ticker}:sync",
             14400,
-            json.dumps({"task_ids": task_ids, "total": len(task_ids), "started_at": datetime.utcnow().isoformat()}),
+            json.dumps({"task_ids": task_ids, "total": len(task_ids), "started_at": datetime.now(timezone.utc).isoformat()}),
         )
     except Exception as e:
         # Log but don't fail the request 

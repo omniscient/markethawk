@@ -2,7 +2,7 @@
 ScannerEvent SQLAlchemy model.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, Uuid as UUID, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
@@ -37,8 +37,8 @@ class ScannerEvent(Base):
     # Enrichment metadata (catalysts, splits, float rotation, etc.)
     metadata_ = Column("metadata", JSONB, nullable=False, default=dict)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     
     __table_args__ = (
         UniqueConstraint('ticker', 'event_date', 'scanner_type', name='uq_scanner_event'),

@@ -8,6 +8,7 @@ this file or any router that depends on it.
 
 import logging
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import Dict, Any, Optional
 
 import pandas as pd
@@ -33,7 +34,7 @@ class StockDataService:
 
             # Convert period to days
             days = int(period.replace("d", "")) if "d" in period else 30
-            end_date = datetime.now()
+            end_date = datetime.now(timezone.utc)
             start_date = end_date - timedelta(days=days)
 
             aggs = massive.get_historical_bars(
@@ -78,15 +79,18 @@ class StockDataService:
                 logging.error("Massive provider not available - check POLYGON_API_KEY")
                 return {}
 
-            today = datetime.now()
+            # Compute today in US/Eastern so the date boundary is always
+            # correct regardless of where the server is running (H3 fix).
+            _ET = ZoneInfo("America/New_York")
+            today_et = datetime.now(_ET)
 
             # Fetch minute-level data for extended hours
             aggs = massive.get_historical_bars(
                 symbol=ticker.upper(),
                 timespan="minute",
                 multiplier=1,
-                from_date=today.strftime("%Y-%m-%d"),
-                to_date=today.strftime("%Y-%m-%d"),
+                from_date=today_et.strftime("%Y-%m-%d"),
+                to_date=today_et.strftime("%Y-%m-%d"),
                 limit=50000,
             )
 
@@ -167,7 +171,7 @@ class StockDataService:
                     days = int(period[:-1]) * 7
                 elif period.isdigit():
                     days = int(period)
-                start_date = datetime.now() - timedelta(days=days)
+                start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
             # Use raw SQL to return lightweight tuples instead of full ORM objects.
             # For large datasets (e.g. 30D of 1M bars) this is 3-5x faster than .all().
@@ -227,7 +231,7 @@ class StockDataService:
                     days = int(period[:-1]) * 7
                 elif period.isdigit():
                     days = int(period)
-                from_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+                from_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
             df = FuturesDataService.get_continuous_series(
                 db=db,

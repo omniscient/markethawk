@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Float, DateTime, Boolean
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.database import Base
 
 class TickerReference(Base):
@@ -11,7 +11,7 @@ class TickerReference(Base):
     outstanding_shares = Column(Float)
     sector = Column(String)
     industry = Column(String)
-    last_updated = Column(DateTime, default=datetime.utcnow)
+    last_updated = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     
     # New fields for detailed info
     description = Column(String, nullable=True)

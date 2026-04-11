@@ -1,6 +1,6 @@
 """Trading session classification utilities."""
 
-from datetime import datetime, timezone
+from datetime import datetime, time, date, timezone
 from zoneinfo import ZoneInfo
 
 _ET = ZoneInfo("America/New_York")
@@ -21,3 +21,13 @@ def classify_session(ts_utc: datetime) -> tuple[bool, bool]:
     is_pre  = (h >= 4 and h < 9) or (h == 9 and m < 30)
     is_post = (h == 16 and m >= 1) or (h > 16 and h < 20)
     return is_pre, is_post
+
+
+def get_market_now() -> datetime:
+    """Return the current time in America/New_York."""
+    return datetime.now(_ET)
+
+
+def get_market_today() -> date:
+    """Return the current date in America/New_York."""
+    return get_market_now().date()

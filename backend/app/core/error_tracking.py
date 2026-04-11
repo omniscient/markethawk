@@ -81,7 +81,7 @@ class SeqErrorTracker:
         payload = {
             "Events": [
                 {
-                    "Timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                    "Timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "Level": "Fatal",
                     "MessageTemplate": "Unhandled exception at {Path}. ErrorId: {ErrorId}",
                     "Properties": {

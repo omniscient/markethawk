@@ -6,7 +6,7 @@ Populated by querying IBKR's reqContractDetails() and cached here so
 subsequent downloads don't need to re-query IBKR for the contract list.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Date, Index
 
 from app.core.database import Base
@@ -32,8 +32,8 @@ class FuturesContract(Base):
     last_bar_date  = Column(DateTime)  # Most recent bar timestamp in DB for this contract
     first_bar_date = Column(DateTime)  # Oldest bar timestamp in DB for this contract
 
-    created_at   = Column(DateTime, default=datetime.utcnow)
-    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    last_updated = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     __table_args__ = (
         # Primary lookup: symbol + contract month must be unique

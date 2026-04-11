@@ -2,7 +2,7 @@
 StockUniverseTicker SQLAlchemy model.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Index
 from app.core.database import Base
 
@@ -20,7 +20,7 @@ class StockUniverseTicker(Base):
     ticker = Column(String(50), nullable=False)
     asset_class = Column(String(50), default="stocks", nullable=False)
     data_source = Column(String(50), default="massive", nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Unique constraint or just index to prevent dupes?
     # Usually a universe shouldn't have the same ticker twice.

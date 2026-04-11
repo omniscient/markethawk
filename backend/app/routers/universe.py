@@ -3,12 +3,11 @@ Universe router - CRUD operations for stock universes.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-
-logger = logging.getLogger(__name__)
+from app.utils.session import get_market_today
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -301,7 +300,7 @@ def refresh_universe(
         monitored_stock = MonitoredStock(
             ticker=res["ticker"],
             universe_id=universe_id,
-            added_date=datetime.now().date(),
+            added_date=get_market_today(),
             is_active=True,
             asset_class=res.get("asset_class", "stocks"),
             data_source=res.get("data_source", "massive"),
@@ -326,7 +325,7 @@ def refresh_universe(
             ticker=res["ticker"],
             asset_class=res.get("asset_class", "stocks"),
             data_source=res.get("data_source", "massive"),
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         db.add(stock_ticker)
 
@@ -368,7 +367,7 @@ def sync_missing_aggregates(
     if not stocks:
         return {"status": "skipped", "message": "No active stocks in this universe."}
 
-    now_utc = datetime.utcnow()
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     today = now_utc.strftime("%Y-%m-%d")
     stock_tickers  = [s.ticker for s in stocks if s.asset_class != "futures"]
     futures_stocks = [s for s in stocks if s.asset_class == "futures"]
@@ -455,7 +454,7 @@ def sync_missing_aggregates(
         r.setex(
             f"universe:{universe_id}:sync",
             14400,
-            json.dumps({"task_ids": task_ids, "total": len(task_ids), "started_at": datetime.utcnow().isoformat()}),
+            json.dumps({"task_ids": task_ids, "total": len(task_ids), "started_at": datetime.now(timezone.utc).isoformat()}),
         )
     except Exception as e:
         logger.warning(f"Could not store sync-missing status in Redis: {e}")
@@ -771,7 +770,7 @@ def sync_universe_aggregates(
             json.dumps({
                 "task_ids": task_ids,
                 "total": len(task_ids),
-                "started_at": datetime.utcnow().isoformat(),
+                "started_at": datetime.now(timezone.utc).isoformat(),
                 "timespan": timespan,
                 "from_date": from_date,
                 "to_date": to_date,
@@ -818,7 +817,7 @@ def trigger_quality_analysis(
         report = UniverseQualityReport(universe_id=universe_id)
         db.add(report)
     report.status = "pending"
-    report.started_at = datetime.utcnow()
+    report.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
 
     analyze_universe_quality.delay(universe_id)

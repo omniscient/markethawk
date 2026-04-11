@@ -2,7 +2,7 @@
 Trade Journaling SQLAlchemy models.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, Text, ForeignKey, Table, Date
 from sqlalchemy.orm import relationship
 import uuid
@@ -55,8 +55,8 @@ class Trade(Base):
     tags = relationship("Tag", secondary=trade_tags)
     notes = Column(Text)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 class TradeExecution(Base):
     """Represents an individual buy or sell order within a trade."""
@@ -85,5 +85,5 @@ class JournalEntry(Base):
     content = Column(Text, nullable=False)
     sentiment = Column(String(20)) # "bullish", "bearish", "neutral"
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

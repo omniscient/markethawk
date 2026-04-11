@@ -6,7 +6,7 @@ StockAggregate so we can track contract_month and source without polluting
 the stock table schema.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, BigInteger, Boolean, Index
 
 from app.core.database import Base
@@ -34,7 +34,7 @@ class FuturesAggregate(Base):
     transactions = Column(Integer)
 
     source     = Column(String(20), default="ibkr")          # which provider supplied this bar
-    created_at = Column(DateTime,   default=datetime.utcnow)
+    created_at = Column(DateTime,   default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     __table_args__ = (
         # Fast lookup when assembling a continuous series

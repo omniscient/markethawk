@@ -2,7 +2,7 @@
 ScannerRun SQLAlchemy model.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Uuid as UUID
 import uuid
 
@@ -23,4 +23,4 @@ class ScannerRun(Base):
     events_detected = Column(Integer, default=0)
     execution_time_ms = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

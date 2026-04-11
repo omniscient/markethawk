@@ -40,7 +40,7 @@ def create_app() -> FastAPI:
 
         @event.listens_for(Engine, "before_cursor_execute")
         def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-            conn.info.setdefault('query_start_time', []).append(datetime.datetime.now())
+            conn.info.setdefault('query_start_time', []).append(datetime.datetime.now(datetime.timezone.utc))
             
             # Attempt to format the query for easier debugging (Copy/Paste to PGAdmin)
             # Note: This is a best-effort approximation for logging purposes.
@@ -167,15 +167,18 @@ def create_app() -> FastAPI:
     # Startup event
     @app.on_event("startup")
     async def startup_event():
-        """Initialize database tables and cleanup orphaned states."""
+        """Cleanup orphaned states on startup.
+
+        Schema management is owned exclusively by Alembic.
+        Do NOT call Base.metadata.create_all() here — it bypasses migrations
+        and can silently leave the schema in an inconsistent state.
+        Run `alembic upgrade head` before starting the application.
+        """
         from app.core.database import SessionLocal
         from app.models.universe_quality_report import UniverseQualityReport
         import redis.asyncio as aioredis
         
         try:
-            Base.metadata.create_all(bind=engine)
-            logging.info("Database tables initialized")
-            
             # Reset orphaned tasks in DB
             db = SessionLocal()
             try:

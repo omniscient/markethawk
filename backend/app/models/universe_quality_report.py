@@ -5,7 +5,7 @@ Stores the latest data-quality analysis result for each universe.
 One row per universe; re-running the analysis overwrites the previous result.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import JSON
 
@@ -21,7 +21,7 @@ class UniverseQualityReport(Base):
     overall_grade = Column(String(1), nullable=True)   # A B C D F
     overall_score = Column(Numeric, nullable=True)      # 0–100
     ticker_count  = Column(Integer, nullable=True)
-    started_at   = Column(DateTime, default=datetime.utcnow, nullable=False)
+    started_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
     generated_at = Column(DateTime, nullable=True)      # set when complete
     report_data  = Column(JSON, nullable=True)          # full per-ticker breakdown
     error_message = Column(Text, nullable=True)

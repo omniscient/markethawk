@@ -21,7 +21,7 @@ Grade scale
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -501,7 +501,7 @@ class DataQualityService:
             "status": "complete",
             "overall_score": round(overall_score, 1),
             "overall_grade": overall_grade,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "ticker_count": len(set(t.ticker for t in tickers)),
             "analyzed_count": len(ticker_results),
             "timespans_analyzed": timespans_analyzed,

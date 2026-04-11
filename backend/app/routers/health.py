@@ -2,7 +2,7 @@
 Health check router.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter
 
 from app.core.config import settings
@@ -15,6 +15,6 @@ def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": settings.APP_VERSION,
     }

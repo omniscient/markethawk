@@ -2,7 +2,7 @@
 Scanner router - endpoints for running and viewing scanner results.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
@@ -12,6 +12,7 @@ from sqlalchemy import cast
 from sqlalchemy.dialects.postgresql import JSONB
 import sqlalchemy as sa
 
+from app.utils.session import get_market_today
 from app.core.database import get_db
 from app.models import MonitoredStock, ScannerEvent, ScannerConfig, ScannerRun
 from app.schemas import (
@@ -35,7 +36,7 @@ def run_scanner(
     db: Session = Depends(get_db),
 ):
     """Run scanner on demand."""
-    start_time = datetime.now()
+    start_time = datetime.now(timezone.utc)
     scan_id = str(uuid.uuid4())
     
     # Create initial run record
@@ -86,7 +87,7 @@ def run_scanner(
         status = "failed"
         error_msg = str(e)
 
-    execution_time = int((datetime.now() - start_time).total_seconds() * 1000)
+    execution_time = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 
     # Update run record
     scanner_run.status = status
@@ -204,7 +205,7 @@ def get_scanner_stats(
     total_events = db.query(func.count(ScannerEvent.id)).scalar() or 0
 
     # Today's events
-    today = datetime.now().date()
+    today = get_market_today()
     today_events = (
         db.query(func.count(ScannerEvent.id))
         .filter(ScannerEvent.event_date == today)
@@ -213,7 +214,7 @@ def get_scanner_stats(
     )
 
     # Active alerts (last 24 hours)
-    last_24h = datetime.utcnow() - timedelta(hours=24)
+    last_24h = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
     active_alerts = (
         db.query(func.count(ScannerEvent.id))
         .filter(ScannerEvent.created_at >= last_24h)
@@ -287,5 +288,5 @@ def get_pre_market_movers(
     return {
         "status": "success",
         "movers": movers,
-        "timestamp": datetime.now()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
