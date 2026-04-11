@@ -37,7 +37,8 @@ class Settings:
 
     # Environment: "development" returns full stack traces to clients.
     # "production" hides internals and only returns error_id.
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development").lower()
+    # Default is "production" so that an unset env var NEVER leaks stack traces.
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production").lower()
 
     # Error Tracking
     # SEQ_URL: base URL for the Seq container (no trailing slash).

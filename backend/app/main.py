@@ -116,6 +116,15 @@ def create_app() -> FastAPI:
     app.include_router(system_router)
     app.include_router(futures_router)
 
+    # Log a clear warning at startup whenever trace-exposure mode is enabled
+    _expose_traces = settings.ENVIRONMENT.lower() in ("development", "debug")
+    if _expose_traces:
+        logging.warning(
+            "⚠️  ENVIRONMENT=%s — stack traces ARE included in HTTP error responses. "
+            "Never use this setting in production.",
+            settings.ENVIRONMENT,
+        )
+
     # Global Exception Handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
@@ -136,8 +145,8 @@ def create_app() -> FastAPI:
         except Exception as handler_exc:
             logging.error(f"Error in global_exception_handler: {handler_exc}")
         
-        # In Development mode, return stack trace. In Prod, just the error ID.
-        if settings.ENVIRONMENT.lower() in ("development", "debug"):
+        # Production-safe by default: only expose detail when explicitly in dev/debug.
+        if _expose_traces:
             return JSONResponse(
                 status_code=500,
                 content={
@@ -147,14 +156,13 @@ def create_app() -> FastAPI:
                     "stack_trace": tb_string
                 }
             )
-        else:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "message": "Internal Server Error",
-                    "error_id": error_id
-                }
-            )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "message": "Internal Server Error",
+                "error_id": error_id
+            }
+        )
 
     # Startup event
     @app.on_event("startup")
