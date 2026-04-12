@@ -13,10 +13,10 @@ const NewsSettings: React.FC = () => {
         queryFn: fetchNewsPreferences,
     });
 
-    // Fetch Universes
+    // Fetch Universes — names only, no aggregate stats needed for this dropdown
     const { data: universes, isLoading: isLoadingUniv } = useQuery({
-        queryKey: ['universes'],
-        queryFn: fetchStockUniverses,
+        queryKey: ['universes', { include_stats: false }],
+        queryFn: () => fetchStockUniverses({ include_stats: false }),
     });
 
 

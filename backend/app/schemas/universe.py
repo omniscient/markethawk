@@ -37,5 +37,6 @@ class StockUniverseResponse(BaseModel):
     min_aggregate_date: Optional[datetime] = None
     max_aggregate_date: Optional[datetime] = None
     available_timespans: Optional[List[str]] = []
+    stats_refreshed_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

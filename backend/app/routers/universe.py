@@ -93,109 +93,175 @@ def delete_stock_universe(
     return {"message": "Universe deleted successfully"}
 
 
-@router.get("/list", response_model=List[StockUniverseResponse])
-def list_stock_universes(
-    db: Session = Depends(get_db),
-):
+def _compute_universe_stats(universe_id: int, db: Session) -> dict:
+    """
+    Run the heavy aggregate queries for one universe and return a stats dict.
+    Called by refresh-stats; not used in the list endpoint anymore.
+    """
     from sqlalchemy import func
     from app.models.futures_aggregate import FuturesAggregate
 
-    """List all stock universes."""
-    universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+    ticker_count = (
+        db.query(func.count(StockUniverseTicker.id))
+        .filter(StockUniverseTicker.universe_id == universe_id)
+        .scalar()
+    ) or 0
 
-    # Enrich with stats
-    # Optimization: Could use a single complex query, but loop is clearer for now given <50 universes
+    futures_tickers = [
+        row.ticker
+        for row in db.query(StockUniverseTicker.ticker)
+        .filter(
+            StockUniverseTicker.universe_id == universe_id,
+            StockUniverseTicker.asset_class == "futures",
+        )
+        .all()
+    ]
+    stock_tickers = [
+        row.ticker
+        for row in db.query(StockUniverseTicker.ticker)
+        .filter(
+            StockUniverseTicker.universe_id == universe_id,
+            StockUniverseTicker.asset_class != "futures",
+        )
+        .all()
+    ]
+
+    count_aggs = 0
+    min_date = None
+    max_date = None
+
+    if stock_tickers:
+        stock_stats = (
+            db.query(
+                func.count(StockAggregate.id),
+                func.min(StockAggregate.timestamp),
+                func.max(StockAggregate.timestamp),
+            )
+            .filter(StockAggregate.ticker.in_(stock_tickers))
+            .first()
+        )
+        if stock_stats and stock_stats[0]:
+            count_aggs += stock_stats[0]
+            min_date = stock_stats[1] if min_date is None else min(min_date, stock_stats[1]) if stock_stats[1] else min_date
+            max_date = stock_stats[2] if max_date is None else max(max_date, stock_stats[2]) if stock_stats[2] else max_date
+
+    if futures_tickers:
+        futures_stats = (
+            db.query(
+                func.count(FuturesAggregate.id),
+                func.min(FuturesAggregate.timestamp),
+                func.max(FuturesAggregate.timestamp),
+            )
+            .filter(FuturesAggregate.symbol.in_(futures_tickers))
+            .first()
+        )
+        if futures_stats and futures_stats[0]:
+            count_aggs += futures_stats[0]
+            min_date = futures_stats[1] if min_date is None else min(min_date, futures_stats[1]) if futures_stats[1] else min_date
+            max_date = futures_stats[2] if max_date is None else max(max_date, futures_stats[2]) if futures_stats[2] else max_date
+
+    timespans_set: set = set()
+    if stock_tickers:
+        for row in (
+            db.query(StockAggregate.timespan, StockAggregate.multiplier)
+            .filter(StockAggregate.ticker.in_(stock_tickers))
+            .distinct()
+            .all()
+        ):
+            label = f"{row.multiplier}{row.timespan}" if row.multiplier > 1 else row.timespan
+            timespans_set.add(label)
+    if futures_tickers:
+        from app.models.futures_aggregate import FuturesAggregate
+        for row in (
+            db.query(FuturesAggregate.timespan, FuturesAggregate.multiplier)
+            .filter(FuturesAggregate.symbol.in_(futures_tickers))
+            .distinct()
+            .all()
+        ):
+            label = f"{row.multiplier}{row.timespan}" if row.multiplier > 1 else row.timespan
+            timespans_set.add(label)
+
+    return {
+        "ticker_count": ticker_count,
+        "aggregate_count": count_aggs,
+        "min_date": min_date,
+        "max_date": max_date,
+        "timespans": sorted(timespans_set),
+    }
+
+
+@router.get("/list", response_model=List[StockUniverseResponse])
+def list_stock_universes(
+    include_stats: bool = True,
+    db: Session = Depends(get_db),
+):
+    """
+    List all active stock universes.
+
+    - include_stats=true (default): returns cached aggregate stats (ticker count,
+      bar count, date range, timespans). Stats are pre-computed; call
+      POST /{id}/refresh-stats to update them after a sync.
+    - include_stats=false: returns only identity fields (id, name, description,
+      criteria). Use this for dropdowns/selects that don't need stats.
+    """
+    universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
 
     results = []
     for universe in universes:
-        # 1. Ticker Count
-        ticker_count = (
-            db.query(func.count(StockUniverseTicker.id))
-            .filter(StockUniverseTicker.universe_id == universe.id)
-            .scalar()
-        )
-
-        # 2. Aggregate Stats — split by asset class so futures bars (FuturesAggregate)
-        #    and stock bars (StockAggregate) are both counted.
-        futures_tickers = [
-            row.ticker
-            for row in db.query(StockUniverseTicker.ticker)
-            .filter(
-                StockUniverseTicker.universe_id == universe.id,
-                StockUniverseTicker.asset_class == "futures",
-            )
-            .all()
-        ]
-        stock_tickers = [
-            row.ticker
-            for row in db.query(StockUniverseTicker.ticker)
-            .filter(
-                StockUniverseTicker.universe_id == universe.id,
-                StockUniverseTicker.asset_class != "futures",
-            )
-            .all()
-        ]
-
-        count_aggs = 0
-        min_date = None
-        max_date = None
-
-        if stock_tickers:
-            stock_stats = (
-                db.query(
-                    func.count(StockAggregate.id),
-                    func.min(StockAggregate.timestamp),
-                    func.max(StockAggregate.timestamp),
-                )
-                .filter(StockAggregate.ticker.in_(stock_tickers))
-                .first()
-            )
-            if stock_stats and stock_stats[0]:
-                count_aggs += stock_stats[0]
-                min_date = stock_stats[1] if min_date is None else min(min_date, stock_stats[1]) if stock_stats[1] else min_date
-                max_date = stock_stats[2] if max_date is None else max(max_date, stock_stats[2]) if stock_stats[2] else max_date
-
-        if futures_tickers:
-            futures_stats = (
-                db.query(
-                    func.count(FuturesAggregate.id),
-                    func.min(FuturesAggregate.timestamp),
-                    func.max(FuturesAggregate.timestamp),
-                )
-                .filter(FuturesAggregate.symbol.in_(futures_tickers))
-                .first()
-            )
-            if futures_stats and futures_stats[0]:
-                count_aggs += futures_stats[0]
-                min_date = futures_stats[1] if min_date is None else min(min_date, futures_stats[1]) if futures_stats[1] else min_date
-                max_date = futures_stats[2] if max_date is None else max(max_date, futures_stats[2]) if futures_stats[2] else max_date
-
-        # 3. Available timespans — distinct (timespan, multiplier) pairs across both tables
-        timespans_set = set()
-        if stock_tickers:
-            for row in db.query(StockAggregate.timespan, StockAggregate.multiplier).filter(
-                StockAggregate.ticker.in_(stock_tickers)
-            ).distinct().all():
-                label = f"{row.multiplier}{row.timespan}" if row.multiplier > 1 else row.timespan
-                timespans_set.add(label)
-        if futures_tickers:
-            for row in db.query(FuturesAggregate.timespan, FuturesAggregate.multiplier).filter(
-                FuturesAggregate.symbol.in_(futures_tickers)
-            ).distinct().all():
-                label = f"{row.multiplier}{row.timespan}" if row.multiplier > 1 else row.timespan
-                timespans_set.add(label)
-
-        # Convert to Pydantic model with extra fields
         universe_data = StockUniverseResponse.from_orm(universe)
-        universe_data.ticker_count = ticker_count or 0
-        universe_data.aggregate_count = count_aggs or 0
-        universe_data.min_aggregate_date = min_date
-        universe_data.max_aggregate_date = max_date
-        universe_data.available_timespans = sorted(timespans_set)
+
+        if include_stats:
+            # Read from cached columns — zero heavy queries
+            universe_data.ticker_count = universe.cached_ticker_count or 0
+            universe_data.aggregate_count = universe.cached_aggregate_count or 0
+            universe_data.min_aggregate_date = universe.cached_min_date
+            universe_data.max_aggregate_date = universe.cached_max_date
+            universe_data.available_timespans = universe.cached_timespans or []
+            universe_data.stats_refreshed_at = universe.stats_refreshed_at
+        else:
+            universe_data.ticker_count = 0
+            universe_data.aggregate_count = 0
+            universe_data.min_aggregate_date = None
+            universe_data.max_aggregate_date = None
+            universe_data.available_timespans = []
 
         results.append(universe_data)
 
     return results
+
+
+@router.post("/{universe_id}/refresh-stats", response_model=StockUniverseResponse)
+def refresh_universe_stats(
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Recompute and persist aggregate stats for this universe.
+    Call after syncing aggregates or refreshing tickers to update the cache.
+    """
+    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+    if not universe:
+        raise HTTPException(status_code=404, detail="Universe not found")
+
+    stats = _compute_universe_stats(universe_id, db)
+
+    universe.cached_ticker_count = stats["ticker_count"]
+    universe.cached_aggregate_count = stats["aggregate_count"]
+    universe.cached_min_date = stats["min_date"]
+    universe.cached_max_date = stats["max_date"]
+    universe.cached_timespans = stats["timespans"]
+    universe.stats_refreshed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+    db.refresh(universe)
+
+    universe_data = StockUniverseResponse.from_orm(universe)
+    universe_data.ticker_count = universe.cached_ticker_count or 0
+    universe_data.aggregate_count = universe.cached_aggregate_count or 0
+    universe_data.min_aggregate_date = universe.cached_min_date
+    universe_data.max_aggregate_date = universe.cached_max_date
+    universe_data.available_timespans = universe.cached_timespans or []
+    universe_data.stats_refreshed_at = universe.stats_refreshed_at
+    return universe_data
 
 
 from fastapi import BackgroundTasks

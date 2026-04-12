@@ -54,6 +54,7 @@ export interface StockUniverse {
   min_aggregate_date?: string;
   max_aggregate_date?: string;
   available_timespans?: string[];
+  stats_refreshed_at?: string;
 }
 
 export interface UniverseSyncStatus {
@@ -193,8 +194,13 @@ export const fetchPreMarketMovers = async (params?: {
 
 // ---- Universe ------------------------------------------------------------- //
 
-export const fetchStockUniverses = async (): Promise<StockUniverse[]> => {
-  const response = await apiClient.get('/universe/list');
+export const fetchStockUniverses = async (params?: { include_stats?: boolean }): Promise<StockUniverse[]> => {
+  const response = await apiClient.get('/universe/list', { params });
+  return response.data;
+};
+
+export const refreshUniverseStats = async (id: number): Promise<StockUniverse> => {
+  const response = await apiClient.post(`/universe/${id}/refresh-stats`);
   return response.data;
 };
 

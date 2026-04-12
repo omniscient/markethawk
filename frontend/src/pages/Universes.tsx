@@ -26,7 +26,7 @@ import QualityReportModal from '../components/QualityReportModal';
 import { StockUniverse, QualityReport, fetchQualityReport } from '../api/scanner';
 
 // API functions
-import { fetchStockUniverses, deleteStockUniverse, fetchUniverseSyncStatus, syncMissingAggregates } from '../api/scanner';
+import { fetchStockUniverses, deleteStockUniverse, fetchUniverseSyncStatus, syncMissingAggregates, refreshUniverseStats } from '../api/scanner';
 
 const Universes: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,6 +116,13 @@ const Universes: React.FC = () => {
     },
   });
 
+  const refreshStatsMutation = useMutation({
+    mutationFn: (id: number) => refreshUniverseStats(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
+    },
+  });
+
   const handleDelete = (id: number) => {
     if (window.confirm('Are you sure you want to delete this universe?')) {
       deleteMutation.mutate(id);
@@ -124,7 +131,7 @@ const Universes: React.FC = () => {
 
   const { data: universes, isLoading } = useQuery({
     queryKey: ['stockUniverses'],
-    queryFn: fetchStockUniverses,
+    queryFn: () => fetchStockUniverses(),
   });
 
   // Fetch quality reports for all loaded universes
@@ -336,6 +343,16 @@ const Universes: React.FC = () => {
                     <span className="hidden xl:inline">Catch Up</span>
                   </Button>
                 )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={refreshStatsMutation.isPending && refreshStatsMutation.variables === universe.id ? Loader2 : RefreshCw}
+                  onClick={() => refreshStatsMutation.mutate(universe.id)}
+                  disabled={refreshStatsMutation.isPending}
+                  title="Recompute cached stats (ticker count, bar count, date range)"
+                >
+                  <span className="hidden xl:inline">Refresh Stats</span>
+                </Button>
                 {(universe.aggregate_count ?? 0) > 0 && (
                   <Button
                     variant="secondary"

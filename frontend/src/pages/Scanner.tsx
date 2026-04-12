@@ -37,7 +37,7 @@ const Scanner: React.FC = () => {
   // Fetch stock universes
   const { data: universes, isLoading: loadingUniverses } = useQuery({
     queryKey: ['stockUniverses'],
-    queryFn: fetchStockUniverses,
+    queryFn: () => fetchStockUniverses(),
   });
 
   // Fetch scanner history
