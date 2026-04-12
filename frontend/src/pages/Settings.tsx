@@ -18,7 +18,12 @@ const Settings: React.FC = () => {
   const [syncingMetrics, setSyncingMetrics] = useState(false);
   const [syncingDetails, setSyncingDetails] = useState(false);
   const [stopping, setStopping] = useState(false);
-  const [crawlSpeed, setCrawlSpeed] = useState<number>(15.0);
+  const [crawlSpeed, setCrawlSpeed] = useState<number>(() => {
+    const saved = localStorage.getItem('crawlSpeed');
+    return saved !== null ? parseFloat(saved) : 15.0;
+  });
+  useEffect(() => { localStorage.setItem('crawlSpeed', String(crawlSpeed)); }, [crawlSpeed]);
+
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
   const [loadingStorage, setLoadingStorage] = useState(false);
 
