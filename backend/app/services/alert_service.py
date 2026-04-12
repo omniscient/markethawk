@@ -188,6 +188,9 @@ class NotificationDispatcher:
 
         data = json.dumps(NotificationDispatcher._build_push_payload(event))
         vapid_claims = {"sub": settings.VAPID_CLAIMS_EMAIL}
+        # Key is stored as raw base64url (43 chars, no PEM headers) — py_vapid from_string
+        # only supports this format; PEM is not recognized in this version.
+        vapid_private_key = settings.VAPID_PRIVATE_KEY
 
         failed = 0
         for sub in subscriptions:
@@ -198,7 +201,7 @@ class NotificationDispatcher:
                         "keys": {"p256dh": sub.p256dh, "auth": sub.auth},
                     },
                     data=data,
-                    vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                    vapid_private_key=vapid_private_key,
                     vapid_claims=vapid_claims,
                 )
             except Exception as exc:

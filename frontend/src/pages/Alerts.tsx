@@ -70,7 +70,7 @@ const Alerts: React.FC = () => {
   const { data: rules, isLoading: isLoadingRules } = useAlertRules();
   const { data: stats } = useAlertStats();
   const { data: logs } = useAlertLogs(15);
-  
+
   const createRule = useCreateAlertRule();
   const updateRule = useUpdateAlertRule();
   const deleteRule = useDeleteAlertRule();
@@ -80,6 +80,18 @@ const Alerts: React.FC = () => {
   // ── State ────────────────────────────────────────────────────────────────
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<Partial<AlertRule> | null>(null);
+  // Track whether the browser actually has an active push subscription (not just permission).
+  const [hasPushSubscription, setHasPushSubscription] = useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setHasPushSubscription(false);
+      return;
+    }
+    navigator.serviceWorker.ready.then(reg =>
+      reg.pushManager.getSubscription()
+    ).then(sub => setHasPushSubscription(sub !== null));
+  }, [stats?.push_subscriptions]); // re-check after subscribe/unsubscribe
   const [formState, setFormState] = useState<Partial<AlertRule>>({});
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -335,13 +347,13 @@ const Alerts: React.FC = () => {
                 Receive instant notifications on your desktop even when MarketHawk is closed.
               </p>
               
-              {Notification.permission === 'granted' ? (
+              {Notification.permission === 'granted' && hasPushSubscription ? (
                 <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex items-start space-x-3">
                   <ShieldCheck className="h-5 w-5 text-green-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-sm font-bold text-green-400 uppercase tracking-widest">Active</h4>
                     <p className="text-xs text-green-400/70 mt-1">This browser is registered for push alerts.</p>
-                    <button 
+                    <button
                       onClick={() => unsubscribe()}
                       className="text-xs font-bold text-gray-500 hover:text-white underline mt-3 uppercase tracking-tighter"
                     >

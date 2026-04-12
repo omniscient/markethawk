@@ -252,25 +252,33 @@ def generate_vapid_keys() -> Dict[str, str]:
     One-time key generation helper. Run once, copy output to .env.
     This endpoint should be removed or restricted in production.
     """
-    try:
-        from py_vapid import Vapid
-        v = Vapid()
-        v.generate_keys()
-        private_pem = v.private_pem().decode("utf-8").strip()
-        public_key = v.public_key
-        return {
-            "VAPID_PRIVATE_KEY": private_pem,
-            "VAPID_PUBLIC_KEY": public_key,
-            "instructions": (
-                "Copy these values into your .env file. "
-                "Restart the backend container after updating .env."
-            ),
-        }
-    except ImportError:
-        raise HTTPException(
-            status_code=503,
-            detail="py_vapid not installed. Add pywebpush to requirements.txt.",
-        )
+    import base64
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding, PrivateFormat, PublicFormat, NoEncryption,
+    )
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+
+    # Raw 32-byte private scalar — base64url encoded.
+    # py_vapid's from_string() only accepts this format (not PEM).
+    # Single-line, safe for .env and Docker env var injection.
+    der = private_key.private_bytes(Encoding.DER, PrivateFormat.TraditionalOpenSSL, NoEncryption())
+    raw_priv = der[7:39]  # SEC1 DER: 7-byte header, then 32-byte key scalar
+    private_b64 = base64.urlsafe_b64encode(raw_priv).decode().rstrip("=")
+
+    # Uncompressed EC point, URL-safe base64 — what browsers expect for applicationServerKey
+    pub_bytes = private_key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    public_b64 = base64.urlsafe_b64encode(pub_bytes).decode().rstrip("=")
+
+    return {
+        "VAPID_PUBLIC_KEY": public_b64,
+        "VAPID_PRIVATE_KEY": private_b64,
+        "instructions": (
+            "Paste both values into .env without quotes. "
+            "Then run: docker-compose up -d --force-recreate backend"
+        ),
+    }
 
 
 @router.post("/push/subscribe", status_code=201)

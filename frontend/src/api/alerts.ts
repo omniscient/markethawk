@@ -149,17 +149,21 @@ export const usePushSubscription = () => {
     mutationFn: async () => {
       // 1. Get VAPID public key
       const { data: { public_key } } = await api.get('/api/alerts/push/vapid-key');
-      
-      // 2. Register Service Worker if not already
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      
+
+      // 2. Ensure service worker is registered and active before subscribing
+      await navigator.serviceWorker.register('/sw.js');
+      const registration = await navigator.serviceWorker.ready;
+
       // 3. Prompt for permission
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
         throw new Error('Notification permission denied');
       }
 
-      // 4. Subscribe
+      // 4. Subscribe (unsubscribe first if a stale subscription exists)
+      const existing = await registration.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(public_key),
