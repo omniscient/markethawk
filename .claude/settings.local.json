@@ -39,7 +39,8 @@
       "Bash(node:*)",
       "Bash(npm outdated:*)",
       "Bash(pip download:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(docker compose:*)"
     ]
   }
 }
