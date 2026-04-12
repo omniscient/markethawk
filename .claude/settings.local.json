@@ -41,7 +41,9 @@
       "Bash(pip download:*)",
       "Bash(xargs grep:*)",
       "Bash(docker compose:*)",
-      "Bash(ls \"C:/git/trading/OKComputer_Custom Stock Scanner System/\"*.md \"C:/git/trading/OKComputer_Custom Stock Scanner System/\".agent/skills/**/*.md)"
+      "Bash(ls \"C:/git/trading/OKComputer_Custom Stock Scanner System/\"*.md \"C:/git/trading/OKComputer_Custom Stock Scanner System/\".agent/skills/**/*.md)",
+      "Bash(rm verify_fix.py inspect_snapshot.py test_movers.py check_polygon_keys.py backend-logs.txt backend.log logs.txt test.db database-schema.sql aws-deployment.yaml)",
+      "Bash(rmdir scratch:*)"
     ]
   }
 }

@@ -41,3 +41,7 @@ logs/
 # Project Specific
 frontend/build.log
 backend/celerybeat-schedule
+
+# Local artifacts (log dumps, scratch DBs)
+*.db
+*-logs.txt
