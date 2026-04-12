@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Database, RefreshCw, Newspaper } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import NewsSettings from '../components/NewsSettings';
 import { syncFundamentals, syncMetrics, syncTickerDetails, stopSync, fetchStorageStats, StorageStats } from '../api/scanner';
+import { getSystemConfig, updateSystemConfig } from '../api/system';
 
 const tabs = [
   { id: 'data', name: 'Data & Storage', icon: Database },
@@ -18,11 +20,17 @@ const Settings: React.FC = () => {
   const [syncingMetrics, setSyncingMetrics] = useState(false);
   const [syncingDetails, setSyncingDetails] = useState(false);
   const [stopping, setStopping] = useState(false);
-  const [crawlSpeed, setCrawlSpeed] = useState<number>(() => {
-    const saved = localStorage.getItem('crawlSpeed');
-    return saved !== null ? parseFloat(saved) : 15.0;
+  const queryClient = useQueryClient();
+  const { data: sysConfig } = useQuery({
+    queryKey: ['systemConfig'],
+    queryFn: getSystemConfig,
   });
-  useEffect(() => { localStorage.setItem('crawlSpeed', String(crawlSpeed)); }, [crawlSpeed]);
+  const crawlSpeed = sysConfig ? parseFloat(sysConfig.polygon_crawl_delay ?? '15.0') : 15.0;
+  const configMutation = useMutation({
+    mutationFn: updateSystemConfig,
+    onSuccess: (data) => queryClient.setQueryData(['systemConfig'], data),
+  });
+  const setCrawlSpeed = (speed: number) => configMutation.mutate({ polygon_crawl_delay: speed });
 
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
   const [loadingStorage, setLoadingStorage] = useState(false);

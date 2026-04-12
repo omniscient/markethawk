@@ -27,3 +27,13 @@ export const getStorageStats = async (): Promise<StorageStats> => {
   const response = await apiClient.get('/system/storage');
   return response.data;
 };
+
+export const getSystemConfig = async (): Promise<Record<string, string>> => {
+  const response = await apiClient.get('/system/config');
+  return response.data;
+};
+
+export const updateSystemConfig = async (patch: Record<string, string | number>): Promise<Record<string, string>> => {
+  const response = await apiClient.patch('/system/config', patch);
+  return response.data;
+};

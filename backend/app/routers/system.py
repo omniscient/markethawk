@@ -14,6 +14,7 @@ import redis.asyncio as aioredis
 from app.core.database import get_db, SessionLocal
 from app.models.universe_quality_report import UniverseQualityReport
 from app.models.stock_universe import StockUniverse
+from app.models.system_config import SystemConfig
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 logger = logging.getLogger(__name__)
@@ -120,6 +121,27 @@ def get_app_info():
         "data_mode": "delayed" if settings.POLYGON_DELAYED else "live",
         "log_level": settings.LOG_LEVEL
     }
+
+@router.get("/config")
+def get_config(db: Session = Depends(get_db)):
+    """Return all system config keys as a flat dict."""
+    rows = db.query(SystemConfig).all()
+    return {row.key: row.value for row in rows}
+
+
+@router.patch("/config")
+def update_config(payload: Dict[str, Any], db: Session = Depends(get_db)):
+    """Upsert one or more system config keys."""
+    for key, value in payload.items():
+        row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+        if row:
+            row.value = str(value)
+        else:
+            db.add(SystemConfig(key=key, value=str(value)))
+    db.commit()
+    rows = db.query(SystemConfig).all()
+    return {row.key: row.value for row in rows}
+
 
 @router.websocket("/ws/tasks")
 async def system_tasks_websocket(websocket: WebSocket):

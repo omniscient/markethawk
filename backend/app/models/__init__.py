@@ -20,6 +20,7 @@ from app.models.futures_rollover import FuturesRollover
 from app.models.futures_contract import FuturesContract
 from app.models.universe_quality_report import UniverseQualityReport
 from app.models.market_holiday import MarketHoliday
+from app.models.system_config import SystemConfig
 
 __all__ = [
     "StockUniverse",
@@ -42,4 +43,5 @@ __all__ = [
     "FuturesContract",
     "UniverseQualityReport",
     "MarketHoliday",
+    "SystemConfig",
 ]
