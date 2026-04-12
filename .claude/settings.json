@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python -c \"import sys,json; d=json.load(sys.stdin); f=d.get('tool_input',{}).get('file_path',''); exit(0 if 'backend' in f and f.endswith('.py') else 1)\" && docker compose -f \"C:/git/trading/OKComputer_Custom Stock Scanner System/docker-compose.yml\" restart celery-worker 2>/dev/null || true",
+            "command": "python -c \"import sys,json; d=json.load(sys.stdin); f=d.get('tool_input',{}).get('file_path',''); exit(0 if 'backend' in f and f.endswith('.py') else 1)\" && docker compose -f \"C:/git/trading/MarketHawk/docker-compose.yml\" restart celery-worker 2>/dev/null || true",
             "statusMessage": "Restarting celery-worker...",
             "async": true
           }

@@ -1,3 +1,5 @@
+name: markethawk
+
 services:
   # PostgreSQL Database
   postgres:
@@ -228,10 +230,20 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: markethawk_postgres_data
   redis_data:
+    external: true
+    name: markethawk_redis_data
   pgadmin_data:
+    external: true
+    name: markethawk_pgadmin_data
   seq_data:
+    external: true
+    name: markethawk_seq_data
   ib_gateway_settings:
+    external: true
+    name: markethawk_ib_gateway_settings
 
 
 networks:

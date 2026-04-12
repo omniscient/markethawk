@@ -12,12 +12,12 @@ This project runs in **bash** (Git Bash), not PowerShell. Use Unix shell syntax 
 Use forward slashes. Git Bash translates them for Windows automatically.
 
 ```bash
-cd /c/git/trading/OKComputer_Custom\ Stock\ Scanner\ System
+cd /c/git/trading/MarketHawk
 ```
 
 Or use the absolute Windows path with forward slashes:
 ```bash
-cd "C:/git/trading/OKComputer_Custom Stock Scanner System"
+cd "C:/git/trading/MarketHawk"
 ```
 
 ## Command Chaining

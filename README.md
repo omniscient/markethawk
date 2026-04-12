@@ -1,4 +1,4 @@
-# OKComputer — Custom Stock Scanner System
+# MarketHawk — Custom Stock Scanner System
 
 A full-stack stock scanning platform that identifies pre-market volume spikes and unusual trading patterns. Built for active traders who need fast, configurable scans with a professional UI.
 

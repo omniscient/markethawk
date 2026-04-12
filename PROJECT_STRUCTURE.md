@@ -1,7 +1,7 @@
 # Project Structure
 
 ```
-OKComputer_Custom Stock Scanner System/
+MarketHawk/
 ├── backend/
 │   ├── alembic/                        # Alembic migration framework
 │   │   ├── versions/                   # Migration scripts (one file per schema change)

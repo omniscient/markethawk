@@ -35,6 +35,9 @@ logs/
 *.swp
 *.swo
 
+# Claude Code (machine-specific)
+.claude/settings.local.json
+
 # Docker
 .docker/
 
