@@ -60,6 +60,23 @@ class Settings:
     # Keep this different from any other apps connecting to TWS simultaneously.
     IBKR_CLIENT_ID: int = int(os.getenv("IBKR_CLIENT_ID", "10"))
 
+    # ── Email / SMTP (Alert Notifications) ────────────────────────────────
+    # Use Gmail + an App Password (not your real Gmail password).
+    # Generate one at: https://myaccount.google.com/apppasswords
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "MarketHawk Alerts <noreply@example.com>")
+
+    # ── Web Push / VAPID (Browser Push Notifications) ─────────────────────
+    # Generate a key pair once with: python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print('PRIV:', v.private_pem().decode()); print('PUB:', v.public_key)"
+    # Or use the /api/alerts/push/generate-keys endpoint on first run.
+    VAPID_PRIVATE_KEY: str = os.getenv("VAPID_PRIVATE_KEY", "")
+    VAPID_PUBLIC_KEY: str = os.getenv("VAPID_PUBLIC_KEY", "")
+    # Must be a mailto: or https: URL identifying the push sender
+    VAPID_CLAIMS_EMAIL: str = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com")
+
 
 @lru_cache()
 def get_settings() -> Settings:

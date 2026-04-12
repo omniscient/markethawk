@@ -726,3 +726,43 @@ def sync_stock_splits(self):
     finally:
         db.close()
 
+
+@celery_app.task(bind=True, max_retries=2)
+def evaluate_scanner_alerts(self, scanner_event_id: int):
+    """
+    Evaluate all active alert rules against a newly-saved ScannerEvent.
+    Dispatches notifications via all configured channels for any matching rules.
+    Called automatically when a new ScannerEvent is created.
+    """
+    from app.models.scanner_event import ScannerEvent
+    from app.services.alert_service import AlertRuleService, NotificationDispatcher
+
+    db: Session = SessionLocal()
+    try:
+        event = db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
+        if not event:
+            logger.warning(f"evaluate_scanner_alerts: ScannerEvent id={scanner_event_id} not found.")
+            return
+
+        matching_rules = AlertRuleService.get_matching_rules(event, db)
+        if not matching_rules:
+            return
+
+        logger.info(
+            f"🔔 {len(matching_rules)} alert rule(s) matched "
+            f"event={scanner_event_id} ticker={event.ticker} type={event.scanner_type}"
+        )
+
+        for rule in matching_rules:
+            try:
+                NotificationDispatcher.dispatch(rule, event, db)
+            except Exception as exc:
+                logger.error(f"❌ Dispatch failed for rule {rule.id}: {exc}")
+
+    except Exception as e:
+        logger.error(f"❌ evaluate_scanner_alerts failed for event {scanner_event_id}: {e}")
+        db.rollback()
+        raise self.retry(exc=e, countdown=30)
+    finally:
+        db.close()
+

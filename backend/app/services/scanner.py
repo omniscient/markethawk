@@ -240,6 +240,10 @@ class ScannerService:
             db.add(new_event)
             db.flush()
             event_dict["id"] = new_event.id
+
+            # Trigger alert evaluation for new events
+            from app.tasks import evaluate_scanner_alerts
+            evaluate_scanner_alerts.delay(new_event.id)
             
         return event_dict
 
