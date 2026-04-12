@@ -2,7 +2,7 @@
 Stock Pydantic schemas.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import date
 
@@ -19,5 +19,4 @@ class MonitoredStockResponse(BaseModel):
     asset_class: str = "stocks"
     data_source: str = "massive"
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

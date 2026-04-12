@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime, date
 from typing import List, Optional
 from decimal import Decimal
@@ -13,8 +13,7 @@ class TagCreate(TagBase):
 class TagSchema(TagBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ExecutionBase(BaseModel):
     timestamp: datetime
@@ -31,8 +30,7 @@ class ExecutionSchema(ExecutionBase):
     id: int
     trade_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TradeBase(BaseModel):
     symbol: str
@@ -64,8 +62,7 @@ class TradeSchema(TradeBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class JournalEntryBase(BaseModel):
     entry_date: date
@@ -80,8 +77,7 @@ class JournalEntrySchema(JournalEntryBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TradeStats(BaseModel):
     total_trades: int

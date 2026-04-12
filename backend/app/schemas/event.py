@@ -2,7 +2,7 @@
 Scanner Event Pydantic schemas.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Dict, Any, Optional, List
 from datetime import datetime, date
 import uuid
@@ -30,9 +30,7 @@ class ScannerEventResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class ScannerEventSummary(BaseModel):
@@ -45,5 +43,4 @@ class ScannerEventSummary(BaseModel):
     summary: Optional[str] = None
     severity: Optional[str] = "medium"
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -8,6 +8,8 @@ import os
 import traceback
 import hashlib
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +23,65 @@ from app.services.websocket_manager import websocket_manager
 
 # Celery Configuration
 # celery instance is imported from app.core.celery_app
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown logic for the FastAPI application."""
+    # --- Startup ---
+    from app.core.database import SessionLocal
+    from app.models.universe_quality_report import UniverseQualityReport
+    import redis.asyncio as aioredis
+
+    try:
+        db = SessionLocal()
+        try:
+            reports = db.query(UniverseQualityReport).filter(
+                (UniverseQualityReport.status.in_(["pending", "running"])) |
+                (UniverseQualityReport.normalization_status.in_(["pending", "running"]))
+            ).all()
+            for report in reports:
+                if report.status in ["pending", "running"]:
+                    report.status = "error"
+                    report.error_message = "Process interrupted by server restart."
+                if report.normalization_status in ["pending", "running"]:
+                    report.normalization_status = "error"
+            if reports:
+                db.commit()
+                logging.info(f"Reset {len(reports)} orphaned quality reports to error state.")
+        except Exception as dbe:
+            logging.error(f"Error resetting orphaned DB tasks: {dbe}")
+        finally:
+            db.close()
+    except Exception as e:
+        logging.error(f"Failed to initialize database tables: {e}")
+        logging.warning("Application starting without verified DB connection")
+
+    try:
+        r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        cursor = '0'
+        keys_deleted = 0
+        while True:
+            cursor, keys = await r.scan(cursor=cursor, match="universe:*:sync", count=100)
+            if keys:
+                await r.delete(*keys)
+                keys_deleted += len(keys)
+            if cursor == 0 or cursor == '0' or str(cursor) == '0':
+                break
+        if keys_deleted > 0:
+            logging.info(f"Cleared {keys_deleted} orphaned sync tracking keys from Redis.")
+        await r.close()
+    except Exception as re:
+        logging.error(f"Failed to clean up Redis sync keys on startup: {re}")
+
+    websocket_manager.start()
+    logging.info("Stock WebSocket Manager started")
+
+    yield
+
+    # --- Shutdown ---
+    engine.dispose()
+    logging.info("Database connection closed")
 
 
 def create_app() -> FastAPI:
@@ -91,6 +152,7 @@ def create_app() -> FastAPI:
         title=settings.APP_NAME,
         description="Professional stock scanning and alert system",
         version=settings.APP_VERSION,
+        lifespan=lifespan,
     )
 
     # CORS middleware
@@ -163,75 +225,6 @@ def create_app() -> FastAPI:
                 "error_id": error_id
             }
         )
-
-    # Startup event
-    @app.on_event("startup")
-    async def startup_event():
-        """Cleanup orphaned states on startup.
-
-        Schema management is owned exclusively by Alembic.
-        Do NOT call Base.metadata.create_all() here — it bypasses migrations
-        and can silently leave the schema in an inconsistent state.
-        Run `alembic upgrade head` before starting the application.
-        """
-        from app.core.database import SessionLocal
-        from app.models.universe_quality_report import UniverseQualityReport
-        import redis.asyncio as aioredis
-        
-        try:
-            # Reset orphaned tasks in DB
-            db = SessionLocal()
-            try:
-                reports = db.query(UniverseQualityReport).filter(
-                    (UniverseQualityReport.status.in_(["pending", "running"])) |
-                    (UniverseQualityReport.normalization_status.in_(["pending", "running"]))
-                ).all()
-                for report in reports:
-                    if report.status in ["pending", "running"]:
-                        report.status = "error"
-                        report.error_message = "Process interrupted by server restart."
-                    if report.normalization_status in ["pending", "running"]:
-                        report.normalization_status = "error"
-                if reports:
-                    db.commit()
-                    logging.info(f"Reset {len(reports)} orphaned quality reports to error state.")
-            except Exception as dbe:
-                logging.error(f"Error resetting orphaned DB tasks: {dbe}")
-            finally:
-                db.close()
-                
-        except Exception as e:
-            logging.error(f"Failed to initialize database tables: {e}")
-            logging.warning("Application starting without verified DB connection")
-            
-        # Optional: cleanup orphaned Redis sync keys if we want to ensure clean slate
-        try:
-            r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-            cursor = '0'
-            keys_deleted = 0
-            while True:
-                cursor, keys = await r.scan(cursor=cursor, match="universe:*:sync", count=100)
-                if keys:
-                    await r.delete(*keys)
-                    keys_deleted += len(keys)
-                if cursor == 0 or cursor == '0' or str(cursor) == '0':
-                    break
-            if keys_deleted > 0:
-                logging.info(f"Cleared {keys_deleted} orphaned sync tracking keys from Redis.")
-            await r.close()
-        except Exception as re:
-            logging.error(f"Failed to clean up Redis sync keys on startup: {re}")
-            
-        # Start Polygon WebSocket Manager
-        websocket_manager.start()
-        logging.info("Stock WebSocket Manager started")
-
-    # Shutdown event
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        """Cleanup resources."""
-        engine.dispose()
-        logging.info("Database connection closed")
 
     return app
 
