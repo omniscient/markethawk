@@ -90,6 +90,32 @@ hooks/        — Custom React hooks
 - **API base URL**: configured via `VITE_API_TARGET` env variable
 - **Charts**: Recharts for analytics, Lightweight Charts (TradingView-style) for price charts
 
+## Development Rules
+
+### Validating Changes Before Committing
+
+**Backend changes** must be validated live before committing:
+1. Confirm the backend reloaded: `docker-compose logs backend --tail=10`
+2. Hit new/changed endpoints with `curl` to verify correct responses
+3. For migrations: confirm `alembic upgrade head` ran without errors
+4. Only then commit
+
+```bash
+# Example validation for a new endpoint
+curl -s http://localhost:8000/api/system/config | python -m json.tool
+curl -s -X PATCH http://localhost:8000/api/system/config \
+  -H "Content-Type: application/json" -d '{"key": "value"}' | python -m json.tool
+```
+
+**Frontend changes**: `npx tsc --noEmit` must pass before committing. For UI behaviour changes, verify in the browser as well.
+
+### New Models
+
+When adding a SQLAlchemy model:
+1. Create the file in `backend/app/models/`
+2. Import and add it to `backend/app/models/__init__.py`
+3. Generate and apply the migration (see below)
+
 ## Database Migrations
 
 After changing any SQLAlchemy model, create and apply a migration:
