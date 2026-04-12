@@ -1,314 +1,91 @@
-# Environment Variables Guide
+# Environment Variables
 
-This guide explains how to manage environment variables for the Stock Scanner System.
-
-## 🔑 Quick Start
-
-### 1. Create `.env` File
-
-Create a file named `.env` in the project root directory:
-
-```
-c:\git\trading\OKComputer_Custom Stock Scanner System\.env
-```
-
-### 2. Add Your Variables
+All variables are read from a `.env` file in the project root. Copy `.env.example` to get started:
 
 ```bash
-# Polygon.io API Key (Required)
-POLYGON_API_KEY=your_polygon_api_key_here
-
-# Optional: Override default database settings
-# DATABASE_URL=postgresql://postgres:stockscanner123@postgres:5432/stockscanner
-
-# Optional: Override default Redis settings
-# REDIS_URL=redis://redis:6379/0
-
-# Optional: Set environment
-# ENVIRONMENT=development
+cp .env.example .env
 ```
 
-### 3. Restart Containers
-
-```bash
-docker-compose down
-docker-compose up -d
-```
+Docker Compose reads this file automatically at startup. Changing `.env` requires a container restart (`docker-compose down && docker-compose up -d`) to take effect.
 
 ---
 
-## 📋 Available Environment Variables
+## Required Variables
 
-### Required Variables
+These must be set before starting the stack. The application will start without them but core features will be broken or insecure.
 
-| Variable | Description | Example | Used By |
-|----------|-------------|---------|---------|
-| `POLYGON_API_KEY` | Your Polygon.io API key for market data | `mhg7iNgqAkNDbuREK8Gl8Cqr7irfkoA9` | Backend, Celery |
-
-### Optional Variables
-
-| Variable | Description | Default | Used By |
-|----------|-------------|---------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:stockscanner123@postgres:5432/stockscanner` | Backend, Celery |
-| `REDIS_URL` | Redis connection string | `redis://redis:6379/0` | Backend, Celery |
-| `ENVIRONMENT` | Environment mode | `development` | Backend |
-| `SECRET_KEY` | Secret key for sessions/JWT | Auto-generated | Backend |
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `POLYGON_API_KEY` | Polygon.io market data API key | `abc123...` |
+| `POSTGRES_PASSWORD` | PostgreSQL superuser password | `change_me` |
+| `DATABASE_URL` | Full PostgreSQL connection string (must match `POSTGRES_*` vars) | `postgresql://postgres:change_me@postgres:5432/stockscanner` |
+| `SECRET_KEY` | JWT and session signing key. Generate with: `python -c "import secrets; print(secrets.token_hex(32))"` | `a3f8d2...` |
+| `PGADMIN_DEFAULT_EMAIL` | Login email for pgAdmin web UI | `admin@example.com` |
+| `PGADMIN_DEFAULT_PASSWORD` | Login password for pgAdmin web UI | `change_me` |
+| `SEQ_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Seq admin password. Generate with: `echo 'YourPassword' \| docker run --rm -i datalust/seq config hash` | `$2a$11$...` |
 
 ---
 
-## 🔧 How It Works
+## Optional Variables
 
-### Docker Compose Integration
-
-Your `docker-compose.yml` automatically reads from the `.env` file:
-
-```yaml
-environment:
-  POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-  DATABASE_URL: postgresql://postgres:stockscanner123@postgres:5432/stockscanner
-```
-
-The `${POLYGON_API_KEY:-}` syntax means:
-- Read `POLYGON_API_KEY` from `.env` file
-- If not found, use empty string (the part after `:-`)
-
-### Which Containers Use Which Variables?
-
-```yaml
-# Backend API
-backend:
-  environment:
-    DATABASE_URL: postgresql://...
-    POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-    ENVIRONMENT: development
-
-# Celery Worker
-celery-worker:
-  environment:
-    DATABASE_URL: postgresql://...
-    POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-    REDIS_URL: redis://redis:6379/0
-
-# Flower
-flower:
-  environment:
-    CELERY_BROKER_URL: redis://redis:6379/0
-    CELERY_RESULT_BACKEND: redis://redis:6379/0
-```
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `POSTGRES_DB` | `stockscanner` | PostgreSQL database name |
+| `POSTGRES_USER` | `postgres` | PostgreSQL superuser name |
+| `REDIS_URL` | `redis://redis:6379/0` | Redis connection string. Overriding is only needed for external Redis. |
+| `ENVIRONMENT` | `production` | Set to `development` to include stack traces in API error responses. Defaults to `production` so unset envs never leak internals. |
+| `LOG_LEVEL` | `INFO` | Backend and Celery log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
+| `SEQ_URL` | `http://seq:5341` | Seq ingestion endpoint. Set to `disabled` or leave empty to fall back to stdout-only logging. |
+| `POLYGON_DELAYED` | `true` | When `true`, treats Polygon data as potentially delayed. Set to `false` if your plan provides real-time data. |
 
 ---
 
-## ✅ Verify Environment Variables
+## Interactive Brokers (IB Gateway)
 
-### Check if variables are loaded:
+These control the `ib-gateway` container and the backend's connection to it. All are optional if you do not use IBKR as a data provider.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `IB_USERNAME` | — | IBKR account username for IBC auto-login |
+| `IB_PASSWORD` | — | IBKR account password for IBC auto-login |
+| `IB_TRADING_MODE` | `paper` | `paper` (port 4002) or `live` (port 4001) |
+| `IB_READ_ONLY` | `yes` | Set to `no` to allow order submission via the API socket. Leave as `yes` for data-only use. |
+| `IBKR_HOST` | `ib-gateway` (Docker) / `127.0.0.1` (local) | Hostname the backend uses to connect to TWS/Gateway |
+| `IBKR_PORT` | `4002` | API socket port (`7496` TWS live, `7497` TWS paper, `4001` Gateway live, `4002` Gateway paper) |
+| `IBKR_CLIENT_ID` | `10` | Unique client ID. Must differ from any other concurrent API connections. |
+
+---
+
+## Frontend Variables
+
+Set in the `frontend` service's environment block in `docker-compose.yml`, or in `frontend/.env.local` for manual setup.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `VITE_API_TARGET` | `http://backend:8000` | Backend base URL used by the Vite dev server proxy |
+| `VITE_SEQ_UI_URL` | `http://localhost:5380` | Seq UI base URL used by the "Trace in Seq" error toast button |
+
+---
+
+## Verification
 
 ```bash
-# Check backend container
+# Check that a variable is set inside a running container
 docker exec stockscanner-api printenv POLYGON_API_KEY
 
-# Check celery worker
-docker exec stockscanner-celery printenv POLYGON_API_KEY
-
-# View all environment variables in backend
+# List all environment variables in the backend container
 docker exec stockscanner-api printenv
-```
 
-### Test API connection:
-
-```bash
-# Check backend health
+# Test API connectivity (health check)
 curl http://localhost:8000/health
-
-# View API docs (should show Polygon.io endpoints)
-# Open: http://localhost:8000/docs
 ```
 
 ---
 
-## 🔒 Security Best Practices
+## Adding a New Variable
 
-### ✅ DO:
-- ✅ Use `.env` file for secrets (already in `.gitignore`)
-- ✅ Keep different `.env` files for dev/staging/production
-- ✅ Regenerate API keys if accidentally committed
-- ✅ Use environment-specific values
-- ✅ Document required variables in this file
-
-### ❌ DON'T:
-- ❌ Commit `.env` to version control (already prevented)
-- ❌ Share `.env` files in chat/email
-- ❌ Hardcode secrets in `docker-compose.yml`
-- ❌ Use production keys in development
-- ❌ Store `.env` in public locations
-
----
-
-## 📝 Example `.env` File
-
-### Development (Local)
-
-```bash
-# Polygon.io API Key
-POLYGON_API_KEY=mhg7iNgqAkNDbuREK8Gl8Cqr7irfkoA9
-
-# Environment
-ENVIRONMENT=development
-
-# Optional: Enable debug logging
-# LOG_LEVEL=DEBUG
-```
-
-### Production (Example - DO NOT USE THESE VALUES)
-
-```bash
-# Polygon.io API Key (use production key)
-POLYGON_API_KEY=prod_key_here
-
-# Database (use managed database)
-DATABASE_URL=postgresql://user:pass@prod-db.example.com:5432/stockscanner
-
-# Redis (use managed Redis)
-REDIS_URL=redis://prod-redis.example.com:6379/0
-
-# Environment
-ENVIRONMENT=production
-
-# Security
-SECRET_KEY=super_secret_production_key_here
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Problem: API key not working
-
-**Check if variable is set:**
-```bash
-docker exec stockscanner-api printenv POLYGON_API_KEY
-```
-
-**If empty:**
-1. Verify `.env` file exists in project root
-2. Check `.env` file has correct format (no quotes needed)
-3. Restart containers: `docker-compose down && docker-compose up -d`
-
-### Problem: Changes to `.env` not reflected
-
-**Solution:**
-```bash
-# Stop containers
-docker-compose down
-
-# Start containers (reads .env again)
-docker-compose up -d
-```
-
-**Note:** Docker Compose only reads `.env` when containers start, not while running.
-
-### Problem: "Invalid API key" errors
-
-**Verify your key:**
-1. Login to https://polygon.io/dashboard
-2. Check your API key is active
-3. Verify you're using the correct key (not the secret key)
-4. Check your plan has access to required endpoints
-
-### Problem: Can't find `.env` file
-
-**Location:**
-```
-c:\git\trading\OKComputer_Custom Stock Scanner System\.env
-```
-
-**Create it:**
-1. Open Notepad or VS Code
-2. Create new file
-3. Save as `.env` (with the dot at the beginning)
-4. Make sure it's not saved as `.env.txt`
-
----
-
-## 🔄 Updating Environment Variables
-
-### Add New Variable
-
-1. **Edit `.env` file:**
-   ```bash
-   NEW_VARIABLE=new_value
-   ```
-
-2. **Update `docker-compose.yml`** (if needed):
-   ```yaml
-   environment:
-     NEW_VARIABLE: ${NEW_VARIABLE:-default_value}
-   ```
-
-3. **Restart containers:**
-   ```bash
-   docker-compose down
-   docker-compose up -d
-   ```
-
-### Remove Variable
-
-1. **Delete from `.env` file**
-2. **Remove from `docker-compose.yml`** (if added)
-3. **Restart containers**
-
----
-
-## 📚 Additional Resources
-
-### Polygon.io API
-- Dashboard: https://polygon.io/dashboard
-- API Docs: https://polygon.io/docs
-- Pricing: https://polygon.io/pricing
-
-### Docker Compose Environment Variables
-- Official Docs: https://docs.docker.com/compose/environment-variables/
-
-### Project Documentation
-- [README.md](README.md) - Project overview
-- [DEVELOPMENT.md](DEVELOPMENT.md) - Development setup and tools
-- [docker-compose.yml](docker-compose.yml) - Container configuration
-
----
-
-## 🎯 Common Use Cases
-
-### Switching Between API Keys
-
-```bash
-# Development key
-POLYGON_API_KEY=dev_key_here
-
-# Production key (in separate .env.production)
-POLYGON_API_KEY=prod_key_here
-```
-
-### Using Different Databases
-
-```bash
-# Local PostgreSQL
-DATABASE_URL=postgresql://postgres:stockscanner123@postgres:5432/stockscanner
-
-# Cloud PostgreSQL (AWS RDS example)
-DATABASE_URL=postgresql://user:pass@mydb.abc123.us-east-1.rds.amazonaws.com:5432/stockscanner
-```
-
-### Multiple Environments
-
-Create separate env files:
-- `.env` - Development (local)
-- `.env.staging` - Staging environment
-- `.env.production` - Production environment
-
-Load specific file:
-```bash
-docker-compose --env-file .env.staging up -d
-```
-
----
-
-**💡 Tip:** Keep this file updated as you add new environment variables to your project!
+1. Add it to `.env.example` with a placeholder value and a comment.
+2. Add it to the relevant service's `environment:` block in `docker-compose.yml`.
+3. Read it in `backend/app/core/config.py` via `os.getenv("VAR_NAME", "default")`.
+4. Restart containers: `docker-compose down && docker-compose up -d`.
+5. Document it in this file.

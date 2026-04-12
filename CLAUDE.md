@@ -33,8 +33,8 @@ python -m pytest tests/api -v              # API tests only
 python -m pytest --cov                      # With coverage
 python -m alembic upgrade head              # Apply migrations
 python -m alembic revision --autogenerate -m "description"  # New migration
-celery -A app.tasks worker --loglevel=info  # Run worker
-celery -A app.tasks beat                    # Run scheduler
+celery -A app.core.celery_app:celery_app worker --loglevel=info  # Run worker
+celery -A app.core.celery_app:celery_app beat                    # Run scheduler
 ```
 
 ### Frontend (manual)
@@ -98,27 +98,19 @@ python -m alembic revision --autogenerate -m "describe_the_change"
 python -m alembic upgrade head
 ```
 
-The `alembic/versions/` directory contains all migration files. New migration `39cb3da5ccb4_add_asset_class_to_universe_models.py` is pending.
+The `alembic/versions/` directory contains all migration files.
 
 ## Environment Variables
 
-Requires a `.env` file in the project root (Docker Compose reads it automatically).
+Requires a `.env` file in the project root (Docker Compose reads it automatically). See [ENV_VARIABLES.md](ENV_VARIABLES.md) for the complete reference.
 
-| Variable          | Purpose                              |
-|-------------------|--------------------------------------|
-| `POLYGON_API_KEY` | **Required** — Polygon.io market data |
-| `DATABASE_URL`    | PostgreSQL connection string          |
-| `REDIS_URL`       | Redis connection string               |
-| `IBKR_HOST/PORT/CLIENT_ID` | Interactive Brokers connection |
-| `SEQ_SERVER_URL`  | Seq logging endpoint                  |
+Key variables: `POLYGON_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `SECRET_KEY`, `SEQ_ADMIN_PASSWORD_HASH`, `PGADMIN_DEFAULT_EMAIL/PASSWORD`, `REDIS_URL`, `IBKR_HOST/PORT/CLIENT_ID`.
 
-## Current Uncommitted Work
+## Further Reading
 
-The working tree has changes across multiple files covering:
-- `models/monitored_stock.py`, `models/stock_universe_ticker.py` — model changes
-- `providers/__init__.py`, `providers/base.py`, `providers/ibkr.py`, `providers/massive.py` — IBKR + generic data management additions (untested per recent commit)
-- `routers/futures.py`, `routers/universe.py` — router updates
-- `schemas/stock.py` — schema changes
-- `services/discovery_service.py` — discovery service updates
-- `frontend/src/api/scanner.ts`, `components/UniverseDetailsModal.tsx`, `components/UniverseFormModal.tsx` — frontend changes
-- Pending migration: `39cb3da5ccb4_add_asset_class_to_universe_models.py`
+- [ARCHITECTURE.md](ARCHITECTURE.md) — service topology, scan execution flow, module map, Celery tasks
+- [DEVELOPMENT.md](DEVELOPMENT.md) — full local setup, Docker commands, Seq/Flower/pgAdmin usage, troubleshooting
+- [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — annotated file tree
+- [ENV_VARIABLES.md](ENV_VARIABLES.md) — all env vars with defaults and descriptions
+- [POLYGON_RATE_LIMITS.md](POLYGON_RATE_LIMITS.md) — API plan tiers, rate limits, key endpoints
+- [deployment-guide.md](deployment-guide.md) — production hardening, backup, upgrade

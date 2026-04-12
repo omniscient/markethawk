@@ -1,351 +1,196 @@
-# Stock Scanner System
+# OKComputer — Custom Stock Scanner System
 
-A professional-grade stock scanner and alert system designed to identify pre-market volume spikes and unusual trading patterns. Built with modern web technologies and deployed on cloud infrastructure.
+A full-stack stock scanning platform that identifies pre-market volume spikes and unusual trading patterns. Built for active traders who need fast, configurable scans with a professional UI.
 
-## 🚀 Features
+## Features
 
-### Core Functionality
-- **Pre-Market Volume Spike Detection**: Identifies stocks with volume spikes >4x average
-- **Low Volume Preceding Days**: Scans for low volume periods before spikes
-- **Price Gap Analysis**: Detects significant price gaps with volume confirmation
-- **Real-time Alerts**: Configurable alert system with multiple delivery methods
-- **Stock Universe Management**: Create and manage custom stock scanning universes
-- **Historical Analysis**: Track and analyze scanner performance over time
+- **Pre-Market Volume Spike Detection** — Flags stocks with volume >4x the 20-day average between 4:00–9:30 AM ET
+- **Price Gap Analysis** — Detects gaps >1% from previous close with volume confirmation
+- **Low Volume Preceding Days** — Finds stocks with compressed volume before a spike
+- **Stock Universes** — Create and manage named groups of tickers for targeted scanning
+- **Futures Monitoring** — Track ES, NQ, and other futures contracts with rollover awareness
+- **News Catalyst Parsing** — Batch-analyzes recent headlines to surface catalysts alongside scan results
+- **Trade Journal** — Log and review trades with structured entry/exit data
+- **Edge Explorer** — Analyze historical scanner hit rates and outcome distributions
+- **WebSocket Live Data** — Real-time price and volume streaming
+- **Scheduled Scans** — Celery Beat runs scans automatically on market open
 
-### Technical Features
-- **Modern Architecture**: React frontend with FastAPI backend
-- **Real-time Data**: Polygon.io integration with professional market data
-- **Scalable Design**: Cloud-native architecture supporting high throughput
-- **Professional UI**: Financial-grade user interface with dark theme
-- **API-first Design**: RESTful API with comprehensive documentation
+## Scanner Criteria
 
-## 📊 Scanner Criteria
+| Criterion | Threshold |
+|---|---|
+| Pre-market volume spike | > 4× 20-day average |
+| Price gap | > 1% from prior close |
+| Minimum pre-market volume | 100,000 shares |
+| Minimum average daily volume | 500,000 shares |
+| Low-volume preceding days | < 0.5× average (last 3 days) |
 
-The system identifies stocks meeting the following criteria:
+Session boundaries are computed in `America/New_York` and mapped to UTC for storage.
 
-1. **Pre-market Volume Spike**: Volume > 4x 20-day average
-2. **Low Volume Preceding Days**: Average volume < 0.5x for last 3 days  
-3. **Price Gap**: Gap up > 1% from previous close
-4. **Minimum Volume**: Pre-market volume > 100,000 shares
-5. **Liquidity Filter**: Average daily volume > 500,000 shares
+## Tech Stack
 
-## 🛠 Technology Stack
+**Backend**: FastAPI · SQLAlchemy 2.0 (async) · PostgreSQL 15 · Redis 7 · Celery  
+**Frontend**: React 18 · TypeScript · Vite · Tailwind CSS · React Query · Recharts · Lightweight Charts  
+**Market Data**: Polygon.io (primary) · Interactive Brokers via IB Gateway (secondary)  
+**Logging**: Seq (structured, centralized)
 
-### Backend
-- **Framework**: FastAPI (Python)
-- **Database**: PostgreSQL with SQLAlchemy ORM
-- **Caching**: Redis for performance optimization
-- **Data Source**: Polygon.io API (Professional market data)
-- **Task Queue**: Celery for background processing
-- **Async Support**: AsyncPG, HTTPX for high-performance async operations
-
-### Frontend
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite for fast development
-- **Styling**: Tailwind CSS with custom financial theme
-- **Charts**: Recharts for data visualization
-- **State Management**: React Query for server state
-
-### Infrastructure
-- **Cloud**: AWS (Lambda, RDS, S3, CloudFront)
-- **Containerization**: Docker with multi-stage builds
-- **Orchestration**: Docker Compose for local development
-- **CI/CD**: GitHub Actions for automated deployment
-
-## 🏗 Architecture
+## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Frontend│    │   FastAPI       │    │   PostgreSQL    │
-│   + Vite        │◄──►│   Backend       │◄──►│   Database      │
-│   + TypeScript  │    │   + Python      │    │   + Redis       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │   Polygon.io    │
-                       │   Market Data   │
-                       └─────────────────┘
+┌──────────────────────┐       ┌──────────────────────┐       ┌────────────────────┐
+│  React 18 Frontend   │◄─────►│  FastAPI Backend      │◄─────►│  PostgreSQL 15     │
+│  Vite · TypeScript   │  HTTP │  Python · Async       │       │  Redis 7           │
+└──────────────────────┘       └──────────────────────┘       └────────────────────┘
+                                          │
+                          ┌───────────────┼───────────────┐
+                          ▼               ▼               ▼
+                   ┌────────────┐  ┌────────────┐  ┌────────────┐
+                   │ Polygon.io │  │ IB Gateway │  │  Celery /  │
+                   │ Market Data│  │  (Docker)  │  │  Beat      │
+                   └────────────┘  └────────────┘  └────────────┘
 ```
 
-## 🚀 Quick Start
+### Backend (`backend/app/`)
+
+```
+core/           — Config, DB session, Celery setup, error tracking
+models/         — SQLAlchemy ORM models (ScannerEvent, ScannerRun, ScannerConfig,
+                  StockUniverse, MonitoredStock, StockAggregate, FuturesAggregate,
+                  NewsArticle, Trade, TickerReference, UniverseQualityReport …)
+routers/        — FastAPI route handlers (scanner, universe, stocks, news,
+                  live_data, futures, journal, health, system)
+schemas/        — Pydantic request/response models
+services/       — Business logic (scanner, stock_data, discovery_service,
+                  futures_data, chart_indicators, catalyst_parser,
+                  journal_service, websocket_manager, data_quality …)
+providers/      — External data integrations (Polygon, IBKR, base interface, bulk ops)
+tasks.py        — Celery background/scheduled tasks
+```
+
+### Frontend (`frontend/src/`)
+
+```
+api/            — Axios HTTP client layer
+components/     — Reusable UI (UniverseFormModal, ScannerResults, …)
+pages/          — Dashboard, Scanner, Universes, PreMarketMovers,
+                  EdgeExplorer, Journal, Alerts, Settings, StockDetailPage
+hooks/          — Custom React hooks
+```
+
+## Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- Node.js 18+
-- Python 3.11+
-- PostgreSQL 15+
 
-### Local Development
+- Docker and Docker Compose
+- A [Polygon.io](https://polygon.io) API key
+- (Optional) Interactive Brokers credentials for live broker data
+
+### 1. Configure environment
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/stock-scanner-system.git
-cd stock-scanner-system
-
-# Start with Docker Compose
-docker-compose up -d
-
-# Access the application
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:8000
-# API Docs: http://localhost:8000/docs
-
-# Management Tools
-# pgAdmin (PostgreSQL): http://localhost:5050
-# Flower (Celery): http://localhost:5555
+cp .env.example .env
+# Edit .env — fill in POLYGON_API_KEY, POSTGRES_PASSWORD, SECRET_KEY,
+# PGADMIN_DEFAULT_EMAIL/PASSWORD, and SEQ_ADMIN_PASSWORD_HASH at minimum.
 ```
 
-> **📖 For detailed setup and connection instructions, see [DEVELOPMENT.md](DEVELOPMENT.md)**
-
-
-### Manual Setup
+Generate the Seq password hash:
 ```bash
-# Backend setup
+echo 'YourPassword' | docker run --rm -i datalust/seq config hash
+```
+
+### 2. Start all services
+
+```bash
+docker-compose up -d
+```
+
+IB Gateway takes ~60 seconds on first startup while IBC authenticates. The backend waits for it automatically.
+
+### 3. Access the application
+
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| API Docs (Swagger) | http://localhost:8000/docs |
+| pgAdmin | http://localhost:5050 |
+| Flower (Celery) | http://localhost:5555 |
+| Seq (Logs) | http://localhost:5380 |
+
+### Manual Setup (without Docker)
+
+```bash
+# Backend
 cd backend
 pip install -r requirements.txt
+python -m alembic upgrade head
 uvicorn app.main:app --reload
 
-# Frontend setup  
+# Frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-### 🧪 Running Tests
-```bash
-cd backend
-python -m pytest
-```
+> See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed local setup, service connection instructions, and troubleshooting.
 
-### 🗄️ Database Migrations
+## Database Migrations
+
+After changing any SQLAlchemy model:
+
 ```bash
 cd backend
-# Run migrations
+python -m alembic revision --autogenerate -m "describe_the_change"
 python -m alembic upgrade head
-
-# Create new migration (after model changes)
-python -m alembic revision --autogenerate -m "description_of_change"
 ```
 
-## 📱 User Interface
+## Running Tests
 
-### Dashboard
-- Real-time scanner metrics and statistics
-- Interactive charts showing volume spike trends
-- Recent alerts and events feed
-- Market status and scanner performance
-
-### Scanner Configuration
-- Multiple scanner types and criteria
-- Real-time parameter adjustment
-- Scan history and performance tracking
-- Export and import scanner configurations
-
-### Stock Universes
-- Create custom stock scanning universes
-- Define criteria-based stock selection
-- Manage multiple universes for different strategies
-- Import/export universe configurations
-
-### Alert Management
-- Configure multiple alert delivery methods
-- Real-time notification system
-- Alert history and performance tracking
-- Customizable alert conditions
-
-## 🔧 Configuration
-
-### Environment Variables
 ```bash
-# Database
-DATABASE_URL=postgresql://user:pass@host:5432/stockscanner
-
-# Market Data API
-POLYGON_API_KEY=your-polygon-api-key
-
-# Redis (optional)
-REDIS_URL=redis://localhost:6379/0
-
-# Environment
-ENVIRONMENT=development|production
-
-# Security
-SECRET_KEY=your-secret-key
+cd backend
+python -m pytest                   # all tests
+python -m pytest tests/api -v      # API tests only
+python -m pytest --cov             # with coverage report
 ```
 
-### Scanner Parameters
-```json
-{
-  "pre_market_hours": {"start": "04:00", "end": "09:30"},
-  "min_pre_market_volume": 100000,
-  "min_avg_daily_volume": 500000,
-  "volume_spike_threshold": 4.0,
-  "low_volume_threshold": 0.5,
-  "min_gap_percentage": 1.0
-}
-```
+## Environment Variables
 
-## 📊 API Documentation
+| Variable | Required | Purpose |
+|---|---|---|
+| `POLYGON_API_KEY` | Yes | Polygon.io market data |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `POSTGRES_DB/USER/PASSWORD` | Yes | Used by the postgres container |
+| `SECRET_KEY` | Yes | JWT tokens and sessions |
+| `PGADMIN_DEFAULT_EMAIL/PASSWORD` | Yes | pgAdmin login |
+| `SEQ_ADMIN_PASSWORD_HASH` | Yes | Seq log viewer login |
+| `REDIS_URL` | No | Defaults to `redis://redis:6379/0` |
+| `ENVIRONMENT` | No | `development` / `production` (default: `development`) |
+| `LOG_LEVEL` | No | `DEBUG` / `INFO` / … (default: `INFO`) |
+| `IB_USERNAME/PASSWORD` | No | IB Gateway auto-login credentials |
+| `IB_TRADING_MODE` | No | `paper` or `live` (default: `paper`) |
+| `IBKR_HOST/PORT/CLIENT_ID` | No | Backend connection to IB Gateway |
 
-### Endpoints
-- `GET /api/scanner/run` - Execute scanner on demand
-- `GET /api/scanner/results` - Get scanner results
-- `POST /api/universe/create` - Create stock universe
-- `GET /api/stocks/historical/{ticker}` - Get historical data
-- `GET /api/health` - Health check
+## Useful Docker Commands
 
-### Example API Call
 ```bash
-curl -X POST http://localhost:8000/api/scanner/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "scanner_type": "pre_market_volume",
-    "tickers": ["AAPL", "GOOGL", "TSLA"]
-  }'
+docker-compose logs -f backend        # stream backend logs
+docker-compose exec backend bash      # shell into backend container
+docker-compose restart backend        # restart one service
+docker-compose down                   # stop everything (data volumes preserved)
+docker-compose down -v                # stop and delete all volumes
 ```
 
-## 🌐 Deployment
+## Documentation
 
-### AWS Deployment (Recommended)
-```bash
-# Deploy with SAM
-sam build
-sam deploy --guided
-
-# Or use CloudFormation
-aws cloudformation create-stack \
-  --stack-name stock-scanner-prod \
-  --template-body file://aws-deployment.yaml
-```
-
-### Docker Deployment
-```bash
-# Production build
-docker-compose -f docker-compose.prod.yml up -d
-
-# Scale services
-docker-compose up -d --scale backend=3
-```
-
-## 📈 Performance
-
-### Optimization Features
-- **Caching Layer**: Redis for frequently accessed data
-- **Database Indexing**: Optimized queries for fast retrieval
-- **Async Processing**: Non-blocking API operations
-- **CDN Integration**: Global content delivery
-- **Connection Pooling**: Efficient database connections
-
-### Benchmarks
-- Scanner execution: ~2.3 seconds for 500 stocks
-- API response time: <100ms for most endpoints
-- Database queries: <50ms with proper indexing
-- Frontend load time: <2 seconds
-
-## 🔒 Security
-
-### Security Features
-- **Data Encryption**: SSL/TLS for data in transit
-- **Authentication**: JWT-based API authentication
-- **Input Validation**: Comprehensive data sanitization
-- **Rate Limiting**: API request throttling
-- **CORS Protection**: Cross-origin request security
-
-### Best Practices
-- Environment-specific configuration
-- Secret management with AWS Secrets Manager
-- Regular security audits and updates
-- Network isolation with VPCs
-- Encrypted data storage
-
-## 📊 Monitoring
-
-### Metrics Tracked
-- Scanner execution time and success rate
-- API response times and error rates
-- Database performance and connection health
-- System resource utilization
-- Alert delivery success rates
-
-### Logging
-- Structured logging with correlation IDs
-- Error tracking and alerting
-- Performance monitoring
-- Audit trails for compliance
-
-## 🎯 Use Cases
-
-### Day Traders
-- Identify pre-market momentum stocks
-- Volume spike alerts for entry points
-- Historical pattern analysis
-
-### Swing Traders
-- Multi-day volume accumulation detection
-- Breakout pattern identification
-- Risk management alerts
-
-### Algorithmic Traders
-- API integration for automated strategies
-- Custom scanner criteria development
-- Backtesting data provision
-
-### Financial Institutions
-- Market monitoring and surveillance
-- Client alert services
-- Research and analysis tools
-
-## 🚀 Roadmap
-
-### Short-term (Q1 2024)
-- [ ] Machine learning integration for pattern recognition
-- [ ] Real-time websocket connections
-- [ ] Mobile application development
-- [ ] Advanced charting capabilities
-
-### Medium-term (Q2-Q3 2024)
-- [ ] Multi-asset class support (options, crypto)
-- [ ] Social sentiment integration
-- [ ] Advanced backtesting framework
-- [ ] White-label enterprise solution
-
-### Long-term (Q4 2024+)
-- [ ] AI-powered trading signal generation
-- [ ] Institutional-grade compliance features
-- [ ] Global market expansion
-- [ ] Advanced risk management tools
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Process
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests and documentation
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Polygon.io**: For providing professional-grade market data
-- **FastAPI**: For the excellent web framework
-- **React Community**: For the powerful frontend ecosystem
-- **Financial Markets**: For providing endless opportunities for analysis
-
-## 📞 Support
-
-- **Documentation**: Check the `/docs` endpoint for API documentation
-- **Issues**: Report bugs via GitHub Issues
-- **Discussions**: Join our community discussions
-- **Email**: support@stockscanner.com
+| Document | Contents |
+|----------|---------|
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Full local setup, Docker commands, service access, debugging, troubleshooting |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Service topology, scan execution flow, module map, database models, error tracking |
+| [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Annotated file tree of the entire repository |
+| [ENV_VARIABLES.md](ENV_VARIABLES.md) | Complete environment variable reference with defaults and usage |
+| [POLYGON_RATE_LIMITS.md](POLYGON_RATE_LIMITS.md) | Polygon.io plan tiers, rate limits, key endpoints, and sync strategy |
+| [deployment-guide.md](deployment-guide.md) | Production hardening checklist, backup, and upgrade procedure |
 
 ---
 
-**⚠️ Disclaimer**: This tool is for educational and research purposes only. Not financial advice. Trading involves substantial risk of loss.
-
-**🚀 Built with passion for financial markets and cutting-edge technology**
+**Disclaimer**: This tool is for research and personal use only. Not financial advice. Trading involves substantial risk of loss.

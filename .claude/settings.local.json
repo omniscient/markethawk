@@ -40,7 +40,8 @@
       "Bash(npm outdated:*)",
       "Bash(pip download:*)",
       "Bash(xargs grep:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(ls \"C:/git/trading/OKComputer_Custom Stock Scanner System/\"*.md \"C:/git/trading/OKComputer_Custom Stock Scanner System/\".agent/skills/**/*.md)"
     ]
   }
 }

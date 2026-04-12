@@ -1,49 +1,83 @@
 ---
 name: Database Migrations
-description: Manage database schema changes using Alembic (create, apply, and check status).
+description: Manage database schema changes using Alembic — create, apply, check status, and roll back migrations.
 ---
 
 # Database Migrations
 
-This skill helps you manage database schema changes using Alembic. Use this when you modify SQLAlchemy models in `backend/app/models` and need to update the database schema.
+Alembic manages all schema changes. Migration scripts live in `backend/alembic/versions/`. Never modify the database schema directly — always go through Alembic.
 
-## Instructions
+## Workflow
 
-1.  **Navigate to the backend directory**:
-    Alembic commands must be run from the `backend` directory.
+### 1. Modify the SQLAlchemy model
 
-    ```powershell
-    cd backend
-    ```
+Edit or create a model in `backend/app/models/`. If creating a new model file, import it in `backend/app/models/__init__.py` so Alembic's autogenerate can detect it.
 
-    > [!IMPORTANT]
-    > **Database Connection**: The `DATABASE_URL` in `.env` often points to `postgres` (the container name) for Docker. When running `alembic` from the host, you may need to override this to `localhost` if the `.env` hasn't been adjusted for local dev.
-    > Example: `$env:DATABASE_URL="postgresql://postgres:stockscanner123@localhost:5432/stockscanner"; python -m alembic current`
+### 2. Check current state
 
-2.  **Check Status**:
-    Before making changes, check the current migration status.
+```bash
+docker-compose exec backend python -m alembic current
+```
 
-    ```powershell
-    python -m alembic current
-    ```
+### 3. Generate the migration script
 
-3.  **Create a Migration**:
-    If you have modified models, generate a new migration script. Always include a descriptive message.
+```bash
+docker-compose exec backend python -m alembic revision --autogenerate -m "describe_the_change"
+```
 
-    ```powershell
-    python -m alembic revision --autogenerate -m "description of changes"
-    ```
-    *After running this, review the generated file in `backend/alembic/versions/` to verify it captures your changes correctly.*
+Always review the generated file in `backend/alembic/versions/` before applying. Autogenerate can miss some changes (e.g., renamed columns, custom constraints).
 
-4.  **Apply Migrations**:
-    Apply pending migrations to the database.
+### 4. Apply the migration
 
-    ```powershell
-    python -m alembic upgrade head
-    ```
+```bash
+docker-compose exec backend python -m alembic upgrade head
+```
+
+### 5. Verify
+
+```bash
+docker-compose exec backend python -m alembic current
+# Should show the new revision hash with (head)
+```
+
+## Other Useful Commands
+
+```bash
+# Show pending migrations (what would be applied)
+docker-compose exec backend python -m alembic upgrade head --sql
+
+# Roll back one migration
+docker-compose exec backend python -m alembic downgrade -1
+
+# Roll back to a specific revision
+docker-compose exec backend python -m alembic downgrade <revision_id>
+
+# Show full migration history
+docker-compose exec backend python -m alembic history --verbose
+
+# Show divergence between DB state and migration files
+docker-compose exec backend python -m alembic heads
+```
+
+## Running from the Host (without Docker)
+
+The `DATABASE_URL` in `.env` points to `postgres` (the container hostname), which is not resolvable from the host. Override it to `localhost`:
+
+```bash
+cd backend
+DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/stockscanner" python -m alembic current
+```
 
 ## Troubleshooting
 
--   **`Target database is not up to date`**: Run `python -m alembic upgrade head` to sync your DB before creating new migrations.
--   **`Can't locate revision`**: You might be missing a migration file locally that the DB expects. Check git history.
--   **Connection Refused**: Ensure the database is running via Docker.
+**`Target database is not up to date`**
+Run `python -m alembic upgrade head` to bring the DB to the latest revision before generating a new one.
+
+**`Can't locate revision`**
+The DB references a revision that doesn't exist locally. Check `git log -- backend/alembic/versions/` for the missing file.
+
+**`Connection refused`**
+The PostgreSQL container isn't running. Start it with `docker-compose up -d postgres` and wait for its healthcheck to pass.
+
+**Autogenerate produces an empty migration**
+Alembic didn't detect the change. Verify the model is imported in `backend/app/models/__init__.py`.

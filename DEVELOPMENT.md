@@ -1,435 +1,328 @@
 # Development Guide
 
-This guide provides instructions for managing and monitoring your local development environment.
+## Prerequisites
 
-## 🛠 Management Tools
+- Docker Desktop (includes Docker Compose)
+- Git Bash or WSL for shell commands
+- A [Polygon.io](https://polygon.io) API key
+- (Optional) Interactive Brokers credentials for live broker data
 
-The Docker setup includes three management tools for monitoring and managing your data services:
+## First-Time Setup
 
-| Tool | Purpose | Access URL | Credentials |
-|------|---------|------------|-------------|
-| **pgAdmin** | PostgreSQL Database Management | http://localhost:5050 | Email: `admin@stockscanner.com`<br>Password: `admin123` |
-| **Flower** | Celery Task Monitoring | http://localhost:5555 | No authentication required |
-| **RedisInsight** | Redis Cache Management | Install separately | See instructions below |
+### 1. Configure environment variables
 
-## 🚀 Quick Start
-
-### Start All Services
 ```bash
-# First time setup: Create .env file with your API keys
-# See ENV_VARIABLES.md for details
+cp .env.example .env
+```
 
-# Start all containers including management tools
-# Start all containers including management tools
+Open `.env` and fill in at minimum:
+- `POLYGON_API_KEY` — your Polygon.io key
+- `POSTGRES_PASSWORD` — choose a strong password
+- `DATABASE_URL` — update to match `POSTGRES_PASSWORD`
+- `SECRET_KEY` — generate with `python -c "import secrets; print(secrets.token_hex(32))"`
+- `PGADMIN_DEFAULT_EMAIL` and `PGADMIN_DEFAULT_PASSWORD` — your pgAdmin login
+- `SEQ_ADMIN_PASSWORD_HASH` — generate with the command below
+
+```bash
+# Generate Seq password hash (replace 'YourPassword')
+echo 'YourPassword' | docker run --rm -i datalust/seq config hash
+```
+
+Paste the output (starting with `$2a$`) as `SEQ_ADMIN_PASSWORD_HASH` in `.env`.
+
+For IB Gateway (optional):
+```bash
+IB_USERNAME=your_ibkr_username
+IB_PASSWORD=your_ibkr_password
+IB_TRADING_MODE=paper   # paper or live
+```
+
+### 2. Start all services
+
+```bash
+docker-compose up -d
+```
+
+On first run, IB Gateway takes 45–60 seconds to authenticate with IBKR servers. The backend waits for it automatically. Watch progress with:
+
+```bash
+docker-compose logs -f ib-gateway
+```
+
+### 3. Apply database migrations
+
+The backend container applies pending migrations at startup. To run manually:
+
+```bash
+docker-compose exec backend python -m alembic upgrade head
+```
+
+## Service URLs
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Frontend | http://localhost:3000 | — |
+| Backend API | http://localhost:8000 | — |
+| Swagger / API Docs | http://localhost:8000/docs | — |
+| pgAdmin | http://localhost:5050 | Values from `PGADMIN_DEFAULT_EMAIL/PASSWORD` in `.env` |
+| Flower | http://localhost:5555 | None (dev only) |
+| Seq Logs | http://localhost:5380 | Admin password used to generate `SEQ_ADMIN_PASSWORD_HASH` |
+
+## Docker Commands
+
+```bash
+# Start all services
 docker-compose up -d
 
-# Check all services are running
-docker-compose ps
-```
-
-### Database Migrations (New!)
-The project now uses **Alembic** for database migrations.
-
-```bash
-# Apply migrations (inside container)
-docker exec -it stockscanner-api python -m alembic upgrade head
-
-# Create a new migration (after modifying models)
-# 1. Edit models in backend/app/models/
-# 2. Run:
-docker exec -it stockscanner-api python -m alembic revision --autogenerate -m "describe_changes"
-# 3. Apply:
-docker exec -it stockscanner-api python -m alembic upgrade head
-```
-
-### Running Tests
-The project uses **Pytest** for automated testing.
-
-```bash
-# Run tests inside the container
-docker exec -it stockscanner-api python -m pytest
-```
-
-> **🔑 API Keys Required:** Before starting, create a `.env` file with your Polygon.io API key. See [ENV_VARIABLES.md](ENV_VARIABLES.md) for detailed instructions.
-
-### Access Management Tools
-- **pgAdmin**: http://localhost:5050
-- **Flower**: http://localhost:5555
-- **API Documentation**: http://localhost:8000/docs
-- **Frontend**: http://localhost:3000
-
----
-
-## 📊 PostgreSQL Management with pgAdmin
-
-### Initial Setup
-
-1. **Access pgAdmin**
-   - Navigate to http://localhost:5050
-   - Login with:
-     - Email: `admin@stockscanner.com`
-     - Password: `admin123`
-
-2. **Add PostgreSQL Server**
-   - Right-click **Servers** → **Register** → **Server**
-   
-3. **Configure Connection**
-   
-   **General Tab:**
-   - Name: `Stock Scanner DB` (or any name you prefer)
-   
-   **Connection Tab:**
-   - Host name/address: `postgres` (Docker service name)
-   - Port: `5432`
-   - Maintenance database: `stockscanner`
-   - Username: `postgres`
-   - Password: `stockscanner123`
-   - Save password: ✓ (optional, for convenience)
-
-4. **Save and Connect**
-   - Click **Save**
-   - The server should now appear in the left sidebar
-
-### Common Tasks
-
-#### View Tables
-1. Expand: **Servers** → **Stock Scanner DB** → **Databases** → **stockscanner** → **Schemas** → **public** → **Tables**
-2. Right-click any table → **View/Edit Data** → **All Rows**
-
-#### Run SQL Queries
-1. Right-click **stockscanner** database → **Query Tool**
-2. Write your SQL query
-3. Click **Execute** (F5) or click the play button
-
-#### Example Queries
-```sql
--- View all stock universes
-SELECT * FROM stock_universes ORDER BY created_at DESC;
-
--- View recent scanner results
-SELECT * FROM scanner_results 
-WHERE created_at > NOW() - INTERVAL '7 days'
-ORDER BY created_at DESC;
-
--- Check database size
-SELECT pg_size_pretty(pg_database_size('stockscanner'));
-
--- View active connections
-SELECT * FROM pg_stat_activity;
-```
-
-#### Export Data
-1. Right-click table → **Import/Export**
-2. Toggle **Export** option
-3. Choose format (CSV, JSON, etc.)
-4. Click **OK**
-
-#### Backup Database
-1. Right-click **stockscanner** database → **Backup**
-2. Choose filename and location
-3. Select format (Custom recommended)
-4. Click **Backup**
-
----
-
-## 🌸 Celery Monitoring with Flower
-
-### Access Flower Dashboard
-
-1. **Navigate to Flower**
-   - URL: http://localhost:5555
-   - No authentication required in development
-
-### Dashboard Overview
-
-#### **Tasks Tab**
-- View all Celery tasks (active, scheduled, completed, failed)
-- Monitor task execution time
-- See task arguments and results
-- Retry failed tasks
-
-#### **Workers Tab**
-- Monitor active Celery workers
-- View worker status and statistics
-- Check worker configuration
-- Manage worker pool
-
-#### **Broker Tab**
-- Monitor Redis broker connection
-- View queue statistics
-- Check message rates
-
-#### **Monitor Tab**
-- Real-time task execution monitoring
-- Live task success/failure rates
-- Task timeline visualization
-
-### Common Tasks
-
-#### View Active Tasks
-1. Click **Tasks** tab
-2. Filter by state: `ACTIVE`, `SUCCESS`, `FAILURE`, `PENDING`
-
-#### Retry Failed Task
-1. Go to **Tasks** tab
-2. Find failed task
-3. Click task ID
-4. Click **Retry** button
-
-#### Monitor Task Performance
-1. Click **Monitor** tab
-2. View real-time task execution graph
-3. Check task throughput and latency
-
-#### Shutdown Worker
-1. Go to **Workers** tab
-2. Select worker
-3. Click **Shutdown** (use with caution)
-
-### Example Background Tasks
-
-Your system includes these Celery tasks:
-- **Universe stock refresh**: Updates stock data for universes
-- **Pre-market scans**: Runs volume spike detection
-- **Data synchronization**: Syncs with Polygon.io API
-
----
-
-## 🔴 Redis Management with RedisInsight
-
-### Installation
-
-RedisInsight is not containerized by default. Install it separately:
-
-1. **Download RedisInsight**
-   - Visit: https://redis.com/redis-enterprise/redis-insight/
-   - Download Windows installer
-   - Install and launch
-
-2. **Add Redis Connection**
-   - Click **Add Redis Database**
-   - Connection Type: **Standalone**
-   - Host: `localhost`
-   - Port: `6379`
-   - Database Alias: `Stock Scanner Redis`
-   - Click **Add Redis Database**
-
-### Common Tasks
-
-#### Browse Keys
-1. Click **Browser** tab
-2. View all keys organized by pattern
-3. Click any key to view its value
-
-#### Monitor Commands
-1. Click **Profiler** tab
-2. Start profiling
-3. View real-time Redis commands
-
-#### View Memory Usage
-1. Click **Analysis Tools**
-2. Run memory analysis
-3. View key size distribution
-
-#### Execute Redis Commands
-1. Click **CLI** tab
-2. Run Redis commands directly
-
-#### Example Redis Commands
-```redis
-# View all keys
-KEYS *
-
-# Get cache value
-GET stock:AAPL:price
-
-# View key TTL
-TTL stock:AAPL:price
-
-# View all Celery tasks
-KEYS celery-task-meta-*
-
-# Monitor real-time commands
-MONITOR
-
-# View Redis info
-INFO
-
-# Check memory usage
-MEMORY USAGE stock:AAPL:price
-```
-
----
-
-## 🐳 Docker Management
-
-### Useful Docker Commands
-
-```bash
-# View running containers
-docker-compose ps
-
-# View logs for specific service
-docker-compose logs -f backend
-docker-compose logs -f celery-worker
-docker-compose logs -f flower
-docker-compose logs -f pgadmin
-
-# Restart specific service
-docker-compose restart backend
-docker-compose restart celery-worker
-
-# Stop all services
+# Stop all services (data volumes preserved)
 docker-compose down
 
-# Stop and remove volumes (⚠️ deletes data)
+# Stop and delete all volumes (wipes database and log data)
 docker-compose down -v
 
-# Rebuild containers
+# Rebuild images after Dockerfile or dependency changes
 docker-compose up -d --build
 
-# View resource usage
-docker stats
+# Stream logs
+docker-compose logs -f backend
+docker-compose logs -f celery-worker
+docker-compose logs -f ib-gateway
 
-# Access container shell
-docker exec -it stockscanner-api bash
-docker exec -it stockscanner-db psql -U postgres -d stockscanner
-docker exec -it stockscanner-redis redis-cli
+# Restart a single service
+docker-compose restart backend
+
+# Check container health and port status
+docker-compose ps
+
+# Open a shell in a container
+docker-compose exec backend bash
+docker-compose exec postgres psql -U postgres -d stockscanner
+docker-compose exec redis redis-cli
 ```
 
-### Container Health Checks
+## Manual Setup (without Docker)
+
+Use this if you need to run backend or frontend outside Docker, for example to attach a debugger.
+
+### Backend
 
 ```bash
-# Check backend health
-curl http://localhost:8000/health
+cd backend
+python -m venv venv
+source venv/bin/activate       # Windows: venv\Scripts\activate
 
-# Check Redis connection
-docker exec -it stockscanner-redis redis-cli ping
+pip install -r requirements.txt
 
-# Check PostgreSQL connection
-docker exec -it stockscanner-db psql -U postgres -d stockscanner -c "SELECT 1;"
+# Point to a running PostgreSQL instance (must match POSTGRES_* vars in .env)
+export DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/stockscanner"
+export POLYGON_API_KEY="your-key"
 
-# Check Celery worker status
-docker exec -it stockscanner-celery celery -A app.main.celery inspect active
+python -m alembic upgrade head
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
----
+### Frontend
 
-## 🔍 Troubleshooting
-
-### pgAdmin Issues
-
-**Problem: Can't connect to PostgreSQL**
-- ✅ Ensure you're using `postgres` as hostname (not `localhost`)
-- ✅ Check containers are running: `docker-compose ps`
-- ✅ Verify credentials match docker-compose.yml
-
-**Problem: pgAdmin won't start**
-- ✅ Check port 5050 is not in use
-- ✅ View logs: `docker-compose logs pgadmin`
-- ✅ Remove volume and restart: `docker volume rm okcomputer_custom-stock-scanner-system_pgadmin_data`
-
-### Flower Issues
-
-**Problem: No workers visible**
-- ✅ Check celery-worker is running: `docker-compose ps`
-- ✅ Verify Redis connection
-- ✅ Check worker logs: `docker-compose logs celery-worker`
-
-**Problem: Tasks not appearing**
-- ✅ Ensure tasks are being triggered
-- ✅ Check Celery configuration in backend
-- ✅ Verify Redis broker URL is correct
-
-### Redis Issues
-
-**Problem: Can't connect with RedisInsight**
-- ✅ Ensure Redis container is running
-- ✅ Check port 6379 is exposed
-- ✅ Use `localhost` (not `redis`) when connecting from host machine
-
-### General Issues
-
-**Problem: Containers won't start**
 ```bash
-# Check for port conflicts
-netstat -ano | findstr :5432  # PostgreSQL
-netstat -ano | findstr :6379  # Redis
-netstat -ano | findstr :5050  # pgAdmin
-netstat -ano | findstr :5555  # Flower
+cd frontend
+npm install
+npm run dev        # Dev server at http://localhost:3000
+npm run build      # Production build
+npm run lint       # ESLint check
+```
 
-# View detailed logs
+The frontend reads `VITE_API_TARGET` to locate the backend. When running manually it defaults to `http://localhost:8000`.
+
+## Database Migrations
+
+Migrations are managed with Alembic. Migration files live in `backend/alembic/versions/`.
+
+```bash
+# Check current migration state
+docker-compose exec backend python -m alembic current
+
+# After modifying any SQLAlchemy model, generate a migration
+docker-compose exec backend python -m alembic revision --autogenerate -m "describe_the_change"
+
+# Review the generated file in backend/alembic/versions/ before applying
+docker-compose exec backend python -m alembic upgrade head
+
+# Roll back one step
+docker-compose exec backend python -m alembic downgrade -1
+```
+
+When running Alembic from the host (not inside Docker), the `DATABASE_URL` must point to `localhost` instead of the `postgres` container name:
+
+```bash
+DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/stockscanner" python -m alembic current
+```
+
+## Running Tests
+
+```bash
+# All tests
+docker-compose exec backend python -m pytest
+
+# Specific directory
+docker-compose exec backend python -m pytest tests/api -v
+
+# With coverage
+docker-compose exec backend python -m pytest --cov
+
+# Stop on first failure
+docker-compose exec backend python -m pytest -x
+```
+
+Or from the host (with venv activated and `DATABASE_URL` pointing to localhost):
+
+```bash
+cd backend
+python -m pytest
+```
+
+## Monitoring Services
+
+### Seq (Structured Log Viewer)
+
+Seq at http://localhost:5380 receives all structured log events from the backend, including full stack traces for every unhandled exception.
+
+Each backend error is tagged with a deterministic `ErrorId` (format: `ERR-xxxxxxxx`). To find a specific error:
+
+```
+# In the Seq search bar
+ErrorId = 'ERR-xxxxxxxx'
+```
+
+Or query the REST API directly:
+
+```bash
+curl -s "http://localhost:5380/api/events?filter=ErrorId%3D%27ERR-xxxxxxxx%27&count=5" \
+  | python -m json.tool
+```
+
+If the Seq container is offline, backend logs fall back to stdout:
+
+```bash
+docker-compose logs backend | grep "ERR-"
+```
+
+### Flower (Celery Task Monitor)
+
+Flower at http://localhost:5555 shows:
+- Active, scheduled, and completed tasks
+- Worker status and throughput
+- Task execution time and retry history
+
+Useful when debugging scheduled scans or slow background jobs.
+
+### pgAdmin (PostgreSQL GUI)
+
+pgAdmin at http://localhost:5050.
+
+To add the database server:
+1. Right-click **Servers** → **Register** → **Server**
+2. **General** tab — Name: `stockscanner` (any label)
+3. **Connection** tab:
+   - Host: `postgres` (the Docker service name, not `localhost`)
+   - Port: `5432`
+   - Database: `stockscanner`
+   - Username: value of `POSTGRES_USER` in `.env` (default: `postgres`)
+   - Password: value of `POSTGRES_PASSWORD` in `.env`
+
+Useful SQL queries for debugging:
+
+```sql
+-- Recent scanner runs and hit counts
+SELECT id, created_at, scanner_type, tickers_scanned, hits
+FROM scanner_runs
+ORDER BY created_at DESC
+LIMIT 20;
+
+-- Scanner events in the last 24 hours
+SELECT ticker, event_type, pre_market_volume, relative_volume, price_change_pct, created_at
+FROM scanner_events
+WHERE created_at > NOW() - INTERVAL '24 hours'
+ORDER BY relative_volume DESC;
+
+-- Universe memberships
+SELECT su.name, count(sut.id) as ticker_count
+FROM stock_universes su
+LEFT JOIN stock_universe_tickers sut ON sut.universe_id = su.id
+GROUP BY su.name
+ORDER BY su.name;
+
+-- Database size
+SELECT pg_size_pretty(pg_database_size('stockscanner'));
+
+-- Active connections
+SELECT pid, state, query_start, query FROM pg_stat_activity WHERE datname = 'stockscanner';
+```
+
+## Troubleshooting
+
+### IB Gateway not starting
+
+- It takes up to 3 minutes on first boot for IBC to authenticate.
+- Verify `IB_USERNAME`, `IB_PASSWORD`, and `IB_TRADING_MODE` are set correctly in `.env`.
+- Check `docker-compose logs ib-gateway` for authentication errors.
+- The backend starts even if IB Gateway is unhealthy; IBKR-dependent features will be unavailable but the rest of the system works normally.
+
+### Port conflicts
+
+```bash
+# Check which process holds a port (Windows)
+netstat -ano | findstr :5432   # PostgreSQL
+netstat -ano | findstr :6379   # Redis
+netstat -ano | findstr :8000   # Backend
+netstat -ano | findstr :3000   # Frontend
+```
+
+### Containers failing to start
+
+```bash
+# View full logs for all services
 docker-compose logs
 
-# Restart everything
+# Rebuild images (if Dockerfile or requirements changed)
+docker-compose up -d --build
+```
+
+### Celery tasks not running
+
+```bash
+# Check worker is alive
+docker-compose exec celery-worker celery -A app.core.celery_app:celery_app inspect active
+
+# Check beat scheduler log
+docker-compose logs celery-beat
+
+# Trigger a task manually via the API
+curl -X POST http://localhost:8000/api/scanner/run
+```
+
+### Database migrations out of sync
+
+```bash
+# Check what revision the DB is on vs. what Alembic expects
+docker-compose exec backend python -m alembic current
+docker-compose exec backend python -m alembic heads
+
+# If behind, apply pending migrations
+docker-compose exec backend python -m alembic upgrade head
+```
+
+### ENV changes not reflected
+
+Docker Compose reads `.env` only at container start time. After changing `.env`:
+
+```bash
 docker-compose down
 docker-compose up -d
 ```
 
----
+## Security Notes
 
-## 📚 Additional Resources
-
-### Documentation Links
-- [pgAdmin Documentation](https://www.pgadmin.org/docs/)
-- [Flower Documentation](https://flower.readthedocs.io/)
-- [RedisInsight Documentation](https://docs.redis.com/latest/ri/)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-- [Celery Documentation](https://docs.celeryproject.org/)
-
-### Keyboard Shortcuts
-
-**pgAdmin:**
-- `F5` - Execute query
-- `F7` - Execute current statement
-- `Ctrl+Space` - Auto-complete
-
-**Flower:**
-- No special shortcuts, web-based interface
-
----
-
-## 🔐 Security Notes
-
-> [!WARNING]
-> **Development Credentials**
-> 
-> The credentials in this setup are for **local development only**. Never use these in production:
-> - pgAdmin: `admin@stockscanner.com` / `admin123`
-> - PostgreSQL: `postgres` / `stockscanner123`
-
-> [!CAUTION]
-> **Production Deployment**
-> 
-> Before deploying to production:
-> 1. Change all default passwords
-> 2. Use environment variables for secrets
-> 3. Enable authentication on Flower
-> 4. Use SSL/TLS for all connections
-> 5. Restrict network access with firewalls
-
----
-
-## 💡 Tips & Best Practices
-
-### Performance Optimization
-- Use pgAdmin's **Explain** feature to analyze slow queries
-- Monitor Celery task execution times in Flower
-- Check Redis memory usage regularly
-- Index frequently queried columns in PostgreSQL
-
-### Data Management
-- Regularly backup your PostgreSQL database
-- Monitor Redis memory usage (default: no eviction)
-- Archive old scanner results to prevent database bloat
-- Use pgAdmin's maintenance tools for vacuum and analyze
-
-### Development Workflow
-1. Use Flower to monitor background tasks during development
-2. Use pgAdmin to inspect database state and run ad-hoc queries
-3. Use RedisInsight to debug caching issues
-4. Check Docker logs when services behave unexpectedly
-
----
-
-**Happy Developing! 🚀**
+- Credentials in `.env` are for local development. Never commit `.env` to version control (it is in `.gitignore`).
+- `ENVIRONMENT=development` returns full stack traces in API error responses. Set to `production` to hide internals.
+- Flower has no authentication in development. Do not expose port 5555 publicly.
+- `READ_ONLY_API=yes` on the IB Gateway container prevents order submission via the API socket.

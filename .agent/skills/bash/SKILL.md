@@ -1,85 +1,99 @@
 ---
-name: Bash Skill (PowerShell 5.1)
-description: A collection of PowerShell 5.1 commands and patterns that mirror common Bash operations for file-system navigation, searching, and script execution on Windows.
+name: Bash (Git Bash on Windows)
+description: Shell patterns for this repository. The environment runs bash (Git Bash) on Windows 11. Use Unix syntax throughout.
 ---
 
-# Bash Skill (PowerShell 5.1)
+# Bash — Git Bash on Windows
 
-This skill provides a standardized set of commands and patterns for interacting with the Windows terminal (PowerShell 5.1) using common Linux-style aliases and logic.
+This project runs in **bash** (Git Bash), not PowerShell. Use Unix shell syntax in all commands.
+
+## Path Conventions
+
+Use forward slashes. Git Bash translates them for Windows automatically.
+
+```bash
+cd /c/git/trading/OKComputer_Custom\ Stock\ Scanner\ System
+```
+
+Or use the absolute Windows path with forward slashes:
+```bash
+cd "C:/git/trading/OKComputer_Custom Stock Scanner System"
+```
+
+## Command Chaining
+
+`&&` and `||` work normally in bash:
+
+```bash
+cd backend && python -m pytest
+docker-compose down && docker-compose up -d
+```
 
 ## Multi-Line Commands
 
-In PowerShell, the continuation character is the **backtick** (`` ` ``), whereas in Bash it is the backslash (`\`).
+Use backslash continuation:
 
-```powershell
-# Example of a multi-line command in PowerShell 5.1
-git commit -m "feat: implement bash skill" `
-  --author="Antigravity <ai@gemini.com>" `
-  --date="2026-04-03T14:15:00"
+```bash
+docker exec stockscanner-api \
+  python -m alembic revision \
+  --autogenerate \
+  -m "add_asset_class_column"
 ```
 
-## Multi-Operation Commands (Chaining)
+## Environment Variables
 
-PowerShell 5.1 does **not** support `&&` or `||`. You must use the semicolon (`;`) for sequential execution or an `if` block to simulate conditional execution.
+```bash
+# Read
+echo $POLYGON_API_KEY
 
-### Sequential Execution (Standard `;`)
-```powershell
-# Runs command2 regardless of command1's success
-command1; command2
+# Set for current session
+export POLYGON_API_KEY=abc123
+
+# Set inline for a single command
+DATABASE_URL="postgresql://postgres:pw@localhost:5432/stockscanner" python -m alembic current
 ```
 
-### Conditional Execution (Simulating `&&`)
-```powershell
-# Runs command2 only if command1 succeeds
-command1; if ($?) { command2 }
+## Useful Patterns
+
+### Find text in Python files
+```bash
+grep -r "calculate_day_metrics" backend/app/
 ```
 
-## Common Aliases (Linux-style)
-
-PowerShell 5.1 includes built-in aliases for many common Bash commands. Use these to maintain a "bash-like" feel while staying compatible with the host OS.
-
-| Bash Alias | PS Cmdlet | Notes |
-|------------|-----------|-------|
-| `ls` | `Get-ChildItem` | Lists directory contents |
-| `cat` | `Get-Content` | Reads file content |
-| `rm` | `Remove-Item` | Deletes files/directories (use `-Recurse -Force` for `rm -rf`) |
-| `cp` | `Copy-Item` | Copies files/directories |
-| `mv` | `Move-Item` | Moves/renames files/directories |
-| `pwd` | `Get-Location` | Prints current working directory |
-| `clear` | `Clear-Host` | Clears the terminal screen |
-| `grep` | `Select-String` | Use `grep "pattern" file` style, or `cat file | Select-String "pattern"` |
-
-## Advanced Operations
-
-### Searching for Text (`grep` equivalent)
-```powershell
-# Case-insensitive search for "error" in all .py files
-ls -Recurse *.py | Select-String "error"
+### Find a file by name
+```bash
+find backend/app -name "scanner.py"
 ```
 
-### JSON Processing
-Instead of `jq`, PowerShell 5.1 has native JSON support.
-```powershell
-# Parse a JSON file and extract a property
-cat settings.json | ConvertFrom-Json | Select-Object -ExpandProperty version
+### Tail logs from a running container
+```bash
+docker-compose logs -f backend
+docker-compose logs -f celery-worker | grep ERROR
 ```
 
-### Environment Variables
-```powershell
-# Read an environment variable
-$env:PATH
-
-# Set an environment variable (for the current session)
-$env:DEBUG = "true"
+### Run a command inside a container
+```bash
+docker-compose exec backend bash
+docker-compose exec backend python -m alembic current
+docker-compose exec postgres psql -U postgres -d stockscanner
 ```
 
-### Network Requests (`curl` alternative)
-```powershell
-# Basic GET request
-Invoke-RestMethod -Uri "http://localhost:8000/api/health"
+### HTTP requests
+```bash
+curl -s http://localhost:8000/health | python -m json.tool
+curl -X POST http://localhost:8000/api/scanner/run
 ```
 
----
+### JSON parsing
+```bash
+curl -s http://localhost:8000/health | python -m json.tool
+# Or with python inline:
+python -c "import json, sys; d = json.load(sys.stdin); print(d['status'])"
+```
 
-> [!TIP]
-> When using `run_command`, always ensure that backticks (`` ` ``) are used for line continuation and that multiple operations are separated by `; if ($?) { ... }` if strict sequencing is required.
+## Windows-Specific Notes
+
+- `netstat` works in Git Bash but some flags differ from Linux. Use `netstat -ano | grep :8000` to check port usage.
+- Docker Desktop must be running for any `docker` or `docker-compose` commands to work.
+- If a script has Windows line endings (`\r\n`), run `dos2unix script.sh` before executing.
+- `python` and `python3` both resolve to the same interpreter. Prefer `python` in this project (matches Dockerfile).

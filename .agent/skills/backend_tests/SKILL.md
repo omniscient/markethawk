@@ -5,41 +5,47 @@ description: Run the backend test suite using pytest to verify API and database 
 
 # Backend Tests
 
-This skill allows you to run the backend test suite. Use this when you modify backend code (API endpoints, services, schemas) and want to ensure you haven't introduced regressions.
+Run this after modifying any backend code (routers, services, models, schemas) to check for regressions.
 
-## Instructions
+## Run All Tests
 
-1.  **Navigate to the backend directory**:
-    The tests must be run from the `backend` directory where `pytest.ini` (or configuration) and `tests/` folder are located.
-    Current Root: `c:\git\trading\OKComputer_Custom Stock Scanner System`
-    Target: `backend`
-
-2.  **Run the tests**:
-    Use `python -m pytest` to run all tests.
-
-    ```powershell
-    cd backend
-    python -m pytest
-    ```
+```bash
+docker-compose exec backend python -m pytest
+```
 
 ## Common Options
 
--   **Run a specific test file**:
-    ```powershell
-    python -m pytest tests/test_specific_file.py
-    ```
+```bash
+# Run a specific test file
+docker-compose exec backend python -m pytest tests/api/test_scanner.py
 
--   **Run a specific test function**:
-    ```powershell
-    python -m pytest tests/test_file.py::test_function_name
-    ```
+# Run a specific test function
+docker-compose exec backend python -m pytest tests/api/test_scanner.py::test_run_scan
 
--   **Fail fast (stop on first error)**:
-    ```powershell
-    python -m pytest -x
-    ```
+# Stop on first failure
+docker-compose exec backend python -m pytest -x
 
-## error Handling
+# Verbose output
+docker-compose exec backend python -m pytest -v
 
--   **`ModuleNotFoundError`**: Ensure you are in the `backend` directory and that dependencies are installed.
--   **Database connection errors**: Ensure the database container is running (`docker compose up -d db`).
+# With coverage report
+docker-compose exec backend python -m pytest --cov
+```
+
+## Running from the Host
+
+With a virtual environment activated and `DATABASE_URL` pointing to `localhost`:
+
+```bash
+cd backend
+source venv/bin/activate
+DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/stockscanner" python -m pytest
+```
+
+## Troubleshooting
+
+**`ModuleNotFoundError`** — Run from inside the container (`docker-compose exec backend`) or ensure the virtual environment is activated and dependencies are installed (`pip install -r requirements.txt`).
+
+**Database connection errors** — The `postgres` container must be running and healthy. Check with `docker-compose ps`.
+
+**Import errors after adding a new model** — Ensure the model is imported in `backend/app/models/__init__.py`.
