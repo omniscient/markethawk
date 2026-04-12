@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/scanner", tags=["scanner"])
 
 
 @router.post("/run", response_model=ScannerRunResponse)
-def run_scanner(
+async def run_scanner(
     request: ScannerRunRequest,
     db: Session = Depends(get_db),
 ):
@@ -74,11 +74,11 @@ def run_scanner(
     # Run scanner
     try:
         if request.scanner_type == "liquidity_hunt":
-            results = ScannerService.run_liquidity_hunt_scan(tickers, db)
+            results = await ScannerService.run_liquidity_hunt_scan(tickers, db)
         elif request.scanner_type == "oversold_bounce":
-            results = ScannerService.run_oversold_bounce_scan(tickers, db)
+            results = await ScannerService.run_oversold_bounce_scan(tickers, db)
         else:
-            results = ScannerService.run_pre_market_scan(tickers, db)
+            results = await ScannerService.run_pre_market_scan(tickers, db)
         
         status = "completed"
         error_msg = None

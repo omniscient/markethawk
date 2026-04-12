@@ -3,7 +3,9 @@ Scanner Service - Pre-market volume scanning logic.
 """
 
 import logging
+import asyncio
 from datetime import datetime, date, timedelta, timezone
+from zoneinfo import ZoneInfo
 from app.utils.session import get_market_today
 from typing import Dict, Any, List
 
@@ -24,6 +26,53 @@ from app.services.event_helpers import generate_event_summary, compute_event_sev
 class ScannerService:
     """Service for running stock scanners."""
 
+    _SCAN_SEMAPHORE = asyncio.Semaphore(10)
+
+    @staticmethod
+    def calculate_day_metrics_from_aggs(aggs: List[StockAggregate]) -> Dict[str, Any]:
+        """Calculate detailed price metrics from a list of minute aggregates."""
+        metrics = {
+            "pre_market_high": 0.0, "pre_market_low": 0.0, "pre_market_open": 0.0, "pre_market_close": 0.0,
+            "regular_high": 0.0, "regular_low": 0.0, "opening_price": 0.0, "closing_price": 0.0,
+            "post_market_high": 0.0, "post_market_low": 0.0, "post_market_open": 0.0, "post_market_close": 0.0,
+            "total_day_high": 0.0, "total_day_low": 0.0, "total_volume": 0
+        }
+        
+        if not aggs:
+            return metrics
+            
+        pre_aggs = [a for a in aggs if a.is_pre_market]
+        reg_aggs = [a for a in aggs if not a.is_pre_market and not a.is_after_market]
+        post_aggs = [a for a in aggs if a.is_after_market]
+        
+        # Total Day
+        metrics["total_day_high"] = float(max(a.high for a in aggs))
+        metrics["total_day_low"] = float(min(a.low for a in aggs))
+        metrics["total_volume"] = sum(a.volume for a in aggs)
+        
+        # Pre Market
+        if pre_aggs:
+            metrics["pre_market_high"] = float(max(a.high for a in pre_aggs))
+            metrics["pre_market_low"] = float(min(a.low for a in pre_aggs))
+            metrics["pre_market_open"] = float(pre_aggs[0].open)
+            metrics["pre_market_close"] = float(pre_aggs[-1].close)
+            
+        # Regular Market
+        if reg_aggs:
+            metrics["regular_high"] = float(max(a.high for a in reg_aggs))
+            metrics["regular_low"] = float(min(a.low for a in reg_aggs))
+            metrics["opening_price"] = float(reg_aggs[0].open)
+            metrics["closing_price"] = float(reg_aggs[-1].close)
+            
+        # Post Market
+        if post_aggs:
+            metrics["post_market_high"] = float(max(a.high for a in post_aggs))
+            metrics["post_market_low"] = float(min(a.low for a in post_aggs))
+            metrics["post_market_open"] = float(post_aggs[0].open)
+            metrics["post_market_close"] = float(post_aggs[-1].close)
+            
+        return metrics
+
     @staticmethod
     def calculate_day_metrics(ticker: str, event_date: date, db: Session) -> Dict[str, Any]:
         """Calculate detailed price metrics for different sessions of a given day."""
@@ -35,15 +84,20 @@ class ScannerService:
         }
         
         # Get all minute aggregates for the day
-        day_start = datetime.combine(event_date, datetime.min.time())
-        day_end = datetime.combine(event_date, datetime.max.time())
+        _ET = ZoneInfo("America/New_York")
+        day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
+        day_end_et = datetime.combine(event_date, datetime.max.time(), tzinfo=_ET)
+        
+        # Convert to UTC and strip tzinfo for DB comparison (since DB stores naive UTC)
+        day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
+        day_end_utc = day_end_et.astimezone(timezone.utc).replace(tzinfo=None)
         
         aggs = (
             db.query(StockAggregate)
             .filter(
                 StockAggregate.ticker == ticker,
-                StockAggregate.timestamp >= day_start,
-                StockAggregate.timestamp <= day_end,
+                StockAggregate.timestamp >= day_start_utc,
+                StockAggregate.timestamp <= day_end_utc,
                 StockAggregate.timespan == 'minute'
             )
             .order_by(StockAggregate.timestamp.asc())
@@ -86,35 +140,48 @@ class ScannerService:
         return metrics
 
     @staticmethod
-    def _get_enrichment_data(ticker: str, event_date: date, db: Session) -> Dict[str, Any]:
-        """Fetch common enrichment data for a ticker on a specific date."""
-        # Market Cap
-        monitored = db.query(MonitoredStock).filter(MonitoredStock.ticker == ticker).first()
-        market_cap = float(monitored.market_cap) if monitored and monitored.market_cap else None
+    def _get_batch_enrichment_data(tickers: List[str], event_date: date, db: Session) -> Dict[str, Dict[str, Any]]:
+        """Fetch common enrichment data for a list of tickers in one batch."""
+        # 1. Fetch MonitoredStock records
+        monitored_records = db.query(MonitoredStock).filter(MonitoredStock.ticker.in_(tickers)).all()
+        monitored_map = {r.ticker: r for r in monitored_records}
         
-        # Outstanding Shares & Float
-        ticker_ref = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
-        outstanding_shares = float(ticker_ref.share_class_shares_outstanding) if ticker_ref and ticker_ref.share_class_shares_outstanding else None
+        # 2. Fetch TickerReference records
+        ref_records = db.query(TickerReference).filter(TickerReference.ticker.in_(tickers)).all()
+        ref_map = {r.ticker: r for r in ref_records}
         
-        # Recent Splits
+        # 3. Recent Splits
         six_months_prior = event_date - timedelta(days=180)
-        recent_split = db.query(StockSplit).filter(
-            StockSplit.ticker == ticker,
+        split_records = db.query(StockSplit).filter(
+            StockSplit.ticker.in_(tickers),
             StockSplit.execution_date <= event_date,
             StockSplit.execution_date >= six_months_prior
-        ).order_by(desc(StockSplit.execution_date)).first()
-        recent_split_date = recent_split.execution_date.isoformat() if recent_split else None
+        ).order_by(desc(StockSplit.execution_date)).all()
         
-        # Catalyst Parser
-        catalyst_info = CatalystParser.analyze(ticker, event_date, db)
+        split_map = {}
+        for s in split_records:
+            if s.ticker not in split_map:
+                split_map[s.ticker] = s.execution_date.isoformat()
         
-        return {
-            "market_cap": market_cap,
-            "outstanding_shares": outstanding_shares,
-            "recent_split_date": recent_split_date,
-            "catalyst_tags": catalyst_info.get("tags", []),
-            "catalyst_summary": catalyst_info.get("summary"),
-        }
+        # 4. Catalyst lookup via optimized batch analyzer
+        catalyst_batch = CatalystParser.batch_analyze(tickers, event_date, db)
+        
+        batch_data = {}
+        for ticker in tickers:
+            t_upper = ticker.upper()
+            monitored = monitored_map.get(t_upper)
+            ref = ref_map.get(t_upper)
+            cat = catalyst_batch.get(t_upper, {"tags": [], "summary": None})
+            
+            batch_data[t_upper] = {
+                "market_cap": float(monitored.market_cap) if monitored and monitored.market_cap else None,
+                "outstanding_shares": float(ref.share_class_shares_outstanding) if ref and ref.share_class_shares_outstanding else None,
+                "recent_split_date": split_map.get(t_upper),
+                "catalyst_tags": cat.get("tags", []),
+                "catalyst_summary": cat.get("summary"),
+            }
+            
+        return batch_data
 
     @staticmethod
     def _save_event(
@@ -177,7 +244,7 @@ class ScannerService:
         return event_dict
 
     @staticmethod
-    def run_liquidity_hunt_scan(
+    async def run_liquidity_hunt_scan(
         tickers: List[str], db: Session
     ) -> List[Dict[str, Any]]:
         """
@@ -206,6 +273,11 @@ class ScannerService:
                 .all()
             )
 
+            # Pre-fetch static ticker enrichment data (H5 fix)
+            all_involved_tickers = list(set(c.ticker for c in candidates))
+            monitored_map = {r.ticker: r for r in db.query(MonitoredStock).filter(MonitoredStock.ticker.in_(all_involved_tickers)).all()}
+            ref_map = {r.ticker: r for r in db.query(TickerReference).filter(TickerReference.ticker.in_(all_involved_tickers)).all()}
+
             for cand in candidates:
                 ticker = cand.ticker
                 raw_event_date = cand.event_date
@@ -217,13 +289,15 @@ class ScannerService:
                 pre_market_volume = float(cand.total_vol)
                 pre_market_high = float(cand.high_price)
                 
-                # Start of the event day for relative lookups
-                day_start = datetime.combine(event_date, datetime.min.time())
+                # Start of the event day for relative lookups (UTC boundary)
+                _ET = ZoneInfo("America/New_York")
+                day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
+                day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
 
                 # Step 2: Get Previous Close
                 prev_close_row = (
                     db.query(StockAggregate.close)
-                    .filter(StockAggregate.ticker == ticker, StockAggregate.timestamp < day_start)
+                    .filter(StockAggregate.ticker == ticker, StockAggregate.timestamp < day_start_utc)
                     .order_by(desc(StockAggregate.timestamp))
                     .limit(1).first()
                 )
@@ -233,7 +307,7 @@ class ScannerService:
                 # Historical data for volume/accumulation check
                 hist_data = (
                     db.query(StockAggregate.close, StockAggregate.volume)
-                    .filter(StockAggregate.ticker == ticker, StockAggregate.timestamp < day_start, StockAggregate.is_pre_market == False)
+                    .filter(StockAggregate.ticker == ticker, StockAggregate.timestamp < day_start_utc, StockAggregate.is_pre_market == False)
                     .order_by(desc(StockAggregate.timestamp))
                     .limit(20).all()
                 )
@@ -302,8 +376,27 @@ class ScannerService:
                         "retrace_fail": bool(is_retrace)
                     }
 
-                    # Enrichment
-                    enrichment = ScannerService._get_enrichment_data(ticker, event_date, db)
+                    # Enrichment (batched news + pre-fetched static data)
+                    cat_info = CatalystParser.analyze(ticker, event_date, db)
+                    monitored = monitored_map.get(ticker)
+                    ref = ref_map.get(ticker)
+                    
+                    # Fetch split for this specific date (harder to batch across all candidates efficiently)
+                    six_months_prior = event_date - timedelta(days=180)
+                    recent_split = db.query(StockSplit).filter(
+                        StockSplit.ticker == ticker,
+                        StockSplit.execution_date <= event_date,
+                        StockSplit.execution_date >= six_months_prior
+                    ).order_by(desc(StockSplit.execution_date)).first()
+                    recent_split_date = recent_split.execution_date.isoformat() if recent_split else None
+
+                    enrichment = {
+                        "market_cap": float(monitored.market_cap) if monitored and monitored.market_cap else None,
+                        "outstanding_shares": float(ref.share_class_shares_outstanding) if ref and ref.share_class_shares_outstanding else None,
+                        "recent_split_date": recent_split_date,
+                        "catalyst_tags": cat_info.get("tags", []),
+                        "catalyst_summary": cat_info.get("summary"),
+                    }
                     if enrichment["outstanding_shares"]:
                         indicators["float_rotation_pct"] = round((pre_market_volume / enrichment["outstanding_shares"] * 100), 4)
 
@@ -330,30 +423,46 @@ class ScannerService:
         return results
 
     @staticmethod
-    def run_pre_market_scan(
+    async def run_pre_market_scan(
         tickers: List[str], db: Session
     ) -> List[Dict[str, Any]]:
         """Run extended hours (pre+post) volume spike scanner."""
         results = []
+        event_date = get_market_today()
+        
+        # Pre-fetch enrichment for all tickers
+        enrichment_batch = await asyncio.to_thread(ScannerService._get_batch_enrichment_data, tickers, event_date, db)
 
-        for ticker in tickers:
+        async def fetch_ticker_data(ticker: str):
+            """Fetch external data in parallel with rate limiting."""
+            async with ScannerService._SCAN_SEMAPHORE:
+                try:
+                    hist_data = await asyncio.to_thread(StockDataService.get_historical_data, ticker, "60d")
+                    if hist_data.empty:
+                        return ticker, None, None
+                        
+                    pre_market_data = await asyncio.to_thread(StockDataService.get_pre_market_data, ticker)
+                    return ticker, hist_data, pre_market_data
+                except Exception as e:
+                    logging.error(f"Error fetching data for {ticker}: {e}")
+                    return ticker, None, None
+
+        # Execute all network providers in parallel (H4 fix)
+        data_tasks = [fetch_ticker_data(t) for t in tickers]
+        fetched_results = await asyncio.gather(*data_tasks)
+
+        # Process results sequentially using the single DB Session (Session is not thread-safe)
+        for ticker, hist_data, pre_market_data in fetched_results:
+            if hist_data is None or hist_data.empty or pre_market_data is None:
+                continue
+                
             try:
-                # Get historical data
-                hist_data = StockDataService.get_historical_data(ticker, "60d")
-                if hist_data.empty: continue
-
-                # Calculate metrics
+                # Calculate indicators
                 avg_volume_20d = hist_data["Volume"].rolling(20).mean().iloc[-1]
                 avg_volume_50d = hist_data["Volume"].rolling(50).mean().iloc[-1] if len(hist_data) >= 50 else None
-
-                # Get pre-market data
-                pre_market_data = StockDataService.get_pre_market_data(ticker)
-                if not pre_market_data: continue
-
                 pre_market_volume = pre_market_data.get("pre_market_volume", 0)
                 relative_volume = (pre_market_volume / avg_volume_20d if avg_volume_20d > 0 else 0)
 
-                # Check criteria
                 criteria_met = {
                     "volume_spike": pre_market_volume > (avg_volume_20d * 4),
                     "minimum_volume": pre_market_volume > 100000,
@@ -362,13 +471,10 @@ class ScannerService:
 
                 if all(criteria_met.values()):
                     previous_close = float(hist_data["Close"].iloc[-1])
-                    event_date = get_market_today()
                     day_metrics = ScannerService.calculate_day_metrics(ticker, event_date, db)
                     
                     current_price = day_metrics["closing_price"] or day_metrics["pre_market_close"] or previous_close
                     gap_pct = (day_metrics["opening_price"] - previous_close) / previous_close * 100 if day_metrics["opening_price"] > 0 else 0
-
-                    current_price = day_metrics["closing_price"] or day_metrics["pre_market_close"] or previous_close
                     fade_from_high_pct = (day_metrics["regular_high"] - current_price) / day_metrics["regular_high"] * 100 if day_metrics["regular_high"] > 0 else 0
                     day_range_pct = (day_metrics["regular_high"] - day_metrics["regular_low"]) / day_metrics["regular_low"] * 100 if day_metrics["regular_low"] > 0 else 0
 
@@ -383,12 +489,10 @@ class ScannerService:
                         "day_range_pct": round(day_range_pct, 4)
                     }
 
-                    # Enrichment
-                    enrichment = ScannerService._get_enrichment_data(ticker, event_date, db)
-                    if enrichment["outstanding_shares"]:
+                    enrichment = enrichment_batch.get(ticker.upper(), {})
+                    if enrichment.get("outstanding_shares"):
                         indicators["float_rotation_pct"] = round((pre_market_volume / enrichment["outstanding_shares"] * 100), 4)
 
-                    # Save using helper
                     event_dict = ScannerService._save_event(
                         db=db,
                         ticker=ticker,
@@ -401,29 +505,43 @@ class ScannerService:
                         opening_price=day_metrics["opening_price"],
                         closing_price=day_metrics["closing_price"]
                     )
-                    
                     results.append(event_dict)
-
             except Exception as e:
-                logging.error(f"Error scanning {ticker}: {e}")
-                continue
+                logging.error(f"Error processing {ticker} results: {e}")
 
         db.commit()
         return results
 
     @staticmethod
-    def run_oversold_bounce_scan(
+    async def run_oversold_bounce_scan(
         tickers: List[str], db: Session
     ) -> List[Dict[str, Any]]:
         """Run the Oversold Bounce (Dual RSI) scan."""
         results = []
         event_date = get_market_today()
         
-        for ticker in tickers:
-            try:
-                hist_data = StockDataService.get_historical_data(ticker, "60d")
-                if hist_data.empty or len(hist_data) < 10: continue
+        # Pre-fetch enrichment
+        enrichment_batch = await asyncio.to_thread(ScannerService._get_batch_enrichment_data, tickers, event_date, db)
+
+        async def fetch_ticker_data(ticker: str):
+            async with ScannerService._SCAN_SEMAPHORE:
+                try:
+                    hist_data = await asyncio.to_thread(StockDataService.get_historical_data, ticker, "60d")
+                    return ticker, hist_data
+                except Exception as e:
+                    logging.error(f"Error fetching data for {ticker}: {e}")
+                    return ticker, None
+
+        # Parallel fetch
+        data_tasks = [fetch_ticker_data(t) for t in tickers]
+        fetched_results = await asyncio.gather(*data_tasks)
+
+        # Sequential DB processing
+        for ticker, hist_data in fetched_results:
+            if hist_data is None or hist_data.empty or len(hist_data) < 10:
+                continue
                 
+            try:
                 df = hist_data.copy()
                 df.sort_index(inplace=True)
                 
@@ -489,10 +607,7 @@ class ScannerService:
                         "no_gap_down": True
                     }
                     
-                    # Enrichment
-                    enrichment = ScannerService._get_enrichment_data(ticker, event_date, db)
-                    
-                    # Save using helper
+                    enrichment = enrichment_batch.get(ticker.upper(), {})
                     event_dict = ScannerService._save_event(
                         db=db,
                         ticker=ticker,
@@ -505,11 +620,9 @@ class ScannerService:
                         opening_price=float(today['Open']),
                         closing_price=float(today['Close'])
                     )
-                    
                     results.append(event_dict)
-                    
             except Exception as e:
-                logging.error(f"Error in oversold_bounce scan for {ticker}: {e}")
-                
+                logging.error(f"Error processing {ticker} oversold bounce: {e}")
+
         db.commit()
         return results

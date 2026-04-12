@@ -37,7 +37,8 @@
       "Bash(npx eslint:*)",
       "Bash(ls \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\frontend\"/*.cjs \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\frontend\"/*.js \"C:\\\\git\\\\trading\\\\OKComputer_Custom Stock Scanner System\\\\frontend\"/*.ts)",
       "Bash(node:*)",
-      "Bash(npm outdated:*)"
+      "Bash(npm outdated:*)",
+      "Bash(pip download:*)"
     ]
   }
 }
