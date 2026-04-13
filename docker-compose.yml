@@ -56,14 +56,15 @@ services:
       TWOFA_TIMEOUT_ACTION: restart
       READ_ONLY_API: ${IB_READ_ONLY:-yes}   # safety: no order submission via API
     ports:
-      - "4002:4002"   # paper trading socket
-      - "4001:4001"   # live trading socket (unused until needed)
+      - "4004:4004"   # paper trading (socat proxy → localhost:4002) — use this for API clients
+      - "4003:4003"   # live trading  (socat proxy → localhost:4001) — unused until needed
     volumes:
       - ib_gateway_settings:/home/ibgateway/Jts
     networks:
       - stockscanner-network
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "4002"]
+      # Port 4004 is the socat proxy — tests the full path that API clients use
+      test: ["CMD", "bash", "-c", "socat /dev/null TCP:localhost:4004,connect-timeout=3"]
       interval: 10s
       timeout: 5s
       retries: 18          # allow up to 3 min for initial login
@@ -83,8 +84,8 @@ services:
       SEQ_URL: http://seq:5341
       WATCHFILES_FORCE_POLLING: "true"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      IBKR_HOST: ${IBKR_HOST:-ib-gateway}
-      IBKR_PORT: ${IBKR_PORT:-4002}
+      IBKR_HOST: ib-gateway
+      IBKR_PORT: 4004
       IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
       # Alerting & Push Notifications
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
@@ -143,8 +144,8 @@ services:
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       WATCHFILES_FORCE_POLLING: "true"
-      IBKR_HOST: ${IBKR_HOST:-ib-gateway}
-      IBKR_PORT: ${IBKR_PORT:-4002}
+      IBKR_HOST: ib-gateway
+      IBKR_PORT: 4004
       IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
       # Alerting & Push Notifications
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
