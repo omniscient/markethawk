@@ -478,16 +478,16 @@ def sync_futures_aggregates(
     from app.services.futures_data import FuturesDataService
 
     db: Session = SessionLocal()
+    # Always create a fresh event loop for each Celery task.
+    # ForkPoolWorker reuses the same process for many tasks; reusing the
+    # inherited or previous loop can leave ib_insync in a broken state.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         logger.info(
             f"📊 Starting futures aggregate sync for {symbol} ({exchange})"
             + (f" [{from_date} → {to_date}]" if from_date else "")
         )
-
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
 
         result = loop.run_until_complete(
             FuturesDataService.download_full_history(
@@ -508,6 +508,13 @@ def sync_futures_aggregates(
         db.rollback()
         raise self.retry(exc=e, countdown=60)
     finally:
+        # Release the IBKR clientId so the next task in this worker process
+        # can connect without hitting error 326 "clientId already in use".
+        from app.providers import DataProviderFactory
+        ibkr = DataProviderFactory.get_or_none("ibkr")
+        if ibkr:
+            ibkr.disconnect()
+        loop.close()
         db.close()
 
 

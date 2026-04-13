@@ -366,6 +366,20 @@ class IBKRDataProvider(BaseDataProvider):
 
         for attempt in range(max_retries):
             self._ib = IB()
+
+            # Capture any IB-level errors (e.g. 326 clientId in use) so they
+            # appear in logs instead of silently causing a disconnect.
+            _last_error: list = []
+
+            def _on_error(reqId, errorCode, errorString, contract):
+                logger.warning(
+                    f"IBKRDataProvider: IB error {errorCode} "
+                    f"(reqId={reqId}): {errorString}"
+                )
+                _last_error.append((errorCode, errorString))
+
+            self._ib.errorEvent += _on_error
+
             try:
                 await self._ib.connectAsync(
                     host=settings.IBKR_HOST,
@@ -378,8 +392,13 @@ class IBKRDataProvider(BaseDataProvider):
                 await asyncio.sleep(0.5)
 
                 if not self._ib.isConnected():
+                    reason = (
+                        f"error {_last_error[-1][0]}: {_last_error[-1][1]}"
+                        if _last_error
+                        else "clientId may already be in use"
+                    )
                     raise ConnectionError(
-                        f"clientId={client_id} rejected — may already be in use"
+                        f"clientId={client_id} rejected — {reason}"
                     )
 
                 self._connected = True
