@@ -48,11 +48,11 @@ These control the `ib-gateway` container and the backend's connection to it. All
 |----------|---------|---------|
 | `IB_USERNAME` | — | IBKR account username for IBC auto-login |
 | `IB_PASSWORD` | — | IBKR account password for IBC auto-login |
-| `IB_TRADING_MODE` | `paper` | `paper` (port 4002) or `live` (port 4001) |
+| `IB_TRADING_MODE` | `paper` | `paper` or `live` — controls which internal Gateway port IBC uses |
 | `IB_READ_ONLY` | `yes` | Set to `no` to allow order submission via the API socket. Leave as `yes` for data-only use. |
-| `IBKR_HOST` | `ib-gateway` (Docker) / `127.0.0.1` (local) | Hostname the backend uses to connect to TWS/Gateway |
-| `IBKR_PORT` | `4002` | API socket port (`7496` TWS live, `7497` TWS paper, `4001` Gateway live, `4002` Gateway paper) |
-| `IBKR_CLIENT_ID` | `10` | Unique client ID. Must differ from any other concurrent API connections. |
+| `IBKR_HOST` | `ib-gateway` (Docker) / `127.0.0.1` (local) | Hostname the backend and live-scanner use to connect to the Gateway |
+| `IBKR_PORT` | `4004` (Docker) | **Use port 4004** — the Gateway API binds to localhost-only inside the container; `socat` proxies it externally on 4004 (paper) / 4003 (live). Direct ports 4002/4001 are unreachable from other containers. |
+| `IBKR_CLIENT_ID` | `10` | Base client ID for the backend and Celery workers. Each worker adds `pid % 50` to avoid collisions. **The live-scanner uses clientId 5 (hardcoded) and is not affected by this variable.** |
 
 ---
 

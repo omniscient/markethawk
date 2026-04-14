@@ -14,6 +14,7 @@ import StockDetailPage from './pages/StockDetailPage';
 import Journal from './pages/Journal';
 import EdgeExplorer from './pages/EdgeExplorer';
 import PreMarketMovers from './pages/PreMarketMovers';
+import ActiveWatchlist from './pages/ActiveWatchlist';
 import { GlobalErrorToast } from './components/ui/GlobalErrorToast';
 
 // Create a client
@@ -41,6 +42,7 @@ function App() {
               <Route path="/journal" element={<Journal />} />
               <Route path="/edge-explorer" element={<EdgeExplorer />} />
               <Route path="/movers/pre-market" element={<PreMarketMovers />} />
+              <Route path="/watchlist" element={<ActiveWatchlist />} />
               <Route path="/stock/:ticker" element={<StockDetailPage />} />
             </Routes>
           </Layout>

@@ -3,6 +3,12 @@
 ```
 MarketHawk/
 ├── backend/
+│   ├── live_scanner/                   # Live scanner — standalone asyncio process (separate Docker service)
+│   │   ├── __init__.py
+│   │   ├── main.py                     # Entry point: connects to IB Gateway, runs sync + process loops
+│   │   ├── bar_aggregator.py           # BarAggregator: 5 s bars → 1 m MinuteBar; session/volume tracking
+│   │   ├── conditions.py               # Alert conditions: live_volume_spike, live_price_move
+│   │   └── publisher.py                # LivePublisher: Redis publish (quote/tick/minute_bar/alert) + DB writes
 │   ├── alembic/                        # Alembic migration framework
 │   │   ├── versions/                   # Migration scripts (one file per schema change)
 │   │   └── env.py                      # Alembic runtime config; imports models for autogenerate
@@ -13,8 +19,9 @@ MarketHawk/
 │   │   │   ├── celery_app.py           # Celery instance and beat schedule definitions
 │   │   │   └── error_tracking.py       # ErrorTracker protocol; Seq + stdout implementations
 │   │   ├── models/
+│   │   │   ├── active_watchlist.py     # ActiveWatchlist — manually curated live-observation list (soft limit 50)
 │   │   │   ├── scanner_run.py          # ScannerRun — one row per scan execution
-│   │   │   ├── scanner_event.py        # ScannerEvent — tickers that passed criteria
+│   │   │   ├── scanner_event.py        # ScannerEvent — tickers that passed criteria (also written by live scanner)
 │   │   │   ├── scanner_config.py       # ScannerConfig — saved parameter sets
 │   │   │   ├── stock_universe.py       # StockUniverse — named ticker groups
 │   │   │   ├── stock_universe_ticker.py # StockUniverseTicker — universe membership
@@ -37,13 +44,15 @@ MarketHawk/
 │   │   │   ├── universe.py             # /api/universe/* — CRUD for universes
 │   │   │   ├── stocks.py               # /api/stocks/* — historical data, ticker search
 │   │   │   ├── news.py                 # /api/news/* — news articles and preferences
-│   │   │   ├── live_data.py            # /api/live/* — WebSocket and real-time quotes
+│   │   │   ├── live_data.py            # /api/live/ws/{ticker}/{resolution} — per-symbol WS; /api/live/ws/watchlist — watchlist-wide WS
 │   │   │   ├── futures.py              # /api/futures/* — contracts, aggregates, rollovers
 │   │   │   ├── journal.py              # /api/journal/* — trade journal CRUD
+│   │   │   ├── watchlist.py            # /api/watchlist/* — active watchlist CRUD
 │   │   │   ├── health.py               # GET /health — liveness probe
 │   │   │   ├── system.py               # /api/system/* — configuration and status
 │   │   │   └── __init__.py
 │   │   ├── schemas/
+│   │   │   ├── active_watchlist.py     # ActiveWatchlistAdd / ActiveWatchlistUpdate / ActiveWatchlistItem
 │   │   │   └── stock.py                # Pydantic request/response models
 │   │   ├── services/
 │   │   │   ├── scanner.py              # Core scan logic; ScannerService; asyncio.Semaphore(10)
@@ -78,7 +87,8 @@ MarketHawk/
 │   │   │   ├── scanner.ts              # Scanner API calls
 │   │   │   ├── stocks.ts               # Stocks and universe API calls
 │   │   │   ├── news.ts                 # News API calls
-│   │   │   └── system.ts               # System/health API calls
+│   │   │   ├── system.ts               # System/health API calls
+│   │   │   └── watchlist.ts            # Active watchlist CRUD + React Query hooks
 │   │   ├── components/
 │   │   │   ├── UniverseFormModal.tsx   # Create/edit universe modal
 │   │   │   ├── UniverseDetailsModal.tsx # Universe detail view modal
@@ -90,6 +100,7 @@ MarketHawk/
 │   │   │   ├── PreMarketMovers.tsx     # Real-time pre-market volume leaders
 │   │   │   ├── Universes.tsx           # Create and manage stock universes
 │   │   │   ├── EdgeExplorer.tsx        # Historical scanner hit rates and outcome distributions
+│   │   │   ├── ActiveWatchlist.tsx     # Live-monitored symbols; real-time price/session/alerts via WS
 │   │   │   ├── Journal.tsx             # Trade journal entry and review
 │   │   │   ├── Alerts.tsx              # Alert configuration and history
 │   │   │   ├── StockDetailPage.tsx     # Per-ticker chart, metrics, and news

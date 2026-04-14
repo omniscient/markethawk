@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  BarChart3, 
-  ScanLine, 
-  Database, 
-  Bell, 
-  Settings, 
-  Menu, 
+import {
+  BarChart3,
+  ScanLine,
+  Database,
+  Bell,
+  Settings,
+  Menu,
   X,
   TrendingUp,
   BookOpen,
+  Eye,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getSystemInfo } from '../api/system';
@@ -34,6 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Pre-market Movers', href: '/movers/pre-market', icon: TrendingUp },
     { name: 'Edge Explorer', href: '/edge-explorer', icon: BarChart3 },
     { name: 'Universes', href: '/universes', icon: Database },
+    { name: 'Watchlist', href: '/watchlist', icon: Eye },
     { name: 'Journal', href: '/journal', icon: BookOpen },
     { name: 'Alerts', href: '/alerts', icon: Bell },
     { name: 'Settings', href: '/settings', icon: Settings },

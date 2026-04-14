@@ -9,12 +9,17 @@ All services run as Docker containers on the `stockscanner-network` bridge netwo
                          │          stockscanner-network            │
                          │                                          │
   Browser ──HTTP:3000──> │ frontend ──HTTP──> backend:8000          │
+                         │   │ WS:3000/api/live/ws/*                │
                          │                       │                  │
                          │                  asyncpg ──> postgres:5432
                          │                  aioredis ──> redis:6379  │
-                         │                  ib_insync ──> ib-gateway:4002
+                         │                  ib_insync ──> ib-gateway:4004
                          │                  HTTPS ──> api.polygon.io │
                          │                  HTTP ──> seq:5341        │
+                         │                                          │
+                         │ live-scanner ──> postgres:5432           │
+                         │              ──> redis:6379              │
+                         │              ──> ib-gateway:4004         │
                          │                                          │
                          │ celery-worker ──> (same: DB, Redis, IBKR, Polygon)
                          │ celery-beat ──> redis:6379 (broker only) │
@@ -82,9 +87,10 @@ A full pre-market scan proceeds as follows:
 | `universe.py` | `/api/universe/*` — CRUD for stock universes and memberships |
 | `stocks.py` | `/api/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/news/*` — news articles and preferences |
-| `live_data.py` | `/api/live/*` — WebSocket and real-time quote endpoints |
+| `live_data.py` | `/api/live/ws/{ticker}/{resolution}` — per-symbol WebSocket; `/api/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts) |
 | `futures.py` | `/api/futures/*` — futures contracts, aggregates, rollovers |
 | `journal.py` | `/api/journal/*` — trade journal entries |
+| `watchlist.py` | `/api/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |
 | `health.py` | `GET /health` — liveness probe |
 | `system.py` | `/api/system/*` — configuration, status |
 
@@ -92,8 +98,9 @@ A full pre-market scan proceeds as follows:
 
 | Model | Table | Purpose |
 |-------|-------|---------|
+| `ActiveWatchlist` | `active_watchlist` | Manually curated symbols under live observation. Soft limit: 50. Fields: `symbol`, `security_type` (STK/FUT), `exchange`, `notes`, `added_at`. |
 | `ScannerRun` | `scanner_runs` | One row per scan execution; stores timing, config snapshot, hit count |
-| `ScannerEvent` | `scanner_events` | One row per ticker that passed all criteria in a run |
+| `ScannerEvent` | `scanner_events` | One row per ticker that passed all criteria in a run. Also written by the live scanner for `live_volume_spike` and `live_price_move` events. |
 | `ScannerConfig` | `scanner_configs` | Saved scanner parameter sets |
 | `StockUniverse` | `stock_universes` | Named groups of tickers (e.g., "Russell 2000 Small Caps") |
 | `StockUniverseTicker` | `stock_universe_tickers` | Universe membership records |
@@ -125,12 +132,13 @@ A full pre-market scan proceeds as follows:
 |------|-------|---------|
 | `Dashboard` | `/` | System metrics, recent alerts, market status |
 | `Scanner` | `/scanner` | Run scans, view results, configure criteria |
-| `PreMarketMovers` | `/pre-market` | Real-time pre-market volume leaders |
+| `PreMarketMovers` | `/movers/pre-market` | Real-time pre-market volume leaders |
 | `Universes` | `/universes` | Create and manage stock universes |
-| `EdgeExplorer` | `/edge` | Historical scanner hit rates and outcome distributions |
+| `EdgeExplorer` | `/edge-explorer` | Historical scanner hit rates and outcome distributions |
+| `ActiveWatchlist` | `/watchlist` | Live-monitored symbols: add/remove, real-time price + session data, alert badges. Connects to `/api/live/ws/watchlist` WebSocket. |
 | `Journal` | `/journal` | Trade journal entry and review |
 | `Alerts` | `/alerts` | Alert configuration and history |
-| `StockDetailPage` | `/stocks/:ticker` | Per-ticker chart, metrics, and news |
+| `StockDetailPage` | `/stock/:ticker` | Per-ticker chart, metrics, and news |
 | `Settings` | `/settings` | System configuration |
 
 ### Charting Libraries
@@ -158,14 +166,87 @@ To add a new error tracking backend (Sentry, Datadog, Loki):
 
 ## IB Gateway Integration
 
-The `ib-gateway` container (`ghcr.io/gnzsnz/ib-gateway:stable`) uses IBC for headless IBKR authentication. It exposes:
+The `ib-gateway` container (`ghcr.io/gnzsnz/ib-gateway:stable`) uses IBC for headless IBKR authentication.
 
-- **4002** — paper trading socket API (default, `IB_TRADING_MODE=paper`)
-- **4001** — live trading socket (opt-in, `IB_TRADING_MODE=live`)
+**Port architecture** — the Gateway API binds to `localhost` only inside the container. `socat` proxies it to an externally-reachable port:
+
+| External port | Internal target | Mode |
+|--------------|----------------|------|
+| **4004** | `localhost:4002` (socat) | Paper trading — all API clients use this |
+| **4003** | `localhost:4001` (socat) | Live trading — unused until needed |
 
 `READ_ONLY_API=yes` by default — order submission via the API is intentionally disabled.
 
-The backend connects via `ib_insync` through `app/providers/ibkr.py`. The `ib-gateway` container has a health check that allows up to 3 minutes (18 retries × 10 seconds) for initial IBC authentication. First startup typically takes 45–60 seconds.
+**Client ID allocation:**
+
+| Service | `clientId` |
+|---------|-----------|
+| `backend` / `celery-worker` | `IBKR_CLIENT_ID` env var (default 10) + `pid % 50` |
+| `live-scanner` | **5** (hardcoded, dedicated) |
+
+Each concurrent connection must use a unique `clientId`. The `live-scanner` uses a fixed ID so it never collides with the backend or Celery workers.
+
+The health check tests the socat proxy (`socat /dev/null TCP:localhost:4004,connect-timeout=3`) and allows up to 3 minutes (18 retries × 10 s) for initial IBC authentication. First startup typically takes 45–60 seconds.
+
+## Live Scanner
+
+The `live-scanner` container (`backend/live_scanner/`) is a standalone asyncio process that streams real-time market data from IB Gateway for every symbol in the active watchlist, evaluates alert conditions, and publishes results to Redis.
+
+### Hybrid data model
+
+Two concurrent IBKR subscriptions are opened per watchlist symbol:
+
+| Subscription | API call | Rate | Used for |
+|-------------|----------|------|----------|
+| Market data | `reqMktData` | Sub-second (every last-price change) | UI price display |
+| Real-time bars | `reqRealTimeBars` | Every 5 seconds (IBKR minimum) | Volume accumulation, OHLCV, alert conditions |
+
+### Data flow
+
+```
+IB Gateway
+  ├── reqMktData (ticker.updateEvent)
+  │     └── price changed? → queue TAG_QUOTE
+  │           └── publish_quote() → Redis watchlist:live_data {"type":"quote"}
+  │
+  └── reqRealTimeBars (bars.updateEvent, every 5 s)
+        └── queue TAG_BAR
+              ├── publish_tick() → Redis stock_updates:{symbol}:second
+              │                  → Redis watchlist:live_data {"type":"tick"}
+              └── BarAggregator.update(bar)
+                    └── minute boundary crossed?
+                          ├── publish_minute_bar() → Redis stock_updates:{symbol}:minute
+                          │                        → Redis watchlist:live_data {"type":"minute_bar"}
+                          └── check_conditions(minute_bar)
+                                └── triggered?
+                                      ├── Redis SET NX EX 3600 (1-hour dedup)
+                                      ├── write ScannerEvent to DB
+                                      └── publish → Redis watchlist:alerts {"type":"alert"}
+
+Redis pub/sub
+  └── FastAPI /api/live/ws/watchlist (subscribes to watchlist:live_data + watchlist:alerts)
+        └── WebSocket → Browser (ActiveWatchlist page)
+```
+
+### Bar aggregation and session detection
+
+`BarAggregator` (`live_scanner/bar_aggregator.py`) accumulates 5-second bars into 1-minute `MinuteBar` objects and tracks:
+- **Session type**: `pre` (04:00–09:30 ET), `regular` (09:30–16:00 ET), `post` (16:00–20:00 ET), or `closed`
+- **Session volume**: cumulative volume since the current session opened (reset on session boundary)
+- **Minutes elapsed**: time into the current session (used for projected-volume calculation)
+
+### Alert conditions (`live_scanner/conditions.py`)
+
+| Scanner type | Condition | Severity |
+|-------------|-----------|----------|
+| `live_volume_spike` | Projected full-session volume ≥ 4× avg daily volume | high > 8×, medium > 4× |
+| `live_price_move` | `\|close − prior_close\| / prior_close ≥ 1%` | high > 5%, medium > 2% |
+
+Both use the same `ScannerEvent` model and `event_helpers` as the batch scanner. The daily UniqueConstraint `(ticker, event_date, scanner_type)` prevents duplicate DB rows; a Redis `SET NX EX 3600` key prevents alert flooding within the same hour.
+
+### Watchlist sync
+
+The `_sync_loop` polls the DB every 30 seconds. Newly added symbols are subscribed immediately; removed symbols have both their `reqRealTimeBars` and `reqMktData` subscriptions cancelled.
 
 ## Celery Task Architecture
 

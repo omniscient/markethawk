@@ -169,6 +169,35 @@ services:
       - stockscanner-network
     restart: unless-stopped
 
+  # Live Scanner — streams real-time IBKR bars for watchlist symbols
+  live-scanner:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: stockscanner-live
+    command: python -m live_scanner.main
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SEQ_URL: http://seq:5341
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      IBKR_HOST: ib-gateway
+      IBKR_PORT: 4004
+      IBKR_CLIENT_ID: 5   # dedicated clientId — never shares with backend or Celery
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ib-gateway:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+    networks:
+      - stockscanner-network
+    restart: unless-stopped
+
   # Celery Beat for reliable scheduling
   celery-beat:
     build:

@@ -24,6 +24,7 @@ from app.models.system_config import SystemConfig
 from app.models.alert_rule import AlertRule
 from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.push_subscription import PushSubscription
+from app.models.active_watchlist import ActiveWatchlist
 
 __all__ = [
     "StockUniverse",
@@ -50,4 +51,5 @@ __all__ = [
     "AlertRule",
     "AlertDeliveryLog",
     "PushSubscription",
+    "ActiveWatchlist",
 ]
