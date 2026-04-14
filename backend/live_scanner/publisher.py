@@ -114,6 +114,10 @@ class LivePublisher:
         Dedup uses Redis SET NX (1-hour window) so we don't spam the same
         alert repeatedly during a sustained move. The DB UniqueConstraint
         provides a hard daily dedup as backup.
+
+        After a successful DB write, evaluate_scanner_alerts is queued so that
+        notification rules and auto-trade rules are evaluated — same path as
+        the historical scanner.
         """
         dedup_key = f"live_alert_dedup:{bar.symbol}:{condition.scanner_type}"
         acquired = await self._redis.set(dedup_key, "1", nx=True, ex=3600)
@@ -124,8 +128,9 @@ class LivePublisher:
         severity = compute_event_severity(condition.scanner_type, condition.indicators)
 
         # Write to DB in a background thread (sync SQLAlchemy)
+        event_id: int | None = None
         try:
-            await asyncio.to_thread(
+            event_id = await asyncio.to_thread(
                 self._write_scanner_event, bar, condition, summary, severity
             )
         except Exception as e:
@@ -144,6 +149,15 @@ class LivePublisher:
         await self._redis.publish("watchlist:alerts", alert_msg)
         logger.info(f"LivePublisher: alert fired — {bar.symbol} [{condition.scanner_type}] {summary}")
 
+        # Trigger alert rule evaluation (notifications + auto-trading)
+        if event_id:
+            try:
+                await asyncio.to_thread(self._queue_alert_evaluation, event_id)
+            except Exception as e:
+                logger.error(
+                    f"LivePublisher: failed to queue alert evaluation for event {event_id}: {e}"
+                )
+
     # ------------------------------------------------------------------
     # Internal / synchronous helpers
     # ------------------------------------------------------------------
@@ -154,8 +168,11 @@ class LivePublisher:
         condition: ConditionResult,
         summary: str,
         severity: str,
-    ) -> None:
-        """Synchronous DB write — runs via asyncio.to_thread."""
+    ) -> int | None:
+        """
+        Synchronous DB write — runs via asyncio.to_thread.
+        Returns the new ScannerEvent.id, or None if the event already existed.
+        """
         today = bar.minute_ts.astimezone(ET).date()
 
         event = ScannerEvent(
@@ -176,13 +193,25 @@ class LivePublisher:
             try:
                 session.add(event)
                 session.commit()
+                session.refresh(event)
                 logger.debug(
                     f"LivePublisher: ScannerEvent created — "
                     f"{bar.symbol} {condition.scanner_type} {today}"
                 )
+                return event.id
             except IntegrityError:
                 session.rollback()
                 logger.debug(
                     f"LivePublisher: ScannerEvent already exists for "
                     f"{bar.symbol} {condition.scanner_type} {today} — skipping"
                 )
+                return None
+
+    def _queue_alert_evaluation(self, event_id: int) -> None:
+        """
+        Queue evaluate_scanner_alerts Celery task for a live-scanner event.
+        Runs in a background thread (called via asyncio.to_thread).
+        """
+        from app.core.celery_app import celery_app
+        celery_app.send_task("app.tasks.evaluate_scanner_alerts", args=[event_id])
+        logger.debug(f"LivePublisher: queued evaluate_scanner_alerts for event {event_id}")

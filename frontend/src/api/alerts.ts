@@ -18,6 +18,8 @@ export interface AlertRule {
     google_chat_webhook?: string;
     webhook_url?: string;
   };
+  auto_trade: boolean;
+  trading_strategy_id: number | null;
   created_at?: string;
   updated_at?: string;
 }

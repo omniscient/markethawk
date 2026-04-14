@@ -20,4 +20,11 @@ celery_app.conf.beat_schedule = {
         'task': 'app.tasks.sync_stock_splits',
         'schedule': crontab(minute='0', hour='1'),
     },
+    # Auto-trade fill polling — every minute on weekdays during extended market hours
+    # (4 AM – 8 PM ET = 9 AM – 1 AM UTC+1, simpler to just run 8-23 UTC Mon-Fri)
+    # The task itself is a no-op when there are no submitted/open orders.
+    'poll-auto-trade-fills': {
+        'task': 'app.tasks.poll_auto_trade_fills',
+        'schedule': crontab(minute='*', hour='9-23', day_of_week='1-5'),
+    },
 }

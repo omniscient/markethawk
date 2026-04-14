@@ -60,6 +60,10 @@ class Settings:
     # Keep this different from any other apps connecting to TWS simultaneously.
     IBKR_CLIENT_ID: int = int(os.getenv("IBKR_CLIENT_ID", "10"))
 
+    # Dedicated clientId for the order manager (auto-trading).
+    # Must differ from IBKR_CLIENT_ID and from the live scanner's clientId (5).
+    IBKR_TRADING_CLIENT_ID: int = int(os.getenv("IBKR_TRADING_CLIENT_ID", "11"))
+
     # ── Email / SMTP (Alert Notifications) ────────────────────────────────
     # Use Gmail + an App Password (not your real Gmail password).
     # Generate one at: https://myaccount.google.com/apppasswords

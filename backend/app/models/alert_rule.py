@@ -3,8 +3,9 @@ AlertRule model — user-defined alert rules for scanner events.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
@@ -39,6 +40,23 @@ class AlertRule(Base):
     #   "webhook_url": "https://hooks.example.com/..."
     # }
     channel_config = Column(JSONB, nullable=False, default=dict)
+
+    # ── Auto-trading ─────────────────────────────────────────────────────
+    # When True, matching scanner events automatically trigger trade execution
+    # via the linked TradingStrategy (if set).
+    auto_trade = Column(Boolean, default=False, nullable=False)
+
+    # FK to the TradingStrategy that governs sizing/entry/exit for auto-trades.
+    # NULL means no automatic trading even if auto_trade=True.
+    trading_strategy_id = Column(
+        Integer,
+        ForeignKey("trading_strategies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Relationship back to the strategy (lazy-loaded, no cascade)
+    trading_strategy = relationship("TradingStrategy", back_populates="alert_rules")
 
     created_at = Column(
         DateTime,

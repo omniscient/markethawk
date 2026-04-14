@@ -11,6 +11,7 @@ import {
   TrendingUp,
   BookOpen,
   Eye,
+  Bot,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getSystemInfo } from '../api/system';
@@ -38,6 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Watchlist', href: '/watchlist', icon: Eye },
     { name: 'Journal', href: '/journal', icon: BookOpen },
     { name: 'Alerts', href: '/alerts', icon: Bell },
+    { name: 'Auto Trading', href: '/trading', icon: Bot },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 

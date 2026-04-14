@@ -13,6 +13,7 @@ from app.routers.system import router as system_router
 from app.routers.futures import router as futures_router
 from app.routers.alerts import router as alerts_router
 from app.routers.watchlist import router as watchlist_router
+from app.routers.auto_trading import router as auto_trading_router
 
 __all__ = [
     "health_router",
@@ -26,4 +27,5 @@ __all__ = [
     "futures_router",
     "alerts_router",
     "watchlist_router",
+    "auto_trading_router",
 ]

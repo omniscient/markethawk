@@ -70,6 +70,8 @@ def _rule_to_dict(rule: AlertRule) -> Dict[str, Any]:
         "cooldown_minutes": rule.cooldown_minutes,
         "channels": rule.channels or [],
         "channel_config": rule.channel_config or {},
+        "auto_trade": rule.auto_trade,
+        "trading_strategy_id": rule.trading_strategy_id,
         "created_at": rule.created_at.isoformat() if rule.created_at else None,
         "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
     }
@@ -93,6 +95,8 @@ def create_rule(payload: Dict[str, Any], db: Session = Depends(get_db)) -> Dict[
         cooldown_minutes=int(payload.get("cooldown_minutes", 60)),
         channels=payload.get("channels", []),
         channel_config=payload.get("channel_config", {}),
+        auto_trade=payload.get("auto_trade", False),
+        trading_strategy_id=payload.get("trading_strategy_id"),
     )
     db.add(rule)
     db.commit()
@@ -111,6 +115,7 @@ def update_rule(rule_id: int, payload: Dict[str, Any], db: Session = Depends(get
     updatable = {
         "name", "is_active", "scanner_types", "severity_filter",
         "cooldown_minutes", "channels", "channel_config",
+        "auto_trade", "trading_strategy_id",
     }
     for key, value in payload.items():
         if key in updatable:

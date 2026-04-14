@@ -19,7 +19,9 @@ import {
   ShieldAlert,
   Send,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Bot,
+  ChevronRight,
 } from 'lucide-react';
 
 // Components
@@ -40,6 +42,7 @@ import {
   usePushSubscription,
   AlertRule
 } from '../api/alerts';
+import { useStrategies } from '../api/trading';
 
 const SCANNER_TYPES = [
   { id: 'pre_market_volume_spike', label: 'Pre-Market Volume Spike' },
@@ -70,6 +73,7 @@ const Alerts: React.FC = () => {
   const { data: rules, isLoading: isLoadingRules } = useAlertRules();
   const { data: stats } = useAlertStats();
   const { data: logs } = useAlertLogs(15);
+  const { data: strategies } = useStrategies(true); // active only, for the dropdown
 
   const createRule = useCreateAlertRule();
   const updateRule = useUpdateAlertRule();
@@ -108,7 +112,9 @@ const Alerts: React.FC = () => {
         email: '',
         google_chat_webhook: '',
         webhook_url: '',
-      }
+      },
+      auto_trade: false,
+      trading_strategy_id: null,
     });
     setIsModalOpen(true);
   };
@@ -296,6 +302,11 @@ const Alerts: React.FC = () => {
                               <Clock className="h-3 w-3 mr-1" />
                               {rule.cooldown_minutes}m cooldown
                             </span>
+                            {rule.auto_trade && (
+                              <span className="text-xs font-bold uppercase px-2 py-0.5 rounded border text-financial-blue bg-financial-blue/10 border-financial-blue/20 flex items-center gap-1">
+                                <Bot className="h-3 w-3" /> Auto-Trade
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -688,6 +699,111 @@ const Alerts: React.FC = () => {
                 </div>
              </div>
           </div>
+
+          {/* ── Auto-Trade Section ─────────────────────────────────────────── */}
+          <div className="space-y-4 pt-4 border-t border-gray-800">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                <Bot className="h-3.5 w-3.5" />
+                Auto-Trading
+              </label>
+              <a
+                href="/trading"
+                className="text-xs text-financial-blue hover:text-blue-300 flex items-center gap-0.5 transition-colors"
+              >
+                Manage strategies <ChevronRight className="h-3 w-3" />
+              </a>
+            </div>
+
+            {/* Toggle */}
+            <div className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+              formState.auto_trade
+                ? 'bg-financial-blue/5 border-financial-blue/30'
+                : 'bg-gray-800 border-gray-700'
+            }`}>
+              <div>
+                <p className={`text-sm font-bold ${formState.auto_trade ? 'text-white' : 'text-gray-400'}`}>
+                  Enable Auto-Trading
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Automatically enter bracket orders when this rule fires.
+                </p>
+              </div>
+              <button
+                onClick={() => setFormState({
+                  ...formState,
+                  auto_trade: !formState.auto_trade,
+                  trading_strategy_id: formState.auto_trade ? null : formState.trading_strategy_id,
+                })}
+              >
+                {formState.auto_trade
+                  ? <ToggleRight className="h-7 w-7 text-financial-blue" />
+                  : <ToggleLeft className="h-7 w-7 text-gray-600" />}
+              </button>
+            </div>
+
+            {/* Strategy picker — shown only when auto_trade is on */}
+            {formState.auto_trade && (
+              <div className="space-y-2 animate-fade-in">
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                  Trading Strategy
+                </label>
+                {!strategies?.length ? (
+                  <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg text-yellow-300 text-sm">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                    <span>No active strategies found.{' '}
+                      <a href="/trading" className="underline hover:text-yellow-200">
+                        Create one first.
+                      </a>
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    value={formState.trading_strategy_id ?? ''}
+                    onChange={e => setFormState({
+                      ...formState,
+                      trading_strategy_id: e.target.value ? parseInt(e.target.value) : null,
+                    })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-financial-blue outline-none appearance-none"
+                  >
+                    <option value="">— Select a strategy —</option>
+                    {strategies.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}{s.paper_mode ? ' (Paper)' : ' (Live)'}
+                        {s.requires_approval ? ' · Requires Approval' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Selected strategy summary */}
+                {formState.trading_strategy_id && strategies && (() => {
+                  const s = strategies.find(x => x.id === formState.trading_strategy_id);
+                  if (!s) return null;
+                  return (
+                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                      {[
+                        { label: 'Stop', value: `${s.stop_pct}%` },
+                        { label: 'R:R', value: `${s.risk_reward_ratio}:1` },
+                        { label: 'Risk/Trade', value: `${s.risk_per_trade_pct}%` },
+                        { label: 'Mode', value: s.paper_mode ? 'Paper' : 'Live' },
+                      ].map(item => (
+                        <div key={item.label} className="bg-gray-800/80 rounded border border-gray-700 py-2">
+                          <div className="text-gray-500 font-bold uppercase tracking-wide">{item.label}</div>
+                          <div className={`font-black mt-0.5 ${
+                            item.label === 'Mode'
+                              ? (s.paper_mode ? 'text-blue-400' : 'text-orange-400')
+                              : 'text-white'
+                          }`}>{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+
         </div>
       </Modal>
     </div>
