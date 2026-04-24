@@ -54,7 +54,7 @@ class TestGetSnapshotPrice:
         p = _make_provider(client)
         assert p.get_snapshot_price("AAPL") is None
 
-    def test_passes_correct_market_type_and_ticker(self):
+    def test_delegates_to_get_snapshot_ticker_correctly(self):
         client = MagicMock()
         client.get_snapshot_ticker.return_value = _make_snapshot(last_trade_price=50.0)
         p = _make_provider(client)
