@@ -413,8 +413,9 @@ def get_account(db: Session = Depends(get_db)) -> Dict[str, Any]:
         asyncio.set_event_loop(loop)
         try:
             manager = IBKROrderManager()
-            account = loop.run_until_complete(manager.get_account_summary())
-            open_broker_orders = loop.run_until_complete(manager.get_open_orders())
+            account, open_broker_orders = loop.run_until_complete(
+                manager.get_account_and_orders()
+            )
         finally:
             loop.close()
 

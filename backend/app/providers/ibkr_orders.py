@@ -130,31 +130,64 @@ class IBKROrderManager:
 
     # ── Account ──────────────────────────────────────────────────────────
 
+    async def _fetch_account_summary(self, ib: "IB") -> AccountSummary:
+        """Parse account summary from an already-connected IB instance."""
+        raw_values = await ib.reqAccountSummaryAsync()
+        result = AccountSummary()
+        raw: dict = {}
+        for item in raw_values:
+            raw[item.tag] = item.value
+            if item.tag == "NetLiquidation":
+                result.net_liquidation = float(item.value)
+                result.currency = item.currency or "USD"
+            elif item.tag == "AvailableFunds":
+                result.available_funds = float(item.value)
+            elif item.tag == "BuyingPower":
+                result.buying_power = float(item.value)
+        result.raw = raw
+        logger.info(
+            f"IBKROrderManager: account summary — "
+            f"NLV=${result.net_liquidation:,.0f} "
+            f"AvailFunds=${result.available_funds:,.0f}"
+        )
+        return result
+
+    async def _fetch_open_orders(self, ib: "IB") -> List["OpenOrderInfo"]:
+        """Parse open orders from an already-connected IB instance."""
+        await ib.reqAllOpenOrdersAsync()
+        return [
+            OpenOrderInfo(
+                order_id=t.order.orderId,
+                perm_id=t.order.permId,
+                symbol=t.contract.symbol,
+                action=t.order.action,
+                order_type=t.order.orderType,
+                total_qty=t.order.totalQuantity,
+                status=t.orderStatus.status,
+                filled=t.orderStatus.filled,
+                avg_fill_price=t.orderStatus.avgFillPrice,
+            )
+            for t in ib.openTrades()
+        ]
+
     async def get_account_summary(self) -> AccountSummary:
         """Fetch key account metrics: net liquidation, available funds, buying power."""
         ib = await self._connect()
         try:
-            tags = ["NetLiquidation", "AvailableFunds", "BuyingPower"]
-            raw_values = await ib.reqAccountSummaryAsync()
+            return await self._fetch_account_summary(ib)
+        finally:
+            await self._disconnect(ib)
 
-            result = AccountSummary()
-            raw: dict = {}
-            for item in raw_values:
-                raw[item.tag] = item.value
-                if item.tag == "NetLiquidation":
-                    result.net_liquidation = float(item.value)
-                    result.currency = item.currency or "USD"
-                elif item.tag == "AvailableFunds":
-                    result.available_funds = float(item.value)
-                elif item.tag == "BuyingPower":
-                    result.buying_power = float(item.value)
-            result.raw = raw
-            logger.info(
-                f"IBKROrderManager: account summary — "
-                f"NLV=${result.net_liquidation:,.0f} "
-                f"AvailFunds=${result.available_funds:,.0f}"
-            )
-            return result
+    async def get_account_and_orders(self) -> tuple:
+        """
+        Fetch account summary and open orders in one IBKR connection.
+        Returns (AccountSummary, List[OpenOrderInfo]).
+        """
+        ib = await self._connect()
+        try:
+            account = await self._fetch_account_summary(ib)
+            orders = await self._fetch_open_orders(ib)
+            return account, orders
         finally:
             await self._disconnect(ib)
 
@@ -303,21 +336,7 @@ class IBKROrderManager:
         """Return all currently open orders."""
         ib = await self._connect()
         try:
-            await ib.reqAllOpenOrdersAsync()
-            result = []
-            for trade in ib.openTrades():
-                result.append(OpenOrderInfo(
-                    order_id=trade.order.orderId,
-                    perm_id=trade.order.permId,
-                    symbol=trade.contract.symbol,
-                    action=trade.order.action,
-                    order_type=trade.order.orderType,
-                    total_qty=trade.order.totalQuantity,
-                    status=trade.orderStatus.status,
-                    filled=trade.orderStatus.filled,
-                    avg_fill_price=trade.orderStatus.avgFillPrice,
-                ))
-            return result
+            return await self._fetch_open_orders(ib)
         finally:
             await self._disconnect(ib)
 

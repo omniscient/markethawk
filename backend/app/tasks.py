@@ -929,6 +929,42 @@ def poll_auto_trade_fills(self):
 # Fill helpers (called by poll_auto_trade_fills)
 # ---------------------------------------------------------------------------
 
+def _check_entry_slippage(
+    order: "AutoTradeOrder",
+    fill_price: float,
+    now: "datetime",
+    db: "Session",
+) -> None:
+    """
+    Enforce max_slippage_pct: reject the order if fill deviated too far from
+    entry_price_target; otherwise delegate to _record_entry_fill.
+
+    Slippage is computed as abs deviation regardless of side, because any
+    large deviation from the intended entry invalidates the trade's risk model.
+    """
+    strategy = order.trading_strategy
+    target = order.entry_price_target
+
+    if strategy is not None and target is not None:
+        target_f = float(target)
+        if target_f > 0:
+            slippage_pct = abs(fill_price - target_f) / target_f * 100
+            max_slip = float(strategy.max_slippage_pct)
+            if slippage_pct > max_slip:
+                order.status = "rejected"
+                order.rejection_reason = (
+                    f"Slippage {slippage_pct:.3f}% exceeded limit {max_slip}% "
+                    f"(fill={fill_price}, target={target_f})"
+                )
+                db.commit()
+                logger.warning(
+                    f"_check_entry_slippage: order {order.id} rejected — {order.rejection_reason}"
+                )
+                return
+
+    _record_entry_fill(order, fill_price, now, db)
+
+
 def _record_entry_fill(
     order: "AutoTradeOrder",
     fill_price: float,
@@ -1062,7 +1098,7 @@ def _poll_live_orders(
                         )
                         if status and status.get("filled", 0) > 0:
                             fill_price = float(status["avg_fill_price"])
-                            _record_entry_fill(order, fill_price, now, db)
+                            _check_entry_slippage(order, fill_price, now, db)
                         elif status is None:
                             # Order vanished — likely rejected
                             order.status = "rejected"
