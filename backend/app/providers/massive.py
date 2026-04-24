@@ -149,3 +149,19 @@ class MassiveDataProvider(BaseDataProvider):
         except Exception as e:
             logger.error(f"MassiveDataProvider: Error fetching snapshot: {e}")
             return []
+
+    def get_snapshot_price(self, symbol: str) -> Optional[float]:
+        if not self._client:
+            return None
+        try:
+            snap = self._client.get_snapshot_ticker("stocks", symbol)
+            if snap and snap.last_trade and snap.last_trade.price is not None:
+                return float(snap.last_trade.price)
+            if snap and snap.day and snap.day.close is not None:
+                return float(snap.day.close)
+            return None
+        except Exception as exc:
+            logger.debug(
+                f"MassiveDataProvider: snapshot price unavailable for {symbol}: {exc}"
+            )
+            return None
