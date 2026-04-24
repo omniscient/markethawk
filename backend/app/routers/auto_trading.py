@@ -304,16 +304,17 @@ def approve_order(
         db.commit()
         logger.info(f"Approved paper order id={o.id}")
     else:
-        # Queue live submission via Celery to avoid blocking the HTTP request
-        from app.tasks import execute_auto_trade  # noqa — task import
+        # Queue IBKR submission via Celery to avoid blocking the HTTP request.
+        # We submit the existing order directly — do NOT re-queue execute_auto_trade,
+        # which would hit the idempotency guard and silently skip.
         from app.core.celery_app import celery_app as _celery
 
         o.status = "pending"
         db.commit()
 
         _celery.send_task(
-            "app.tasks.execute_auto_trade",
-            kwargs={"rule_id": o.alert_rule_id, "scanner_event_id": o.scanner_event_id},
+            "app.tasks.submit_approved_order",
+            kwargs={"order_id": o.id},
         )
         logger.info(f"Approved live order id={o.id}, queued for IBKR submission")
 

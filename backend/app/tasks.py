@@ -836,6 +836,43 @@ def execute_auto_trade(self, rule_id: int, scanner_event_id: int):
         db.close()
 
 
+@celery_app.task(bind=True, max_retries=1)
+def submit_approved_order(self, order_id: int):
+    """
+    Submit a manually-approved AutoTradeOrder to IBKR.
+
+    Called by the approve_order endpoint instead of re-queuing execute_auto_trade
+    (which would hit the idempotency guard and silently skip the order).
+    Reads all sizing values from the stored order — no recalculation.
+    """
+    from app.models.auto_trade_order import AutoTradeOrder
+    from app.services.auto_trade_service import auto_trade_executor
+
+    db: Session = SessionLocal()
+    try:
+        order = db.query(AutoTradeOrder).filter(AutoTradeOrder.id == order_id).first()
+        if not order:
+            logger.warning(f"submit_approved_order: order {order_id} not found")
+            return
+        if order.status != "pending":
+            logger.warning(
+                f"submit_approved_order: order {order_id} has status='{order.status}', "
+                f"expected 'pending' — skipping to avoid double-submit"
+            )
+            return
+
+        auto_trade_executor.submit_existing_order(order, db)
+        logger.info(
+            f"✅ submit_approved_order: order {order_id} submitted, status={order.status}"
+        )
+    except Exception as exc:
+        logger.error(f"❌ submit_approved_order failed order={order_id}: {exc}")
+        db.rollback()
+        raise self.retry(exc=exc, countdown=15)
+    finally:
+        db.close()
+
+
 @celery_app.task(bind=True, max_retries=0)
 def poll_auto_trade_fills(self):
     """

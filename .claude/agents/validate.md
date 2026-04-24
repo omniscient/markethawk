@@ -91,8 +91,14 @@ TypeScript check:  PASS / FAIL / SKIP
 OVERALL: PASS ✓  /  FAIL ✗ — [reason]
 ```
 
-If OVERALL is PASS, tell the user it is safe to commit.
-If OVERALL is FAIL, list every failing check with the exact error and what to fix before committing. Do not suggest committing until all checks pass.
+If OVERALL is PASS, immediately offer a git commit. Do not wait to be asked. Draft a commit message with:
+- A title line (≤72 chars, imperative mood: fix/feat/refactor/chore)
+- A blank line
+- A body of 2–4 sentences explaining what changed and why — the reasoning, not just the file list
+
+Present the message and ask the user to confirm or edit before running `git commit`.
+
+If OVERALL is FAIL, list every failing check with the exact error and what to fix. Do not suggest committing until all checks pass.
 
 ## Rules
 

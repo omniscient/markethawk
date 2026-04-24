@@ -297,6 +297,25 @@ class AutoTradeExecutor:
 
     # ── IBKR submission (live only) ──────────────────────────────────────
 
+    def submit_existing_order(self, order: AutoTradeOrder, db: Session) -> None:
+        """
+        Submit an already-created AutoTradeOrder to IBKR.
+
+        Used by the approve_order endpoint for orders that were held at
+        pending_approval and are now manually approved.  All sizing values
+        are read directly from the order record so no recalculation happens.
+        """
+        entry_price = float(order.entry_price_target) if order.entry_price_target is not None else None
+        calc = PositionCalc(
+            quantity=order.quantity or 0,
+            entry=entry_price,
+            stop=float(order.calculated_stop),
+            target=float(order.calculated_target),
+            risk_amount_usd=float(order.risk_amount_usd) if order.risk_amount_usd else 0.0,
+            stop_distance=0.0,  # not used by _submit_to_ibkr
+        )
+        self._submit_to_ibkr(order, calc, db)
+
     def _submit_to_ibkr(
         self,
         order: AutoTradeOrder,
