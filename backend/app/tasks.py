@@ -911,6 +911,8 @@ def poll_auto_trade_fills(self):
             if order.status == "submitted":
                 fill_price = float(order.trigger_price or order.entry_price_target or 0)
                 _record_entry_fill(order, fill_price, now, db)
+            elif order.status == "open":
+                _simulate_paper_exit(order, db, now)
 
         # ── Live mode: query IBKR ────────────────────────────────────────
         if live_orders:
@@ -1091,4 +1093,34 @@ def _poll_live_orders(
         logger.error(f"_poll_live_orders: IBKR connection error: {exc}")
     finally:
         loop.close()
+
+
+def _simulate_paper_exit(
+    order: "AutoTradeOrder",
+    db: "Session",
+    now: "datetime",
+) -> None:
+    from app.providers import DataProviderFactory
+
+    provider = DataProviderFactory.get_or_none("massive")
+    if not provider:
+        return
+
+    price = provider.get_snapshot_price(order.symbol)
+    if price is None:
+        return
+
+    stop   = float(order.calculated_stop)
+    target = float(order.calculated_target)
+
+    if order.side == "long":
+        if price >= target:
+            _record_exit_fill(order, price, "target", now, db)
+        elif price <= stop:
+            _record_exit_fill(order, price, "stop", now, db)
+    else:  # short
+        if price <= target:
+            _record_exit_fill(order, price, "target", now, db)
+        elif price >= stop:
+            _record_exit_fill(order, price, "stop", now, db)
 
