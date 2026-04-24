@@ -348,7 +348,8 @@ class StockDataService:
                 timespan=timespan,
                 from_date=from_date,
                 to_date=to_date,
-                limit=50000
+                limit=50000,
+                paginate=True,
             )
             
             if not aggs:
@@ -427,12 +428,14 @@ class StockDataService:
         sort: str = "asc",
         limit: int = 50000,
         provider: str = "massive",
+        paginate: bool = False,
     ) -> list[Dict[str, Any]]:
         """
         Fetch OHLCV bars via the configured data provider.
 
         Defaults to the 'massive' (Polygon) provider for backwards compat.
         Pass provider='ibkr' to route through Interactive Brokers instead.
+        Pass paginate=True to follow Polygon page boundaries automatically.
         """
         try:
             p = DataProviderFactory.get(provider)
@@ -449,6 +452,7 @@ class StockDataService:
                 adjusted=adjusted,
                 sort=sort,
                 limit=limit,
+                paginate=paginate,
             )
 
         except Exception as e:

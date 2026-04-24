@@ -70,41 +70,66 @@ class MassiveDataProvider(BaseDataProvider):
         adjusted: bool = True,
         sort: str = "asc",
         limit: int = 50000,
+        paginate: bool = False,
         **kwargs,
     ) -> List[Dict[str, Any]]:
-        """Fetch OHLCV bars from Polygon.io."""
+        """
+        Fetch OHLCV bars from Polygon.io with automatic pagination.
+
+        Polygon's /v2/aggs endpoint returns at most `limit` bars per call and
+        provides no next_url cursor.  When a full page arrives we advance
+        `from_` to last_bar.timestamp + 1 ms and fetch again until a partial
+        page signals the end of available data.
+        """
         if not self._client:
             logger.error("MassiveDataProvider: client not initialized.")
             return []
 
+        def _convert(agg) -> Dict[str, Any]:
+            return {
+                "timestamp": datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc),
+                "open": agg.open,
+                "high": agg.high,
+                "low": agg.low,
+                "close": agg.close,
+                "volume": agg.volume,
+                "vwap": getattr(agg, "vwap", None),
+                "transactions": getattr(agg, "transactions", None),
+            }
+
         try:
-            aggs = self._client.get_aggs(
-                ticker=symbol.upper(),
-                multiplier=multiplier,
-                timespan=timespan,
-                from_=from_date,
-                to=to_date,
-                adjusted=adjusted,
-                sort=sort,
-                limit=limit,
-            )
+            all_bars: List[Dict[str, Any]] = []
+            current_from: Any = from_date  # str on first call, int (ms) on subsequent calls
 
-            if not aggs:
-                return []
+            while True:
+                page = self._client.get_aggs(
+                    ticker=symbol.upper(),
+                    multiplier=multiplier,
+                    timespan=timespan,
+                    from_=current_from,
+                    to=to_date,
+                    adjusted=adjusted,
+                    sort=sort,
+                    limit=limit,
+                )
 
-            return [
-                {
-                    "timestamp": datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc),
-                    "open": agg.open,
-                    "high": agg.high,
-                    "low": agg.low,
-                    "close": agg.close,
-                    "volume": agg.volume,
-                    "vwap": getattr(agg, "vwap", None),
-                    "transactions": getattr(agg, "transactions", None),
-                }
-                for agg in aggs
-            ]
+                if not page:
+                    break
+
+                all_bars.extend(_convert(agg) for agg in page)
+
+                if not paginate or len(page) < limit:
+                    break  # single-page mode, or partial page means no more data
+
+                # Full page: advance past the last bar's millisecond timestamp
+                current_from = page[-1].timestamp + 1
+
+            if all_bars:
+                logger.debug(
+                    f"MassiveDataProvider: {symbol} {timespan} fetched "
+                    f"{len(all_bars)} bars in total"
+                )
+            return all_bars
 
         except Exception as e:
             logger.error(f"MassiveDataProvider: Error fetching bars for {symbol}: {e}")
