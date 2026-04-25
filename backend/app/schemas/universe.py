@@ -40,3 +40,11 @@ class StockUniverseResponse(BaseModel):
     stats_refreshed_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UniverseSummary(BaseModel):
+    """Minimal universe info returned for ticker membership lookups."""
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)

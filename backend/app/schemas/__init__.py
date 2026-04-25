@@ -6,6 +6,7 @@ from app.schemas.universe import (
     StockUniverseCreate,
     StockUniverseUpdate,
     StockUniverseResponse,
+    UniverseSummary,
 )
 from app.schemas.scanner import (
     ScannerRunRequest, 
@@ -22,6 +23,7 @@ __all__ = [
     "StockUniverseCreate",
     "StockUniverseUpdate",
     "StockUniverseResponse",
+    "UniverseSummary",
     "ScannerRunRequest",
     "ScannerRunResponse",
     "ScannerStatsResponse",
