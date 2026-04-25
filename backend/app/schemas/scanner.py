@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, validator
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 
@@ -72,3 +72,18 @@ class PreMarketMoversResponse(BaseModel):
     status: str
     movers: List[PreMarketMover]
     timestamp: datetime
+
+
+class ScannerRangeRequest(BaseModel):
+    """Schema for a date-range scanner run against a single ticker."""
+    ticker: str
+    scanner_types: List[str]
+    start_date: date
+    end_date: date
+    fetch_missing_data: bool = True
+
+    @validator('scanner_types')
+    def scanner_types_not_empty(cls, v):
+        if not v:
+            raise ValueError('At least one scanner type must be selected')
+        return v

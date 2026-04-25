@@ -1160,3 +1160,20 @@ def _simulate_paper_exit(
         elif price >= stop:
             _record_exit_fill(order, price, "stop", now, db)
 
+
+# ---------------------------------------------------------------------------
+# Date-range scan task (stub — full implementation in Task 5)
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, max_retries=0)
+def run_range_scan(
+    self,
+    ticker: str,
+    scanner_types: list,
+    start_date_str: str,
+    end_date_str: str,
+    fetch_missing_data: bool = True,
+):
+    """Run one or more scanner types against a single ticker over a date range."""
+    raise NotImplementedError("run_range_scan is not yet implemented")
+

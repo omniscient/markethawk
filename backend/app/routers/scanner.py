@@ -16,14 +16,15 @@ from app.utils.session import get_market_today
 from app.core.database import get_db
 from app.models import MonitoredStock, ScannerEvent, ScannerConfig, ScannerRun
 from app.schemas import (
-    ScannerRunRequest, 
-    ScannerRunResponse, 
+    ScannerRunRequest,
+    ScannerRunResponse,
     ScannerEventResponse,
-    ScannerEventSummary, 
+    ScannerEventSummary,
     ScannerStatsResponse,
     ScannerConfigResponse,
     PreMarketMoversResponse,
-    PreMarketMover
+    PreMarketMover,
+    ScannerRangeRequest,
 )
 from app.services import ScannerService, StockDataService
 
@@ -283,10 +284,27 @@ def get_pre_market_movers(
         min_volume=min_volume,
         limit=limit
     )
-    
+
     # Map to schema if necessary, but the dicts should match
     return {
         "status": "success",
         "movers": movers,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+
+@router.post("/run-range")
+def run_scanner_range(
+    request: ScannerRangeRequest,
+    db: Session = Depends(get_db),
+):
+    """Enqueue a date-range scan for a single ticker as a background Celery task."""
+    from app.tasks import run_range_scan
+    task = run_range_scan.delay(
+        ticker=request.ticker.upper(),
+        scanner_types=request.scanner_types,
+        start_date_str=request.start_date.isoformat(),
+        end_date_str=request.end_date.isoformat(),
+        fetch_missing_data=request.fetch_missing_data,
+    )
+    return {"task_id": task.id, "status": "queued"}

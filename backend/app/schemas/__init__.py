@@ -9,12 +9,13 @@ from app.schemas.universe import (
     UniverseSummary,
 )
 from app.schemas.scanner import (
-    ScannerRunRequest, 
-    ScannerRunResponse, 
-    ScannerStatsResponse, 
-    ScannerConfigResponse, 
-    PreMarketMoversResponse, 
-    PreMarketMover
+    ScannerRunRequest,
+    ScannerRunResponse,
+    ScannerStatsResponse,
+    ScannerConfigResponse,
+    PreMarketMoversResponse,
+    PreMarketMover,
+    ScannerRangeRequest,
 )
 from app.schemas.event import ScannerEventResponse, ScannerEventSummary
 from app.schemas.stock import MonitoredStockResponse
@@ -33,4 +34,5 @@ __all__ = [
     "MonitoredStockResponse",
     "PreMarketMoversResponse",
     "PreMarketMover",
+    "ScannerRangeRequest",
 ]
