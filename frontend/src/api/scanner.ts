@@ -169,6 +169,26 @@ export const runScanner = async (request: ScannerRunRequest): Promise<ScannerRun
   return response.data;
 };
 
+export interface ScannerRangeRequest {
+  ticker: string;
+  scanner_types: string[];
+  start_date: string;   // ISO date string, e.g. "2025-01-01"
+  end_date: string;
+  fetch_missing_data: boolean;
+}
+
+export interface ScannerRangeResponse {
+  task_id: string;
+  status: 'queued';
+}
+
+export const runScannerRange = async (
+  request: ScannerRangeRequest
+): Promise<ScannerRangeResponse> => {
+  const response = await apiClient.post('/scanner/run-range', request);
+  return response.data;
+};
+
 export const fetchScannerConfigs = async (): Promise<ScannerConfig[]> => {
   const response = await apiClient.get('/scanner/configs');
   return response.data;
