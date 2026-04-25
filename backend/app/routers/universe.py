@@ -19,6 +19,7 @@ from app.schemas import (
     StockUniverseUpdate,
     StockUniverseResponse,
     MonitoredStockResponse,
+    UniverseSummary,
 )
 from app.services import StockDataService
 
@@ -54,6 +55,26 @@ def create_stock_universe(
     db.refresh(db_universe)
 
     return db_universe
+
+
+@router.get("/by-ticker/{ticker}", response_model=List[UniverseSummary])
+def get_universes_for_ticker(
+    ticker: str,
+    db: Session = Depends(get_db),
+):
+    """Return all active universes that contain the given ticker."""
+    ticker_upper = ticker.upper()
+    rows = (
+        db.query(StockUniverse)
+        .join(StockUniverseTicker, StockUniverseTicker.universe_id == StockUniverse.id)
+        .filter(
+            StockUniverseTicker.ticker == ticker_upper,
+            StockUniverse.is_active == True,
+        )
+        .order_by(StockUniverse.name)
+        .all()
+    )
+    return rows
 
 
 @router.put("/{universe_id}", response_model=StockUniverseResponse)
