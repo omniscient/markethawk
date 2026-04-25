@@ -399,6 +399,16 @@ def refresh_universe(
         
     db.commit()
 
+    # Refresh cached stats now that tickers changed
+    stats = _compute_universe_stats(universe_id, db)
+    universe.cached_ticker_count = stats["ticker_count"]
+    universe.cached_aggregate_count = stats["aggregate_count"]
+    universe.cached_min_date = stats["min_date"]
+    universe.cached_max_date = stats["max_date"]
+    universe.cached_timespans = stats["timespans"]
+    universe.stats_refreshed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+
     return {
         "status": "completed",
         "scanned": "ALL",  # We scanned the whole DB effectively

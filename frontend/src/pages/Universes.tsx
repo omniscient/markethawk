@@ -83,6 +83,8 @@ const Universes: React.FC = () => {
           completed.forEach(id => delete next[id]);
           return next;
         });
+        // Auto-refresh cached stats for each completed universe, then reload list
+        await Promise.allSettled(completed.map(id => refreshUniverseStats(id)));
         queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
       }
 
