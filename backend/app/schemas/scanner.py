@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict, validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from uuid import UUID
@@ -82,7 +82,8 @@ class ScannerRangeRequest(BaseModel):
     end_date: date
     fetch_missing_data: bool = True
 
-    @validator('scanner_types')
+    @field_validator('scanner_types')
+    @classmethod
     def scanner_types_not_empty(cls, v):
         if not v:
             raise ValueError('At least one scanner type must be selected')
