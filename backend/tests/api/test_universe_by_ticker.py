@@ -68,4 +68,5 @@ def test_ticker_lookup_is_case_insensitive(db: Session):
     app.dependency_overrides.clear()
 
     assert response.status_code == 200
-    assert len(response.json()) >= 1
+    assert len(response.json()) == 1
+    assert response.json()[0]["name"] == "Mixed Case"
