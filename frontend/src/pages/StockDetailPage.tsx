@@ -363,33 +363,6 @@ const StockDetailPage: React.FC = () => {
             )}
             {systemInfo?.data_mode === 'delayed' ? 'Delayed Feed' : 'Live Feed'}: {format(lastUpdatedTime, 'h:mm:ss a')}
           </p>
-          <div className="flex items-center justify-end space-x-2 mt-2">
-            {scanTask.status === 'running' && (
-              <span className="text-xs text-financial-blue font-semibold animate-pulse">
-                Scanning… {scanTask.done} / {scanTask.total} days
-              </span>
-            )}
-            {scanDoneMsg && (
-              <span className="text-xs text-positive font-semibold">{scanDoneMsg}</span>
-            )}
-            {scanTask.status === 'failed' && (
-              <span className="text-xs text-negative font-semibold" title={scanTask.error ?? ''}>
-                Scan failed
-              </span>
-            )}
-            <button
-              onClick={() => setScanDialogOpen(true)}
-              disabled={scanTask.status === 'running'}
-              className={`flex items-center space-x-2 px-3 py-1 text-xs font-bold rounded-md border transition-all ${
-                scanTask.status === 'running'
-                  ? 'bg-gray-800 border-gray-700 text-gray-500 cursor-not-allowed'
-                  : 'bg-financial-blue/10 border-financial-blue/30 text-financial-blue hover:bg-financial-blue hover:text-white'
-              }`}
-            >
-              <Zap className={`h-3 w-3 ${scanTask.status === 'running' ? 'animate-pulse' : ''}`} />
-              <span>Run Scanner</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -558,10 +531,42 @@ const StockDetailPage: React.FC = () => {
           </div>
 
           {/* Scanner Event History */}
-          <Card title="Scanner Event History" icon={Zap as any}>
-            <RecentEvents 
-              events={events} 
-              maxItems={10} 
+          <Card
+            title="Scanner Event History"
+            icon={Zap as any}
+            actions={
+              <div className="flex items-center space-x-2">
+                {scanTask.status === 'running' && (
+                  <span className="text-xs text-financial-blue font-semibold animate-pulse">
+                    Scanning… {scanTask.done} / {scanTask.total} days
+                  </span>
+                )}
+                {scanDoneMsg && (
+                  <span className="text-xs text-positive font-semibold">{scanDoneMsg}</span>
+                )}
+                {scanTask.status === 'failed' && (
+                  <span className="text-xs text-negative font-semibold" title={scanTask.error ?? ''}>
+                    Scan failed
+                  </span>
+                )}
+                <button
+                  onClick={() => setScanDialogOpen(true)}
+                  disabled={scanTask.status === 'running'}
+                  className={`flex items-center space-x-2 px-3 py-1 text-xs font-bold rounded-md border transition-all ${
+                    scanTask.status === 'running'
+                      ? 'bg-gray-800 border-gray-700 text-gray-500 cursor-not-allowed'
+                      : 'bg-financial-blue/10 border-financial-blue/30 text-financial-blue hover:bg-financial-blue hover:text-white'
+                  }`}
+                >
+                  <Zap className={`h-3 w-3 ${scanTask.status === 'running' ? 'animate-pulse' : ''}`} />
+                  <span>Run Scanner</span>
+                </button>
+              </div>
+            }
+          >
+            <RecentEvents
+              events={events}
+              maxItems={10}
               onEventClick={handleEventClick}
             />
           </Card>
