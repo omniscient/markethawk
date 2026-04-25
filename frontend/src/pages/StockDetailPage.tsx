@@ -25,7 +25,7 @@ import NewsFeed from '../components/NewsFeed';
 
 // API
 import { fetchStockDetails, refreshStockData, syncMissingStockAggregates } from '../api/stocks';
-import { fetchScannerResults, fetchHistoricalData } from '../api/scanner';
+import { fetchScannerResults, fetchHistoricalData, fetchUniversesForTicker } from '../api/scanner';
 import { getSystemInfo } from '../api/system';
 import { useLiveStockData } from '../hooks/useLiveStockData';
 
@@ -147,6 +147,14 @@ const StockDetailPage: React.FC = () => {
   const { data: systemInfo } = useQuery({
     queryKey: ['systemInfo'],
     queryFn: getSystemInfo
+  });
+
+  // 6. Universe Membership Tags
+  const { data: tickerUniverses = [] } = useQuery({
+    queryKey: ['tickerUniverses', symbol],
+    queryFn: () => fetchUniversesForTicker(symbol),
+    enabled: !!symbol,
+    staleTime: 300_000,
   });
 
   const lastUpdatedTime = liveData
@@ -284,6 +292,14 @@ const StockDetailPage: React.FC = () => {
             <div className="px-2 py-0.5 bg-gray-800 rounded text-xs font-bold text-gray-400 uppercase">
               {details.info.sector || 'Unknown Sector'}
             </div>
+            {tickerUniverses.map((u) => (
+              <div
+                key={u.id}
+                className="px-2 py-0.5 bg-purple-900/50 border border-purple-700/50 rounded text-xs font-bold text-purple-300 uppercase"
+              >
+                {u.name}
+              </div>
+            ))}
           </div>
           <p className="text-xl text-gray-400 font-medium">{details.info.longName}</p>
         </div>
