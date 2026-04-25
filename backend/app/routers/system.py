@@ -2,14 +2,17 @@
 System-level information and status router.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 import asyncio
 import json
+import socket
 import redis.asyncio as aioredis
+from datetime import datetime, timezone
+import zoneinfo
 
 from app.core.database import get_db, SessionLocal
 from app.models.universe_quality_report import UniverseQualityReport
@@ -18,6 +21,32 @@ from app.models.system_config import SystemConfig
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 logger = logging.getLogger(__name__)
+
+ET = zoneinfo.ZoneInfo("America/New_York")
+
+
+def _market_status() -> str:
+    """Return market session based on current ET time (weekday only)."""
+    now_et = datetime.now(ET)
+    if now_et.weekday() >= 5:
+        return "closed"
+    t = now_et.hour * 60 + now_et.minute
+    if 240 <= t < 570:   # 04:00–09:30
+        return "pre_market"
+    if 570 <= t < 960:   # 09:30–16:00
+        return "open"
+    if 960 <= t < 1200:  # 16:00–20:00
+        return "post_market"
+    return "closed"
+
+
+def _ibkr_reachable(host: str, port: int, timeout: float = 2.0) -> bool:
+    try:
+        sock = socket.create_connection((host, port), timeout=timeout)
+        sock.close()
+        return True
+    except OSError:
+        return False
 
 def format_bytes(size: int) -> str:
     """Format bytes into a human-readable string."""
@@ -121,6 +150,33 @@ def get_app_info():
         "data_mode": "delayed" if settings.POLYGON_DELAYED else "live",
         "log_level": settings.LOG_LEVEL
     }
+
+@router.get("/status")
+def get_system_status(db: Session = Depends(get_db)):
+    """Lightweight status snapshot: market session, last scan, IBKR reachability."""
+    from app.core.config import settings
+    from app.models.scanner_run import ScannerRun
+
+    # Last scan
+    last_run = db.query(ScannerRun).order_by(ScannerRun.created_at.desc()).first()
+    last_scan_at: Optional[str] = None
+    if last_run and last_run.created_at:
+        ts = last_run.created_at
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        last_scan_at = ts.isoformat()
+
+    ibkr_host = getattr(settings, "IBKR_HOST", "127.0.0.1")
+    ibkr_port = int(getattr(settings, "IBKR_PORT", 7497))
+
+    return {
+        "market_status": _market_status(),
+        "last_scan_at": last_scan_at,
+        "ibkr_reachable": _ibkr_reachable(ibkr_host, ibkr_port),
+        "ibkr_host": ibkr_host,
+        "ibkr_port": ibkr_port,
+    }
+
 
 @router.get("/config")
 def get_config(db: Session = Depends(get_db)):

@@ -9,6 +9,16 @@ export interface SystemInfo {
   log_level: string;
 }
 
+export type MarketStatus = 'pre_market' | 'open' | 'post_market' | 'closed';
+
+export interface SystemStatus {
+  market_status: MarketStatus;
+  last_scan_at: string | null;
+  ibkr_reachable: boolean;
+  ibkr_host: string;
+  ibkr_port: number;
+}
+
 export interface StorageStats {
   scanner: { bytes: number; formatted: string };
   historical: { bytes: number; formatted: string };
@@ -20,6 +30,11 @@ export interface StorageStats {
 
 export const getSystemInfo = async (): Promise<SystemInfo> => {
   const response = await apiClient.get('/system/info');
+  return response.data;
+};
+
+export const getSystemStatus = async (): Promise<SystemStatus> => {
+  const response = await apiClient.get('/system/status');
   return response.data;
 };
 

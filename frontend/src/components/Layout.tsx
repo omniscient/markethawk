@@ -14,8 +14,51 @@ import {
   Bot,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { getSystemInfo } from '../api/system';
+import { getSystemStatus, MarketStatus } from '../api/system';
 import SystemActivityMonitor from './SystemActivityMonitor';
+
+// ── Status helpers ────────────────────────────────────────────────────────────
+
+const MARKET_LABELS: Record<MarketStatus, string> = {
+  open: 'MKT OPEN',
+  pre_market: 'PRE-MKT',
+  post_market: 'AFTER-HRS',
+  closed: 'MKT CLOSED',
+};
+
+const MARKET_DOT_COLOR: Record<MarketStatus, string> = {
+  open: 'bg-green-400',
+  pre_market: 'bg-amber-400',
+  post_market: 'bg-amber-400',
+  closed: 'bg-gray-500',
+};
+
+function formatRelativeTime(isoString: string | null): string {
+  if (!isoString) return 'never';
+  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+interface StatusDotProps {
+  color: string;
+  label: string;
+  pulse?: boolean;
+}
+
+const StatusDot: React.FC<StatusDotProps> = ({ color, label, pulse }) => (
+  <div className="flex items-center gap-1.5">
+    <span className={`relative flex h-2 w-2 ${pulse ? 'shrink-0' : ''}`}>
+      {pulse && (
+        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${color} opacity-60`} />
+      )}
+      <span className={`relative inline-flex rounded-full h-2 w-2 ${color}`} />
+    </span>
+    <span className="text-xs font-medium text-gray-300">{label}</span>
+  </div>
+);
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -25,9 +68,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-  const { data: systemInfo } = useQuery({
-    queryKey: ['systemInfo'],
-    queryFn: getSystemInfo
+  const { data: status } = useQuery({
+    queryKey: ['systemStatus'],
+    queryFn: getSystemStatus,
+    refetchInterval: 30_000,
+    staleTime: 20_000,
   });
 
   const navigation = [
@@ -96,19 +141,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Menu className="h-6 w-6" />
           </button>
           
-          <div className="flex items-center space-x-6 ml-auto">
+          <div className="flex items-center gap-4 ml-auto">
             <SystemActivityMonitor />
-            <div className="flex items-center text-xs space-x-2 px-2 py-1 bg-gray-800 rounded-full border border-gray-700">
-              <span className="text-gray-500 uppercase font-bold tracking-tighter">Plan:</span>
-              <span className={`font-bold ${systemInfo?.data_mode === 'live' ? 'text-positive' : 'text-warning'}`}>
-                {systemInfo?.data_mode === 'live' ? 'LIVE-RT' : 'STARTER-15M'}
+            <div className="flex items-center gap-4 px-3 py-1.5 bg-gray-800 rounded-full border border-gray-700">
+              <StatusDot
+                color={status ? MARKET_DOT_COLOR[status.market_status] : 'bg-gray-600'}
+                label={status ? MARKET_LABELS[status.market_status] : '—'}
+                pulse={status?.market_status === 'open'}
+              />
+              <span className="w-px h-3 bg-gray-700" />
+              <StatusDot
+                color={status?.ibkr_reachable ? 'bg-green-400' : 'bg-red-500'}
+                label={status?.ibkr_reachable ? 'IB CONN' : 'IB OFF'}
+              />
+              <span className="w-px h-3 bg-gray-700" />
+              <span className="text-xs text-gray-500">
+                {status?.last_scan_at ? (
+                  <>
+                    <span className="text-gray-400">SCAN</span>{' '}
+                    {formatRelativeTime(status.last_scan_at)}
+                  </>
+                ) : (
+                  <span className="text-gray-500">NO SCAN</span>
+                )}
               </span>
-            </div>
-            <div className="text-sm text-gray-400">
-              Market Status: <span className="text-positive">Open</span>
-            </div>
-            <div className="text-sm text-gray-400">
-              Last Scan: <span className="text-financial-light">2 min ago</span>
             </div>
           </div>
         </div>
