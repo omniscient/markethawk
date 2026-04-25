@@ -87,3 +87,40 @@ async def watchlist_live_websocket(websocket: WebSocket):
     finally:
         await pubsub.unsubscribe("watchlist:live_data", "watchlist:alerts")
         await redis_client.close()
+
+
+@router.websocket("/ws/scan-task/{task_id}")
+async def scan_task_websocket(websocket: WebSocket, task_id: str):
+    """
+    WebSocket endpoint that streams Celery task progress for a range scan.
+    Subscribes to Redis channel scan_task:{task_id} and forwards messages to the client.
+    """
+    await websocket.accept()
+
+    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    pubsub = redis_client.pubsub()
+    channel = f"scan_task:{task_id}"
+    await pubsub.subscribe(channel)
+
+    logger.info(f"Client connected to scan task: {task_id}")
+
+    try:
+        while True:
+            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if message:
+                await websocket.send_text(message["data"])
+                # Unsubscribe once the terminal state is delivered
+                try:
+                    parsed = json.loads(message["data"])
+                    if parsed.get("status") in ("completed", "failed"):
+                        break
+                except Exception:
+                    pass
+            await asyncio.sleep(0.01)
+    except WebSocketDisconnect:
+        logger.info(f"Client disconnected from scan task: {task_id}")
+    except Exception as e:
+        logger.error(f"Scan task WebSocket error for {task_id}: {e}")
+    finally:
+        await pubsub.unsubscribe(channel)
+        await redis_client.aclose()
