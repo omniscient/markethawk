@@ -246,7 +246,8 @@ class ScannerService:
 
     @staticmethod
     async def run_liquidity_hunt_scan(
-        tickers: List[str], db: Session
+        tickers: List[str], db: Session,
+        start_date: date = None, end_date: date = None
     ) -> List[Dict[str, Any]]:
         """
         Run Extended Hours Liquidity Hunt scan using DB Aggregates across all history.
@@ -254,10 +255,10 @@ class ScannerService:
         Optimized to use stock_aggregates table and scan entire available timeline.
         """
         results = []
-        
+
         try:
             # Step 1: Find all (ticker, date) combinations with high pre-market volume
-            candidates = (
+            candidates_query = (
                 db.query(
                     StockAggregate.ticker,
                     func.date(StockAggregate.timestamp).label('event_date'),
@@ -269,6 +270,17 @@ class ScannerService:
                     or_(StockAggregate.is_pre_market == True, StockAggregate.is_after_market == True),
                     StockAggregate.ticker.in_(tickers)
                 )
+            )
+            if start_date:
+                candidates_query = candidates_query.filter(
+                    func.date(StockAggregate.timestamp) >= start_date
+                )
+            if end_date:
+                candidates_query = candidates_query.filter(
+                    func.date(StockAggregate.timestamp) <= end_date
+                )
+            candidates = (
+                candidates_query
                 .group_by(StockAggregate.ticker, func.date(StockAggregate.timestamp))
                 .having(func.sum(StockAggregate.volume) > 50000)
                 .all()
@@ -653,3 +665,23 @@ class ScannerService:
 
         db.commit()
         return results
+
+    @staticmethod
+    async def run_pre_market_scan_for_date(
+        ticker: str, event_date: date, db: Session
+    ) -> List[Dict[str, Any]]:
+        return await ScannerService.run_pre_market_scan([ticker], db, event_date=event_date)
+
+    @staticmethod
+    async def run_oversold_bounce_scan_for_date(
+        ticker: str, event_date: date, db: Session
+    ) -> List[Dict[str, Any]]:
+        return await ScannerService.run_oversold_bounce_scan([ticker], db, event_date=event_date)
+
+    @staticmethod
+    async def run_liquidity_hunt_scan_for_date(
+        ticker: str, event_date: date, db: Session
+    ) -> List[Dict[str, Any]]:
+        return await ScannerService.run_liquidity_hunt_scan(
+            [ticker], db, start_date=event_date, end_date=event_date
+        )
