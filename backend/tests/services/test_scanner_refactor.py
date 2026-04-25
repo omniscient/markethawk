@@ -39,12 +39,12 @@ def _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_
 
     def query_side_effect(model):
         mock_q = MagicMock()
-        # daily bars query returns daily_bars
         mock_q.filter.return_value = mock_q
         mock_q.order_by.return_value = mock_q
-        mock_q.all.return_value = daily_bars
-        # pre-market volume scalar
-        mock_q.scalar.return_value = pm_volume
+        if model is StockAggregate:
+            mock_q.all.return_value = daily_bars
+        else:
+            mock_q.scalar.return_value = pm_volume
         return mock_q
 
     db.query.side_effect = query_side_effect
@@ -117,7 +117,10 @@ def test_oversold_bounce_detects_rsi_crossover():
     ticker = "BOUNCE"
     event_date = date(2025, 1, 20)
 
-    closes = [100.0] * 15 + [95.0, 90.0, 91.0, 92.0, 98.0]
+    # 18 bars at 100, then sharp dip to 60, then recovery to 100.
+    # The dip to 60 pushes RSI-2 and RSI-5 well below their thresholds (15 and 27),
+    # and the recovery to 100 causes both to cross back above on the final bar.
+    closes = [100.0] * 18 + [60.0, 100.0]
     opens  = closes[:]
     highs  = [c + 1 for c in closes]
     lows   = [c - 1 for c in closes]
@@ -137,8 +140,8 @@ def test_oversold_bounce_detects_rsi_crossover():
 
     with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
          patch.object(ScannerService, 'calculate_day_metrics', return_value={
-             "closing_price": 98.0, "pre_market_close": 97.0,
-             "opening_price": 91.0, "regular_high": 99.0, "regular_low": 90.0,
+             "closing_price": 100.0, "pre_market_close": 99.0,
+             "opening_price": 100.0, "regular_high": 101.0, "regular_low": 99.0,
          }), \
          patch.object(ScannerService, '_save_event', return_value={"id": 2}) as mock_save:
 
@@ -146,7 +149,8 @@ def test_oversold_bounce_detects_rsi_crossover():
             ScannerService.run_oversold_bounce_scan([ticker], db, event_date=event_date)
         )
 
-    assert isinstance(results, list)
+    mock_save.assert_called_once()
+    assert len(results) == 1
 
 
 def test_oversold_bounce_skips_with_insufficient_bars():

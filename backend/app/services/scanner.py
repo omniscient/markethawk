@@ -623,7 +623,7 @@ class ScannerService:
                         "gap_pct": round(gap_pct, 4),
                         "fade_from_high_pct": round(fade_from_high_pct, 4),
                         "day_range_pct": round(day_range_pct, 4),
-                        "relative_volume": 1.0,
+                        "relative_volume": round(float(today['Volume']) / float(today['vol_ma_3']), 2) if today['vol_ma_3'] > 0 else 0.0,
                     }
 
                     criteria_met = {
