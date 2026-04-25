@@ -428,44 +428,60 @@ class ScannerService:
 
     @staticmethod
     async def run_pre_market_scan(
-        tickers: List[str], db: Session
+        tickers: List[str], db: Session, event_date: date = None
     ) -> List[Dict[str, Any]]:
-        """Run extended hours (pre+post) volume spike scanner."""
+        """Run extended hours volume spike scanner using DB aggregates."""
+        if event_date is None:
+            event_date = get_market_today()
+
         results = []
-        event_date = get_market_today()
-        
-        # Pre-fetch enrichment for all tickers
-        enrichment_batch = await asyncio.to_thread(ScannerService._get_batch_enrichment_data, tickers, event_date, db)
+        _ET = ZoneInfo("America/New_York")
+        day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
+        day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
+        day_end_utc = (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
+        hist_start_utc = (day_start_et - timedelta(days=90)).astimezone(timezone.utc).replace(tzinfo=None)
 
-        async def fetch_ticker_data(ticker: str):
-            """Fetch external data in parallel with rate limiting."""
-            async with ScannerService._SCAN_SEMAPHORE:
-                try:
-                    hist_data = await asyncio.to_thread(StockDataService.get_historical_data, ticker, "60d")
-                    if hist_data.empty:
-                        return ticker, None, None
-                        
-                    pre_market_data = await asyncio.to_thread(StockDataService.get_pre_market_data, ticker)
-                    return ticker, hist_data, pre_market_data
-                except Exception as e:
-                    logging.error(f"Error fetching data for {ticker}: {e}")
-                    return ticker, None, None
+        enrichment_batch = await asyncio.to_thread(
+            ScannerService._get_batch_enrichment_data, tickers, event_date, db
+        )
 
-        # Execute all network providers in parallel (H4 fix)
-        data_tasks = [fetch_ticker_data(t) for t in tickers]
-        fetched_results = await asyncio.gather(*data_tasks)
-
-        # Process results sequentially using the single DB Session (Session is not thread-safe)
-        for ticker, hist_data, pre_market_data in fetched_results:
-            if hist_data is None or hist_data.empty or pre_market_data is None:
-                continue
-                
+        for ticker in tickers:
             try:
-                # Calculate indicators
-                avg_volume_20d = hist_data["Volume"].rolling(20).mean().iloc[-1]
-                avg_volume_50d = hist_data["Volume"].rolling(50).mean().iloc[-1] if len(hist_data) >= 50 else None
-                pre_market_volume = pre_market_data.get("pre_market_volume", 0)
-                relative_volume = (pre_market_volume / avg_volume_20d if avg_volume_20d > 0 else 0)
+                daily_bars = (
+                    db.query(StockAggregate)
+                    .filter(
+                        StockAggregate.ticker == ticker,
+                        StockAggregate.timespan == 'day',
+                        StockAggregate.timestamp >= hist_start_utc,
+                        StockAggregate.timestamp < day_start_utc,
+                    )
+                    .order_by(StockAggregate.timestamp.asc())
+                    .all()
+                )
+
+                if len(daily_bars) < 20:
+                    continue
+
+                volumes = [float(b.volume) for b in daily_bars]
+                closes = [float(b.close) for b in daily_bars]
+
+                avg_volume_20d = sum(volumes[-20:]) / 20
+                avg_volume_50d = sum(volumes[-50:]) / 50 if len(volumes) >= 50 else None
+                previous_close = closes[-1]
+
+                pre_market_volume = float(
+                    db.query(func.sum(StockAggregate.volume))
+                    .filter(
+                        StockAggregate.ticker == ticker,
+                        StockAggregate.timespan == 'minute',
+                        StockAggregate.is_pre_market == True,
+                        StockAggregate.timestamp >= day_start_utc,
+                        StockAggregate.timestamp < day_end_utc,
+                    )
+                    .scalar() or 0
+                )
+
+                relative_volume = pre_market_volume / avg_volume_20d if avg_volume_20d > 0 else 0
 
                 criteria_met = {
                     "volume_spike": pre_market_volume > (avg_volume_20d * 4),
@@ -474,9 +490,7 @@ class ScannerService:
                 }
 
                 if all(criteria_met.values()):
-                    previous_close = float(hist_data["Close"].iloc[-1])
                     day_metrics = ScannerService.calculate_day_metrics(ticker, event_date, db)
-                    
                     current_price = day_metrics["closing_price"] or day_metrics["pre_market_close"] or previous_close
                     gap_pct = (day_metrics["opening_price"] - previous_close) / previous_close * 100 if day_metrics["opening_price"] > 0 else 0
                     fade_from_high_pct = (day_metrics["regular_high"] - current_price) / day_metrics["regular_high"] * 100 if day_metrics["regular_high"] > 0 else 0
@@ -485,17 +499,19 @@ class ScannerService:
                     indicators = {
                         "pre_market_volume": pre_market_volume,
                         "avg_volume_20d": int(avg_volume_20d),
-                        "avg_volume_50d": int(avg_volume_50d) if avg_volume_50d and not pd.isna(avg_volume_50d) else None,
+                        "avg_volume_50d": int(avg_volume_50d) if avg_volume_50d else None,
                         "relative_volume": round(relative_volume, 2),
                         "volume_spike_ratio": round(pre_market_volume / avg_volume_20d, 2),
                         "gap_pct": round(gap_pct, 4),
                         "fade_from_high_pct": round(fade_from_high_pct, 4),
-                        "day_range_pct": round(day_range_pct, 4)
+                        "day_range_pct": round(day_range_pct, 4),
                     }
 
                     enrichment = enrichment_batch.get(ticker.upper(), {})
                     if enrichment.get("outstanding_shares"):
-                        indicators["float_rotation_pct"] = round((pre_market_volume / enrichment["outstanding_shares"] * 100), 4)
+                        indicators["float_rotation_pct"] = round(
+                            pre_market_volume / enrichment["outstanding_shares"] * 100, 4
+                        )
 
                     event_dict = ScannerService._save_event(
                         db=db,
@@ -507,11 +523,11 @@ class ScannerService:
                         enrichment=enrichment,
                         previous_close=previous_close,
                         opening_price=day_metrics["opening_price"],
-                        closing_price=day_metrics["closing_price"]
+                        closing_price=day_metrics["closing_price"],
                     )
                     results.append(event_dict)
             except Exception as e:
-                logging.error(f"Error processing {ticker} results: {e}")
+                logging.error(f"Error processing {ticker} in pre_market_scan: {e}")
 
         db.commit()
         return results
