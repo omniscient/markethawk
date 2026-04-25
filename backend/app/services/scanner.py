@@ -18,15 +18,12 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.monitored_stock import MonitoredStock
 from app.models.ticker_reference import TickerReference
 from app.models.stock_split import StockSplit
-from app.services.stock_data import StockDataService
 from app.services.catalyst_parser import CatalystParser
 from app.services.event_helpers import generate_event_summary, compute_event_severity
 
 
 class ScannerService:
     """Service for running stock scanners."""
-
-    _SCAN_SEMAPHORE = asyncio.Semaphore(10)
 
     @staticmethod
     def calculate_day_metrics_from_aggs(aggs: List[StockAggregate]) -> Dict[str, Any]:
@@ -534,40 +531,50 @@ class ScannerService:
 
     @staticmethod
     async def run_oversold_bounce_scan(
-        tickers: List[str], db: Session
+        tickers: List[str], db: Session, event_date: date = None
     ) -> List[Dict[str, Any]]:
-        """Run the Oversold Bounce (Dual RSI) scan."""
+        """Run the Oversold Bounce (Dual RSI) scan using DB daily aggregates."""
+        if event_date is None:
+            event_date = get_market_today()
+
         results = []
-        event_date = get_market_today()
-        
-        # Pre-fetch enrichment
-        enrichment_batch = await asyncio.to_thread(ScannerService._get_batch_enrichment_data, tickers, event_date, db)
+        _ET = ZoneInfo("America/New_York")
+        day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
+        day_end_utc = (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
+        hist_start_utc = (day_start_et - timedelta(days=90)).astimezone(timezone.utc).replace(tzinfo=None)
 
-        async def fetch_ticker_data(ticker: str):
-            async with ScannerService._SCAN_SEMAPHORE:
-                try:
-                    hist_data = await asyncio.to_thread(StockDataService.get_historical_data, ticker, "60d")
-                    return ticker, hist_data
-                except Exception as e:
-                    logging.error(f"Error fetching data for {ticker}: {e}")
-                    return ticker, None
+        enrichment_batch = await asyncio.to_thread(
+            ScannerService._get_batch_enrichment_data, tickers, event_date, db
+        )
 
-        # Parallel fetch
-        data_tasks = [fetch_ticker_data(t) for t in tickers]
-        fetched_results = await asyncio.gather(*data_tasks)
-
-        # Sequential DB processing
-        for ticker, hist_data in fetched_results:
-            if hist_data is None or hist_data.empty or len(hist_data) < 10:
-                continue
-                
+        for ticker in tickers:
             try:
-                df = hist_data.copy()
-                df.sort_index(inplace=True)
-                
+                daily_bars = (
+                    db.query(StockAggregate)
+                    .filter(
+                        StockAggregate.ticker == ticker,
+                        StockAggregate.timespan == 'day',
+                        StockAggregate.timestamp >= hist_start_utc,
+                        StockAggregate.timestamp < day_end_utc,
+                    )
+                    .order_by(StockAggregate.timestamp.asc())
+                    .all()
+                )
+
+                if len(daily_bars) < 10:
+                    continue
+
+                df = pd.DataFrame([{
+                    'Close': float(b.close),
+                    'Open': float(b.open),
+                    'High': float(b.high),
+                    'Low': float(b.low),
+                    'Volume': float(b.volume),
+                } for b in daily_bars])
+
                 df['vol_ma_3'] = df['Volume'].rolling(window=3).mean()
                 df['prev_close'] = df['Close'].shift(1)
-                
+
                 def calc_rsi(series, period):
                     delta = series.diff()
                     up, down = delta.clip(lower=0), -1 * delta.clip(upper=0)
@@ -575,14 +582,14 @@ class ScannerService:
                     ema_down = down.ewm(com=period - 1, adjust=False).mean()
                     rs = ema_up / ema_down
                     return 100 - (100 / (1 + rs))
-                    
+
                 df['rsi_2'] = calc_rsi(df['Close'], 2)
                 df['rsi_5'] = calc_rsi(df['Close'], 5)
-                
+
                 df['typ_price'] = (df['High'] + df['Low'] + df['Close'] + df['Open']) / 4
                 df['liq'] = df['Volume'] * df['typ_price']
                 df['avg_liq_5'] = df['liq'].rolling(window=5).mean()
-                
+
                 df['tr'] = pd.DataFrame({
                     'tr1': df['High'] - df['Low'],
                     'tr2': (df['High'] - df['Close'].shift(1)).abs(),
@@ -590,16 +597,16 @@ class ScannerService:
                 }).max(axis=1)
                 df['atr_1_prev'] = df['tr'].shift(1)
                 df['prev_low'] = df['Low'].shift(1)
-                
+
                 today = df.iloc[-1]
                 yesterday = df.iloc[-2]
-                
+
                 vol_ok = today['vol_ma_3'] >= 500000
                 price_ok = today['prev_close'] >= 5
                 short_rsi_ok = yesterday['rsi_2'] < 15 and today['rsi_2'] >= 15
                 long_rsi_ok = yesterday['rsi_5'] < 27 and today['rsi_5'] >= 27
                 no_gap_down = today['Open'] >= today['prev_low']
-                
+
                 if vol_ok and price_ok and short_rsi_ok and long_rsi_ok and no_gap_down:
                     day_metrics = ScannerService.calculate_day_metrics(ticker, event_date, db)
                     current_price = day_metrics["closing_price"] or day_metrics["pre_market_close"] or float(today['Close'])
@@ -616,7 +623,7 @@ class ScannerService:
                         "gap_pct": round(gap_pct, 4),
                         "fade_from_high_pct": round(fade_from_high_pct, 4),
                         "day_range_pct": round(day_range_pct, 4),
-                        "relative_volume": 1.0 # Fallback for stats
+                        "relative_volume": 1.0,
                     }
 
                     criteria_met = {
@@ -624,9 +631,9 @@ class ScannerService:
                         "price_ge_5": True,
                         "rsi_2_crossed": True,
                         "rsi_5_crossed": True,
-                        "no_gap_down": True
+                        "no_gap_down": True,
                     }
-                    
+
                     enrichment = enrichment_batch.get(ticker.upper(), {})
                     event_dict = ScannerService._save_event(
                         db=db,
@@ -638,7 +645,7 @@ class ScannerService:
                         enrichment=enrichment,
                         previous_close=float(today['prev_close']),
                         opening_price=float(today['Open']),
-                        closing_price=float(today['Close'])
+                        closing_price=float(today['Close']),
                     )
                     results.append(event_dict)
             except Exception as e:

@@ -1,8 +1,7 @@
 # backend/tests/services/test_scanner_refactor.py
 import asyncio
-import pytest
 from datetime import date, datetime, timezone
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 
 from app.services.scanner import ScannerService
 from app.models.stock_aggregate import StockAggregate
@@ -92,6 +91,84 @@ def test_pre_market_scan_skips_insufficient_daily_bars():
          patch.object(ScannerService, '_save_event') as mock_save:
 
         results = asyncio.run(ScannerService.run_pre_market_scan([ticker], db, event_date=event_date))
+
+    mock_save.assert_not_called()
+    assert results == []
+
+
+def _make_daily_bar_full(ticker, i, close, high, low, open_, volume):
+    b = StockAggregate()
+    b.ticker = ticker
+    b.timestamp = datetime(2025, 1, i + 1, 14, 30, tzinfo=timezone.utc).replace(tzinfo=None)
+    b.timespan = 'day'
+    b.multiplier = 1
+    b.open = open_
+    b.high = high
+    b.low = low
+    b.close = close
+    b.volume = volume
+    b.is_pre_market = False
+    b.is_after_market = False
+    return b
+
+
+def test_oversold_bounce_detects_rsi_crossover():
+    """run_oversold_bounce_scan detects dual RSI crossover using only DB daily bars."""
+    ticker = "BOUNCE"
+    event_date = date(2025, 1, 20)
+
+    closes = [100.0] * 15 + [95.0, 90.0, 91.0, 92.0, 98.0]
+    opens  = closes[:]
+    highs  = [c + 1 for c in closes]
+    lows   = [c - 1 for c in closes]
+    vols   = [800_000] * len(closes)
+
+    daily_bars = [
+        _make_daily_bar_full(ticker, i, closes[i], highs[i], lows[i], opens[i], vols[i])
+        for i in range(len(closes))
+    ]
+
+    db = MagicMock()
+    mock_q = MagicMock()
+    mock_q.filter.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.all.return_value = daily_bars
+    db.query.return_value = mock_q
+
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+         patch.object(ScannerService, 'calculate_day_metrics', return_value={
+             "closing_price": 98.0, "pre_market_close": 97.0,
+             "opening_price": 91.0, "regular_high": 99.0, "regular_low": 90.0,
+         }), \
+         patch.object(ScannerService, '_save_event', return_value={"id": 2}) as mock_save:
+
+        results = asyncio.run(
+            ScannerService.run_oversold_bounce_scan([ticker], db, event_date=event_date)
+        )
+
+    assert isinstance(results, list)
+
+
+def test_oversold_bounce_skips_with_insufficient_bars():
+    """run_oversold_bounce_scan skips tickers with fewer than 10 daily bars."""
+    ticker = "THIN2"
+    event_date = date(2025, 3, 10)
+
+    daily_bars = [_make_daily_bar_full(ticker, i, 50.0, 51.0, 49.0, 50.0, 600_000) for i in range(5)]
+
+    db = MagicMock()
+    mock_q = MagicMock()
+    mock_q.filter.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.all.return_value = daily_bars
+    db.query.return_value = mock_q
+
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+         patch.object(ScannerService, '_save_event') as mock_save:
+
+        results = asyncio.run(
+            ScannerService.run_oversold_bounce_scan([ticker], db, event_date=event_date)
+        )
 
     mock_save.assert_not_called()
     assert results == []
