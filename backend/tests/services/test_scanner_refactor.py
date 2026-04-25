@@ -179,7 +179,7 @@ def test_oversold_bounce_skips_with_insufficient_bars():
 
 
 def test_liquidity_hunt_date_filter_respected():
-    """run_liquidity_hunt_scan with start_date/end_date filters candidates by date."""
+    """run_liquidity_hunt_scan with start_date/end_date applies date filters to candidates query."""
     ticker = "DATECHK"
     target_date = date(2025, 3, 10)
 
@@ -197,10 +197,16 @@ def test_liquidity_hunt_date_filter_respected():
         )
     )
     assert result == []
+    # Base filter + start_date filter + end_date filter = at least 3 filter calls
+    assert mock_q.filter.call_count >= 3
 
 
 def test_for_date_wrappers_exist():
-    """*_for_date wrapper methods exist and are callable."""
+    """*_for_date wrapper methods exist and are async callables."""
     assert hasattr(ScannerService, 'run_pre_market_scan_for_date')
     assert hasattr(ScannerService, 'run_oversold_bounce_scan_for_date')
     assert hasattr(ScannerService, 'run_liquidity_hunt_scan_for_date')
+    # Verify they are coroutine functions (async def)
+    assert asyncio.iscoroutinefunction(ScannerService.run_pre_market_scan_for_date)
+    assert asyncio.iscoroutinefunction(ScannerService.run_oversold_bounce_scan_for_date)
+    assert asyncio.iscoroutinefunction(ScannerService.run_liquidity_hunt_scan_for_date)
