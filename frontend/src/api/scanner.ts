@@ -194,6 +194,16 @@ export const fetchPreMarketMovers = async (params?: {
 
 // ---- Universe ------------------------------------------------------------- //
 
+export interface UniverseSummary {
+  id: number;
+  name: string;
+}
+
+export const fetchUniversesForTicker = async (ticker: string): Promise<UniverseSummary[]> => {
+  const response = await apiClient.get(`/universe/by-ticker/${ticker}`);
+  return response.data;
+};
+
 export const fetchStockUniverses = async (params?: { include_stats?: boolean }): Promise<StockUniverse[]> => {
   const response = await apiClient.get('/universe/list', { params });
   return response.data;
