@@ -1162,18 +1162,90 @@ def _simulate_paper_exit(
 
 
 # ---------------------------------------------------------------------------
-# Date-range scan task (stub — full implementation in Task 5)
+# Date-range scan task
 # ---------------------------------------------------------------------------
 
-@celery_app.task(bind=True, max_retries=0)
+@celery_app.task
 def run_range_scan(
-    self,
     ticker: str,
     scanner_types: list,
     start_date_str: str,
     end_date_str: str,
-    fetch_missing_data: bool = True,
+    fetch_missing_data: bool,
 ):
-    """Run one or more scanner types against a single ticker over a date range."""
-    raise NotImplementedError("run_range_scan is not yet implemented")
+    """Background task: run selected scanners over a date range for one ticker."""
+    import asyncio
+    from datetime import date, timedelta
+    from app.services.scanner import ScannerService
+
+    task_id = run_range_scan.request.id
+    r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    channel = f"scan_task:{task_id}"
+
+    start = date.fromisoformat(start_date_str)
+    end = date.fromisoformat(end_date_str)
+
+    trading_days = [
+        start + timedelta(days=i)
+        for i in range((end - start).days + 1)
+        if (start + timedelta(days=i)).weekday() < 5
+    ]
+
+    total = len(trading_days) * len(scanner_types)
+    events_detected = 0
+    done = 0
+
+    db: Session = SessionLocal()
+    try:
+        if fetch_missing_data:
+            # Daily bars: need 90-day lookback before start for rolling metrics
+            daily_period_days = (date.today() - (start - timedelta(days=90))).days
+            StockDataService.refresh_stock_data(
+                db, ticker, timespan='day', period=f"{daily_period_days}d"
+            )
+            # Minute bars: cover just the requested range
+            minute_period_days = (date.today() - start).days + 5
+            StockDataService.refresh_stock_data(
+                db, ticker, timespan='minute', period=f"{minute_period_days}d"
+            )
+
+        scanner_map = {
+            "pre_market_volume_spike": ScannerService.run_pre_market_scan_for_date,
+            "liquidity_hunt": ScannerService.run_liquidity_hunt_scan_for_date,
+            "oversold_bounce": ScannerService.run_oversold_bounce_scan_for_date,
+        }
+
+        async def _scan_day(day):
+            results = []
+            for st in scanner_types:
+                fn = scanner_map.get(st)
+                if fn:
+                    results.extend(await fn(ticker, day, db))
+            return results
+
+        for day in trading_days:
+            day_results = asyncio.run(_scan_day(day))
+            events_detected += len(day_results)
+            done += len(scanner_types)
+            r.publish(channel, json.dumps({
+                "status": "progress",
+                "day": day.isoformat(),
+                "done": done,
+                "total": total,
+            }))
+
+        r.publish(channel, json.dumps({
+            "status": "completed",
+            "events_detected": events_detected,
+        }))
+        logger.info(f"run_range_scan {task_id}: completed, {events_detected} events")
+
+    except Exception as e:
+        logger.error(f"run_range_scan {task_id} failed: {e}")
+        r.publish(channel, json.dumps({
+            "status": "failed",
+            "error": str(e),
+        }))
+    finally:
+        db.close()
 
