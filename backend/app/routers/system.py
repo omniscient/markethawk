@@ -315,6 +315,47 @@ async def system_tasks_websocket(websocket: WebSocket):
                             "status": "running"
                         })
                 
+                # 1.6. Check Redis for active range scans
+                scan_keys = []
+                cursor = '0'
+                while True:
+                    cursor, keys = await redis_client.scan(cursor=cursor, match="scan:*:range", count=100)
+                    scan_keys.extend(keys)
+                    if cursor == 0 or cursor == '0' or str(cursor) == '0':
+                        break
+
+                for key in scan_keys:
+                    parts = key.split(":")
+                    ticker_name = parts[1] if len(parts) >= 2 else "?"
+                    raw = await redis_client.get(key)
+                    if not raw:
+                        continue
+                    try:
+                        sdata = json.loads(raw)
+                        ts_str = sdata.get("started_at")
+                        if ts_str:
+                            ts = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+                            if (datetime.now(timezone.utc) - ts).total_seconds() / 3600 > 4:
+                                await redis_client.delete(key)
+                                continue
+                        tids = sdata.get("task_ids", [])
+                        if tids:
+                            tpending = sum(
+                                1 for tid in tids
+                                if AsyncResult(tid, app=celery_app).state in ("PENDING", "STARTED", "RETRY")
+                            )
+                            if tpending == 0:
+                                await redis_client.delete(key)
+                                continue
+                    except (ValueError, TypeError, AttributeError):
+                        pass
+                    active_tasks.append({
+                        "id": f"scan_{ticker_name}",
+                        "type": "scan",
+                        "title": f"Range Scan: {ticker_name}",
+                        "status": "running",
+                    })
+
                 # 2. Check DB for quality and normalization tasks.
                 # Auto-reset rows that have been stuck in pending/running for >4 hours
                 # (worker crash without updating status).

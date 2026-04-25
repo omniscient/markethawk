@@ -1182,6 +1182,13 @@ def run_range_scan(
     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
     channel = f"scan_task:{task_id}"
 
+    from datetime import datetime as _dt
+    r.set(
+        f"scan:{ticker}:range",
+        json.dumps({"task_ids": [task_id], "started_at": _dt.utcnow().isoformat()}),
+        ex=14400,
+    )
+
     start = date.fromisoformat(start_date_str)
     end = date.fromisoformat(end_date_str)
 
@@ -1247,5 +1254,6 @@ def run_range_scan(
             "error": str(e),
         }))
     finally:
+        r.delete(f"scan:{ticker}:range")
         db.close()
 

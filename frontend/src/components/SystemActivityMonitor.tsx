@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { RefreshCw, Loader2, Wand2, Activity } from 'lucide-react';
+import { RefreshCw, Loader2, Wand2, Activity, Zap } from 'lucide-react';
 
 interface SystemTask {
   id: string;
@@ -127,6 +127,7 @@ export const SystemActivityMonitor: React.FC = () => {
                 <div className="mt-0.5">
                     {task.type === 'sync' ? <RefreshCw className="h-4 w-4 text-blue-400 animate-spin" /> :
                      task.type === 'analysis' ? <Activity className="h-4 w-4 text-orange-400 animate-pulse" /> :
+                     task.type === 'scan' ? <Zap className="h-4 w-4 text-financial-blue animate-pulse" /> :
                      <Wand2 className="h-4 w-4 text-purple-400 animate-pulse" />}
                 </div>
                 <div className="flex-1 min-w-0">

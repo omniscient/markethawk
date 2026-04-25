@@ -536,7 +536,13 @@ const StockDetailPage: React.FC = () => {
             icon={Zap as any}
             actions={
               <div className="flex items-center space-x-2">
-                {scanTask.status === 'running' && (
+                {scanTask.status === 'connecting' && (
+                  <span className="text-xs text-gray-400 font-semibold animate-pulse">Queued…</span>
+                )}
+                {scanTask.status === 'running' && scanTask.total === 0 && (
+                  <span className="text-xs text-financial-blue font-semibold animate-pulse">Preparing…</span>
+                )}
+                {scanTask.status === 'running' && scanTask.total > 0 && (
                   <span className="text-xs text-financial-blue font-semibold animate-pulse">
                     Scanning… {scanTask.done} / {scanTask.total} days
                   </span>
@@ -551,9 +557,9 @@ const StockDetailPage: React.FC = () => {
                 )}
                 <button
                   onClick={() => setScanDialogOpen(true)}
-                  disabled={scanTask.status === 'running'}
+                  disabled={scanTask.status === 'connecting' || scanTask.status === 'running'}
                   className={`flex items-center space-x-2 px-3 py-1 text-xs font-bold rounded-md border transition-all ${
-                    scanTask.status === 'running'
+                    scanTask.status === 'connecting' || scanTask.status === 'running'
                       ? 'bg-gray-800 border-gray-700 text-gray-500 cursor-not-allowed'
                       : 'bg-financial-blue/10 border-financial-blue/30 text-financial-blue hover:bg-financial-blue hover:text-white'
                   }`}
