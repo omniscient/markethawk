@@ -260,3 +260,76 @@ Defined in `app/tasks.py`, scheduled via `app/core/celery_app.py`:
 | `update_daily_metrics` | Beat schedule (daily, after close) | Compute and store daily metric snapshots |
 
 Redis is used as both the Celery broker and result backend. Worker and beat run as separate containers so the scheduler doesn't compete with task execution.
+
+---
+
+## Catch Up Feature (Universe Aggregate Backfill)
+
+The **Catch Up** button on the Universes page brings a universe's historical price data up to date without requiring the user to choose a date range. It is distinct from the full **Sync** operation, which downloads a user-specified range from scratch.
+
+### What it does
+
+1. **Discovers existing timespans** — Queries `stock_aggregates` (stocks) or `futures_aggregates` (futures) grouped by `(timespan, multiplier)` to find every resolution already stored for the universe (e.g. `1-minute`, `1-day`).
+2. **Computes the gap** — For each `(timespan, multiplier)` combo, finds `MAX(timestamp)` across all tickers in the universe. The backfill window starts one second after that timestamp and ends at today. If `MAX(timestamp)` is already in the future (nothing new can exist) the combo is skipped.
+3. **Queues Celery tasks** — One `sync_stock_aggregates` task per ticker per combo for equities (via Polygon/MassiveProvider); one `sync_futures_aggregates` task per symbol per combo for futures (via IBKR/FuturesDataService). Tasks auto-retry up to 3 times on failure.
+4. **Stores progress in Redis** — Task IDs and a start timestamp are written to `universe:{id}:sync` with a 4-hour TTL.
+5. **Polls to completion** — The frontend polls `GET /universe/{id}/sync-status` every 5 seconds, checking Celery task states. When all tasks finish (or a 20-minute client-side timeout fires), the universe's cached stats are auto-refreshed and the list reloads.
+
+### Guard rails
+
+| Condition | Behaviour |
+|---|---|
+| No active stocks in universe | Returns `skipped` — nothing queued |
+| No existing aggregate rows | Returns `skipped` — use Sync first to do the initial download |
+| `MAX(timestamp)` already in the future | That combo is marked "already up to date" and skipped |
+| Futures symbol with unknown exchange | Warning logged, symbol skipped |
+| Sync key older than 4 hours in Redis | Treated as stale, cleared, reported as not syncing |
+
+### Flow diagram
+
+```mermaid
+sequenceDiagram
+    participant UI as Universes Page (React)
+    participant API as FastAPI /universe/{id}/sync-missing
+    participant DB as PostgreSQL
+    participant Q as Celery (Redis broker)
+    participant W as Celery Worker
+    participant P as Polygon.io / IBKR
+    participant R as Redis
+
+    UI->>API: POST /universe/{id}/sync-missing
+    API->>DB: SELECT active tickers for universe
+    DB-->>API: [ticker list]
+    API->>DB: GROUP BY (timespan, multiplier), MAX(timestamp)\nfor stock_aggregates + futures_aggregates
+    DB-->>API: [(timespan, mult, max_ts), ...]
+
+    loop per (timespan × multiplier) combo
+        Note over API: from_date = max_ts + 1s (or 7 days ago if no data)\nSkip if from_date > now
+        loop per ticker / symbol
+            API->>Q: sync_stock_aggregates.delay(ticker, from_date, today)\nor sync_futures_aggregates.delay(symbol, exchange, ...)
+        end
+    end
+
+    API->>R: SETEX universe:{id}:sync {task_ids, started_at} TTL=4h
+    API-->>UI: {status: "accepted", queued: N, summary: [...]}
+
+    UI->>UI: Start 5-second polling loop
+
+    loop every 5 s while is_syncing
+        UI->>API: GET /universe/{id}/sync-status
+        API->>R: GET universe:{id}:sync
+        API->>Q: AsyncResult.state for each task_id
+        API-->>UI: {is_syncing, pending, success, failed, total}
+    end
+
+    Note over W: Meanwhile, workers execute tasks
+    W->>P: Fetch OHLCV bars (Polygon paginated or IBKR historical)
+    P-->>W: bars[]
+    W->>DB: DELETE existing rows in date range
+    W->>DB: INSERT new StockAggregate / FuturesAggregate rows
+    W->>Q: Mark task SUCCESS
+
+    Note over UI: When is_syncing = false (or 20-min timeout)
+    UI->>API: POST /universe/{id}/refresh-stats  (per completed universe)
+    UI->>UI: Invalidate React Query cache → reload universe list
+```
