@@ -28,6 +28,9 @@ import { fetchStockDetails, refreshStockData, syncMissingStockAggregates } from 
 import { fetchScannerResults, fetchHistoricalData, fetchUniversesForTicker } from '../api/scanner';
 import { getSystemInfo } from '../api/system';
 import { useLiveStockData } from '../hooks/useLiveStockData';
+import ForceScanDialog from '../components/ForceScanDialog';
+import { useScanTask } from '../hooks/useScanTask';
+import { runScannerRange } from '../api/scanner';
 
 const StockDetailPage: React.FC = () => {
   const { ticker } = useParams<{ ticker: string }>();
@@ -40,6 +43,10 @@ const StockDetailPage: React.FC = () => {
   const [highlightDate, setHighlightDate] = React.useState<string | undefined>(undefined);
   const [catchingUp, setCatchingUp] = React.useState(false);
   const [showST, setShowST] = React.useState(localStorage.getItem('show_double_st') === 'true');
+  const [scanDialogOpen, setScanDialogOpen] = React.useState(false);
+  const [scanTaskId, setScanTaskId] = React.useState<string | null>(null);
+  const [scanSubmitting, setScanSubmitting] = React.useState(false);
+  const [scanDoneMsg, setScanDoneMsg] = React.useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // 0. Refresh Data Mechanism
@@ -157,6 +164,18 @@ const StockDetailPage: React.FC = () => {
     staleTime: 300_000,
   });
 
+  // 7. Scan Task Polling
+  const scanTaskRef = React.useRef<ReturnType<typeof useScanTask> | null>(null);
+
+  const scanTask = useScanTask(scanTaskId, () => {
+    queryClient.invalidateQueries({ queryKey: ['scannerResults', { ticker: symbol }] });
+    const count = scanTaskRef.current?.eventsDetected ?? 0;
+    setScanTaskId(null);
+    setScanDoneMsg(`Done — ${count} event${count !== 1 ? 's' : ''} found`);
+    setTimeout(() => setScanDoneMsg(null), 5000);
+  });
+  scanTaskRef.current = scanTask;
+
   const lastUpdatedTime = liveData
     ? new Date(liveData.e)
     : details?.last_updated
@@ -217,6 +236,27 @@ const StockDetailPage: React.FC = () => {
     setHighlightDate(event.event_date);
     // Scroll to top where chart is
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleScanSubmit = async (
+    types: string[], startDate: string, endDate: string, fetchData: boolean
+  ) => {
+    setScanSubmitting(true);
+    try {
+      const res = await runScannerRange({
+        ticker: symbol,
+        scanner_types: types,
+        start_date: startDate,
+        end_date: endDate,
+        fetch_missing_data: fetchData,
+      });
+      setScanTaskId(res.task_id);
+      setScanDialogOpen(false);
+    } catch (err) {
+      console.error('Failed to queue scan:', err);
+    } finally {
+      setScanSubmitting(false);
+    }
   };
 
   const _handleRefreshCheck = (newTimespan?: string, newPeriod?: string) => {
@@ -323,6 +363,33 @@ const StockDetailPage: React.FC = () => {
             )}
             {systemInfo?.data_mode === 'delayed' ? 'Delayed Feed' : 'Live Feed'}: {format(lastUpdatedTime, 'h:mm:ss a')}
           </p>
+          <div className="flex items-center justify-end space-x-2 mt-2">
+            {scanTask.status === 'running' && (
+              <span className="text-xs text-financial-blue font-semibold animate-pulse">
+                Scanning… {scanTask.done} / {scanTask.total} days
+              </span>
+            )}
+            {scanDoneMsg && (
+              <span className="text-xs text-positive font-semibold">{scanDoneMsg}</span>
+            )}
+            {scanTask.status === 'failed' && (
+              <span className="text-xs text-negative font-semibold" title={scanTask.error ?? ''}>
+                Scan failed
+              </span>
+            )}
+            <button
+              onClick={() => setScanDialogOpen(true)}
+              disabled={scanTask.status === 'running'}
+              className={`flex items-center space-x-2 px-3 py-1 text-xs font-bold rounded-md border transition-all ${
+                scanTask.status === 'running'
+                  ? 'bg-gray-800 border-gray-700 text-gray-500 cursor-not-allowed'
+                  : 'bg-financial-blue/10 border-financial-blue/30 text-financial-blue hover:bg-financial-blue hover:text-white'
+              }`}
+            >
+              <Zap className={`h-3 w-3 ${scanTask.status === 'running' ? 'animate-pulse' : ''}`} />
+              <span>Run Scanner</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -528,6 +595,12 @@ const StockDetailPage: React.FC = () => {
           </Card>
         </div>
       </div>
+      <ForceScanDialog
+        isOpen={scanDialogOpen}
+        isSubmitting={scanSubmitting}
+        onClose={() => setScanDialogOpen(false)}
+        onSubmit={handleScanSubmit}
+      />
     </div>
   );
 };
