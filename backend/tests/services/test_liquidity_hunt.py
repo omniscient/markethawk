@@ -516,3 +516,49 @@ def test_split_in_lookback_flag():
 
     indicators_list = [c.kwargs["indicators"] for c in mock_save.call_args_list]
     assert any(ind.get("split_in_lookback") is True for ind in indicators_list)
+
+
+def test_scan_fires_post_only_when_pre_does_not_qualify():
+    """Post fires when pre_high doesn't reach 10% spike; post_high does."""
+    post_only_metrics = {
+        **_CLEAN_METRICS,
+        "pre_high": 11.55,  # (11.55-11.00)/11.00 = 5% — pre criterion 3 fails
+        # post_high=12.25 gives (12.25-11.10)/11.10 = 10.36% ✓ (uses event_date_regular_close)
+    }
+    db = MagicMock()
+    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=post_only_metrics), \
+         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
+         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
+         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
+         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
+         patch("app.services.scanner.ScannerService._save_event", return_value={"id": 1}) as mock_save:
+
+        results = _run(run_liquidity_hunt_scan(
+            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+        ))
+
+    saved_types = [c.kwargs["scanner_type"] for c in mock_save.call_args_list]
+    assert "liquidity_hunt_post" in saved_types
+    assert "liquidity_hunt_pre" not in saved_types
+
+
+def test_scan_fires_no_events_when_regular_vol_too_high():
+    """Neither variant fires when regular session volume is 2× average (criterion 4 fails)."""
+    noisy_day_metrics = {
+        **_CLEAN_METRICS,
+        "regular_vol": 2_000_000,  # 2M/950k = 2.1 > 1.2 — criterion 4 fails for both variants
+    }
+    db = MagicMock()
+    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=noisy_day_metrics), \
+         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
+         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
+         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
+         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
+         patch("app.services.scanner.ScannerService._save_event") as mock_save:
+
+        results = _run(run_liquidity_hunt_scan(
+            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+        ))
+
+    mock_save.assert_not_called()
+    assert results == []

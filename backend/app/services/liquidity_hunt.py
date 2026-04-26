@@ -400,6 +400,7 @@ def _build_indicators(
 
     if enrichment.get("recent_split_date"):
         split_dt = date.fromisoformat(enrichment["recent_split_date"])
+        # 28 calendar days ≈ 20 trading days (4 weekday weeks), matching the baseline window
         if (event_date - split_dt).days <= 28:
             indicators["split_in_lookback"] = True
 
