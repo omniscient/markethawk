@@ -75,3 +75,75 @@ def test_c6_fails_when_below_absolute_floor():
     assert criteria["volume_floor"] is False
     assert criteria["volume_ratio"] is True
     assert criteria["volume_materiality"] is True
+
+
+def test_c5_fails_when_range_too_wide():
+    """Intraday range 3x wider than average — day was volatile."""
+    fires, _, criteria = _evaluate_criteria(
+        **{**CLEAN_PRE, "regular_high": 13.50, "regular_low": 8.50}
+        # range = (13.50-8.50)/11.05 = 45.2% → ratio = 45.2%/2% = 22.6 > 1.5
+    )
+    assert fires is False
+    assert criteria["quiet_regular_range"] is False
+
+
+def test_zero_session_baseline_fires_when_floor_and_materiality_pass():
+    """avg_pre_vol_20d=0: ratio criterion is trivially satisfied; other checks carry the load."""
+    zero_baselines = {
+        **BASELINES,
+        "avg_pre_vol_20d": 0,
+        "avg_total_daily_vol_20d": 200_000,   # 75k/200k = 37.5% ≥ 30%
+        "avg_regular_vol_20d": 190_000,
+    }
+    fires, indicators, criteria = _evaluate_criteria(
+        session="pre",
+        session_vol=75_000,       # > 50k floor ✓  and 37.5% of daily ✓
+        session_high=12.11,
+        reference_close=11.00,
+        regular_vol=180_000,      # 180k/190k = 0.95 ≤ 1.2 ✓
+        regular_high=11.20,
+        regular_low=10.90,
+        regular_open=11.05,
+        baselines=zero_baselines,
+        config=None,
+    )
+    assert fires is True
+    assert criteria["volume_ratio"] is True   # trivially satisfied
+    assert indicators["session_volume_ratio"] is None  # signals "infinite"
+
+
+def test_post_variant_fires():
+    """After-market variant uses avg_post_vol_20d and session='post'."""
+    fires, indicators, criteria = _evaluate_criteria(
+        session="post",
+        session_vol=350_000,      # 350k/30k = 11.7x ≥ 4 ✓  350k/1M = 35% ≥ 30% ✓
+        session_high=12.11,
+        reference_close=11.00,   # today's regular close for post variant
+        regular_vol=900_000,
+        regular_high=11.20,
+        regular_low=10.90,
+        regular_open=11.05,
+        baselines=BASELINES,
+        config=None,
+    )
+    assert fires is True
+    assert indicators["session"] == "post"
+    assert all(criteria.values())
+
+
+def test_c1_fails_for_post_when_after_market_vol_too_low():
+    """Post variant: 60k / 30k = 2x < 4x threshold."""
+    fires, _, criteria = _evaluate_criteria(
+        session="post",
+        session_vol=60_000,       # 60k/30k = 2x < 4 ✗  (also: 60k/1M = 6% < 30%)
+        session_high=12.11,
+        reference_close=11.00,
+        regular_vol=900_000,
+        regular_high=11.20,
+        regular_low=10.90,
+        regular_open=11.05,
+        baselines=BASELINES,
+        config=None,
+    )
+    assert fires is False
+    assert criteria["volume_ratio"] is False
