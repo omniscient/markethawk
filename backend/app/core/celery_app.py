@@ -27,4 +27,10 @@ celery_app.conf.beat_schedule = {
         'task': 'app.tasks.poll_auto_trade_fills',
         'schedule': crontab(minute='*', hour='9-23', day_of_week='1-5'),
     },
+    # Liquidity hunt scan: runs at 02:00 UTC Mon–Fri
+    # After-market closes 20:00 ET; 02:00 UTC = 21:00 EST (winter) / 22:00 EDT (summer) — always post-close.
+    'run-liquidity-hunt-scan-evening': {
+        'task': 'app.tasks.run_liquidity_hunt_scheduled',
+        'schedule': crontab(minute='0', hour='2', day_of_week='1-5'),
+    },
 }
