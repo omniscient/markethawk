@@ -27,6 +27,7 @@ from app.models.ticker_reference import TickerReference
 from app.models.stock_split import StockSplit
 from app.services.catalyst_parser import CatalystParser
 from app.services.scanner import ScannerService
+from app.utils.session import get_market_today
 
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
@@ -430,7 +431,6 @@ async def run_liquidity_hunt_scan(
       5. Evaluate post-market criteria → save event if fires.
     """
     if start_date is None and end_date is None:
-        from app.utils.session import get_market_today
         today = get_market_today()
         start_date = end_date = today
     elif start_date is None:
@@ -445,6 +445,8 @@ async def run_liquidity_hunt_scan(
         for i in range((end_date - start_date).days + 1)
         if (start_date + timedelta(days=i)).weekday() < 5
     ]
+    # Note: weekday() < 5 excludes weekends; market holidays pass through and are
+    # filtered naturally when _get_session_metrics returns None (no regular bars).
 
     for event_date in trading_days:
         for ticker in tickers:
@@ -463,7 +465,17 @@ async def run_liquidity_hunt_scan(
                 if baselines is None:
                     continue
 
-                enrichment = _get_enrichment(db, ticker, event_date)
+                try:
+                    enrichment = _get_enrichment(db, ticker, event_date)
+                except Exception:
+                    _LOG.warning(
+                        "Enrichment failed for %s on %s; proceeding with empty enrichment",
+                        ticker, event_date, exc_info=True,
+                    )
+                    enrichment = {
+                        "market_cap": None, "outstanding_shares": None,
+                        "recent_split_date": None, "catalyst_tags": [], "catalyst_summary": None,
+                    }
 
                 # Pre-market variant
                 fires_pre, base_ind_pre, criteria_pre = _evaluate_criteria(
