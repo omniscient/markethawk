@@ -406,7 +406,7 @@ _CLEAN_METRICS = {
     "pre_vol": 350_000, "pre_high": 12.11,
     "regular_vol": 900_000, "regular_high": 11.20,
     "regular_low": 10.90, "regular_open": 11.05, "regular_close": 11.10,
-    "post_vol": 350_000, "post_high": 12.11,
+    "post_vol": 350_000, "post_high": 12.25,
 }
 
 

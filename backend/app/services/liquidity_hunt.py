@@ -499,44 +499,41 @@ async def run_liquidity_hunt_scan(
                     )
                     results.append(event_dict)
 
-                # Post-market variant
-                # Use prior_day_close as the reference so the spike is measured
-                # against the price before the trading day began (same baseline as pre).
-                # event_date_regular_close is still recorded for the event record
-                # but is not the spike reference.
-                fires_post, base_ind_post, criteria_post = _evaluate_criteria(
-                    session="post",
-                    session_vol=session_metrics["post_vol"],
-                    session_high=session_metrics["post_high"],
-                    reference_close=prior_day_close,
-                    regular_vol=session_metrics["regular_vol"],
-                    regular_high=session_metrics["regular_high"],
-                    regular_low=session_metrics["regular_low"],
-                    regular_open=session_metrics["regular_open"],
-                    baselines=baselines,
-                    config=config,
-                )
-                if fires_post:
-                    indicators_post = _build_indicators(
-                        "post", base_ind_post,
-                        session_metrics["regular_open"],
-                        session_metrics["regular_close"],
-                        enrichment, event_date,
-                        session_metrics["post_vol"],
+                # Post-market variant (skip if no event_date regular close)
+                if event_date_regular_close is not None:
+                    fires_post, base_ind_post, criteria_post = _evaluate_criteria(
+                        session="post",
+                        session_vol=session_metrics["post_vol"],
+                        session_high=session_metrics["post_high"],
+                        reference_close=event_date_regular_close,
+                        regular_vol=session_metrics["regular_vol"],
+                        regular_high=session_metrics["regular_high"],
+                        regular_low=session_metrics["regular_low"],
+                        regular_open=session_metrics["regular_open"],
+                        baselines=baselines,
+                        config=config,
                     )
-                    event_dict = ScannerService._save_event(
-                        db=db,
-                        ticker=ticker,
-                        event_date=event_date,
-                        scanner_type="liquidity_hunt_post",
-                        indicators=indicators_post,
-                        criteria_met=criteria_post,
-                        enrichment=enrichment,
-                        previous_close=prior_day_close,
-                        opening_price=session_metrics["regular_open"],
-                        closing_price=event_date_regular_close,
-                    )
-                    results.append(event_dict)
+                    if fires_post:
+                        indicators_post = _build_indicators(
+                            "post", base_ind_post,
+                            session_metrics["regular_open"],
+                            session_metrics["regular_close"],
+                            enrichment, event_date,
+                            session_metrics["post_vol"],
+                        )
+                        event_dict = ScannerService._save_event(
+                            db=db,
+                            ticker=ticker,
+                            event_date=event_date,
+                            scanner_type="liquidity_hunt_post",
+                            indicators=indicators_post,
+                            criteria_met=criteria_post,
+                            enrichment=enrichment,
+                            previous_close=event_date_regular_close,
+                            opening_price=session_metrics["regular_open"],
+                            closing_price=session_metrics["regular_close"],
+                        )
+                        results.append(event_dict)
 
             except Exception:
                 _LOG.exception("Error in liquidity_hunt scan for %s on %s", ticker, event_date)
