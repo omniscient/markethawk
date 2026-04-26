@@ -78,7 +78,7 @@ def test_c6_fails_when_below_absolute_floor():
 
 
 def test_c5_fails_when_range_too_wide():
-    """Intraday range 3x wider than average — day was volatile."""
+    """Wide intraday range — day was volatile."""
     fires, _, criteria = _evaluate_criteria(
         **{**CLEAN_PRE, "regular_high": 13.50, "regular_low": 8.50}
         # range = (13.50-8.50)/11.05 = 45.2% → ratio = 45.2%/2% = 22.6 > 1.5
@@ -113,17 +113,22 @@ def test_zero_session_baseline_fires_when_floor_and_materiality_pass():
 
 
 def test_post_variant_fires():
-    """After-market variant uses avg_post_vol_20d and session='post'."""
+    """After-market variant routes to avg_post_vol_20d (not avg_pre_vol_20d)."""
+    # session_vol=130k: 130k/30k=4.33x passes post threshold but 130k/35k=3.71x fails pre
+    post_baselines = {
+        **BASELINES,
+        "avg_total_daily_vol_20d": 400_000,  # 130k/400k=32.5% ≥ 30% ✓
+    }
     fires, indicators, criteria = _evaluate_criteria(
         session="post",
-        session_vol=350_000,      # 350k/30k = 11.7x ≥ 4 ✓  350k/1M = 35% ≥ 30% ✓
+        session_vol=130_000,
         session_high=12.11,
-        reference_close=11.00,   # today's regular close for post variant
+        reference_close=11.00,
         regular_vol=900_000,
         regular_high=11.20,
         regular_low=10.90,
         regular_open=11.05,
-        baselines=BASELINES,
+        baselines=post_baselines,
         config=None,
     )
     assert fires is True
@@ -147,3 +152,4 @@ def test_c1_fails_for_post_when_after_market_vol_too_low():
     )
     assert fires is False
     assert criteria["volume_ratio"] is False
+    assert criteria["volume_materiality"] is False
