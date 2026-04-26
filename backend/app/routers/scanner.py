@@ -27,6 +27,7 @@ from app.schemas import (
     ScannerRangeRequest,
 )
 from app.services import ScannerService, StockDataService
+from app.services.liquidity_hunt import run_liquidity_hunt_scan
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
 
@@ -74,8 +75,8 @@ async def run_scanner(
 
     # Run scanner
     try:
-        if request.scanner_type == "liquidity_hunt":
-            results = await ScannerService.run_liquidity_hunt_scan(tickers, db)
+        if request.scanner_type in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
+            results = await run_liquidity_hunt_scan(tickers, db)
         elif request.scanner_type == "oversold_bounce":
             results = await ScannerService.run_oversold_bounce_scan(tickers, db)
         else:
@@ -227,7 +228,10 @@ def get_scanner_stats(
     # We use cast for JSON access in Postgres
     avg_spike = (
         db.query(func.avg(sa.cast(ScannerEvent.indicators['volume_spike_ratio'].astext, sa.Numeric)))
-        .filter(ScannerEvent.scanner_type.in_(['pre_market_volume_spike', 'liquidity_hunt']))
+        .filter(ScannerEvent.scanner_type.in_([
+            'pre_market_volume_spike', 'liquidity_hunt',
+            'liquidity_hunt_pre', 'liquidity_hunt_post',
+        ]))
         .scalar()
     )
     if avg_spike is None:
