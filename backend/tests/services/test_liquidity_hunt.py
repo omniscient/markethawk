@@ -62,9 +62,16 @@ def test_c4_fails_when_regular_vol_exceeds_threshold():
 
 
 def test_c6_fails_when_below_absolute_floor():
-    """40k shares < 50k floor."""
+    """40k shares < 50k floor — only c6 fails, all others pass."""
+    isolated_baselines = {
+        **BASELINES,
+        "avg_pre_vol_20d": 1_000,           # 40k/1k = 40x ≥ 4 ✓ (c1 passes)
+        "avg_total_daily_vol_20d": 100_000, # 40k/100k = 40% ≥ 30% ✓ (c2 passes)
+    }
     fires, _, criteria = _evaluate_criteria(
-        **{**CLEAN_PRE, "session_vol": 40_000}
+        **{**CLEAN_PRE, "session_vol": 40_000, "baselines": isolated_baselines}
     )
     assert fires is False
     assert criteria["volume_floor"] is False
+    assert criteria["volume_ratio"] is True
+    assert criteria["volume_materiality"] is True

@@ -12,6 +12,7 @@ Two event types are emitted: liquidity_hunt_pre and liquidity_hunt_post.
 from __future__ import annotations
 
 import logging
+import math
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
@@ -30,7 +31,7 @@ from app.services.scanner import ScannerService
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
 
-DEFAULT_CONFIG: dict[str, float] = {
+DEFAULT_CONFIG: dict[str, Any] = {
     "volume_ratio_min": 4.0,           # criterion 1: session vol / 20d avg session vol
     "volume_pct_of_daily_min": 0.30,   # criterion 2: session vol / 20d avg total daily vol
     "spike_pct_min": 0.10,             # criterion 3: (session_high / reference_close) - 1
@@ -122,10 +123,10 @@ def _evaluate_criteria(
         "session_spike_pct": round(spike_pct, 4),
         "regular_volume": int(regular_vol),
         "avg_regular_volume_20d": int(avg_regular_vol),
-        "regular_volume_ratio": round(regular_vol_ratio, 4),
+        "regular_volume_ratio": round(regular_vol_ratio, 4) if math.isfinite(regular_vol_ratio) else None,
         "regular_range_pct": round(regular_range_pct, 4),
         "avg_regular_range_pct_20d": round(avg_range_pct, 4),
-        "regular_range_ratio": round(regular_range_ratio, 4),
+        "regular_range_ratio": round(regular_range_ratio, 4) if math.isfinite(regular_range_ratio) else None,
     }
 
     criteria_met: dict[str, bool] = {
