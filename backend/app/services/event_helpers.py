@@ -8,7 +8,14 @@ from typing import Dict, Any, Callable
 # Summary generators for each scanner type
 SUMMARY_GENERATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
     "pre_market_volume_spike": lambda ind: f"{ind.get('volume_spike_ratio', 0):.1f}x volume spike, {ind.get('gap_pct', 0):+.1f}% gap",
-    "liquidity_hunt": lambda ind: f"Liquidity hunt, {ind.get('relative_volume', 0):.1f}x RVOL, {ind.get('gap_pct', 0):+.1f}% gap",
+    "liquidity_hunt_pre": lambda ind: (
+        f"Pre-mkt liquidity hunt: {ind.get('session_volume_ratio') or '∞'}x session vol, "
+        f"{ind.get('session_spike_pct', 0)*100:+.1f}% spike"
+    ),
+    "liquidity_hunt_post": lambda ind: (
+        f"Post-mkt liquidity hunt: {ind.get('session_volume_ratio') or '∞'}x session vol, "
+        f"{ind.get('session_spike_pct', 0)*100:+.1f}% spike"
+    ),
     "oversold_bounce": lambda ind: f"RSI cross ({ind.get('rsi_2', 0):.0f}/{ind.get('rsi_5', 0):.0f}), ATR ${ind.get('atr_target', 0):.2f}",
     "live_volume_spike": lambda ind: (
         f"{ind.get('volume_spike_ratio', 0):.1f}x projected volume "
@@ -27,9 +34,14 @@ SEVERITY_CALCULATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
         else "medium" if ind.get('volume_spike_ratio', 0) > 3
         else "low"
     ),
-    "liquidity_hunt": lambda ind: (
-        "high" if ind.get('relative_volume', 0) > 4
-        else "medium" if ind.get('relative_volume', 0) > 2
+    "liquidity_hunt_pre": lambda ind: (
+        "high" if (ind.get('session_volume_ratio') or 0) > 8
+        else "medium" if (ind.get('session_volume_ratio') or 0) > 4
+        else "low"
+    ),
+    "liquidity_hunt_post": lambda ind: (
+        "high" if (ind.get('session_volume_ratio') or 0) > 8
+        else "medium" if (ind.get('session_volume_ratio') or 0) > 4
         else "low"
     ),
     "oversold_bounce": lambda ind: (
