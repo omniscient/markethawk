@@ -154,7 +154,7 @@ def _get_session_metrics(
         .replace(tzinfo=None)
     )
     day_end_utc = (
-        datetime.combine(event_date, time.max, tzinfo=_ET)
+        datetime.combine(event_date + timedelta(days=1), time.min, tzinfo=_ET)
         .astimezone(timezone.utc)
         .replace(tzinfo=None)
     )
@@ -165,7 +165,7 @@ def _get_session_metrics(
             StockAggregate.ticker == ticker,
             StockAggregate.timespan == "minute",
             StockAggregate.timestamp >= day_start_utc,
-            StockAggregate.timestamp <= day_end_utc,
+            StockAggregate.timestamp < day_end_utc,
         )
         .order_by(StockAggregate.timestamp)
         .all()

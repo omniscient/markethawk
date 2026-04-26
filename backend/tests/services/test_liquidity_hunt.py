@@ -266,6 +266,20 @@ def test_get_prior_day_close_returns_none_when_no_history():
     assert _get_prior_day_close(db, "TEST", EVENT_DATE) is None
 
 
+def test_get_prior_day_close_falls_back_to_minute_bar():
+    """When no day bar exists, falls back to the last regular minute bar."""
+    db = MagicMock()
+    mock_q = MagicMock()
+    mock_q.filter.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.limit.return_value = mock_q
+    mock_q.first.side_effect = [None, (10.25,)]   # day query miss, minute query hit
+    db.query.return_value = mock_q
+
+    result = _get_prior_day_close(db, "TEST", EVENT_DATE)
+    assert result == 10.25
+
+
 def test_get_event_date_regular_close():
     db = MagicMock()
     mock_q = MagicMock()
