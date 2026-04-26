@@ -291,3 +291,63 @@ def test_get_event_date_regular_close():
 
     result = _get_event_date_regular_close(db, "TEST", EVENT_DATE)
     assert result == 11.90
+
+
+# ─── _get_rolling_baselines tests ─────────────────────────────────────────────
+
+from app.services.liquidity_hunt import _get_rolling_baselines
+
+
+def _make_history(ticker, event_date, n_days, pre_vol, regular_vol, post_vol,
+                  regular_high_pct=0.01):
+    """
+    Generate n_days of fake minute-bar history before event_date.
+    Each day gets one pre bar, one regular bar, one post bar at 08:00/14:00/21:00 UTC.
+    regular_high_pct: regular high = regular_open * (1 + regular_high_pct).
+    """
+    from zoneinfo import ZoneInfo
+    _ET2 = ZoneInfo("America/New_York")
+    bars = []
+    for i in range(1, n_days + 1):
+        d = event_date - timedelta(days=i)
+        pre_ts = _datetime.combine(d, _datetime.min.time(), tzinfo=_ET2).replace(
+            hour=8).astimezone(_tz.utc).replace(tzinfo=None)
+        reg_ts = pre_ts.replace(hour=14)
+        post_ts = pre_ts.replace(hour=21)
+
+        bars.append(_make_minute_bar(ticker, pre_ts, 10.0, 10.5, 9.8, 10.3, pre_vol, is_pre=True))
+        bars.append(_make_minute_bar(ticker, reg_ts, 10.3, 10.3 * (1 + regular_high_pct),
+                                     10.3 * (1 - regular_high_pct), 10.2, regular_vol))
+        bars.append(_make_minute_bar(ticker, post_ts, 10.2, 10.4, 10.1, 10.3, post_vol, is_after=True))
+    return bars
+
+
+def test_get_rolling_baselines_returns_correct_averages():
+    bars = _make_history("TEST", EVENT_DATE, n_days=20,
+                         pre_vol=40_000, regular_vol=800_000, post_vol=25_000)
+    db = _make_db_returning(bars)
+    result = _get_rolling_baselines(db, "TEST", EVENT_DATE)
+
+    assert result is not None
+    assert result["days_available"] == 20
+    assert abs(result["avg_pre_vol_20d"] - 40_000) < 100
+    assert abs(result["avg_regular_vol_20d"] - 800_000) < 100
+    assert abs(result["avg_post_vol_20d"] - 25_000) < 100
+    assert result["avg_total_daily_vol_20d"] > 800_000  # pre + regular + post
+
+
+def test_get_rolling_baselines_returns_none_when_fewer_than_10_days():
+    bars = _make_history("TEST", EVENT_DATE, n_days=8,
+                         pre_vol=40_000, regular_vol=800_000, post_vol=25_000)
+    db = _make_db_returning(bars)
+    result = _get_rolling_baselines(db, "TEST", EVENT_DATE)
+    assert result is None
+
+
+def test_get_rolling_baselines_uses_at_most_20_days():
+    """Even with 25 days of history, only the most recent 20 are averaged."""
+    bars = _make_history("TEST", EVENT_DATE, n_days=25,
+                         pre_vol=40_000, regular_vol=800_000, post_vol=25_000)
+    db = _make_db_returning(bars)
+    result = _get_rolling_baselines(db, "TEST", EVENT_DATE)
+    assert result["days_available"] == 20

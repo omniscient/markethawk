@@ -265,3 +265,89 @@ def _get_event_date_regular_close(
         .first()
     )
     return float(row[0]) if row else None
+
+
+def _get_rolling_baselines(
+    db: Session, ticker: str, event_date: date
+) -> dict[str, Any] | None:
+    """
+    Compute 20-day rolling session averages from minute bars prior to event_date.
+    Returns None if fewer than 10 trading days of data are available.
+    """
+    day_start_utc = (
+        datetime.combine(event_date, time.min, tzinfo=_ET)
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+    lookback_start_utc = (
+        datetime.combine(event_date - timedelta(days=45), time.min, tzinfo=_ET)
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+
+    rows = (
+        db.query(StockAggregate)
+        .filter(
+            StockAggregate.ticker == ticker,
+            StockAggregate.timespan == "minute",
+            StockAggregate.timestamp >= lookback_start_utc,
+            StockAggregate.timestamp < day_start_utc,
+        )
+        .order_by(StockAggregate.timestamp)
+        .all()
+    )
+
+    if not rows:
+        return None
+
+    # Group rows by ET calendar date
+    daily: dict[date, dict[str, list]] = defaultdict(
+        lambda: {"pre": [], "post": [], "regular": []}
+    )
+    for r in rows:
+        ts_et = r.timestamp.replace(tzinfo=timezone.utc).astimezone(_ET)
+        d = ts_et.date()
+        if r.is_pre_market:
+            daily[d]["pre"].append(r)
+        elif r.is_after_market:
+            daily[d]["post"].append(r)
+        else:
+            daily[d]["regular"].append(r)
+
+    # Keep only days that have regular-session bars; take the 20 most recent
+    trading_days = sorted(
+        [d for d, sess in daily.items() if sess["regular"]]
+    )[-20:]
+
+    if len(trading_days) < 10:
+        return None
+
+    pre_vols, post_vols, regular_vols, total_vols, range_pcts = [], [], [], [], []
+
+    for d in trading_days:
+        sess = daily[d]
+        pv = float(sum(r.volume for r in sess["pre"]))
+        rv = float(sum(r.volume for r in sess["regular"]))
+        ov = float(sum(r.volume for r in sess["post"]))
+        pre_vols.append(pv)
+        post_vols.append(ov)
+        regular_vols.append(rv)
+        total_vols.append(pv + rv + ov)
+
+        reg = sess["regular"]
+        if reg:
+            h = float(max(r.high for r in reg))
+            l = float(min(r.low for r in reg))
+            o = float(reg[0].open)
+            if o > 0:
+                range_pcts.append((h - l) / o)
+
+    n = len(trading_days)
+    return {
+        "avg_pre_vol_20d": sum(pre_vols) / n,
+        "avg_post_vol_20d": sum(post_vols) / n,
+        "avg_regular_vol_20d": sum(regular_vols) / n,
+        "avg_total_daily_vol_20d": sum(total_vols) / n,
+        "avg_regular_range_pct_20d": sum(range_pcts) / len(range_pcts) if range_pcts else 0.0,
+        "days_available": n,
+    }
