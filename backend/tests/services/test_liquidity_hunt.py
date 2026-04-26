@@ -153,3 +153,127 @@ def test_c1_fails_for_post_when_after_market_vol_too_low():
     assert fires is False
     assert criteria["volume_ratio"] is False
     assert criteria["volume_materiality"] is False
+
+
+# ─── DB helper tests ───────────────────────────────────────────────────────
+
+from datetime import date as _date, datetime as _datetime, timezone as _tz
+from datetime import timedelta
+from unittest.mock import MagicMock
+from app.models.stock_aggregate import StockAggregate
+from app.services.liquidity_hunt import (
+    _get_session_metrics,
+    _get_prior_day_close,
+    _get_event_date_regular_close,
+)
+
+
+def _make_minute_bar(ticker, ts_utc, open_, high, low, close, volume,
+                     is_pre=False, is_after=False):
+    b = StockAggregate()
+    b.ticker = ticker
+    b.timestamp = ts_utc
+    b.timespan = "minute"
+    b.multiplier = 1
+    b.open, b.high, b.low, b.close = open_, high, low, close
+    b.volume = volume
+    b.is_pre_market = is_pre
+    b.is_after_market = is_after
+    return b
+
+
+def _make_day_bar(ticker, ts_utc, close, volume):
+    b = StockAggregate()
+    b.ticker = ticker
+    b.timestamp = ts_utc
+    b.timespan = "day"
+    b.multiplier = 1
+    b.open = b.high = b.low = b.close = close
+    b.volume = volume
+    b.is_pre_market = False
+    b.is_after_market = False
+    return b
+
+
+def _make_db_returning(rows):
+    """Return a mock Session whose .query().filter().order_by().all() returns rows."""
+    db = MagicMock()
+    mock_q = MagicMock()
+    mock_q.filter.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.limit.return_value = mock_q
+    mock_q.all.return_value = rows
+    mock_q.first.return_value = rows[0] if rows else None
+    db.query.return_value = mock_q
+    return db
+
+
+EVENT_DATE = _date(2025, 6, 10)
+# 2025-06-10 09:00 ET = 13:00 UTC
+_PRE_TS = _datetime(2025, 6, 10, 8, 0, tzinfo=_tz.utc).replace(tzinfo=None)    # 4 AM ET
+_REG_TS = _datetime(2025, 6, 10, 14, 0, tzinfo=_tz.utc).replace(tzinfo=None)   # 10 AM ET
+_POST_TS = _datetime(2025, 6, 10, 21, 0, tzinfo=_tz.utc).replace(tzinfo=None)  # 5 PM ET
+
+
+def test_get_session_metrics_returns_correct_buckets():
+    pre_bar = _make_minute_bar("TEST", _PRE_TS, 10.0, 12.0, 9.9, 11.8, 200_000, is_pre=True)
+    reg_bar = _make_minute_bar("TEST", _REG_TS, 11.8, 12.1, 11.5, 11.9, 900_000)
+    post_bar = _make_minute_bar("TEST", _POST_TS, 11.9, 13.0, 11.8, 12.5, 150_000, is_after=True)
+
+    db = _make_db_returning([pre_bar, reg_bar, post_bar])
+    metrics = _get_session_metrics(db, "TEST", EVENT_DATE)
+
+    assert metrics is not None
+    assert metrics["pre_vol"] == 200_000
+    assert metrics["pre_high"] == 12.0
+    assert metrics["regular_vol"] == 900_000
+    assert metrics["regular_high"] == 12.1
+    assert metrics["regular_low"] == 11.5
+    assert metrics["regular_open"] == 11.8
+    assert metrics["regular_close"] == 11.9
+    assert metrics["post_vol"] == 150_000
+    assert metrics["post_high"] == 13.0
+
+
+def test_get_session_metrics_returns_none_when_no_regular_bars():
+    pre_bar = _make_minute_bar("TEST", _PRE_TS, 10.0, 12.0, 9.9, 11.8, 200_000, is_pre=True)
+    db = _make_db_returning([pre_bar])
+    assert _get_session_metrics(db, "TEST", EVENT_DATE) is None
+
+
+def test_get_prior_day_close_uses_daily_bar():
+    db = MagicMock()
+    mock_q = MagicMock()
+    mock_q.filter.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.limit.return_value = mock_q
+    mock_q.first.return_value = (10.50,)
+    db.query.return_value = mock_q
+
+    result = _get_prior_day_close(db, "TEST", EVENT_DATE)
+    assert result == 10.50
+
+
+def test_get_prior_day_close_returns_none_when_no_history():
+    db = MagicMock()
+    mock_q = MagicMock()
+    mock_q.filter.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.limit.return_value = mock_q
+    mock_q.first.return_value = None
+    db.query.return_value = mock_q
+
+    assert _get_prior_day_close(db, "TEST", EVENT_DATE) is None
+
+
+def test_get_event_date_regular_close():
+    db = MagicMock()
+    mock_q = MagicMock()
+    mock_q.filter.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.limit.return_value = mock_q
+    mock_q.first.return_value = (11.90,)
+    db.query.return_value = mock_q
+
+    result = _get_event_date_regular_close(db, "TEST", EVENT_DATE)
+    assert result == 11.90

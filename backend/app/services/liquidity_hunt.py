@@ -139,3 +139,129 @@ def _evaluate_criteria(
     }
 
     return fires, indicators, criteria_met
+
+
+def _get_session_metrics(
+    db: Session, ticker: str, event_date: date
+) -> dict[str, Any] | None:
+    """
+    Query all minute bars for event_date. Return per-session aggregates.
+    Returns None if no regular-session bars exist (e.g. market holiday).
+    """
+    day_start_utc = (
+        datetime.combine(event_date, time.min, tzinfo=_ET)
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+    day_end_utc = (
+        datetime.combine(event_date, time.max, tzinfo=_ET)
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+
+    rows = (
+        db.query(StockAggregate)
+        .filter(
+            StockAggregate.ticker == ticker,
+            StockAggregate.timespan == "minute",
+            StockAggregate.timestamp >= day_start_utc,
+            StockAggregate.timestamp <= day_end_utc,
+        )
+        .order_by(StockAggregate.timestamp)
+        .all()
+    )
+
+    pre = [r for r in rows if r.is_pre_market]
+    regular = [r for r in rows if not r.is_pre_market and not r.is_after_market]
+    post = [r for r in rows if r.is_after_market]
+
+    if not regular:
+        return None
+
+    return {
+        "pre_vol": float(sum(r.volume for r in pre)),
+        "pre_high": float(max((r.high for r in pre), default=0)),
+        "regular_vol": float(sum(r.volume for r in regular)),
+        "regular_high": float(max(r.high for r in regular)),
+        "regular_low": float(min(r.low for r in regular)),
+        "regular_open": float(regular[0].open),
+        "regular_close": float(regular[-1].close),
+        "post_vol": float(sum(r.volume for r in post)),
+        "post_high": float(max((r.high for r in post), default=0)),
+    }
+
+
+def _get_prior_day_close(db: Session, ticker: str, event_date: date) -> float | None:
+    """
+    Return the regular close of the most recent trading day before event_date.
+    Tries timespan='day' bars first; falls back to the last regular minute bar.
+    """
+    day_start_utc = (
+        datetime.combine(event_date, time.min, tzinfo=_ET)
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+
+    row = (
+        db.query(StockAggregate.close)
+        .filter(
+            StockAggregate.ticker == ticker,
+            StockAggregate.timespan == "day",
+            StockAggregate.timestamp < day_start_utc,
+        )
+        .order_by(desc(StockAggregate.timestamp))
+        .limit(1)
+        .first()
+    )
+    if row:
+        return float(row[0])
+
+    row = (
+        db.query(StockAggregate.close)
+        .filter(
+            StockAggregate.ticker == ticker,
+            StockAggregate.timespan == "minute",
+            StockAggregate.is_pre_market.is_(False),
+            StockAggregate.is_after_market.is_(False),
+            StockAggregate.timestamp < day_start_utc,
+        )
+        .order_by(desc(StockAggregate.timestamp))
+        .limit(1)
+        .first()
+    )
+    return float(row[0]) if row else None
+
+
+def _get_event_date_regular_close(
+    db: Session, ticker: str, event_date: date
+) -> float | None:
+    """
+    Return the last regular-session minute close on event_date itself.
+    Used as the reference close for the post-market variant.
+    """
+    day_start_utc = (
+        datetime.combine(event_date, time.min, tzinfo=_ET)
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+    reg_end_utc = (
+        datetime.combine(event_date, time(16, 0), tzinfo=_ET)  # 4:00 PM ET (regular close)
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+
+    row = (
+        db.query(StockAggregate.close)
+        .filter(
+            StockAggregate.ticker == ticker,
+            StockAggregate.timespan == "minute",
+            StockAggregate.is_pre_market.is_(False),
+            StockAggregate.is_after_market.is_(False),
+            StockAggregate.timestamp >= day_start_utc,
+            StockAggregate.timestamp < reg_end_utc,
+        )
+        .order_by(desc(StockAggregate.timestamp))
+        .limit(1)
+        .first()
+    )
+    return float(row[0]) if row else None
