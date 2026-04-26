@@ -382,3 +382,137 @@ def test_get_rolling_baselines_lookback_starts_45_days_before_event():
         .replace(tzinfo=None)
     )
     assert lookback_value == expected, f"Expected {expected}, got {lookback_value}"
+
+
+# ─── run_liquidity_hunt_scan tests ────────────────────────────────────────────
+
+import asyncio
+from unittest.mock import patch
+from app.services.liquidity_hunt import run_liquidity_hunt_scan
+
+
+# Shared baselines for scan-loop tests
+_SCAN_BASELINES = {
+    "avg_pre_vol_20d": 35_000,
+    "avg_post_vol_20d": 30_000,
+    "avg_regular_vol_20d": 950_000,
+    "avg_total_daily_vol_20d": 1_000_000,
+    "avg_regular_range_pct_20d": 0.020,
+    "days_available": 20,
+}
+
+# Metrics for a day where both pre and post qualify
+_CLEAN_METRICS = {
+    "pre_vol": 350_000, "pre_high": 12.11,
+    "regular_vol": 900_000, "regular_high": 11.20,
+    "regular_low": 10.90, "regular_open": 11.05, "regular_close": 11.10,
+    "post_vol": 350_000, "post_high": 12.11,
+}
+
+
+def _run(coro):
+    return asyncio.get_event_loop().run_until_complete(coro)
+
+
+def _mock_enrichment():
+    return {
+        "market_cap": 500_000_000,
+        "outstanding_shares": 50_000_000,
+        "recent_split_date": None,
+        "catalyst_tags": [],
+        "catalyst_summary": None,
+    }
+
+
+def test_scan_fires_liquidity_hunt_pre():
+    """Clean pre-market hunt: pre fires."""
+    db = MagicMock()
+    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
+         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
+         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
+         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
+         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
+         patch("app.services.scanner.ScannerService._save_event", return_value={"id": 1}) as mock_save:
+
+        results = _run(run_liquidity_hunt_scan(
+            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+        ))
+
+    saved_types = [c.kwargs["scanner_type"] for c in mock_save.call_args_list]
+    assert "liquidity_hunt_pre" in saved_types
+    assert len(results) >= 1
+
+
+def test_scan_fires_both_variants():
+    """Both pre and post qualify on the same day — two separate events."""
+    db = MagicMock()
+    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
+         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
+         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
+         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
+         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
+         patch("app.services.scanner.ScannerService._save_event", return_value={"id": 1}) as mock_save:
+
+        _run(run_liquidity_hunt_scan(
+            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+        ))
+
+    saved_types = [c.kwargs["scanner_type"] for c in mock_save.call_args_list]
+    assert "liquidity_hunt_pre" in saved_types
+    assert "liquidity_hunt_post" in saved_types
+
+
+def test_scan_skips_ticker_when_sparse_history():
+    """No events emitted when _get_rolling_baselines returns None."""
+    db = MagicMock()
+    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
+         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
+         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
+         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=None), \
+         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
+         patch("app.services.scanner.ScannerService._save_event") as mock_save:
+
+        results = _run(run_liquidity_hunt_scan(
+            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+        ))
+
+    mock_save.assert_not_called()
+    assert results == []
+
+
+def test_scan_skips_ticker_when_no_prior_close():
+    """No events when prior_day_close is unavailable."""
+    db = MagicMock()
+    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
+         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=None), \
+         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
+         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
+         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
+         patch("app.services.scanner.ScannerService._save_event") as mock_save:
+
+        results = _run(run_liquidity_hunt_scan(
+            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+        ))
+
+    mock_save.assert_not_called()
+    assert results == []
+
+
+def test_split_in_lookback_flag():
+    """Recent split within 28 days sets split_in_lookback=True in indicators."""
+    split_date = EVENT_DATE - timedelta(days=10)
+    enrichment_with_split = {**_mock_enrichment(), "recent_split_date": split_date.isoformat()}
+    db = MagicMock()
+    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
+         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
+         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
+         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
+         patch("app.services.liquidity_hunt._get_enrichment", return_value=enrichment_with_split), \
+         patch("app.services.scanner.ScannerService._save_event", return_value={"id": 1}) as mock_save:
+
+        _run(run_liquidity_hunt_scan(
+            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+        ))
+
+    indicators_list = [c.kwargs["indicators"] for c in mock_save.call_args_list]
+    assert any(ind.get("split_in_lookback") is True for ind in indicators_list)

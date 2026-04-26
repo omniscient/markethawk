@@ -351,3 +351,206 @@ def _get_rolling_baselines(
         "avg_regular_range_pct_20d": sum(range_pcts) / len(range_pcts) if range_pcts else 0.0,
         "days_available": n,
     }
+
+
+def _get_enrichment(
+    db: Session, ticker: str, event_date: date
+) -> dict[str, Any]:
+    """Fetch catalyst, split, market-cap, and float enrichment for one ticker."""
+    monitored = db.query(MonitoredStock).filter(MonitoredStock.ticker == ticker).first()
+    ref = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
+    six_months_prior = event_date - timedelta(days=180)
+    recent_split = (
+        db.query(StockSplit)
+        .filter(
+            StockSplit.ticker == ticker,
+            StockSplit.execution_date <= event_date,
+            StockSplit.execution_date >= six_months_prior,
+        )
+        .order_by(desc(StockSplit.execution_date))
+        .first()
+    )
+    cat = CatalystParser.analyze(ticker, event_date, db)
+    outstanding = float(ref.share_class_shares_outstanding) if ref and ref.share_class_shares_outstanding else None
+    return {
+        "market_cap": float(monitored.market_cap) if monitored and monitored.market_cap else None,
+        "outstanding_shares": outstanding,
+        "recent_split_date": recent_split.execution_date.isoformat() if recent_split else None,
+        "catalyst_tags": cat.get("tags", []),
+        "catalyst_summary": cat.get("summary"),
+    }
+
+
+def _build_indicators(
+    session: str,
+    base_indicators: dict[str, Any],
+    regular_open: float,
+    regular_close: float,
+    enrichment: dict[str, Any],
+    event_date: date,
+    session_vol: float,
+) -> dict[str, Any]:
+    """Merge base indicators with opening/closing prices, float rotation, and split flag."""
+    indicators = {
+        **base_indicators,
+        "opening_price": regular_open,
+        "closing_price": regular_close,
+        "split_in_lookback": False,
+    }
+
+    if enrichment.get("recent_split_date"):
+        split_dt = date.fromisoformat(enrichment["recent_split_date"])
+        if (event_date - split_dt).days <= 28:
+            indicators["split_in_lookback"] = True
+
+    if enrichment.get("outstanding_shares") and enrichment["outstanding_shares"] > 0:
+        indicators["float_rotation_pct"] = round(
+            session_vol / enrichment["outstanding_shares"] * 100, 4
+        )
+
+    return indicators
+
+
+async def run_liquidity_hunt_scan(
+    tickers: list[str],
+    db: Session,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    config: dict | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Run liquidity_hunt_pre and liquidity_hunt_post scans over a date range.
+
+    For each (ticker, date):
+      1. Fetch today's session metrics from minute bars.
+      2. Fetch reference closes (prior day + today's regular close).
+      3. Compute 20-day rolling baselines.
+      4. Evaluate pre-market criteria → save event if fires.
+      5. Evaluate post-market criteria → save event if fires.
+    """
+    if start_date is None and end_date is None:
+        from app.utils.session import get_market_today
+        today = get_market_today()
+        start_date = end_date = today
+    elif start_date is None:
+        start_date = end_date
+    elif end_date is None:
+        end_date = start_date
+
+    results: list[dict[str, Any]] = []
+
+    trading_days = [
+        start_date + timedelta(days=i)
+        for i in range((end_date - start_date).days + 1)
+        if (start_date + timedelta(days=i)).weekday() < 5
+    ]
+
+    for event_date in trading_days:
+        for ticker in tickers:
+            try:
+                session_metrics = _get_session_metrics(db, ticker, event_date)
+                if session_metrics is None:
+                    continue
+
+                prior_day_close = _get_prior_day_close(db, ticker, event_date)
+                if prior_day_close is None:
+                    continue
+
+                event_date_regular_close = _get_event_date_regular_close(db, ticker, event_date)
+
+                baselines = _get_rolling_baselines(db, ticker, event_date)
+                if baselines is None:
+                    continue
+
+                enrichment = _get_enrichment(db, ticker, event_date)
+
+                # Pre-market variant
+                fires_pre, base_ind_pre, criteria_pre = _evaluate_criteria(
+                    session="pre",
+                    session_vol=session_metrics["pre_vol"],
+                    session_high=session_metrics["pre_high"],
+                    reference_close=prior_day_close,
+                    regular_vol=session_metrics["regular_vol"],
+                    regular_high=session_metrics["regular_high"],
+                    regular_low=session_metrics["regular_low"],
+                    regular_open=session_metrics["regular_open"],
+                    baselines=baselines,
+                    config=config,
+                )
+                if fires_pre:
+                    indicators_pre = _build_indicators(
+                        "pre", base_ind_pre,
+                        session_metrics["regular_open"],
+                        session_metrics["regular_close"],
+                        enrichment, event_date,
+                        session_metrics["pre_vol"],
+                    )
+                    event_dict = ScannerService._save_event(
+                        db=db,
+                        ticker=ticker,
+                        event_date=event_date,
+                        scanner_type="liquidity_hunt_pre",
+                        indicators=indicators_pre,
+                        criteria_met=criteria_pre,
+                        enrichment=enrichment,
+                        previous_close=prior_day_close,
+                        opening_price=session_metrics["regular_open"],
+                        closing_price=session_metrics["regular_close"],
+                    )
+                    results.append(event_dict)
+
+                # Post-market variant
+                # Use prior_day_close as the reference so the spike is measured
+                # against the price before the trading day began (same baseline as pre).
+                # event_date_regular_close is still recorded for the event record
+                # but is not the spike reference.
+                fires_post, base_ind_post, criteria_post = _evaluate_criteria(
+                    session="post",
+                    session_vol=session_metrics["post_vol"],
+                    session_high=session_metrics["post_high"],
+                    reference_close=prior_day_close,
+                    regular_vol=session_metrics["regular_vol"],
+                    regular_high=session_metrics["regular_high"],
+                    regular_low=session_metrics["regular_low"],
+                    regular_open=session_metrics["regular_open"],
+                    baselines=baselines,
+                    config=config,
+                )
+                if fires_post:
+                    indicators_post = _build_indicators(
+                        "post", base_ind_post,
+                        session_metrics["regular_open"],
+                        session_metrics["regular_close"],
+                        enrichment, event_date,
+                        session_metrics["post_vol"],
+                    )
+                    event_dict = ScannerService._save_event(
+                        db=db,
+                        ticker=ticker,
+                        event_date=event_date,
+                        scanner_type="liquidity_hunt_post",
+                        indicators=indicators_post,
+                        criteria_met=criteria_post,
+                        enrichment=enrichment,
+                        previous_close=prior_day_close,
+                        opening_price=session_metrics["regular_open"],
+                        closing_price=event_date_regular_close,
+                    )
+                    results.append(event_dict)
+
+            except Exception:
+                _LOG.exception("Error in liquidity_hunt scan for %s on %s", ticker, event_date)
+
+    db.commit()
+    return results
+
+
+async def run_liquidity_hunt_scan_for_date(
+    ticker: str,
+    event_date: date,
+    db: Session,
+) -> list[dict[str, Any]]:
+    """Single-ticker single-date wrapper (used by tasks scanner_map)."""
+    return await run_liquidity_hunt_scan(
+        [ticker], db, start_date=event_date, end_date=event_date
+    )
