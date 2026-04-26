@@ -1177,6 +1177,7 @@ def run_range_scan(
     import asyncio
     from datetime import date, timedelta
     from app.services.scanner import ScannerService
+    from app.services.liquidity_hunt import run_liquidity_hunt_scan_for_date as _lh_scan
 
     task_id = run_range_scan.request.id
     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -1218,7 +1219,9 @@ def run_range_scan(
 
         scanner_map = {
             "pre_market_volume_spike": ScannerService.run_pre_market_scan_for_date,
-            "liquidity_hunt": ScannerService.run_liquidity_hunt_scan_for_date,
+            "liquidity_hunt": _lh_scan,
+            "liquidity_hunt_pre": _lh_scan,
+            "liquidity_hunt_post": _lh_scan,
             "oversold_bounce": ScannerService.run_oversold_bounce_scan_for_date,
         }
 
@@ -1255,5 +1258,57 @@ def run_range_scan(
         }))
     finally:
         r.delete(f"scan:{ticker}:range")
+        db.close()
+
+
+@celery_app.task(bind=True, max_retries=1)
+def run_liquidity_hunt_scheduled(self):
+    """
+    Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post
+    for today's date over all active ScannerConfig universes of type 'liquidity_hunt'.
+    """
+    from app.utils.session import get_market_today
+    from app.services.liquidity_hunt import run_liquidity_hunt_scan
+    from app.models.scanner_config import ScannerConfig
+
+    db: Session = SessionLocal()
+    try:
+        event_date = get_market_today()
+        configs = (
+            db.query(ScannerConfig)
+            .filter(
+                ScannerConfig.scanner_type == "liquidity_hunt",
+                ScannerConfig.is_active.is_(True),
+            )
+            .all()
+        )
+
+        for cfg in configs:
+            universe_id = cfg.parameters.get("universe_id")
+            if not universe_id:
+                logger.warning("liquidity_hunt ScannerConfig %s has no universe_id", cfg.id)
+                continue
+
+            tickers = [
+                ms.ticker
+                for ms in db.query(MonitoredStock).filter(
+                    MonitoredStock.universe_id == universe_id,
+                    MonitoredStock.is_active.is_(True),
+                ).all()
+            ]
+            if not tickers:
+                continue
+
+            results = asyncio.run(
+                run_liquidity_hunt_scan(tickers, db, start_date=event_date, end_date=event_date)
+            )
+            logger.info(
+                "liquidity_hunt scheduled scan for universe %s on %s: %d events",
+                universe_id, event_date, len(results),
+            )
+    except Exception as exc:
+        logger.exception("run_liquidity_hunt_scheduled failed: %s", exc)
+        raise self.retry(exc=exc)
+    finally:
         db.close()
 
