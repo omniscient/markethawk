@@ -351,3 +351,34 @@ def test_get_rolling_baselines_uses_at_most_20_days():
     db = _make_db_returning(bars)
     result = _get_rolling_baselines(db, "TEST", EVENT_DATE)
     assert result["days_available"] == 20
+
+
+def test_get_rolling_baselines_lookback_starts_45_days_before_event():
+    """Query lower bound is exactly event_date − 45 calendar days, expressed in naive UTC."""
+    from datetime import time as _time2
+    from zoneinfo import ZoneInfo as _ZI2
+
+    db = MagicMock()
+    mock_q = MagicMock()
+    mock_q.filter.return_value = mock_q
+    mock_q.order_by.return_value = mock_q
+    mock_q.all.return_value = []
+    db.query.return_value = mock_q
+
+    _get_rolling_baselines(db, "TEST", EVENT_DATE)
+
+    # All four conditions are passed in a single .filter() call.
+    # Index 2: StockAggregate.timestamp >= lookback_start_utc
+    lookback_expr = mock_q.filter.call_args.args[2]
+    lookback_value = lookback_expr.right.value  # BindParameter.value
+
+    expected = (
+        _datetime.combine(
+            EVENT_DATE - timedelta(days=45),
+            _time2.min,
+            tzinfo=_ZI2("America/New_York"),
+        )
+        .astimezone(_tz.utc)
+        .replace(tzinfo=None)
+    )
+    assert lookback_value == expected, f"Expected {expected}, got {lookback_value}"
