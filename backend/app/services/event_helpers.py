@@ -36,12 +36,16 @@ SEVERITY_CALCULATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
     ),
     "liquidity_hunt_pre": lambda ind: (
         "high" if (ind.get('session_volume_ratio') or 0) > 8
+             or (ind.get('session_volume_ratio') is None and (ind.get('session_volume_pct_of_daily') or 0) > 0.50)
         else "medium" if (ind.get('session_volume_ratio') or 0) > 4
+             or ind.get('session_volume_ratio') is None
         else "low"
     ),
     "liquidity_hunt_post": lambda ind: (
         "high" if (ind.get('session_volume_ratio') or 0) > 8
+             or (ind.get('session_volume_ratio') is None and (ind.get('session_volume_pct_of_daily') or 0) > 0.50)
         else "medium" if (ind.get('session_volume_ratio') or 0) > 4
+             or ind.get('session_volume_ratio') is None
         else "low"
     ),
     "oversold_bounce": lambda ind: (

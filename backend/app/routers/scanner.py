@@ -162,7 +162,13 @@ def get_scanner_results(
     # Support both scanner_type and the legacy event_type param
     stype = scanner_type or event_type
     if stype:
-        query = query.filter(ScannerEvent.scanner_type == stype)
+        # 'liquidity_hunt' is the umbrella type — include all three variants
+        if stype == "liquidity_hunt":
+            query = query.filter(ScannerEvent.scanner_type.in_([
+                "liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"
+            ]))
+        else:
+            query = query.filter(ScannerEvent.scanner_type == stype)
 
     if universe_id:
         query = query.join(

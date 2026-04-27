@@ -432,7 +432,9 @@ async def run_liquidity_hunt_scan(
     """
     if start_date is None and end_date is None:
         today = get_market_today()
-        start_date = end_date = today
+        # Roll back to Friday if today is Saturday (5) or Sunday (6)
+        days_back = max(0, today.weekday() - 4)
+        start_date = end_date = today - timedelta(days=days_back)
     elif start_date is None:
         start_date = end_date
     elif end_date is None:
@@ -551,7 +553,6 @@ async def run_liquidity_hunt_scan(
             except Exception:
                 _LOG.exception("Error in liquidity_hunt scan for %s on %s", ticker, event_date)
 
-    db.commit()
     return results
 
 

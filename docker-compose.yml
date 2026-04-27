@@ -118,7 +118,7 @@ services:
       dockerfile: Dockerfile
     container_name: stockscanner-frontend
     ports:
-      - "3000:3000"
+      - "3333:3333"
     environment:
       REACT_APP_API_URL: http://localhost:8000
       VITE_API_TARGET: http://backend:8000

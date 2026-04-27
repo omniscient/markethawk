@@ -50,7 +50,7 @@ npm run lint      # ESLint
 
 | Service      | URL                          |
 |-------------|------------------------------|
-| Frontend    | http://localhost:3000         |
+| Frontend    | http://localhost:3333         |
 | Backend API | http://localhost:8000         |
 | API Docs    | http://localhost:8000/docs    |
 | pgAdmin     | http://localhost:5050         |

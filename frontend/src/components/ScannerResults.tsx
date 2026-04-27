@@ -68,10 +68,12 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
   const getImportantIndicators = (event: ScannerEvent) => {
     const ind = event.indicators || {};
     const keys = Object.keys(ind);
-    // Prefer certain keys for display
-    const preferred = ['relative_volume', 'gap_pct', 'rsi_2', 'rsi_5', 'volume_spike_ratio'];
+    const preferred =
+      event.scanner_type === 'liquidity_hunt_pre' || event.scanner_type === 'liquidity_hunt_post'
+        ? ['session_volume_ratio', 'session_spike_pct', 'session_volume_pct_of_daily', 'regular_volume_ratio', 'regular_range_ratio']
+        : ['relative_volume', 'gap_pct', 'rsi_2', 'rsi_5', 'volume_spike_ratio'];
     return keys
-      .filter(k => preferred.includes(k) || preferred.some(p => k.includes(p)))
+      .filter(k => preferred.includes(k))
       .sort((a, b) => preferred.indexOf(a) - preferred.indexOf(b))
       .slice(0, 3);
   };
