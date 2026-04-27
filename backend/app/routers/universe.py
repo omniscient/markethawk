@@ -906,7 +906,9 @@ def trigger_quality_analysis(
     if not universe:
         raise HTTPException(status_code=404, detail="Universe not found")
 
-    # Upsert a "pending" record so the frontend can show a spinner immediately
+    # Upsert a "pending" record so the frontend can show a spinner immediately.
+    # Clear stale snapshot fields so the UI doesn't render the previous run's
+    # numbers while the new analysis is in flight.
     report = db.query(UniverseQualityReport).filter(
         UniverseQualityReport.universe_id == universe_id
     ).first()
@@ -915,6 +917,12 @@ def trigger_quality_analysis(
         db.add(report)
     report.status = "pending"
     report.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    report.generated_at = None
+    report.report_data = None
+    report.overall_grade = None
+    report.overall_score = None
+    report.ticker_count = None
+    report.error_message = None
     db.commit()
 
     analyze_universe_quality.delay(universe_id)
