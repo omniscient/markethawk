@@ -33,6 +33,43 @@ class ScannerRunResponse(BaseModel):
     scanner_type: str
     error_message: Optional[str] = None
     created_at: Optional[datetime] = None
+    scan_start_date: Optional[date] = None
+    scan_end_date: Optional[date] = None
+    diagnostics: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ScannerRunAsyncResponse(BaseModel):
+    """Returned when a scan is queued; the result is delivered via WS / status endpoint."""
+    scan_id: str
+    task_id: str
+    started_at: datetime
+    scanner_type: str
+    universe_id: Optional[int] = None
+    scan_start_date: Optional[date] = None
+    scan_end_date: Optional[date] = None
+    status: str = "queued"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ScannerRunStatusResponse(BaseModel):
+    """Snapshot of an in-flight or finished scan."""
+    scan_id: str
+    task_id: Optional[str] = None
+    status: str  # queued | running | completed | failed | cancelled
+    scanner_type: str
+    universe_id: Optional[int] = None
+    scan_start_date: Optional[date] = None
+    scan_end_date: Optional[date] = None
+    stocks_scanned: int = 0
+    events_detected: int = 0
+    execution_time_ms: int = 0
+    error_message: Optional[str] = None
+    started_at: Optional[datetime] = None
+    # Live progress, only present while running. Cleared on completion.
+    progress: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 

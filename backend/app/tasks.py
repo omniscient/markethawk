@@ -1323,3 +1323,223 @@ def run_liquidity_hunt_scheduled(self):
     finally:
         db.close()
 
+
+# ---------------------------------------------------------------------------
+# Async universe scan — drives a (universe, scanner_type) over a date range
+# and publishes per-day progress to Redis.
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, max_retries=0)
+def run_universe_scan(
+    self,
+    scan_id: str,
+    scanner_type: str,
+    universe_id: int,
+    start_date_iso: str,
+    end_date_iso: str,
+):
+    """Run a scanner across (universe, [start_date..end_date]) with progress reporting.
+
+    Per-day granularity: invokes the relevant scanner once per trading day with
+    every ticker in the universe. After each day we update the Redis state key
+    (so /runs/{id}/status reflects current progress) and publish a message on
+    the pub/sub channel (so the WS reattach path receives it). The state key is
+    deleted in ``finally``; the system tasks aggregator at /api/system/ws/tasks
+    discovers active scans by scanning ``universe:*:scan:*``.
+    """
+    from datetime import date as _date, timedelta as _td
+    from app.models.scanner_run import ScannerRun
+    from app.services.scanner import ScannerService
+    from app.services.liquidity_hunt import run_liquidity_hunt_scan
+
+    task_id = self.request.id
+    r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    channel = f"scan_task:{task_id}"
+    state_key = f"universe:{universe_id}:scan:{scanner_type}"
+    cancel_key = f"scan_cancel:{scan_id}"
+
+    def _cancelled() -> bool:
+        return r.exists(cancel_key) > 0
+
+    def _publish(payload: dict) -> None:
+        try:
+            r.publish(channel, json.dumps(payload, default=str))
+        except Exception:
+            logger.exception("scan_task publish failed")
+
+    db: Session = SessionLocal()
+    started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    try:
+        run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_id).first()
+        if run is None:
+            logger.error("run_universe_scan: ScannerRun %s not found", scan_id)
+            return
+
+        tickers = [
+            ms.ticker
+            for ms in db.query(MonitoredStock).filter(
+                MonitoredStock.universe_id == universe_id,
+                MonitoredStock.is_active.is_(True),
+            ).all()
+        ]
+        if not tickers:
+            run.status = "failed"
+            run.error_message = "Universe has no active tickers"
+            db.commit()
+            _publish({"type": "failed", "error": run.error_message})
+            return
+
+        start = _date.fromisoformat(start_date_iso)
+        end = _date.fromisoformat(end_date_iso)
+        trading_days = [
+            start + _td(days=i)
+            for i in range((end - start).days + 1)
+            if (start + _td(days=i)).weekday() < 5
+        ]
+
+        run.status = "running"
+        run.stocks_scanned = len(tickers)
+        run.scan_start_date = start
+        run.scan_end_date = end
+        db.commit()
+
+        cum = {
+            "evaluated": 0, "no_data": 0, "no_prior_close": 0, "no_baseline": 0,
+            "errors": 0, "fired_pre": 0, "fired_post": 0,
+        }
+        events_total = 0
+
+        def _write_state(progress_extra: dict | None = None):
+            r.set(state_key, json.dumps({
+                "task_ids": [task_id],
+                "scan_id": scan_id,
+                "scanner_type": scanner_type,
+                "universe_id": universe_id,
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                "started_at": started_at.replace(tzinfo=timezone.utc).isoformat(),
+                "tickers": len(tickers),
+                "total_days": len(trading_days),
+                "events_detected": events_total,
+                **cum,
+                **(progress_extra or {}),
+            }), ex=14400)
+
+        _write_state({"day_index": 0})
+        _publish({
+            "type": "started",
+            "scan_id": scan_id,
+            "task_id": task_id,
+            "total_days": len(trading_days),
+            "total_tickers": len(tickers),
+            "estimated_pairs": len(tickers) * len(trading_days),
+            "scanner_type": scanner_type,
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+        })
+
+        for i, day in enumerate(trading_days, start=1):
+            if _cancelled():
+                run.status = "cancelled"
+                run.events_detected = events_total
+                run.execution_time_ms = int(
+                    (datetime.now(timezone.utc).replace(tzinfo=None) - started_at).total_seconds() * 1000
+                )
+                db.commit()
+                _publish({
+                    "type": "cancelled",
+                    "evaluated_so_far": cum["evaluated"],
+                    "events_detected_so_far": events_total,
+                })
+                return
+
+            _publish({
+                "type": "day_started",
+                "date": day.isoformat(),
+                "day_index": i,
+                "total_days": len(trading_days),
+            })
+
+            day_diag: dict = {}
+            try:
+                if scanner_type in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
+                    day_events = asyncio.run(run_liquidity_hunt_scan(
+                        tickers, db, start_date=day, end_date=day, diagnostics_out=day_diag,
+                    ))
+                elif scanner_type == "oversold_bounce":
+                    day_events = asyncio.run(
+                        ScannerService.run_oversold_bounce_scan(tickers, db, event_date=day)
+                    )
+                else:
+                    day_events = asyncio.run(
+                        ScannerService.run_pre_market_scan(tickers, db, event_date=day)
+                    )
+            except Exception as e:
+                cum["errors"] += 1
+                logger.exception("run_universe_scan: day %s failed", day)
+                _publish({"type": "day_error", "date": day.isoformat(), "error": str(e)})
+                continue
+
+            events_total += len(day_events)
+            for k in ("evaluated", "no_data", "no_prior_close", "no_baseline",
+                      "errors", "fired_pre", "fired_post"):
+                cum[k] += int(day_diag.get(k, 0))
+
+            run.events_detected = events_total
+            db.commit()
+
+            _write_state({"day_index": i})
+            _publish({
+                "type": "day_completed",
+                "date": day.isoformat(),
+                "day_index": i,
+                "total_days": len(trading_days),
+                "events": len(day_events),
+                "events_detected": events_total,
+                **cum,
+            })
+
+        run.status = "completed"
+        run.events_detected = events_total
+        run.execution_time_ms = int(
+            (datetime.now(timezone.utc).replace(tzinfo=None) - started_at).total_seconds() * 1000
+        )
+        db.commit()
+        _publish({
+            "type": "completed",
+            "events_detected": events_total,
+            "diagnostics": {
+                "tickers": len(tickers),
+                "days": len(trading_days),
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                **cum,
+            },
+            "execution_time_ms": run.execution_time_ms,
+        })
+        logger.info(
+            "run_universe_scan %s completed: type=%s universe=%s days=%d events=%d",
+            scan_id, scanner_type, universe_id, len(trading_days), events_total,
+        )
+
+    except Exception as exc:
+        logger.exception("run_universe_scan %s failed", scan_id)
+        try:
+            run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_id).first()
+            if run is not None:
+                run.status = "failed"
+                run.error_message = str(exc)
+                run.execution_time_ms = int(
+                    (datetime.now(timezone.utc).replace(tzinfo=None) - started_at).total_seconds() * 1000
+                )
+                db.commit()
+        except Exception:
+            db.rollback()
+        _publish({"type": "failed", "error": str(exc)})
+    finally:
+        try:
+            r.delete(state_key)
+            r.delete(cancel_key)
+        except Exception:
+            pass
+        db.close()

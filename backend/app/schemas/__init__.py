@@ -11,6 +11,8 @@ from app.schemas.universe import (
 from app.schemas.scanner import (
     ScannerRunRequest,
     ScannerRunResponse,
+    ScannerRunAsyncResponse,
+    ScannerRunStatusResponse,
     ScannerStatsResponse,
     ScannerConfigResponse,
     PreMarketMoversResponse,
@@ -27,6 +29,8 @@ __all__ = [
     "UniverseSummary",
     "ScannerRunRequest",
     "ScannerRunResponse",
+    "ScannerRunAsyncResponse",
+    "ScannerRunStatusResponse",
     "ScannerStatsResponse",
     "ScannerConfigResponse",
     "ScannerEventResponse",

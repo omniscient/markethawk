@@ -424,6 +424,7 @@ async def run_liquidity_hunt_scan(
     start_date: date | None = None,
     end_date: date | None = None,
     config: dict | None = None,
+    diagnostics_out: dict | None = None,
 ) -> list[dict[str, Any]]:
     """
     Run liquidity_hunt_pre and liquidity_hunt_post scans over a date range.
@@ -434,12 +435,20 @@ async def run_liquidity_hunt_scan(
       3. Compute 20-day rolling baselines.
       4. Evaluate pre-market criteria → save event if fires.
       5. Evaluate post-market criteria → save event if fires.
+
+    When ``diagnostics_out`` is supplied it is populated with per-bucket counts
+    (no_data / no_prior_close / no_baseline / evaluated / fired_pre / fired_post /
+    errors) plus the resolved start/end dates and ticker count.
     """
+    # The pre/post variants need a *completed* regular session as a baseline,
+    # so the no-args default rolls back to the previous trading day. This makes
+    # the "Run Scanner" button always produce something pre-open instead of
+    # silently dropping every ticker as no_data.
     if start_date is None and end_date is None:
-        today = get_market_today()
-        # Roll back to Friday if today is Saturday (5) or Sunday (6)
-        days_back = max(0, today.weekday() - 4)
-        start_date = end_date = today - timedelta(days=days_back)
+        d = get_market_today() - timedelta(days=1)
+        while d.weekday() >= 5:  # Saturday=5, Sunday=6
+            d -= timedelta(days=1)
+        start_date = end_date = d
     elif start_date is None:
         start_date = end_date
     elif end_date is None:
@@ -583,6 +592,21 @@ async def run_liquidity_hunt_scan(
         counts["no_session_metrics"], counts["no_prior_close"], counts["no_baseline"],
         counts["evaluated"], counts["fired_pre"], counts["fired_post"], counts["errors"],
     )
+
+    if diagnostics_out is not None:
+        diagnostics_out.update({
+            "tickers": len(tickers),
+            "days": len(trading_days),
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "no_data": counts["no_session_metrics"],
+            "no_prior_close": counts["no_prior_close"],
+            "no_baseline": counts["no_baseline"],
+            "evaluated": counts["evaluated"],
+            "fired_pre": counts["fired_pre"],
+            "fired_post": counts["fired_post"],
+            "errors": counts["errors"],
+        })
 
     return results
 

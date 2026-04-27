@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from sqlalchemy import cast
 from sqlalchemy.dialects.postgresql import JSONB
@@ -18,6 +18,8 @@ from app.models import MonitoredStock, ScannerEvent, ScannerConfig, ScannerRun
 from app.schemas import (
     ScannerRunRequest,
     ScannerRunResponse,
+    ScannerRunAsyncResponse,
+    ScannerRunStatusResponse,
     ScannerEventResponse,
     ScannerEventSummary,
     ScannerStatsResponse,
@@ -26,127 +28,280 @@ from app.schemas import (
     PreMarketMover,
     ScannerRangeRequest,
 )
-from app.services import ScannerService, StockDataService
-from app.services.liquidity_hunt import run_liquidity_hunt_scan
+from app.services import StockDataService
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
 
 
-async def _run_scan_over_range(scan_fn, tickers, db, start_date, end_date):
-    """
-    Drive a single-date scanner (pre_market_volume / oversold_bounce) across a
-    date range. When both bounds are None the scanner is invoked with its own
-    default (today), preserving prior behaviour. Weekends are skipped.
-    """
-    if start_date is None and end_date is None:
-        return await scan_fn(tickers, db)
-
+def _last_completed_weekday() -> "date":
+    """Default scan date when none supplied — most recent completed weekday."""
     from datetime import timedelta as _td
-    results = []
-    day = start_date
-    while day <= end_date:
-        if day.weekday() < 5:  # Mon-Fri
-            results.extend(await scan_fn(tickers, db, event_date=day))
-        day += _td(days=1)
-    return results
+    d = get_market_today() - _td(days=1)
+    while d.weekday() >= 5:  # Saturday=5, Sunday=6
+        d -= _td(days=1)
+    return d
 
 
-@router.post("/run", response_model=ScannerRunResponse)
-async def run_scanner(
+@router.post("/run", response_model=ScannerRunAsyncResponse, status_code=202)
+def run_scanner(
     request: ScannerRunRequest,
     db: Session = Depends(get_db),
 ):
-    """Run scanner on demand."""
-    start_time = datetime.now(timezone.utc)
+    """Enqueue a scan and return immediately.
+
+    Progress is delivered via WS /api/scanner/ws/runs/{task_id} or polled at
+    GET /api/scanner/runs/{scan_id}/status. Final events are persisted to the
+    DB and queryable through /api/scanner/results once status='completed'.
+
+    Returns 409 if a scan with the same (universe_id, scanner_type) is already
+    in flight — the response includes the live task_id so the client can
+    reattach instead of starting a duplicate.
+    """
+    import json
+    import redis as _redis
+    from app.core.config import settings as _settings
+    from app.tasks import run_universe_scan
+
+    if not request.universe_id:
+        raise HTTPException(
+            status_code=400,
+            detail="universe_id is required (per-ticker scans go through /run-range)",
+        )
+
+    # Concurrency guard: one scan per (universe, scanner_type)
+    r = _redis.Redis.from_url(_settings.REDIS_URL, decode_responses=True)
+    state_key = f"universe:{request.universe_id}:scan:{request.scanner_type}"
+    existing = r.get(state_key)
+    if existing:
+        try:
+            data = json.loads(existing)
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "A scan is already running for this universe and scanner type",
+                    "scan_id": data.get("scan_id"),
+                    "task_id": (data.get("task_ids") or [None])[0],
+                    "started_at": data.get("started_at"),
+                },
+            )
+        except json.JSONDecodeError:
+            r.delete(state_key)  # corrupt key, clear and proceed
+
+    # Resolve date range (default = last completed weekday for both bounds)
+    start_date = request.start_date or _last_completed_weekday()
+    end_date = request.end_date or start_date
+    if end_date < start_date:
+        raise HTTPException(status_code=400, detail="end_date must not be before start_date")
+
+    # Verify universe has tickers before queueing — fail fast on misconfig.
+    ticker_count = (
+        db.query(MonitoredStock)
+        .filter(
+            MonitoredStock.universe_id == request.universe_id,
+            MonitoredStock.is_active.is_(True),
+        )
+        .count()
+    )
+    if ticker_count == 0:
+        raise HTTPException(
+            status_code=400, detail="No tickers found in the selected universe"
+        )
+
     scan_id = str(uuid.uuid4())
-    
-    # Create initial run record
     scanner_run = ScannerRun(
         uuid=uuid.UUID(scan_id),
         scanner_type=request.scanner_type,
         universe_id=request.universe_id,
-        status="running",
+        status="queued",
+        stocks_scanned=ticker_count,
+        scan_start_date=start_date,
+        scan_end_date=end_date,
     )
     db.add(scanner_run)
     db.commit()
+    db.refresh(scanner_run)
 
-    # Get tickers to scan
-    tickers = request.tickers
-    if not tickers and request.universe_id:
-        # Get tickers from universe
-        stocks = (
-            db.query(MonitoredStock)
-            .filter(
-                MonitoredStock.universe_id == request.universe_id,
-                MonitoredStock.is_active == True,
-            )
-            .all()
-        )
-        tickers = [stock.ticker for stock in stocks]
+    async_result = run_universe_scan.delay(
+        scan_id=scan_id,
+        scanner_type=request.scanner_type,
+        universe_id=request.universe_id,
+        start_date_iso=start_date.isoformat(),
+        end_date_iso=end_date.isoformat(),
+    )
 
-    if not tickers:
-        scanner_run.status = "failed"
-        scanner_run.error_message = "No tickers provided or found in universe"
-        db.commit()
-        raise HTTPException(
-            status_code=400, detail="No tickers provided or found in universe"
-        )
-
-    # Resolve date range. If neither bound is given, scanners fall back to "today"
-    # (preserving prior behaviour for the daily cron). If only one bound is given,
-    # treat the run as a single day.
-    start_date = request.start_date
-    end_date = request.end_date
-    if start_date is not None and end_date is None:
-        end_date = start_date
-    elif end_date is not None and start_date is None:
-        start_date = end_date
-
-    # Run scanner
-    try:
-        if request.scanner_type in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
-            results = await run_liquidity_hunt_scan(
-                tickers, db, start_date=start_date, end_date=end_date
-            )
-        elif request.scanner_type == "oversold_bounce":
-            results = await _run_scan_over_range(
-                ScannerService.run_oversold_bounce_scan, tickers, db,
-                start_date, end_date,
-            )
-        else:
-            results = await _run_scan_over_range(
-                ScannerService.run_pre_market_scan, tickers, db,
-                start_date, end_date,
-            )
-
-        status = "completed"
-        error_msg = None
-    except Exception as e:
-        results = []
-        status = "failed"
-        error_msg = str(e)
-
-    execution_time = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
-
-    # Update run record
-    scanner_run.status = status
-    scanner_run.stocks_scanned = len(tickers)
-    scanner_run.events_detected = len(results)
-    scanner_run.execution_time_ms = execution_time
-    scanner_run.error_message = error_msg
+    scanner_run.celery_task_id = async_result.id
     db.commit()
 
-    return ScannerRunResponse(
+    started_at = scanner_run.created_at
+    if started_at and started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+
+    return ScannerRunAsyncResponse(
         scan_id=scan_id,
-        status=status,
-        stocks_scanned=len(tickers),
-        events_detected=len(results),
-        execution_time_ms=execution_time,
-        events=results,
+        task_id=async_result.id,
+        started_at=started_at,
         scanner_type=request.scanner_type,
-        error_message=error_msg,
-        created_at=scanner_run.created_at
+        universe_id=request.universe_id,
+        scan_start_date=start_date,
+        scan_end_date=end_date,
+        status="queued",
     )
+
+
+@router.get("/runs/{scan_id}/status", response_model=ScannerRunStatusResponse)
+def get_scan_status(scan_id: str, db: Session = Depends(get_db)):
+    """Snapshot of an in-flight or finished scan.
+
+    Live scans: progress payload comes from the Redis state key written by the
+    Celery worker after each day. Finished scans: progress is None and the row
+    fields (status, events_detected, execution_time_ms) are authoritative.
+    """
+    import json
+    import redis as _redis
+    from app.core.config import settings as _settings
+
+    try:
+        scan_uuid = uuid.UUID(scan_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid scan_id")
+
+    run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_uuid).first()
+    if run is None:
+        raise HTTPException(status_code=404, detail="scan not found")
+
+    progress = None
+    if run.status in ("queued", "running"):
+        try:
+            r = _redis.Redis.from_url(_settings.REDIS_URL, decode_responses=True)
+            state = r.get(f"universe:{run.universe_id}:scan:{run.scanner_type}")
+            if state:
+                progress = json.loads(state)
+        except Exception:
+            progress = None
+
+    started_at = run.created_at
+    if started_at and started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+
+    return ScannerRunStatusResponse(
+        scan_id=str(run.uuid),
+        task_id=run.celery_task_id,
+        status=run.status,
+        scanner_type=run.scanner_type,
+        universe_id=run.universe_id,
+        scan_start_date=run.scan_start_date,
+        scan_end_date=run.scan_end_date,
+        stocks_scanned=run.stocks_scanned or 0,
+        events_detected=run.events_detected or 0,
+        execution_time_ms=run.execution_time_ms or 0,
+        error_message=run.error_message,
+        started_at=started_at,
+        progress=progress,
+    )
+
+
+@router.post("/runs/{scan_id}/cancel")
+def cancel_scan(scan_id: str, db: Session = Depends(get_db)):
+    """Request cancellation of an in-flight scan.
+
+    Sets a Redis flag the worker checks at each day boundary. Mid-day work
+    completes; the worker then writes status='cancelled' and emits a
+    'cancelled' message on its progress channel.
+    """
+    import redis as _redis
+    from app.core.config import settings as _settings
+
+    try:
+        scan_uuid = uuid.UUID(scan_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid scan_id")
+
+    run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_uuid).first()
+    if run is None:
+        raise HTTPException(status_code=404, detail="scan not found")
+    if run.status not in ("queued", "running"):
+        raise HTTPException(status_code=409, detail=f"scan is {run.status}, not cancellable")
+
+    r = _redis.Redis.from_url(_settings.REDIS_URL, decode_responses=True)
+    r.set(f"scan_cancel:{scan_id}", "1", ex=3600)
+    return {"status": "cancel_requested", "scan_id": scan_id}
+
+
+@router.websocket("/ws/runs/{task_id}")
+async def scan_run_websocket(websocket: WebSocket, task_id: str):
+    """Stream progress messages for one running scan.
+
+    On connect the most recent state is replayed once (so a page reload doesn't
+    miss already-published progress), then the client subscribes to live
+    pub/sub messages for the same channel until the task completes/fails.
+    """
+    import json
+    from redis import asyncio as aioredis
+    from app.core.config import settings as _settings
+
+    await websocket.accept()
+    redis_client = aioredis.from_url(_settings.REDIS_URL, decode_responses=True)
+
+    try:
+        # 1. Replay last known state (Redis state key is universe-scoped, so we
+        #    locate it by scanning for any key whose stored task_id matches).
+        cursor = 0
+        while True:
+            cursor, keys = await redis_client.scan(cursor=cursor, match="universe:*:scan:*", count=100)
+            for key in keys:
+                raw = await redis_client.get(key)
+                if not raw:
+                    continue
+                try:
+                    data = json.loads(raw)
+                    if task_id in (data.get("task_ids") or []):
+                        await websocket.send_json({"type": "snapshot", **data})
+                        raise StopIteration
+                except StopIteration:
+                    raise
+                except Exception:
+                    pass
+            if str(cursor) == "0":
+                break
+
+    except StopIteration:
+        pass
+    except WebSocketDisconnect:
+        await redis_client.close()
+        return
+    except Exception:
+        pass
+
+    # 2. Subscribe to live messages.
+    pubsub = redis_client.pubsub()
+    channel = f"scan_task:{task_id}"
+    await pubsub.subscribe(channel)
+    try:
+        async for message in pubsub.listen():
+            if message.get("type") != "message":
+                continue
+            try:
+                payload = json.loads(message["data"])
+            except Exception:
+                continue
+            await websocket.send_json(payload)
+            if payload.get("type") in ("completed", "failed", "cancelled"):
+                break
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        try:
+            await pubsub.unsubscribe(channel)
+            await pubsub.close()
+        except Exception:
+            pass
+        await redis_client.close()
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 
 @router.get("/history", response_model=List[ScannerRunResponse])

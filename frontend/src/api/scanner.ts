@@ -74,6 +74,22 @@ export interface ScannerRunRequest {
   tickers?: string[];
   scanner_type: string;
   dry_run?: boolean;
+  start_date?: string; // ISO date "YYYY-MM-DD"
+  end_date?: string;
+}
+
+export interface ScannerDiagnostics {
+  tickers?: number;
+  days?: number;
+  start_date?: string;
+  end_date?: string;
+  no_data?: number;
+  no_prior_close?: number;
+  no_baseline?: number;
+  evaluated?: number;
+  fired_pre?: number;
+  fired_post?: number;
+  errors?: number;
 }
 
 export interface ScannerRunResponse {
@@ -86,6 +102,9 @@ export interface ScannerRunResponse {
   events?: ScannerEvent[];
   error_message?: string;
   created_at?: string;
+  scan_start_date?: string;
+  scan_end_date?: string;
+  diagnostics?: ScannerDiagnostics;
 }
 
 export interface MarketStats {
@@ -164,9 +183,64 @@ export const fetchScannerResults = async (params?: {
   return response.data;
 };
 
-export const runScanner = async (request: ScannerRunRequest): Promise<ScannerRunResponse> => {
+export interface ScannerRunAsyncResponse {
+  scan_id: string;
+  task_id: string;
+  started_at: string;
+  scanner_type: string;
+  universe_id?: number;
+  scan_start_date?: string;
+  scan_end_date?: string;
+  status: 'queued';
+}
+
+export interface ScannerRunStatus {
+  scan_id: string;
+  task_id?: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  scanner_type: string;
+  universe_id?: number;
+  scan_start_date?: string;
+  scan_end_date?: string;
+  stocks_scanned: number;
+  events_detected: number;
+  execution_time_ms: number;
+  error_message?: string | null;
+  started_at?: string;
+  progress?: ScannerDiagnostics & {
+    day_index?: number;
+    total_days?: number;
+    tickers?: number;
+    events_detected?: number;
+    [k: string]: any;
+  } | null;
+}
+
+/** Enqueue a scan. Returns immediately with task/scan IDs; progress arrives via WS. */
+export const runScanner = async (request: ScannerRunRequest): Promise<ScannerRunAsyncResponse> => {
   const response = await apiClient.post('/scanner/run', request);
   return response.data;
+};
+
+export const fetchScanStatus = async (scanId: string): Promise<ScannerRunStatus> => {
+  const response = await apiClient.get(`/scanner/runs/${scanId}/status`);
+  return response.data;
+};
+
+export const cancelScan = async (scanId: string): Promise<{ status: string; scan_id: string }> => {
+  const response = await apiClient.post(`/scanner/runs/${scanId}/cancel`);
+  return response.data;
+};
+
+/** Open a WebSocket that streams progress for one running scan task. */
+export const createScanRunWebSocket = (taskId: string): WebSocket | null => {
+  try {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return new WebSocket(`${protocol}//${window.location.host}/api/scanner/ws/runs/${taskId}`);
+  } catch (e) {
+    console.error('[WS] Failed to open scanner run WS', e);
+    return null;
+  }
 };
 
 export interface ScannerRangeRequest {

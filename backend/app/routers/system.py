@@ -356,6 +356,58 @@ async def system_tasks_websocket(websocket: WebSocket):
                         "status": "running",
                     })
 
+                # 1.7. Check Redis for active universe scans
+                #     Key shape: universe:{universe_id}:scan:{scanner_type}
+                uscan_keys = []
+                cursor = '0'
+                while True:
+                    cursor, keys = await redis_client.scan(cursor=cursor, match="universe:*:scan:*", count=100)
+                    uscan_keys.extend(keys)
+                    if cursor == 0 or cursor == '0' or str(cursor) == '0':
+                        break
+
+                for key in uscan_keys:
+                    parts = key.split(":")
+                    if len(parts) < 4 or not parts[1].isdigit():
+                        continue
+                    uid = int(parts[1])
+                    scanner_type = parts[3]
+                    raw = await redis_client.get(key)
+                    if not raw:
+                        continue
+                    try:
+                        udata = json.loads(raw)
+                        ts_str = udata.get("started_at")
+                        if ts_str:
+                            ts = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+                            if (datetime.now(timezone.utc) - ts).total_seconds() / 3600 > 4:
+                                await redis_client.delete(key)
+                                continue
+                        tids = udata.get("task_ids", [])
+                        if tids:
+                            tpending = sum(
+                                1 for tid in tids
+                                if AsyncResult(tid, app=celery_app).state in ("PENDING", "STARTED", "RETRY")
+                            )
+                            if tpending == 0:
+                                await redis_client.delete(key)
+                                continue
+                    except (ValueError, TypeError, AttributeError):
+                        pass
+                    universe = db.query(StockUniverse).filter(StockUniverse.id == uid).first()
+                    universe_name = universe.name if universe else f"Universe {uid}"
+                    day_idx = udata.get("day_index", 0) if isinstance(udata, dict) else 0
+                    total_days = udata.get("total_days", 0) if isinstance(udata, dict) else 0
+                    active_tasks.append({
+                        "id": f"scan_{uid}_{scanner_type}",
+                        "type": "scan",
+                        "title": (
+                            f"Scanning {universe_name}: {scanner_type.replace('_', ' ')}"
+                            + (f" — day {day_idx}/{total_days}" if total_days else "")
+                        ),
+                        "status": "running",
+                    })
+
                 # 2. Check DB for quality and normalization tasks.
                 # Auto-reset rows that have been stuck in pending/running for >4 hours
                 # (worker crash without updating status).

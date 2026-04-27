@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import Card from './ui/Card';
 import Ticker from './Ticker';
-import { ScannerEvent } from '../api/scanner';
+import { ScannerEvent, ScannerDiagnostics } from '../api/scanner';
 
 interface ScannerResultsProps {
   results: {
@@ -19,6 +19,9 @@ interface ScannerResultsProps {
     events_detected: number;
     execution_time_ms: number;
     events?: ScannerEvent[];
+    scan_start_date?: string;
+    scan_end_date?: string;
+    diagnostics?: ScannerDiagnostics;
   };
   onSort?: (column: string) => void;
   sortBy?: string;
@@ -107,6 +110,37 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
           <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Filtered Results</div>
         </div>
       </div>
+
+      {results.diagnostics && (
+        <div className="mb-6 p-4 bg-gray-900/60 border border-gray-800 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Scan Diagnostics</div>
+            <div className="text-xs text-gray-500">
+              {results.diagnostics.start_date}
+              {results.diagnostics.end_date && results.diagnostics.end_date !== results.diagnostics.start_date
+                ? ` → ${results.diagnostics.end_date}`
+                : ''}
+              {' · '}
+              {results.diagnostics.days ?? 0} day{(results.diagnostics.days ?? 0) === 1 ? '' : 's'}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <DiagStat label="Evaluated" value={results.diagnostics.evaluated} tone="ok" />
+            <DiagStat label="No data" value={results.diagnostics.no_data} tone="warn" />
+            <DiagStat label="No prior close" value={results.diagnostics.no_prior_close} tone="warn" />
+            <DiagStat label="No baseline" value={results.diagnostics.no_baseline} tone="warn" />
+            <DiagStat label="Fired pre" value={results.diagnostics.fired_pre} tone="ok" />
+            <DiagStat label="Fired post" value={results.diagnostics.fired_post} tone="ok" />
+            <DiagStat label="Errors" value={results.diagnostics.errors} tone="err" />
+          </div>
+          {(results.events_detected === 0 && (results.diagnostics.no_data ?? 0) > 0) && (
+            <p className="mt-3 text-xs text-yellow-300/80">
+              No regular-session minute bars were available for {(results.diagnostics.no_data ?? 0)} ticker(s) on this date.
+              The market may not have closed yet, or data ingestion is incomplete — try a previous trading day.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-gray-900 border border-gray-800 rounded-lg shadow-inner">
@@ -248,6 +282,27 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
         </div>
       )}
     </Card>
+  );
+};
+
+interface DiagStatProps {
+  label: string;
+  value: number | undefined;
+  tone: 'ok' | 'warn' | 'err';
+}
+
+const DiagStat: React.FC<DiagStatProps> = ({ label, value, tone }) => {
+  const v = value ?? 0;
+  const colour =
+    tone === 'err' && v > 0 ? 'text-red-400'
+      : tone === 'warn' && v > 0 ? 'text-yellow-400'
+      : tone === 'ok' && v > 0 ? 'text-green-400'
+      : 'text-gray-500';
+  return (
+    <div className="flex justify-between items-baseline border-b border-gray-800/60 pb-1">
+      <span className="text-[10px] uppercase tracking-wider text-gray-500">{label}</span>
+      <span className={`font-mono font-semibold ${colour}`}>{v.toLocaleString()}</span>
+    </div>
   );
 };
 
