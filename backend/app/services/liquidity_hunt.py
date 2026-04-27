@@ -441,6 +441,15 @@ async def run_liquidity_hunt_scan(
         end_date = start_date
 
     results: list[dict[str, Any]] = []
+    counts = {
+        "no_session_metrics": 0,
+        "no_prior_close": 0,
+        "no_baseline": 0,
+        "evaluated": 0,
+        "fired_pre": 0,
+        "fired_post": 0,
+        "errors": 0,
+    }
 
     trading_days = [
         start_date + timedelta(days=i)
@@ -455,17 +464,22 @@ async def run_liquidity_hunt_scan(
             try:
                 session_metrics = _get_session_metrics(db, ticker, event_date)
                 if session_metrics is None:
+                    counts["no_session_metrics"] += 1
                     continue
 
                 prior_day_close = _get_prior_day_close(db, ticker, event_date)
                 if prior_day_close is None:
+                    counts["no_prior_close"] += 1
                     continue
 
                 event_date_regular_close = _get_event_date_regular_close(db, ticker, event_date)
 
                 baselines = _get_rolling_baselines(db, ticker, event_date)
                 if baselines is None:
+                    counts["no_baseline"] += 1
                     continue
+
+                counts["evaluated"] += 1
 
                 try:
                     enrichment = _get_enrichment(db, ticker, event_date)
@@ -513,6 +527,7 @@ async def run_liquidity_hunt_scan(
                         closing_price=session_metrics["regular_close"],
                     )
                     results.append(event_dict)
+                    counts["fired_pre"] += 1
 
                 # Post-market variant (skip if no event_date regular close)
                 if event_date_regular_close is not None:
@@ -549,9 +564,20 @@ async def run_liquidity_hunt_scan(
                             closing_price=session_metrics["regular_close"],
                         )
                         results.append(event_dict)
+                        counts["fired_post"] += 1
 
             except Exception:
+                counts["errors"] += 1
                 _LOG.exception("Error in liquidity_hunt scan for %s on %s", ticker, event_date)
+
+    _LOG.info(
+        "liquidity_hunt scan complete: tickers=%d days=%d "
+        "dropped=(no_data:%d no_prior_close:%d no_baseline:%d) "
+        "evaluated=%d fired=(pre:%d post:%d) errors=%d",
+        len(tickers), len(trading_days),
+        counts["no_session_metrics"], counts["no_prior_close"], counts["no_baseline"],
+        counts["evaluated"], counts["fired_pre"], counts["fired_post"], counts["errors"],
+    )
 
     return results
 
