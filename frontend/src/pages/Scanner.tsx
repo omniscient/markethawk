@@ -61,19 +61,22 @@ const Scanner: React.FC = () => {
     enabled: !!selectedUniverse && !!selectedConfig,
   });
 
-  // Update scanResults when existingResults changes (if no manual scan run recently)
+  // Auto-load existing results when the user changes universe/scanner. Don't clobber a fresh
+  // manual scan — only overwrite if scanResults is empty or itself a 'historical' placeholder.
   React.useEffect(() => {
-    if (existingResults && !isScanning) {
-      setScanResults({
+    if (!existingResults) return;
+    setScanResults((prev: any) => {
+      if (prev && prev.scan_id !== 'historical') return prev;
+      return {
         scan_id: 'historical',
         status: 'completed',
-        stocks_scanned: 0, // Unknown for historical
+        stocks_scanned: 0,
         events_detected: existingResults.length,
         execution_time_ms: 0,
-        events: existingResults
-      });
-    }
-  }, [existingResults, isScanning]);
+        events: existingResults,
+      };
+    });
+  }, [existingResults]);
 
   // Run scanner mutation
   const scannerMutation = useMutation({
@@ -81,9 +84,10 @@ const Scanner: React.FC = () => {
     onSuccess: (data) => {
       setScanResults(data);
       setIsScanning(false);
-      // Refresh history and configs (which has last_run)
+      // Refresh history, configs (last_run), and results so future cache reads include the new events.
       queryClient.invalidateQueries({ queryKey: ['scannerHistory'] });
       queryClient.invalidateQueries({ queryKey: ['scannerConfigs'] });
+      queryClient.invalidateQueries({ queryKey: ['scannerResults'] });
     },
     onError: (error) => {
       console.error('Scanner error:', error);
