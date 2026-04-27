@@ -132,7 +132,12 @@ class MassiveDataProvider(BaseDataProvider):
             return all_bars
 
         except Exception as e:
-            logger.error(f"MassiveDataProvider: Error fetching bars for {symbol}: {e}")
+            # Distinct from the "no bars returned" path so logs disambiguate
+            # API errors (rate limit, 5xx, network) from genuinely empty ranges.
+            logger.exception(
+                f"❌ Polygon fetch FAILED for {symbol} {timespan}×{multiplier} "
+                f"({from_date} → {to_date}): {e}"
+            )
             return []
 
     def get_ticker_details(self, symbol: str) -> Dict[str, Any]:

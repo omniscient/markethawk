@@ -10,6 +10,16 @@ class ScannerRunRequest(BaseModel):
     tickers: Optional[List[str]] = None
     scanner_type: str = "pre_market_volume"
     dry_run: bool = False
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+    @field_validator("end_date")
+    @classmethod
+    def end_date_not_before_start(cls, v, info):
+        start = info.data.get("start_date")
+        if v is not None and start is not None and v < start:
+            raise ValueError("end_date must not be before start_date")
+        return v
 
 
 class ScannerRunResponse(BaseModel):

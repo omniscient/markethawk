@@ -456,7 +456,10 @@ class StockDataService:
             )
 
         except Exception as e:
-            logging.error(f"Error fetching aggregates for {ticker}: {e}")
+            logging.exception(
+                f"❌ Provider fetch FAILED for {ticker} {timespan}×{multiplier} "
+                f"({from_date} → {to_date}) via {provider}: {e}"
+            )
             return []
 
     @staticmethod

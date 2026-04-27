@@ -263,9 +263,12 @@ def sync_stock_aggregates(
     """
     db: Session = SessionLocal()
     try:
-        logger.info(f"📊 Syncing aggregates for {ticker} ({from_date} to {to_date})")
-        
-        # 1. Fetch data
+        logger.info(
+            f"📊 Syncing aggregates for {ticker} {timespan}×{multiplier} "
+            f"({from_date} to {to_date})"
+        )
+
+        # 1. Fetch data (paginate so >50k bars over a long range aren't truncated)
         aggs = StockDataService.get_aggregates(
             ticker=ticker,
             multiplier=multiplier,
@@ -274,22 +277,30 @@ def sync_stock_aggregates(
             to_date=to_date,
             adjusted=adjusted,
             sort=sort,
-            limit=limit
+            limit=limit,
+            paginate=True,
         )
-        
+
         if not aggs:
-            logger.info(f"No aggregates found for {ticker}")
+            logger.info(
+                f"📭 Polygon returned no bars for {ticker} "
+                f"{timespan}×{multiplier} ({from_date} to {to_date})"
+            )
             return
-            
-        # 2. Delete existing data for this range to avoid duplicates
+
+        # 2. Delete existing data for the SAME timespan/multiplier and date range to
+        #    avoid duplicates. Filtering by timespan/multiplier is critical: a day-bar
+        #    sync must not wipe minute-bar rows in the same date range, and vice versa.
         start_dt = datetime.strptime(from_date, "%Y-%m-%d")
         end_dt = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
-        
+
         db.query(StockAggregate).filter(
             StockAggregate.ticker == ticker,
+            StockAggregate.timespan == timespan,
+            StockAggregate.multiplier == multiplier,
             StockAggregate.timestamp >= start_dt,
             StockAggregate.timestamp < end_dt
-        ).delete()
+        ).delete(synchronize_session=False)
         
         # 3. Insert new data
         from app.utils.session import classify_session

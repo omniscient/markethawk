@@ -36,7 +36,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "volume_ratio_min": 4.0,           # criterion 1: session vol / 20d avg session vol
     "volume_pct_of_daily_min": 0.30,   # criterion 2: session vol / 20d avg total daily vol
     "spike_pct_min": 0.10,             # criterion 3: (session_high / reference_close) - 1
-    "regular_vol_ratio_max": 1.20,     # criterion 4: regular vol / 20d avg regular vol
+    # criterion 4: regular vol / 20d avg regular vol. Effectively disabled (1000.0) —
+    # criterion 5 (regular range ratio) is the meaningful "orderly regular session"
+    # filter. Tracking high regular volume actively excludes the canonical liquidity
+    # hunt pattern where retail piles in after a pre-market spike but price stays
+    # range-bound. Kept in the indicators dict for inspection.
+    "regular_vol_ratio_max": 1000.0,
     "regular_range_ratio_max": 1.50,   # criterion 5: today range% / 20d avg range%
     "session_volume_floor": 50_000,    # criterion 6: absolute minimum shares
 }

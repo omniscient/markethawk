@@ -32,6 +32,25 @@ from app.services.liquidity_hunt import run_liquidity_hunt_scan
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
 
 
+async def _run_scan_over_range(scan_fn, tickers, db, start_date, end_date):
+    """
+    Drive a single-date scanner (pre_market_volume / oversold_bounce) across a
+    date range. When both bounds are None the scanner is invoked with its own
+    default (today), preserving prior behaviour. Weekends are skipped.
+    """
+    if start_date is None and end_date is None:
+        return await scan_fn(tickers, db)
+
+    from datetime import timedelta as _td
+    results = []
+    day = start_date
+    while day <= end_date:
+        if day.weekday() < 5:  # Mon-Fri
+            results.extend(await scan_fn(tickers, db, event_date=day))
+        day += _td(days=1)
+    return results
+
+
 @router.post("/run", response_model=ScannerRunResponse)
 async def run_scanner(
     request: ScannerRunRequest,
@@ -73,15 +92,33 @@ async def run_scanner(
             status_code=400, detail="No tickers provided or found in universe"
         )
 
+    # Resolve date range. If neither bound is given, scanners fall back to "today"
+    # (preserving prior behaviour for the daily cron). If only one bound is given,
+    # treat the run as a single day.
+    start_date = request.start_date
+    end_date = request.end_date
+    if start_date is not None and end_date is None:
+        end_date = start_date
+    elif end_date is not None and start_date is None:
+        start_date = end_date
+
     # Run scanner
     try:
         if request.scanner_type in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
-            results = await run_liquidity_hunt_scan(tickers, db)
+            results = await run_liquidity_hunt_scan(
+                tickers, db, start_date=start_date, end_date=end_date
+            )
         elif request.scanner_type == "oversold_bounce":
-            results = await ScannerService.run_oversold_bounce_scan(tickers, db)
+            results = await _run_scan_over_range(
+                ScannerService.run_oversold_bounce_scan, tickers, db,
+                start_date, end_date,
+            )
         else:
-            results = await ScannerService.run_pre_market_scan(tickers, db)
-        
+            results = await _run_scan_over_range(
+                ScannerService.run_pre_market_scan, tickers, db,
+                start_date, end_date,
+            )
+
         status = "completed"
         error_msg = None
     except Exception as e:

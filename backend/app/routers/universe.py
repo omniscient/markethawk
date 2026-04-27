@@ -808,7 +808,40 @@ def sync_universe_aggregates(
 
     import json
     import redis as redis_lib
+    from celery.result import AsyncResult
+    from app.core.celery_app import celery_app
     from app.core.config import settings
+
+    # Dedup: if a sync for this universe is already running, refuse the new one
+    # rather than racing two writers (which under bug #1's old delete logic was
+    # actively destructive across timespans).
+    r = redis_lib.from_url(settings.REDIS_URL)
+    existing = r.get(f"universe:{universe_id}:sync")
+    if existing:
+        try:
+            data = json.loads(existing)
+            states = [
+                AsyncResult(tid, app=celery_app).state
+                for tid in data.get("task_ids", [])
+            ]
+            pending = sum(1 for s in states if s in ("PENDING", "STARTED", "RETRY"))
+            if pending > 0:
+                return {
+                    "status": "rejected",
+                    "message": (
+                        f"Sync already in progress for universe {universe_id} "
+                        f"({pending} tasks pending, started {data.get('started_at')}, "
+                        f"timespan={data.get('timespan')}). "
+                        f"Wait for it to finish or call /sync/stop first."
+                    ),
+                    "pending": pending,
+                    "started_at": data.get("started_at"),
+                    "timespan": data.get("timespan"),
+                }
+            # No pending work — clear the stale key and proceed
+            r.delete(f"universe:{universe_id}:sync")
+        except (ValueError, json.JSONDecodeError):
+            r.delete(f"universe:{universe_id}:sync")  # corrupt key, drop it
 
     stock_count = 0
     futures_count = 0
@@ -860,7 +893,6 @@ def sync_universe_aggregates(
 
     # Store task IDs in Redis so the frontend can poll sync progress
     try:
-        r = redis_lib.from_url(settings.REDIS_URL)
         r.setex(
             f"universe:{universe_id}:sync",
             14400,  # 4-hour TTL
