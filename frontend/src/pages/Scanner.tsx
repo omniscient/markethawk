@@ -31,6 +31,23 @@ import {
 } from '../api/scanner';
 
 const ACTIVE_SCAN_LS_KEY = 'markethawk.activeScan';
+const SELECTION_LS_KEY = 'markethawk.scanner.selection';
+
+interface PersistedSelection {
+  scanner_type?: string;
+  universe_id?: number | null;
+}
+
+const loadPersistedSelection = (): PersistedSelection => {
+  try {
+    const raw = localStorage.getItem(SELECTION_LS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
 
 interface ActiveScanRef {
   scan_id: string;
@@ -78,8 +95,13 @@ const todayIso = (): string => new Date().toISOString().slice(0, 10);
 
 const Scanner: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
-  const [selectedConfig, setSelectedConfig] = useState<string>('pre_market_volume_spike');
-  const [selectedUniverse, setSelectedUniverse] = useState<number | null>(null);
+  const persisted = useRef<PersistedSelection>(loadPersistedSelection()).current;
+  const [selectedConfig, setSelectedConfig] = useState<string>(
+    persisted.scanner_type || 'pre_market_volume_spike',
+  );
+  const [selectedUniverse, setSelectedUniverse] = useState<number | null>(
+    typeof persisted.universe_id === 'number' ? persisted.universe_id : null,
+  );
   const [scanStartDate, setScanStartDate] = useState<string>(lastCompletedWeekday());
   const [scanEndDate, setScanEndDate] = useState<string>(lastCompletedWeekday());
   const [scanResults, setScanResults] = useState<any>(null);
@@ -343,6 +365,16 @@ const Scanner: React.FC = () => {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Remember the user's last universe + scanner type across page navigations.
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SELECTION_LS_KEY,
+        JSON.stringify({ scanner_type: selectedConfig, universe_id: selectedUniverse }),
+      );
+    } catch { /* ignore quota errors */ }
+  }, [selectedConfig, selectedUniverse]);
 
   // Tear down WS on unmount.
   useEffect(() => {
