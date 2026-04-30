@@ -47,6 +47,9 @@ logs/
 frontend/build.log
 backend/celerybeat-schedule
 
+# Git worktrees
+.worktrees/
+
 # Local artifacts (log dumps, scratch DBs)
 *.db
 *-logs.txt
