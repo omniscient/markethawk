@@ -107,17 +107,22 @@ nodes:
         -f dark-factory/docker-compose.preview.yml \
         exec -T backend python -m alembic upgrade head
 
+      PREVIEW_NET="mh-preview-${ISSUE}_preview-network"
+      docker network connect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
+
       echo "Waiting for backend health..."
       for i in $(seq 1 60); do
-        if curl -sf "http://localhost:1${PADDED}80/api/health" > /dev/null 2>&1; then
+        if docker compose -p "mh-preview-${ISSUE}" -f dark-factory/docker-compose.preview.yml exec -T backend python -c 'import urllib.request; urllib.request.urlopen("http://localhost:8000/api/health")' 2>/dev/null; then
           echo "Backend healthy!"
           echo "PREVIEW_FRONTEND=http://localhost:1${PADDED}33"
           echo "PREVIEW_BACKEND=http://localhost:1${PADDED}80"
+          docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
           exit 0
         fi
         sleep 3
       done
       echo "WARNING: Backend did not become healthy within 180s"
+      docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
       exit 1
     depends_on: [implement]
     when: "$parse-intent.output.intent != 'close'"
