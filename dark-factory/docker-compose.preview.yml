@@ -1,0 +1,97 @@
+# Preview environment for MarketHawk feature branches.
+# Invoked as: ISSUE_NUM=3 docker compose -p mh-preview-3 -f dark-factory/docker-compose.preview.yml up -d --build
+#
+# Port scheme: 1{ISSUE_NUM_PADDED}XX where XX is the service suffix.
+# Example for issue #3:  frontend=10333, backend=10380, postgres=10354, redis=10363
+# Example for issue #12: frontend=11233, backend=11280, postgres=11254, redis=11263
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: stockscanner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: preview_password
+    ports:
+      - "1${ISSUE_NUM_PADDED:-00}54:5432"
+    volumes:
+      - preview_postgres_data:/var/lib/postgresql/data
+    networks:
+      - preview-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "1${ISSUE_NUM_PADDED:-00}63:6379"
+    networks:
+      - preview-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:preview_password@postgres:5432/stockscanner
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+    ports:
+      - "1${ISSUE_NUM_PADDED:-00}80:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - preview-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_TARGET: http://backend:8000
+    ports:
+      - "1${ISSUE_NUM_PADDED:-00}33:3333"
+    networks:
+      - preview-network
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: celery -A app.core.celery_app:celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://postgres:preview_password@postgres:5432/stockscanner
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - preview-network
+    restart: unless-stopped
+
+volumes:
+  preview_postgres_data:
+
+networks:
+  preview-network:
+    driver: bridge
