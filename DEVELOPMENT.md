@@ -5,7 +5,11 @@
 - Docker Desktop (includes Docker Compose)
 - Git Bash or WSL for shell commands
 - A [Polygon.io](https://polygon.io) API key
+- [GitHub CLI](https://cli.github.com/) (`gh`) — required for Archon workflows to create issues, PRs, and post reviews
+- [Bun](https://bun.sh/) — required for Archon CLI
 - (Optional) Interactive Brokers credentials for live broker data
+
+> **AI-assisted development:** This repo uses superpowers (Claude Code plugin) and Archon (autonomous workflow engine) for structured development. See the "AI-Assisted Development" and "Setup for AI Development" sections in [CLAUDE.md](CLAUDE.md) for full setup instructions.
 
 ## First-Time Setup
 

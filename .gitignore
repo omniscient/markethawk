@@ -50,6 +50,10 @@ backend/celerybeat-schedule
 # Git worktrees
 .worktrees/
 
+# Archon runtime artifacts
+.archon/state/
+.archon/.env
+
 # Local artifacts (log dumps, scratch DBs)
 *.db
 *-logs.txt
