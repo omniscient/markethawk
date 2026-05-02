@@ -276,38 +276,17 @@ services:
     networks:
       - stockscanner-network
 
-  # Docker Socket Proxy — restricted API access for dark-factory
-  docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy
-    container_name: markethawk-socket-proxy
-    environment:
-      CONTAINERS: 1
-      IMAGES: 1
-      NETWORKS: 1
-      VOLUMES: 1
-      SERVICES: 0
-      EXEC: 0
-      POST: 1
-      BUILD: 1
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - factory-network
-    restart: unless-stopped
-
   # Dark Factory — autonomous development agent (run on demand)
   dark-factory:
     build:
       context: ./dark-factory
       dockerfile: Dockerfile
     container_name: markethawk-dark-factory
-    environment:
-      DOCKER_HOST: tcp://docker-socket-proxy:2375
     env_file:
       - path: .archon/.env
         required: true
-    depends_on:
-      - docker-socket-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - factory-network
     profiles:
