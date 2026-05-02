@@ -96,7 +96,23 @@ nodes:
         -f dark-factory/docker-compose.preview.yml \
         up -d --build
 
+      echo "Initializing database schema..."
+      docker compose -p "mh-preview-${ISSUE}" \
+        -f dark-factory/docker-compose.preview.yml \
+        exec -T backend python -c "
+from app.core.database import Base, engine
+from app.models import *
+from sqlalchemy import inspect
+if not inspect(engine).get_table_names():
+    Base.metadata.create_all(bind=engine)
+    print('Tables created from models')
+else:
+    print('Tables already exist')
+"
       echo "Running alembic migrations..."
+      docker compose -p "mh-preview-${ISSUE}" \
+        -f dark-factory/docker-compose.preview.yml \
+        exec -T backend python -m alembic stamp head
       docker compose -p "mh-preview-${ISSUE}" \
         -f dark-factory/docker-compose.preview.yml \
         exec -T backend python -m alembic upgrade head
