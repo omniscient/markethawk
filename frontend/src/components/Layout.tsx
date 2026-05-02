@@ -12,6 +12,7 @@ import {
   BookOpen,
   Eye,
   Bot,
+  Trophy,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getSystemStatus, MarketStatus } from '../api/system';
@@ -80,6 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Scanner', href: '/scanner', icon: ScanLine },
     { name: 'Pre-market Movers', href: '/movers/pre-market', icon: TrendingUp },
     { name: 'Edge Explorer', href: '/edge-explorer', icon: BarChart3 },
+    { name: 'Scorecard', href: '/scorecard', icon: Trophy },
     { name: 'Universes', href: '/universes', icon: Database },
     { name: 'Watchlist', href: '/watchlist', icon: Eye },
     { name: 'Journal', href: '/journal', icon: BookOpen },
@@ -89,7 +91,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
 
   const isActive = (path: string) => {
-    return location.pathname === path;
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
   };
 
   return (

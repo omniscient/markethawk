@@ -20,6 +20,13 @@ export interface StockDetailConsolidated {
   };
   latest_price: number | null;
   last_updated: string;
+  recent_splits?: {
+    execution_date: string;
+    split_from: number;
+    split_to: number;
+    adjusted: boolean;
+  }[];
+  split_adjustment_pending?: boolean;
 }
 
 // ---- API calls ------------------------------------------------------------ //

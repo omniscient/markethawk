@@ -27,6 +27,8 @@ from app.models.push_subscription import PushSubscription
 from app.models.active_watchlist import ActiveWatchlist
 from app.models.trading_strategy import TradingStrategy
 from app.models.auto_trade_order import AutoTradeOrder
+from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
+from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 
 __all__ = [
     "StockUniverse",
@@ -56,4 +58,6 @@ __all__ = [
     "ActiveWatchlist",
     "TradingStrategy",
     "AutoTradeOrder",
+    "ScannerOutcomeSnapshot",
+    "ScannerOutcomeSummary",
 ]

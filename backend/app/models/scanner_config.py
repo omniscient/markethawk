@@ -4,6 +4,7 @@ ScannerConfig SQLAlchemy model.
 
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text, Uuid as UUID
+from sqlalchemy.dialects.postgresql import JSONB
 import uuid
 
 from app.core.database import Base
@@ -25,5 +26,8 @@ class ScannerConfig(Base):
     run_frequency = Column(String(20))
     last_run = Column(DateTime)
     next_run = Column(DateTime)
+    outcome_config = Column(JSONB, nullable=True)
+    data_requirements = Column(JSONB, nullable=True)
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

@@ -728,14 +728,21 @@ def sync_stock_splits(self):
                     ticker=ticker,
                     execution_date=execution_date,
                     split_from=split_from,
-                    split_to=split_to
+                    split_to=split_to,
+                    source="polygon",
                 )
                 db.add(split)
                 count += 1
-                
+
         db.commit()
         if count > 0:
             logger.info(f"✅ Synced {count} new stock splits.")
+
+        from app.services.split_adjustment import SplitAdjustmentService
+        adj_results = SplitAdjustmentService.apply_all_pending(db)
+        applied = [r for r in adj_results if not r.get("skipped")]
+        if applied:
+            logger.info(f"✅ Applied split adjustments for {len(applied)} splits.")
             
     except Exception as e:
         logger.error(f"Error syncing stock splits: {e}")

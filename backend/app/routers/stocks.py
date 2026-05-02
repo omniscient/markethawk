@@ -243,12 +243,35 @@ def get_stock_detail_consolidated(
         if minute_aggs:
             latest_price = minute_aggs[-1]["close"]
 
+        from app.models.stock_split import StockSplit
+        recent_splits_query = (
+            db.query(StockSplit)
+            .filter(StockSplit.ticker == ticker)
+            .order_by(StockSplit.execution_date.desc())
+            .limit(5)
+            .all()
+        )
+        recent_splits = [
+            {
+                "execution_date": s.execution_date.isoformat(),
+                "split_from": float(s.split_from),
+                "split_to": float(s.split_to),
+                "adjusted": s.adjustments_applied_at is not None,
+            }
+            for s in recent_splits_query
+        ]
+        split_adjustment_pending = any(
+            s.adjustments_applied_at is None for s in recent_splits_query
+        )
+
         result = {
             "ticker": ticker,
             "info": info,
             "pre_market": pre_market,
             "latest_price": latest_price,
-            "last_updated": datetime.now(timezone.utc).isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "recent_splits": recent_splits,
+            "split_adjustment_pending": split_adjustment_pending,
         }
         try:
             if _redis:

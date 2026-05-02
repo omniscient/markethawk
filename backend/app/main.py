@@ -17,7 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.core.error_tracking import ErrorTrackerFactory
-from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router, futures_router, alerts_router, watchlist_router, auto_trading_router
+from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router, futures_router, alerts_router, watchlist_router, auto_trading_router, outcomes_router
 from app.core.celery_app import celery_app as celery
 from app.services.websocket_manager import websocket_manager
 
@@ -180,6 +180,7 @@ def create_app() -> FastAPI:
     app.include_router(alerts_router)
     app.include_router(watchlist_router)
     app.include_router(auto_trading_router)
+    app.include_router(outcomes_router)
 
     # Log a clear warning at startup whenever trace-exposure mode is enabled
     _expose_traces = settings.ENVIRONMENT.lower() in ("development", "debug")

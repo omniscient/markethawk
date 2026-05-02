@@ -318,6 +318,9 @@ const StockDetailPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['historicalData', symbol, p, timespan] });
   };
 
+  const recentSplits = details.recent_splits || [];
+  const splitPending = details.split_adjustment_pending === true;
+
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Breadcrumbs & Header */}
@@ -365,6 +368,38 @@ const StockDetailPage: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Split Warning Banner */}
+      {recentSplits.length > 0 && (
+        <div className={`flex items-start gap-3 p-4 rounded-lg border ${
+          splitPending
+            ? 'bg-amber-500/10 border-amber-500/30'
+            : 'bg-blue-500/10 border-blue-500/30'
+        }`}>
+          <Info className={`h-5 w-5 mt-0.5 flex-shrink-0 ${splitPending ? 'text-amber-400' : 'text-blue-400'}`} />
+          <div className="text-sm">
+            <p className={`font-semibold ${splitPending ? 'text-amber-300' : 'text-blue-300'}`}>
+              {splitPending ? 'Split Adjustment Pending' : 'Recent Stock Split'}
+            </p>
+            <p className="text-gray-400 mt-1">
+              {recentSplits.map((s: any) => (
+                <span key={s.execution_date} className="mr-4">
+                  {s.split_to}:{s.split_from} split on {format(new Date(s.execution_date + 'T00:00:00'), 'MMM d, yyyy')}
+                  {s.adjusted
+                    ? <span className="text-positive ml-1">(adjusted)</span>
+                    : <span className="text-amber-400 ml-1">(pending adjustment)</span>
+                  }
+                </span>
+              ))}
+            </p>
+            {splitPending && (
+              <p className="text-amber-400/80 text-xs mt-1">
+                Scanner event prices may be inconsistent until the split adjustment runs.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -16,6 +16,8 @@ import EdgeExplorer from './pages/EdgeExplorer';
 import PreMarketMovers from './pages/PreMarketMovers';
 import ActiveWatchlist from './pages/ActiveWatchlist';
 import AutoTrading from './pages/AutoTrading';
+import ScorecardOverview from './pages/ScorecardOverview';
+import ScorecardDetail from './pages/ScorecardDetail';
 import { GlobalErrorToast } from './components/ui/GlobalErrorToast';
 
 // Create a client
@@ -42,6 +44,8 @@ function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/journal" element={<Journal />} />
               <Route path="/edge-explorer" element={<EdgeExplorer />} />
+              <Route path="/scorecard" element={<ScorecardOverview />} />
+              <Route path="/scorecard/:scannerType" element={<ScorecardDetail />} />
               <Route path="/movers/pre-market" element={<PreMarketMovers />} />
               <Route path="/watchlist" element={<ActiveWatchlist />} />
               <Route path="/trading" element={<AutoTrading />} />

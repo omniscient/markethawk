@@ -199,6 +199,19 @@ def update_config(payload: Dict[str, Any], db: Session = Depends(get_db)):
     return {row.key: row.value for row in rows}
 
 
+@router.post("/apply-split-adjustments")
+def apply_split_adjustments(db: Session = Depends(get_db)):
+    """Manually trigger split adjustments for all pending splits."""
+    from app.services.split_adjustment import SplitAdjustmentService
+    results = SplitAdjustmentService.apply_all_pending(db)
+    applied = [r for r in results if not r.get("skipped")]
+    return {
+        "total_checked": len(results),
+        "applied": len(applied),
+        "details": applied,
+    }
+
+
 @router.websocket("/ws/tasks")
 async def system_tasks_websocket(websocket: WebSocket):
     """
