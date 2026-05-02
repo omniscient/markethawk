@@ -67,9 +67,10 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
 # Workspace directory
 RUN mkdir -p /workspace && chown factory:factory /workspace
 
-# Copy entrypoint and preview template
+# Copy entrypoint, preview template, and seed data
 COPY --chown=factory:factory entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY --chown=factory:factory docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
+COPY --chown=factory:factory seed_preview.sql /opt/dark-factory/seed_preview.sql
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Move bun to factory user

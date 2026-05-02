@@ -40,9 +40,10 @@ fi
 git clone "$REPO_URL" "$CLONE_DIR"
 cd "$CLONE_DIR"
 
-# --- Copy preview template into clone ---
+# --- Copy preview template and seed data into clone ---
 mkdir -p "$CLONE_DIR/dark-factory"
 cp /opt/dark-factory/docker-compose.preview.yml "$CLONE_DIR/dark-factory/docker-compose.preview.yml"
+cp /opt/dark-factory/seed_preview.sql "$CLONE_DIR/dark-factory/seed_preview.sql"
 
 # --- Install backend/frontend deps for local testing ---
 echo "Installing backend dependencies..."
