@@ -1,0 +1,160 @@
+name: archon-dark-factory
+description: |
+  Use when: Running inside the dark-factory Docker container to implement a GitHub issue.
+  Triggers: "Fix issue", "Continue issue", "Close issue".
+  Does: Parses intent -> fetches issue context -> branches -> implements with TDD ->
+        spins up preview stack -> validates against preview -> pushes and creates PR.
+  NOT for: Running outside the dark-factory container.
+
+provider: claude
+model: sonnet
+
+worktree:
+  enabled: false
+
+nodes:
+  # Layer 0: Parse the command and fetch issue context
+  - id: parse-intent
+    prompt: |
+      Parse this command and extract two things:
+      1. The GitHub issue number
+      2. The intent: "new" (first time working on this issue), "continue" (iterate on existing work), or "close" (merge and tear down)
+
+      Command: $ARGUMENTS
+
+      Output ONLY valid JSON, nothing else:
+      {"issue_number": <int>, "intent": "<new|continue|close>"}
+    allowed_tools: []
+    model: haiku
+    output_format:
+      type: object
+      properties:
+        issue_number:
+          type: integer
+        intent:
+          type: string
+          enum: [new, continue, close]
+      required: [issue_number, intent]
+
+  - id: fetch-issue
+    bash: |
+      gh issue view $parse-intent.output.issue_number --json title,body,labels,comments
+    depends_on: [parse-intent]
+    timeout: 15000
+
+  # Layer 1: Route based on intent
+  - id: close-preview
+    bash: |
+      ISSUE=$parse-intent.output.issue_number
+      PADDED=$(printf "%02d" "$ISSUE")
+      echo "Tearing down mh-preview-${ISSUE}..."
+      docker compose -p "mh-preview-${ISSUE}" down -v 2>/dev/null || echo "No preview stack found"
+      PR_NUM=$(gh pr list --head "feat/issue-${ISSUE}" --json number --jq '.[0].number // empty')
+      if [ -n "$PR_NUM" ]; then
+        gh pr merge "$PR_NUM" --merge --delete-branch || echo "PR not mergeable (check approval status)"
+      fi
+      gh issue comment "$ISSUE" --body "Dark factory: preview torn down, PR merged (if approved). Issue work complete."
+      echo "CLOSED"
+    depends_on: [parse-intent, fetch-issue]
+    when: "$parse-intent.output.intent == 'close'"
+    timeout: 30000
+
+  - id: setup-branch
+    bash: |
+      ISSUE=$parse-intent.output.issue_number
+      INTENT=$parse-intent.output.intent
+      SLUG=$(echo $fetch-issue.output | jq -r '.title // "feature"' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
+      BRANCH="feat/issue-${ISSUE}-${SLUG}"
+
+      if [ "$INTENT" = "continue" ]; then
+        git fetch origin "$BRANCH" 2>/dev/null && git checkout "$BRANCH" || git checkout -b "$BRANCH"
+      else
+        git checkout -b "$BRANCH"
+      fi
+      echo "$BRANCH"
+    depends_on: [parse-intent, fetch-issue]
+    when: "$parse-intent.output.intent != 'close'"
+    timeout: 15000
+
+  # Layer 2: Implement the feature
+  - id: implement
+    command: dark-factory-implement
+    depends_on: [setup-branch, fetch-issue]
+    when: "$parse-intent.output.intent != 'close'"
+    idle_timeout: 600000
+
+  # Layer 3: Spin up preview and validate
+  - id: preview-up
+    bash: |
+      ISSUE=$parse-intent.output.issue_number
+      PADDED=$(printf "%02d" "$ISSUE")
+      export ISSUE_NUM_PADDED="$PADDED"
+      export POLYGON_API_KEY="${POLYGON_API_KEY:-}"
+
+      echo "Starting preview stack mh-preview-${ISSUE} (ports: 1${PADDED}33, 1${PADDED}80)..."
+      docker compose -p "mh-preview-${ISSUE}" \
+        -f dark-factory/docker-compose.preview.yml \
+        up -d --build
+
+      echo "Waiting for backend health..."
+      for i in $(seq 1 60); do
+        if curl -sf "http://localhost:1${PADDED}80/api/health" > /dev/null 2>&1; then
+          echo "Backend healthy!"
+          echo "PREVIEW_FRONTEND=http://localhost:1${PADDED}33"
+          echo "PREVIEW_BACKEND=http://localhost:1${PADDED}80"
+          exit 0
+        fi
+        sleep 3
+      done
+      echo "WARNING: Backend did not become healthy within 180s"
+      exit 1
+    depends_on: [implement]
+    when: "$parse-intent.output.intent != 'close'"
+    timeout: 300000
+
+  - id: validate
+    command: dark-factory-validate
+    depends_on: [preview-up]
+    when: "$parse-intent.output.intent != 'close'"
+    idle_timeout: 300000
+
+  # Layer 4: Push and create PR
+  - id: push-and-pr
+    bash: |
+      ISSUE=$parse-intent.output.issue_number
+      PADDED=$(printf "%02d" "$ISSUE")
+      BRANCH=$(git branch --show-current)
+
+      git push -u origin "$BRANCH"
+
+      EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number // empty')
+      if [ -n "$EXISTING_PR" ]; then
+        echo "PR #${EXISTING_PR} already exists, updated with latest push."
+        echo "$EXISTING_PR"
+      else
+        PR_URL=$(gh pr create \
+          --title "$(gh issue view $ISSUE --json title --jq '.title')" \
+          --body "## Summary
+      Automated implementation for issue #${ISSUE}.
+
+      ## Preview
+      - Frontend: http://localhost:1${PADDED}33
+      - Backend API: http://localhost:1${PADDED}80/docs
+
+      ## Commands
+      \`\`\`bash
+      # Iterate after feedback
+      docker compose --profile factory run --rm dark-factory \"Continue issue #${ISSUE}\"
+
+      # Tear down preview when done
+      docker compose --profile factory run --rm dark-factory \"Close issue #${ISSUE}\"
+      \`\`\`
+
+      ---
+      *Generated by MarketHawk Dark Factory*" \
+          --draft)
+        echo "Created PR: $PR_URL"
+      fi
+    depends_on: [validate]
+    when: "$parse-intent.output.intent != 'close'"
+    timeout: 30000
