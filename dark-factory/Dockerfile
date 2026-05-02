@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -22,7 +22,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Python 3.12
+# Python 3.12 (ships with Ubuntu 24.04)
 RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
@@ -46,7 +46,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
 # Docker CLI (client only — no daemon)
 RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu jammy stable" \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu noble stable" \
     | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && apt-get install -y docker-ce-cli docker-compose-plugin && \
     rm -rf /var/lib/apt/lists/*
@@ -59,8 +59,9 @@ RUN git clone https://github.com/coleam00/Archon.git /opt/archon && \
     cd /opt/archon && bun install && \
     cd /opt/archon/packages/cli && bun link
 
-# Non-root user
-RUN groupadd -g 1000 factory && \
+# Non-root user (Ubuntu 24.04 ships with ubuntu:1000 — remove it first)
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    groupadd -f -g 1000 factory && \
     useradd -m -u 1000 -g factory factory
 
 # Workspace directory
