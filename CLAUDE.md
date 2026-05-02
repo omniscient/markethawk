@@ -199,6 +199,48 @@ docker-compose ps                                                 # All containe
 
 You're ready. Pick an issue from the [backlog](https://github.com/omniscient/markethawk/issues) and start building.
 
+## Dark Factory (Autonomous Docker Development)
+
+An isolated Docker container that autonomously develops features from GitHub issues. Runs Claude Code inside a sandboxed environment with no host access.
+
+### Quick Start
+
+```bash
+# Build the dark factory image (first time only)
+docker compose --profile factory build dark-factory
+
+# Start a new feature from a GitHub issue
+docker compose --profile factory run --rm dark-factory "Fix issue #3"
+
+# Iterate after reviewing the preview and leaving feedback
+docker compose --profile factory run --rm dark-factory "Continue issue #3"
+
+# Tear down preview and merge when satisfied
+docker compose --profile factory run --rm dark-factory "Close issue #3"
+```
+
+### Prerequisites
+
+Add to `.archon/.env` (not `.env` — keep AI credentials separate):
+```
+ANTHROPIC_API_KEY=sk-ant-...
+GH_TOKEN=ghp_...
+```
+
+The `GH_TOKEN` should be a fine-grained PAT scoped to `omniscient/markethawk` with `repo` permissions.
+
+### Preview Environments
+
+Each issue gets its own preview stack on deterministic ports:
+- Frontend: `http://localhost:1{NN}33` (e.g. `:10333` for issue #3)
+- Backend: `http://localhost:1{NN}80` (e.g. `:10380` for issue #3)
+
+Preview URLs are included in the PR body. The preview persists after the factory exits so you can browse and test.
+
+### Architecture
+
+See [dark factory design spec](docs/superpowers/specs/2026-05-02-dark-factory-design.md) for the full architecture, security model, and container topology.
+
 ## Development Rules
 
 ### Validating Changes Before Committing
