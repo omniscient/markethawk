@@ -29,7 +29,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && ln -sf /usr/bin/python3.12 /usr/bin/python \
     && ln -sf /usr/bin/python3.12 /usr/bin/python3 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /usr/lib/python*/EXTERNALLY-MANAGED
 
 # Bun
 RUN curl -fsSL https://bun.sh/install | bash

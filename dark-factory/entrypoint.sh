@@ -19,9 +19,8 @@ done
 git config --global user.name "$FACTORY_NAME"
 git config --global user.email "$FACTORY_EMAIL"
 
-# --- GitHub CLI auth ---
-echo "$GH_TOKEN" | gh auth login --with-token 2>/dev/null
-echo "Authenticated as: $(gh auth status 2>&1 | grep 'Logged in' || echo 'unknown')"
+# --- GitHub CLI auth (GH_TOKEN env var is auto-detected by gh) ---
+echo "GitHub auth: $(gh auth status 2>&1 | head -2 | tail -1 || echo 'using GH_TOKEN env var')"
 
 # --- Parse arguments ---
 ARGUMENTS="${*}"
