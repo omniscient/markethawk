@@ -60,26 +60,15 @@ RUN git clone https://github.com/coleam00/Archon.git /opt/archon && \
     cd /opt/archon && bun install && \
     cd /opt/archon/packages/cli && bun link
 
-# Non-root user (Ubuntu 24.04 ships with ubuntu:1000 — remove it first)
-RUN userdel -r ubuntu 2>/dev/null || true && \
-    groupadd -f -g 1000 factory && \
-    useradd -m -u 1000 -g factory factory
-
 # Workspace directory
-RUN mkdir -p /workspace && chown factory:factory /workspace
+RUN mkdir -p /workspace
 
 # Copy entrypoint, preview template, and seed data
-COPY --chown=factory:factory entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY --chown=factory:factory docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
-COPY --chown=factory:factory seed_preview.sql /opt/dark-factory/seed_preview.sql
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
+COPY seed_preview.sql /opt/dark-factory/seed_preview.sql
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Move bun to factory user
-RUN cp -r /root/.bun /home/factory/.bun && \
-    chown -R factory:factory /home/factory/.bun
-ENV PATH="/home/factory/.bun/bin:/usr/local/bin:${PATH}"
-
-USER factory
 WORKDIR /workspace
 
 ENTRYPOINT ["entrypoint.sh"]
