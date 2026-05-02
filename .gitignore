@@ -54,6 +54,9 @@ backend/celerybeat-schedule
 .archon/state/
 .archon/.env
 
+# Dark factory runtime
+dark-factory/tmp/
+
 # Local artifacts (log dumps, scratch DBs)
 *.db
 *-logs.txt
