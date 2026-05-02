@@ -96,6 +96,11 @@ nodes:
         -f dark-factory/docker-compose.preview.yml \
         up -d --build
 
+      echo "Running alembic migrations..."
+      docker compose -p "mh-preview-${ISSUE}" \
+        -f dark-factory/docker-compose.preview.yml \
+        exec -T backend python -m alembic upgrade head
+
       echo "Waiting for backend health..."
       for i in $(seq 1 60); do
         if curl -sf "http://localhost:1${PADDED}80/api/health" > /dev/null 2>&1; then
