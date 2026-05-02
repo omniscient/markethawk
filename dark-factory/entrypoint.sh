@@ -53,6 +53,7 @@ cd "$CLONE_DIR"
 
 # --- Run via Archon workflow ---
 export CLAUDE_BIN_PATH=/usr/bin/claude
+export IS_SANDBOX=1
 export ARCHON_SUPPRESS_NESTED_CLAUDE_WARNING=1
 echo "Starting dark factory: $ARGUMENTS"
 archon workflow run archon-dark-factory "$ARGUMENTS"
