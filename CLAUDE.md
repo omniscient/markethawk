@@ -135,6 +135,7 @@ Key variables: `POLYGON_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `SECRET_K
 ## Further Reading
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — service topology, scan execution flow, module map, Celery tasks
+- [Docs/database-schema.md](Docs/database-schema.md) — auto-generated database schema ERD and indices
 - [DEVELOPMENT.md](DEVELOPMENT.md) — full local setup, Docker commands, Seq/Flower/pgAdmin usage, troubleshooting
 - [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — annotated file tree
 - [ENV_VARIABLES.md](ENV_VARIABLES.md) — all env vars with defaults and descriptions

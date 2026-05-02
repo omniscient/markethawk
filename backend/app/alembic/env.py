@@ -78,6 +78,18 @@ def run_migrations_online() -> None:
         with context.begin_transaction():
             context.run_migrations()
 
+    # Auto-generate schema document after successful migration
+    try:
+        import sys
+        import os
+        scripts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'scripts'))
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import generate_schema_doc
+        generate_schema_doc.main()
+    except Exception as e:
+        print(f"Warning: Failed to generate schema document: {e}")
+
 
 if context.is_offline_mode():
     run_migrations_offline()
