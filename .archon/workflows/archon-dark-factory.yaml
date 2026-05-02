@@ -91,6 +91,7 @@ nodes:
       export ISSUE_NUM_PADDED="$PADDED"
       export POLYGON_API_KEY="${POLYGON_API_KEY:-}"
 
+      PREVIEW_START=$(date +%s)
       echo "Starting preview stack mh-preview-${ISSUE} (ports: 1${PADDED}33, 1${PADDED}80)..."
       docker compose -p "mh-preview-${ISSUE}" \
         -f dark-factory/docker-compose.preview.yml \
@@ -113,9 +114,11 @@ nodes:
       echo "Waiting for backend health..."
       for i in $(seq 1 60); do
         if docker compose -p "mh-preview-${ISSUE}" -f dark-factory/docker-compose.preview.yml exec -T backend python -c 'import urllib.request; urllib.request.urlopen("http://localhost:8000/api/health")' 2>/dev/null; then
+          PREVIEW_SECS=$(( $(date +%s) - PREVIEW_START ))
           echo "Backend healthy!"
           echo "PREVIEW_FRONTEND=http://localhost:1${PADDED}33"
           echo "PREVIEW_BACKEND=http://localhost:1${PADDED}80"
+          echo "PREVIEW_MOUNT_SECS=${PREVIEW_SECS}"
           docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
           exit 0
         fi
@@ -174,3 +177,50 @@ nodes:
     depends_on: [validate]
     when: "$parse-intent.output.intent != 'close'"
     timeout: 30000
+
+  # Layer 5: Post run report to GitHub issue
+  - id: report
+    bash: |
+      ISSUE=$parse-intent.output.issue_number
+      PADDED=$(printf "%02d" "$ISSUE")
+      INTENT=$parse-intent.output.intent
+      BRANCH=$(git branch --show-current)
+
+      PR_NUM=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number // empty')
+      PR_LINE=""
+      [ -n "$PR_NUM" ] && PR_LINE="**PR:** #${PR_NUM}"
+
+      ACTION="New implementation"
+      [ "$INTENT" = "continue" ] && ACTION="Continued iteration"
+
+      gh issue comment "$ISSUE" --body "## Dark Factory Run — ${ACTION}
+
+      ${PR_LINE}
+      **Branch:** \`${BRANCH}\`
+
+      ### Preview Environment
+
+      | Service | URL |
+      |---------|-----|
+      | Frontend | http://localhost:1${PADDED}33 |
+      | Backend API | http://localhost:1${PADDED}80 |
+      | API Docs | http://localhost:1${PADDED}80/docs |
+      | PostgreSQL | \`localhost:1${PADDED}54\` |
+      | Redis | \`localhost:1${PADDED}63\` |
+
+      ### Commands
+      \`\`\`bash
+      # Iterate after review
+      docker compose --profile factory run --rm dark-factory \"Continue issue #${ISSUE}\"
+
+      # Tear down when done
+      docker compose --profile factory run --rm dark-factory \"Close issue #${ISSUE}\"
+      \`\`\`
+
+      ---
+      *Posted by MarketHawk Dark Factory*"
+
+      echo "Report posted to issue #${ISSUE}"
+    depends_on: [push-and-pr]
+    when: "$parse-intent.output.intent != 'close'"
+    timeout: 15000
