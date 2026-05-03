@@ -514,9 +514,11 @@ const Scanner: React.FC = () => {
                 <span className="text-gray-400">Status</span>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${isScanning
                   ? 'bg-blue-500/20 text-blue-400'
-                  : 'bg-green-500/20 text-green-400'
+                  : statusBlock?.next_run
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : 'bg-green-500/20 text-green-400'
                   }`}>
-                  {isScanning ? 'Running' : 'Ready'}
+                  {isScanning ? 'Running' : statusBlock?.next_run ? 'Scheduled' : 'Ready'}
                 </span>
               </div>
 
