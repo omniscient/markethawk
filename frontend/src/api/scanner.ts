@@ -263,6 +263,40 @@ export const runScannerRange = async (
   return response.data;
 };
 
+export interface ScannerLastRunInfo {
+  timestamp: string | null;
+  status: string;
+  events_detected: number;
+  duration_ms: number;
+}
+
+export interface ScannerSparklinePoint {
+  created_at: string | null;
+  events_detected: number;
+  status: string;
+}
+
+export interface ScannerStatusBlock {
+  scanner_type: string;
+  universe_id: number | null;
+  last_run: ScannerLastRunInfo | null;
+  next_run: string | null;
+  total_events: number;
+  success_rate: number | null;
+  avg_events_per_scan: number | null;
+  sparkline: ScannerSparklinePoint[];
+}
+
+export const fetchScanStatusBlock = async (
+  scannerType: string,
+  universeId?: number | null,
+): Promise<ScannerStatusBlock> => {
+  const params: Record<string, unknown> = { scanner_type: scannerType };
+  if (universeId != null) params.universe_id = universeId;
+  const response = await apiClient.get('/scanner/scan-status-block', { params });
+  return response.data;
+};
+
 export const fetchScannerConfigs = async (): Promise<ScannerConfig[]> => {
   const response = await apiClient.get('/scanner/configs');
   return response.data;

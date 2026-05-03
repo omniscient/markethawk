@@ -27,6 +27,7 @@ from app.schemas import (
     PreMarketMoversResponse,
     PreMarketMover,
     ScannerRangeRequest,
+    ScannerStatusBlockResponse,
 )
 from app.services import StockDataService
 
@@ -464,6 +465,110 @@ def get_edge_distribution(
     """Get distribution data for scatter plots."""
     from app.services.stats import StatsService
     return StatsService.get_distribution_data(db, ticker=ticker, scanner_type=scanner_type)
+
+
+def _compute_next_run(scanner_type: str) -> Optional[datetime]:
+    """Return next scheduled fire time for scanner_type, or None if not scheduled."""
+    from datetime import timedelta as _td
+
+    if scanner_type not in {"liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"}:
+        return None
+
+    now = datetime.now(timezone.utc)
+    candidate = now.replace(minute=0, second=0, microsecond=0, hour=2)
+    if candidate <= now:
+        candidate += _td(days=1)
+    while candidate.weekday() >= 5:
+        candidate += _td(days=1)
+    return candidate
+
+
+@router.get("/scan-status-block", response_model=ScannerStatusBlockResponse)
+def get_scan_status_block(
+    scanner_type: str,
+    universe_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    """Rich status data for the Scan Status card."""
+    from sqlalchemy import func
+
+    base_q = db.query(ScannerRun).filter(ScannerRun.scanner_type == scanner_type)
+    if universe_id is not None:
+        base_q = base_q.filter(ScannerRun.universe_id == universe_id)
+
+    last_run_record: Optional[ScannerRun] = (
+        base_q.order_by(ScannerRun.created_at.desc()).first()
+    )
+
+    last_run_info = None
+    if last_run_record is not None:
+        ts = last_run_record.created_at
+        if ts is not None and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        last_run_info = {
+            "timestamp": ts,
+            "status": last_run_record.status,
+            "events_detected": last_run_record.events_detected or 0,
+            "duration_ms": last_run_record.execution_time_ms or 0,
+        }
+
+    recent_20 = (
+        base_q.order_by(ScannerRun.created_at.desc()).limit(20).all()
+    )
+    success_rate: Optional[float] = None
+    avg_events: Optional[float] = None
+    if recent_20:
+        completed = [r for r in recent_20 if r.status == "completed"]
+        success_rate = round(len(completed) / len(recent_20) * 100, 1)
+        if completed:
+            avg_events = round(
+                sum(r.events_detected or 0 for r in completed) / len(completed), 1
+            )
+
+    sparkline_rows = (
+        base_q.order_by(ScannerRun.created_at.desc()).limit(10).all()
+    )
+    sparkline = [
+        {
+            "created_at": (
+                r.created_at.replace(tzinfo=timezone.utc).isoformat()
+                if r.created_at and r.created_at.tzinfo is None
+                else r.created_at.isoformat() if r.created_at else None
+            ),
+            "events_detected": r.events_detected or 0,
+            "status": r.status,
+        }
+        for r in reversed(sparkline_rows)
+    ]
+
+    type_variants = [scanner_type]
+    if scanner_type == "liquidity_hunt":
+        type_variants = ["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]
+
+    event_q = db.query(func.count(ScannerEvent.id)).filter(
+        ScannerEvent.scanner_type.in_(type_variants)
+    )
+    if universe_id is not None:
+        event_q = event_q.join(
+            MonitoredStock,
+            sa.and_(
+                ScannerEvent.ticker == MonitoredStock.ticker,
+                MonitoredStock.universe_id == universe_id,
+                MonitoredStock.is_active.is_(True),
+            ),
+        )
+    total_events: int = event_q.scalar() or 0
+
+    return ScannerStatusBlockResponse(
+        scanner_type=scanner_type,
+        universe_id=universe_id,
+        last_run=last_run_info,
+        next_run=_compute_next_run(scanner_type),
+        total_events=total_events,
+        success_rate=success_rate,
+        avg_events_per_scan=avg_events,
+        sparkline=sparkline,
+    )
 
 
 @router.get("/configs", response_model=List[ScannerConfigResponse])

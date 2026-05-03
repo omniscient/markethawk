@@ -28,6 +28,7 @@ import {
   fetchScanStatus,
   cancelScan,
   createScanRunWebSocket,
+  fetchScanStatusBlock,
 } from '../api/scanner';
 
 const ACTIVE_SCAN_LS_KEY = 'markethawk.activeScan';
@@ -127,6 +128,13 @@ const Scanner: React.FC = () => {
     queryFn: () => fetchScannerHistory(10),
   });
 
+  // Fetch rich status block (last run, next run, metrics, sparkline)
+  const { data: statusBlock } = useQuery({
+    queryKey: ['scanStatusBlock', selectedConfig, selectedUniverse],
+    queryFn: () => fetchScanStatusBlock(selectedConfig, selectedUniverse),
+    refetchInterval: isScanning ? 5000 : false,
+  });
+
   const queryClient = useQueryClient();
 
   // Auto-load existing results
@@ -183,6 +191,7 @@ const Scanner: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['scannerHistory'] });
     queryClient.invalidateQueries({ queryKey: ['scannerConfigs'] });
     queryClient.invalidateQueries({ queryKey: ['scannerResults'] });
+    queryClient.invalidateQueries({ queryKey: ['scanStatusBlock'] });
   };
 
   const handleWsMessage = (msg: any) => {
@@ -500,6 +509,7 @@ const Scanner: React.FC = () => {
         <div className="space-y-4">
           <Card title="Scan Status" icon={Eye as any}>
             <div className="space-y-3">
+              {/* Status badge */}
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Status</span>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${isScanning
@@ -509,34 +519,104 @@ const Scanner: React.FC = () => {
                   {isScanning ? 'Running' : 'Ready'}
                 </span>
               </div>
+
+              {/* Last Run */}
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Last Run</span>
-                <span className="text-financial-light">
-                  {(() => {
-                    const currentConf = configs?.find(c => c.scanner_type === selectedConfig);
-                    return currentConf?.last_run 
-                      ? formatDistanceToNow(new Date(currentConf.last_run), { addSuffix: true })
-                      : 'Never';
-                  })()}
+                <span className="text-financial-light text-right">
+                  {statusBlock?.last_run?.timestamp
+                    ? (
+                      <span>
+                        {formatDistanceToNow(new Date(statusBlock.last_run.timestamp), { addSuffix: true })}
+                        <span className="ml-1 text-xs text-gray-500">
+                          · {statusBlock.last_run.events_detected} events
+                        </span>
+                      </span>
+                    )
+                    : 'Never'}
                 </span>
               </div>
+
+              {/* Next Run */}
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Next Run</span>
                 <span className="text-financial-light">
-                  {(() => {
-                    const currentConf = configs?.find(c => c.scanner_type === selectedConfig);
-                    return currentConf?.next_run 
-                      ? formatDistanceToNow(new Date(currentConf.next_run), { addSuffix: true })
-                      : 'Not scheduled';
-                  })()}
+                  {statusBlock === undefined
+                    ? '—'
+                    : statusBlock?.next_run
+                      ? formatDistanceToNow(new Date(statusBlock.next_run), { addSuffix: true })
+                      : 'Manual only'}
                 </span>
               </div>
+
+              {/* Stocks in Universe */}
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Stocks in Universe</span>
                 <span className="text-financial-light">
                   {universes?.find(u => u.id === selectedUniverse)?.ticker_count || universes?.find(u => u.id === selectedUniverse)?.aggregate_count || 0}
                 </span>
               </div>
+
+              {/* Total Events */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Total Events</span>
+                <span className="text-financial-light">
+                  {statusBlock !== undefined ? statusBlock.total_events.toLocaleString() : '—'}
+                </span>
+              </div>
+
+              {/* Last Run Duration */}
+              {statusBlock?.last_run?.duration_ms != null && statusBlock.last_run.duration_ms > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Last Duration</span>
+                  <span className="text-financial-light">
+                    {statusBlock.last_run.duration_ms < 1000
+                      ? `${statusBlock.last_run.duration_ms}ms`
+                      : `${(statusBlock.last_run.duration_ms / 1000).toFixed(1)}s`}
+                  </span>
+                </div>
+              )}
+
+              {/* Success Rate */}
+              {statusBlock?.success_rate != null && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Success Rate</span>
+                  <span className={`text-financial-light ${statusBlock.success_rate < 80 ? 'text-red-400' : statusBlock.success_rate < 95 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    {statusBlock.success_rate}%
+                    <span className="ml-1 text-xs text-gray-500">last 20</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Avg events per scan */}
+              {statusBlock?.avg_events_per_scan != null && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Avg Events/Scan</span>
+                  <span className="text-financial-light">{statusBlock.avg_events_per_scan}</span>
+                </div>
+              )}
+
+              {/* Sparkline — events per run over last 10 scans */}
+              {statusBlock?.sparkline && statusBlock.sparkline.length > 1 && (() => {
+                const pts = statusBlock.sparkline;
+                const maxVal = Math.max(...pts.map(p => p.events_detected), 1);
+                const w = 100, h = 28, barW = Math.floor(w / pts.length) - 1;
+                return (
+                  <div className="pt-1">
+                    <span className="text-xs text-gray-500 mb-1 block">Events/run (last {pts.length})</span>
+                    <svg width={w} height={h} className="w-full" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+                      {pts.map((p, i) => {
+                        const barH = Math.max(2, Math.round((p.events_detected / maxVal) * (h - 2)));
+                        const x = i * (barW + 1);
+                        const fill = p.status === 'completed' ? '#60a5fa' : p.status === 'failed' ? '#f87171' : '#6b7280';
+                        return (
+                          <rect key={i} x={x} y={h - barH} width={barW} height={barH} fill={fill} rx={1} />
+                        );
+                      })}
+                    </svg>
+                  </div>
+                );
+              })()}
             </div>
           </Card>
 

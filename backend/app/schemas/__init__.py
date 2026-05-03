@@ -18,6 +18,7 @@ from app.schemas.scanner import (
     PreMarketMoversResponse,
     PreMarketMover,
     ScannerRangeRequest,
+    ScannerStatusBlockResponse,
 )
 from app.schemas.event import ScannerEventResponse, ScannerEventSummary
 from app.schemas.stock import MonitoredStockResponse
@@ -39,4 +40,5 @@ __all__ = [
     "PreMarketMoversResponse",
     "PreMarketMover",
     "ScannerRangeRequest",
+    "ScannerStatusBlockResponse",
 ]

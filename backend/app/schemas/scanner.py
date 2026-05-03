@@ -121,6 +121,32 @@ class PreMarketMoversResponse(BaseModel):
     timestamp: datetime
 
 
+class ScannerLastRunInfo(BaseModel):
+    timestamp: Optional[datetime] = None
+    status: str
+    events_detected: int = 0
+    duration_ms: int = 0
+
+
+class ScannerSparklinePoint(BaseModel):
+    created_at: Optional[str] = None
+    events_detected: int = 0
+    status: str
+
+
+class ScannerStatusBlockResponse(BaseModel):
+    scanner_type: str
+    universe_id: Optional[int] = None
+    last_run: Optional[ScannerLastRunInfo] = None
+    next_run: Optional[datetime] = None
+    total_events: int = 0
+    success_rate: Optional[float] = None
+    avg_events_per_scan: Optional[float] = None
+    sparkline: List[ScannerSparklinePoint] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ScannerRangeRequest(BaseModel):
     """Schema for a date-range scanner run against a single ticker."""
     ticker: str
