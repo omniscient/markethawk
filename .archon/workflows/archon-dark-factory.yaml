@@ -38,7 +38,15 @@ nodes:
 
   - id: fetch-issue
     bash: |
-      gh issue view $parse-intent.output.issue_number --json title,body,labels,comments
+      N=$parse-intent.output.issue_number
+      ISSUE_DATA=$(gh issue view "$N" --json title,body,labels,comments)
+      PR_NUM=$(gh pr list --head "feat/issue-${N}" --json number --jq '.[0].number // empty')
+      if [ -n "$PR_NUM" ]; then
+        PR_DATA=$(gh pr view "$PR_NUM" --json reviews,comments)
+        echo "$ISSUE_DATA" | jq --argjson pr "$PR_DATA" '. + {pr_reviews: $pr}'
+      else
+        echo "$ISSUE_DATA"
+      fi
     depends_on: [parse-intent]
     timeout: 15000
 
