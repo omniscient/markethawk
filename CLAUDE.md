@@ -223,7 +223,13 @@ docker compose --profile factory run --rm dark-factory "Close issue #3"
 
 Add to `.archon/.env` (not `.env` — keep AI credentials separate):
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+# Option A: Use your Claude Max subscription (recommended — no per-token cost)
+# Generate with: claude setup-token
+CLAUDE_CODE_OAUTH_TOKEN=<token-from-setup-token>
+
+# Option B: Use Anthropic API key (pay-per-token)
+# ANTHROPIC_API_KEY=sk-ant-...
+
 GH_TOKEN=ghp_...
 ```
 

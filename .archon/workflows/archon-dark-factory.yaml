@@ -39,14 +39,18 @@ nodes:
   - id: fetch-issue
     bash: |
       N=$parse-intent.output.issue_number
+      INTENT=$parse-intent.output.intent
       ISSUE_DATA=$(gh issue view "$N" --json title,body,labels,comments)
-      PR_NUM=$(gh pr list --head "feat/issue-${N}" --json number --jq '.[0].number // empty')
+      PR_NUM=$(gh pr list --search "head:feat/issue-${N}-" --json number --jq '.[0].number // empty')
       if [ -n "$PR_NUM" ]; then
-        PR_DATA=$(gh pr view "$PR_NUM" --json reviews,comments)
-        echo "$ISSUE_DATA" | jq --argjson pr "$PR_DATA" '. + {pr_reviews: $pr}'
-      else
-        echo "$ISSUE_DATA"
+        PR_COMMENTS=$(gh pr view "$PR_NUM" --json reviews,comments,reviewRequests)
+        INLINE_COMMENTS=$(gh api "repos/omniscient/markethawk/pulls/$PR_NUM/comments" \
+          --jq '[.[] | {path: .path, line: .line, body: .body, created_at: .created_at}]' 2>/dev/null || echo '[]')
+        ISSUE_DATA=$(echo "$ISSUE_DATA" \
+          | jq --argjson pr "$PR_COMMENTS" --argjson inline "$INLINE_COMMENTS" \
+            '. + {pr_reviews: $pr, pr_inline_comments: $inline}')
       fi
+      echo "$ISSUE_DATA" | jq --arg intent "$INTENT" '. + {intent: $intent}'
     depends_on: [parse-intent]
     timeout: 15000
 
@@ -60,6 +64,16 @@ nodes:
       PR_NUM=$(gh pr list --head "feat/issue-${ISSUE}" --json number --jq '.[0].number // empty')
       if [ -n "$PR_NUM" ]; then
         gh pr merge "$PR_NUM" --merge --delete-branch || echo "PR not mergeable (check approval status)"
+      fi
+      ITEM_ID=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
+        | jq -r ".items[] | select(.content.number == $ISSUE and .content.type == \"Issue\") | .id")
+      if [ -n "$ITEM_ID" ]; then
+        gh project item-edit \
+          --project-id PVT_kwHOAAFds84BWh4w \
+          --id "$ITEM_ID" \
+          --field-id PVTSSF_lAHOAAFds84BWh4wzhR1VaA \
+          --single-select-option-id 98236657
+        echo "Moved issue #$ISSUE to Done"
       fi
       gh issue comment "$ISSUE" --body "Dark factory: preview torn down, PR merged (if approved). Issue work complete."
       echo "CLOSED"
@@ -84,7 +98,7 @@ nodes:
     when: "$parse-intent.output.intent != 'close'"
     timeout: 15000
 
-  # Layer 2: Implement the feature
+  # Layer 2: Implement the feature (status already set to "In Progress" by entrypoint)
   - id: implement
     command: dark-factory-implement
     depends_on: [setup-branch, fetch-issue]
@@ -186,7 +200,26 @@ nodes:
     when: "$parse-intent.output.intent != 'close'"
     timeout: 30000
 
-  # Layer 5: Post run report to GitHub issue
+  # Layer 5: Move to "In review" and post report
+  - id: status-in-review
+    bash: |
+      ISSUE=$parse-intent.output.issue_number
+      ITEM_ID=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
+        | jq -r ".items[] | select(.content.number == $ISSUE and .content.type == \"Issue\") | .id")
+      if [ -n "$ITEM_ID" ]; then
+        gh project item-edit \
+          --project-id PVT_kwHOAAFds84BWh4w \
+          --id "$ITEM_ID" \
+          --field-id PVTSSF_lAHOAAFds84BWh4wzhR1VaA \
+          --single-select-option-id df73e18b
+        echo "Moved issue #$ISSUE to In Review"
+      else
+        echo "WARNING: Issue #$ISSUE not found on project board"
+      fi
+    depends_on: [push-and-pr]
+    when: "$parse-intent.output.intent != 'close'"
+    timeout: 15000
+
   - id: report
     bash: |
       ISSUE=$parse-intent.output.issue_number
@@ -201,10 +234,19 @@ nodes:
       ACTION="New implementation"
       [ "$INTENT" = "continue" ] && ACTION="Continued iteration"
 
+      CHANGES=""
+      if [ -f "$ARTIFACTS_DIR/implementation.md" ]; then
+        CHANGES=$(cat "$ARTIFACTS_DIR/implementation.md")
+      fi
+
       gh issue comment "$ISSUE" --body "## Dark Factory Run — ${ACTION}
 
       ${PR_LINE}
       **Branch:** \`${BRANCH}\`
+
+      ### Changes
+
+      ${CHANGES:-_No implementation summary available._}
 
       ### Preview Environment
 
@@ -229,6 +271,6 @@ nodes:
       *Posted by MarketHawk Dark Factory*"
 
       echo "Report posted to issue #${ISSUE}"
-    depends_on: [push-and-pr]
+    depends_on: [status-in-review]
     when: "$parse-intent.output.intent != 'close'"
     timeout: 15000

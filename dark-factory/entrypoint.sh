@@ -8,12 +8,14 @@ FACTORY_NAME="MarketHawk Factory"
 FACTORY_EMAIL="factory@markethawk"
 
 # --- Validate required environment ---
-for var in GH_TOKEN ANTHROPIC_API_KEY; do
-  if [ -z "${!var:-}" ]; then
-    echo "ERROR: $var is not set. Add it to .archon/.env" >&2
-    exit 1
-  fi
-done
+if [ -z "${GH_TOKEN:-}" ]; then
+  echo "ERROR: GH_TOKEN is not set. Add it to .archon/.env" >&2
+  exit 1
+fi
+if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+  echo "ERROR: Set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY in .archon/.env" >&2
+  exit 1
+fi
 
 # --- Git identity ---
 git config --global user.name "$FACTORY_NAME"
@@ -21,6 +23,12 @@ git config --global user.email "$FACTORY_EMAIL"
 
 # --- GitHub CLI auth (GH_TOKEN env var is auto-detected by gh) ---
 echo "GitHub auth: $(gh auth status 2>&1 | head -2 | tail -1 || echo 'using GH_TOKEN env var')"
+
+# --- Project board constants ---
+PROJECT_ID="PVT_kwHOAAFds84BWh4w"
+STATUS_FIELD="PVTSSF_lAHOAAFds84BWh4wzhR1VaA"
+STATUS_IN_PROGRESS="47fc9ee4"
+STATUS_BLOCKED="93d87b2f"
 
 # --- Parse arguments ---
 ARGUMENTS="${*}"
@@ -30,6 +38,56 @@ if [ -z "$ARGUMENTS" ]; then
   echo "       docker compose --profile factory run --rm dark-factory \"Close issue #3\""
   exit 1
 fi
+
+# --- Extract issue number and intent immediately (no AI needed) ---
+ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1)
+INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close)' | head -1 | tr '[:upper:]' '[:lower:]')
+INTENT=${INTENT:-fix}
+
+# --- Helper: look up project board item for this issue ---
+find_board_item() {
+  gh project item-list 1 --owner omniscient --format json --limit 200 \
+    | jq -r ".items[] | select(.content.number == $ISSUE_NUM and .content.type == \"Issue\") | .id"
+}
+
+# --- Helper: move issue to a board status ---
+set_board_status() {
+  local OPTION_ID="$1"
+  local ITEM_ID
+  ITEM_ID=$(find_board_item)
+  if [ -n "$ITEM_ID" ]; then
+    gh project item-edit --project-id "$PROJECT_ID" --id "$ITEM_ID" \
+      --field-id "$STATUS_FIELD" --single-select-option-id "$OPTION_ID"
+  fi
+}
+
+# --- Move to "In Progress" immediately (skip for close) ---
+if [ -n "$ISSUE_NUM" ] && [ "$INTENT" != "close" ]; then
+  echo "Moving issue #$ISSUE_NUM to In Progress..."
+  set_board_status "$STATUS_IN_PROGRESS" || echo "WARNING: Could not update project board"
+fi
+
+# --- Error handler: move ticket back to Ready and post comment ---
+on_failure() {
+  local EXIT_CODE=$?
+  if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
+    echo "Dark factory failed (exit $EXIT_CODE). Moving issue #$ISSUE_NUM back to Ready..."
+    set_board_status "$STATUS_BLOCKED" 2>/dev/null || true
+    gh issue comment "$ISSUE_NUM" --body "## Dark Factory Run — Failed
+
+The dark factory encountered an error (exit code $EXIT_CODE) and could not complete.
+Issue has been moved to **Blocked**.
+
+\`\`\`bash
+# Retry
+docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
+\`\`\`
+
+---
+*Posted by MarketHawk Dark Factory*" 2>/dev/null || true
+  fi
+}
+trap on_failure ERR
 
 # --- Clone the repo ---
 echo "Cloning markethawk..."

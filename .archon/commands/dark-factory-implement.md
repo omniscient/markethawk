@@ -14,10 +14,24 @@ argument-hint: (no arguments - reads issue context from workflow)
 Read the project rules:
 - Read `CLAUDE.md` for all development rules, architecture, and validation requirements.
 - The issue context has been fetched by the workflow. It is available in the conversation.
+- **Check the `intent` field** in the issue context: `"new"` or `"continue"`.
+
+### If intent is "continue"
+
+This is an iteration on existing work. **The latest comments on the issue and PR contain feedback that must drive your changes.** Do NOT re-implement from scratch. Instead:
+1. Read the latest issue comments (bottom of the `comments` array) — these are the user's feedback
+2. Read `pr_reviews` if present — top-level PR conversation and review summaries
+3. Read `pr_inline_comments` if present — these are line-level code review comments with `path` and `line` pointing to exact locations
+3. Review what was already implemented on this branch (`git log --oneline main..HEAD`, read changed files)
+4. Focus exclusively on addressing the feedback
+
+### If intent is "new"
+
+This is a fresh implementation. Follow the issue description.
 
 ## Phase 2: PLAN
 
-Based on the issue description and codebase analysis:
+Based on the issue description (new) or feedback (continue) and codebase analysis:
 1. Identify which files need to change (backend models, routers, services, frontend components, etc.)
 2. Determine if database migrations are needed
 3. Write a brief plan (10-20 lines) as a checklist in `$ARTIFACTS_DIR/plan.md`
