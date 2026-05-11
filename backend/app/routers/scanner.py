@@ -28,6 +28,7 @@ from app.schemas import (
     PreMarketMover,
     ScannerRangeRequest,
     ScannerStatusBlockResponse,
+    ClearEventsResponse,
 )
 from app.services import StockDataService
 
@@ -615,3 +616,19 @@ def run_scanner_range(
         fetch_missing_data=request.fetch_missing_data,
     )
     return {"task_id": task.id, "status": "queued"}
+
+
+@router.delete("/events/{ticker}", response_model=ClearEventsResponse)
+def clear_scanner_events(
+    ticker: str,
+    db: Session = Depends(get_db),
+):
+    """Delete all scanner events for the given ticker and return the count removed."""
+    ticker = ticker.strip().upper()
+    deleted = (
+        db.query(ScannerEvent)
+        .filter(ScannerEvent.ticker == ticker)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return ClearEventsResponse(ticker=ticker, deleted_count=deleted)

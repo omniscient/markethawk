@@ -662,6 +662,18 @@ export const createScannerWebSocket = (): WebSocket | null => {
   }
 };
 
+// ---- Event History -------------------------------------------------------- //
+
+export interface ClearEventsResponse {
+  ticker: string;
+  deleted_count: number;
+}
+
+export const clearScannerEvents = async (ticker: string): Promise<ClearEventsResponse> => {
+  const response = await apiClient.delete(`/scanner/events/${encodeURIComponent(ticker)}`);
+  return response.data;
+};
+
 // ---- Error Helpers -------------------------------------------------------- //
 
 /**

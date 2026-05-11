@@ -25,7 +25,7 @@ import NewsFeed from '../components/NewsFeed';
 
 // API
 import { fetchStockDetails, refreshStockData, syncMissingStockAggregates } from '../api/stocks';
-import { fetchScannerResults, fetchHistoricalData, fetchUniversesForTicker } from '../api/scanner';
+import { fetchScannerResults, fetchHistoricalData, fetchUniversesForTicker, clearScannerEvents } from '../api/scanner';
 import { getSystemInfo } from '../api/system';
 import { useLiveStockData } from '../hooks/useLiveStockData';
 import ForceScanDialog from '../components/ForceScanDialog';
@@ -47,6 +47,7 @@ const StockDetailPage: React.FC = () => {
   const [scanTaskId, setScanTaskId] = React.useState<string | null>(null);
   const [scanSubmitting, setScanSubmitting] = React.useState(false);
   const [scanDoneMsg, setScanDoneMsg] = React.useState<string | null>(null);
+  const [clearConfirmOpen, setClearConfirmOpen] = React.useState(false);
   const queryClient = useQueryClient();
 
   // 0. Refresh Data Mechanism
@@ -68,6 +69,14 @@ const StockDetailPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['historicalData', symbol] });
     },
     onError: () => setCatchingUp(false),
+  });
+
+  const clearEventsMutation = useMutation({
+    mutationFn: () => clearScannerEvents(symbol),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scannerResults', { ticker: symbol }] });
+      setClearConfirmOpen(false);
+    },
   });
 
   // Save settings to localStorage
@@ -602,9 +611,37 @@ const StockDetailPage: React.FC = () => {
                   <Zap className={`h-3 w-3 ${scanTask.status === 'running' ? 'animate-pulse' : ''}`} />
                   <span>Run Scanner</span>
                 </button>
+                <button
+                  onClick={() => setClearConfirmOpen(true)}
+                  className="flex items-center space-x-2 px-3 py-1 text-xs font-bold rounded-md border border-negative/30 text-negative hover:bg-negative hover:text-white transition-all"
+                >
+                  <span>Clear History</span>
+                </button>
               </div>
             }
           >
+            {clearConfirmOpen && (
+              <div className="mb-4 p-4 bg-gray-800 border border-negative/40 rounded-lg">
+                <p className="text-sm text-financial-light mb-3">
+                  Are you sure you want to clear all scanner event history for <strong>{symbol}</strong>? This cannot be undone.
+                </p>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => clearEventsMutation.mutate()}
+                    disabled={clearEventsMutation.isPending}
+                    className="px-3 py-1 text-xs font-bold rounded-md bg-negative text-white hover:bg-red-700 transition-all disabled:opacity-50"
+                  >
+                    {clearEventsMutation.isPending ? 'Clearing…' : 'Yes, Clear'}
+                  </button>
+                  <button
+                    onClick={() => setClearConfirmOpen(false)}
+                    className="px-3 py-1 text-xs font-bold rounded-md border border-gray-600 text-gray-400 hover:text-white hover:border-gray-400 transition-all"
+                  >
+                    No, Cancel
+                  </button>
+                </div>
+              </div>
+            )}
             <RecentEvents
               events={events}
               maxItems={10}
