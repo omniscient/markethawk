@@ -147,6 +147,11 @@ class ScannerStatusBlockResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ClearEventsResponse(BaseModel):
+    ticker: str
+    deleted_count: int
+
+
 class ScannerRangeRequest(BaseModel):
     """Schema for a date-range scanner run against a single ticker."""
     ticker: str

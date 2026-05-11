@@ -53,9 +53,10 @@ def test_c3_spike_fails_when_less_than_10_pct():
 
 
 def test_c4_fails_when_regular_vol_exceeds_threshold():
-    """2× regular vol — day was not quiet."""
+    """2× regular vol fails c4 when threshold is explicitly set to 1.2 (default is 1000.0)."""
     fires, _, criteria = _evaluate_criteria(
-        **{**CLEAN_PRE, "regular_vol": 2_000_000}  # 2M/950k = 2.1 > 1.2
+        **{**CLEAN_PRE, "regular_vol": 2_000_000,   # 2M/950k = 2.1 > 1.2
+           "config": {"regular_vol_ratio_max": 1.2}}
     )
     assert fires is False
     assert criteria["quiet_regular_vol"] is False
@@ -542,11 +543,17 @@ def test_scan_fires_post_only_when_pre_does_not_qualify():
     assert "liquidity_hunt_pre" not in saved_types
 
 
-def test_scan_fires_no_events_when_regular_vol_too_high():
-    """Neither variant fires when regular session volume is 2× average (criterion 4 fails)."""
+def test_scan_fires_events_despite_high_regular_vol():
+    """Both variants still fire when regular vol is 2× average.
+
+    DEFAULT_CONFIG has regular_vol_ratio_max=1000.0 (effectively disabled) — retail
+    piling in during the regular session after a pre-market spike is part of the
+    canonical pattern, so c4 is intentionally lenient. c5 (range ratio) is the
+    meaningful "orderly session" guard.
+    """
     noisy_day_metrics = {
         **_CLEAN_METRICS,
-        "regular_vol": 2_000_000,  # 2M/950k = 2.1 > 1.2 — criterion 4 fails for both variants
+        "regular_vol": 2_000_000,  # 2M/950k = 2.1 — below the 1000.0 default threshold
     }
     db = MagicMock()
     with patch("app.services.liquidity_hunt._get_session_metrics", return_value=noisy_day_metrics), \
@@ -556,9 +563,8 @@ def test_scan_fires_no_events_when_regular_vol_too_high():
          patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
          patch("app.services.scanner.ScannerService._save_event") as mock_save:
 
-        results = _run(run_liquidity_hunt_scan(
+        _run(run_liquidity_hunt_scan(
             ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
         ))
 
-    mock_save.assert_not_called()
-    assert results == []
+    assert mock_save.call_count == 2  # pre + post both fire
