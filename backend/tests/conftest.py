@@ -1,54 +1,53 @@
-
 import pytest
 import logging as _logging
 from typing import Generator
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
+from testcontainers.postgres import PostgresContainer
 
 from app.core.database import Base, get_db
 from app.main import app
-from app.core.config import settings
 
 _conftest_logger = _logging.getLogger(__name__)
 
-# Use an in-memory SQLite database for testing
-# or a separate test database URL if preferred
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+POSTGRES_IMAGE = "postgres:15-alpine"
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@pytest.fixture(scope="session", autouse=True)
-def db_engine():
-    # Try to create tables, but don't fail if it doesn't work
-    # (SQLite doesn't support JSONB, so skip for unit tests that mock dependencies)
+@pytest.fixture(scope="session")
+def pg_container():
+    with PostgresContainer(POSTGRES_IMAGE) as container:
+        yield container
+
+
+@pytest.fixture(scope="session")
+def db_engine(pg_container):
+    url = pg_container.get_connection_url()
+    engine = create_engine(url)
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as exc:
-        _conftest_logger.warning(f"db_engine: create_all skipped ({exc})")
-
+        _conftest_logger.warning(f"db_engine: create_all failed ({exc})")
+        raise
     yield engine
-
-    # Try to drop tables
     try:
         Base.metadata.drop_all(bind=engine)
     except Exception as exc:
         _conftest_logger.warning(f"db_engine: drop_all skipped ({exc})")
 
+
 @pytest.fixture(scope="function")
-def db() -> Generator:
-    connection = engine.connect()
+def db(db_engine) -> Generator:
+    connection = db_engine.connect()
     transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-    
+    session = Session(bind=connection)
+
     yield session
-    
+
     session.close()
     transaction.rollback()
     connection.close()
+
 
 @pytest.fixture(scope="module")
 def client() -> Generator:
