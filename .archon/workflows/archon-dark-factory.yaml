@@ -97,16 +97,6 @@ nodes:
         echo "Resolved epic #$N → sub-issue #$RESOLVED" >&2
         EPIC_N="$N"
         N="$RESOLVED"
-
-        # Move the resolved sub-issue to "In Progress" on the board
-        SUB_ITEM=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
-          | jq -r ".items[] | select(.content.number == $N and .content.type == \"Issue\") | .id")
-        if [ -n "$SUB_ITEM" ]; then
-          gh project item-edit --project-id PVT_kwHOAAFds84BWh4w --id "$SUB_ITEM" \
-            --field-id PVTSSF_lAHOAAFds84BWh4wzhR1VaA --single-select-option-id 47fc9ee4
-          echo "  Moved sub-issue #$N to In Progress" >&2
-        fi
-
         ISSUE_DATA=$(gh issue view "$N" --json title,body,labels,comments)
       fi
 
