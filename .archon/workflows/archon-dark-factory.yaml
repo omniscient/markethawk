@@ -95,9 +95,18 @@ nodes:
         fi
 
         echo "Resolved epic #$N → sub-issue #$RESOLVED" >&2
-        gh issue comment "$N" --body "> Dark factory: working on sub-issue #$RESOLVED" 2>/dev/null || true
         EPIC_N="$N"
         N="$RESOLVED"
+
+        # Move the resolved sub-issue to "In Progress" on the board
+        SUB_ITEM=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
+          | jq -r ".items[] | select(.content.number == $N and .content.type == \"Issue\") | .id")
+        if [ -n "$SUB_ITEM" ]; then
+          gh project item-edit --project-id PVT_kwHOAAFds84BWh4w --id "$SUB_ITEM" \
+            --field-id PVTSSF_lAHOAAFds84BWh4wzhR1VaA --single-select-option-id 47fc9ee4
+          echo "  Moved sub-issue #$N to In Progress" >&2
+        fi
+
         ISSUE_DATA=$(gh issue view "$N" --json title,body,labels,comments)
       fi
 
@@ -163,7 +172,7 @@ nodes:
     when: "$parse-intent.output.intent != 'close'"
     timeout: 15000
 
-  # Layer 2: Implement the feature (status already set to "In Progress" by entrypoint)
+  # Layer 2: Implement the feature (status set to "In Progress" by entrypoint or epic resolver)
   - id: implement
     command: dark-factory-implement
     depends_on: [setup-branch, fetch-issue]
@@ -343,11 +352,6 @@ nodes:
 
       ---
       *Posted by MarketHawk Dark Factory*"
-
-      # Also notify the epic if this was resolved from one
-      if [ -n "$EPIC_NUM" ]; then
-        gh issue comment "$EPIC_NUM" --body "> Dark factory: completed run for sub-issue #${ISSUE} — PR #${PR_NUM:-pending}" 2>/dev/null || true
-      fi
 
       echo "Report posted to issue #${ISSUE}"
     depends_on: [status-in-review]
