@@ -9,6 +9,16 @@ argument-hint: (no arguments - reads issue context from workflow)
 
 ---
 
+## CRITICAL: Epic Guard
+
+**NEVER implement an epic (issue with the `epic` label) as a monolithic change.** Each sub-issue
+gets its own branch, PR, and preview stack. The workflow resolves epics to individual sub-issues
+before reaching this command. If the issue context still has the `epic` label, STOP immediately
+and exit with an error — the resolution should have happened upstream.
+
+**NEVER work on multiple sub-issues in the same branch.** If the issue body references sibling
+sub-issues, ignore them. Focus exclusively on the single resolved issue you were given.
+
 ## Phase 1: LOAD
 
 Read the project rules:

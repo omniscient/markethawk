@@ -40,7 +40,68 @@ nodes:
     bash: |
       N=$parse-intent.output.issue_number
       INTENT=$parse-intent.output.intent
+      EPIC_N=""
       ISSUE_DATA=$(gh issue view "$N" --json title,body,labels,comments)
+
+      # --- Epic resolution: never implement an epic monolithically ---
+      IS_EPIC=$(echo "$ISSUE_DATA" | jq -r 'if [.labels[].name] | index("epic") then "yes" else "no" end')
+
+      if [ "$IS_EPIC" = "yes" ] && [ "$INTENT" != "close" ]; then
+        echo "Issue #$N is an epic — resolving to next sub-issue..." >&2
+        BODY=$(echo "$ISSUE_DATA" | jq -r '.body // ""')
+        SUB_ISSUES=$(echo "$BODY" | grep -oP '\- \[ \] #\K\d+' || true)
+
+        if [ -z "$SUB_ISSUES" ]; then
+          echo "ERROR: Epic #$N has no unchecked sub-issues (expected '- [ ] #NN' entries)" >&2
+          exit 1
+        fi
+
+        RESOLVED=""
+        for SUB in $SUB_ISSUES; do
+          STATE=$(gh issue view "$SUB" --json state --jq '.state')
+          if [ "$STATE" != "OPEN" ]; then
+            echo "  #$SUB — closed, skipping" >&2
+            continue
+          fi
+          HAS_PR=$(gh pr list --search "head:feat/issue-${SUB}-" --json number --jq '.[0].number // empty')
+          if [ "$INTENT" = "continue" ] && [ -n "$HAS_PR" ]; then
+            echo "  #$SUB — has open PR, continuing this one" >&2
+            RESOLVED="$SUB"
+            break
+          elif [ "$INTENT" != "continue" ] && [ -z "$HAS_PR" ]; then
+            echo "  #$SUB — open and no PR, starting this one" >&2
+            RESOLVED="$SUB"
+            break
+          else
+            echo "  #$SUB — skipping (intent=$INTENT, has_pr=${HAS_PR:-none})" >&2
+          fi
+        done
+
+        # Fallback for continue: if no sub-issue has a PR, pick first open one
+        if [ -z "$RESOLVED" ] && [ "$INTENT" = "continue" ]; then
+          for SUB in $SUB_ISSUES; do
+            STATE=$(gh issue view "$SUB" --json state --jq '.state')
+            if [ "$STATE" = "OPEN" ]; then
+              echo "  Fallback: picking first open sub-issue #$SUB" >&2
+              RESOLVED="$SUB"
+              break
+            fi
+          done
+        fi
+
+        if [ -z "$RESOLVED" ]; then
+          echo "ERROR: All sub-issues in epic #$N are closed or already have PRs" >&2
+          exit 1
+        fi
+
+        echo "Resolved epic #$N → sub-issue #$RESOLVED" >&2
+        gh issue comment "$N" --body "> Dark factory: working on sub-issue #$RESOLVED" 2>/dev/null || true
+        EPIC_N="$N"
+        N="$RESOLVED"
+        ISSUE_DATA=$(gh issue view "$N" --json title,body,labels,comments)
+      fi
+
+      # --- Fetch PR review comments if a PR exists for this issue ---
       PR_NUM=$(gh pr list --search "head:feat/issue-${N}-" --json number --jq '.[0].number // empty')
       if [ -n "$PR_NUM" ]; then
         PR_COMMENTS=$(gh pr view "$PR_NUM" --json reviews,comments,reviewRequests)
@@ -50,9 +111,13 @@ nodes:
           | jq --argjson pr "$PR_COMMENTS" --argjson inline "$INLINE_COMMENTS" \
             '. + {pr_reviews: $pr, pr_inline_comments: $inline}')
       fi
-      echo "$ISSUE_DATA" | jq --arg intent "$INTENT" '. + {intent: $intent}'
+      echo "$ISSUE_DATA" | jq \
+        --arg intent "$INTENT" \
+        --argjson resolved "$N" \
+        --arg epic "${EPIC_N:-null}" \
+        '. + {intent: $intent, resolved_number: $resolved, epic_number: (if $epic == "null" then null else ($epic | tonumber) end)}'
     depends_on: [parse-intent]
-    timeout: 15000
+    timeout: 60000
 
   # Layer 1: Route based on intent
   - id: close-preview
@@ -83,7 +148,7 @@ nodes:
 
   - id: setup-branch
     bash: |
-      ISSUE=$parse-intent.output.issue_number
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       INTENT=$parse-intent.output.intent
       SLUG=$(echo $fetch-issue.output | jq -r '.title // "feature"' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
       BRANCH="feat/issue-${ISSUE}-${SLUG}"
@@ -108,7 +173,7 @@ nodes:
   # Layer 3: Spin up preview and validate
   - id: preview-up
     bash: |
-      ISSUE=$parse-intent.output.issue_number
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       PADDED=$(printf "%02d" "$ISSUE")
       export ISSUE_NUM_PADDED="$PADDED"
       export POLYGON_API_KEY="${POLYGON_API_KEY:-}"
@@ -162,7 +227,8 @@ nodes:
   # Layer 4: Push and create PR
   - id: push-and-pr
     bash: |
-      ISSUE=$parse-intent.output.issue_number
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
       PADDED=$(printf "%02d" "$ISSUE")
       BRANCH=$(git branch --show-current)
 
@@ -173,10 +239,13 @@ nodes:
         echo "PR #${EXISTING_PR} already exists, updated with latest push."
         echo "$EXISTING_PR"
       else
+        EPIC_LINE=""
+        [ -n "$EPIC_NUM" ] && EPIC_LINE="
+      **Epic:** #${EPIC_NUM}"
         PR_URL=$(gh pr create \
           --title "$(gh issue view $ISSUE --json title --jq '.title')" \
           --body "## Summary
-      Automated implementation for issue #${ISSUE}.
+      Automated implementation for issue #${ISSUE}.${EPIC_LINE}
 
       ## Preview
       - Frontend: http://localhost:1${PADDED}33
@@ -203,7 +272,7 @@ nodes:
   # Layer 5: Move to "In review" and post report
   - id: status-in-review
     bash: |
-      ISSUE=$parse-intent.output.issue_number
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       ITEM_ID=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
         | jq -r ".items[] | select(.content.number == $ISSUE and .content.type == \"Issue\") | .id")
       if [ -n "$ITEM_ID" ]; then
@@ -222,7 +291,8 @@ nodes:
 
   - id: report
     bash: |
-      ISSUE=$parse-intent.output.issue_number
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
       PADDED=$(printf "%02d" "$ISSUE")
       INTENT=$parse-intent.output.intent
       BRANCH=$(git branch --show-current)
@@ -230,6 +300,9 @@ nodes:
       PR_NUM=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number // empty')
       PR_LINE=""
       [ -n "$PR_NUM" ] && PR_LINE="**PR:** #${PR_NUM}"
+
+      EPIC_LINE=""
+      [ -n "$EPIC_NUM" ] && EPIC_LINE="**Epic:** #${EPIC_NUM}"
 
       ACTION="New implementation"
       [ "$INTENT" = "continue" ] && ACTION="Continued iteration"
@@ -242,6 +315,7 @@ nodes:
       gh issue comment "$ISSUE" --body "## Dark Factory Run — ${ACTION}
 
       ${PR_LINE}
+      ${EPIC_LINE}
       **Branch:** \`${BRANCH}\`
 
       ### Changes
@@ -269,6 +343,11 @@ nodes:
 
       ---
       *Posted by MarketHawk Dark Factory*"
+
+      # Also notify the epic if this was resolved from one
+      if [ -n "$EPIC_NUM" ]; then
+        gh issue comment "$EPIC_NUM" --body "> Dark factory: completed run for sub-issue #${ISSUE} — PR #${PR_NUM:-pending}" 2>/dev/null || true
+      fi
 
       echo "Report posted to issue #${ISSUE}"
     depends_on: [status-in-review]
