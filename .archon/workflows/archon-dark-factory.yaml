@@ -46,7 +46,7 @@ nodes:
       # --- Epic resolution: never implement an epic monolithically ---
       IS_EPIC=$(echo "$ISSUE_DATA" | jq -r 'if [.labels[].name] | index("epic") then "yes" else "no" end')
 
-      if [ "$IS_EPIC" = "yes" ] && [ "$INTENT" != "close" ]; then
+      if [ "$IS_EPIC" = "yes" ]; then
         echo "Issue #$N is an epic — resolving to next sub-issue..." >&2
         BODY=$(echo "$ISSUE_DATA" | jq -r '.body // ""')
         SUB_ISSUES=$(echo "$BODY" | grep -oP '\- \[ \] #\K\d+' || true)
@@ -64,11 +64,11 @@ nodes:
             continue
           fi
           HAS_PR=$(gh pr list --search "head:feat/issue-${SUB}-" --json number --jq '.[0].number // empty')
-          if [ "$INTENT" = "continue" ] && [ -n "$HAS_PR" ]; then
-            echo "  #$SUB — has open PR, continuing this one" >&2
+          if ([ "$INTENT" = "continue" ] || [ "$INTENT" = "close" ]) && [ -n "$HAS_PR" ]; then
+            echo "  #$SUB — has open PR, picking for $INTENT" >&2
             RESOLVED="$SUB"
             break
-          elif [ "$INTENT" != "continue" ] && [ -z "$HAS_PR" ]; then
+          elif [ "$INTENT" != "continue" ] && [ "$INTENT" != "close" ] && [ -z "$HAS_PR" ]; then
             echo "  #$SUB — open and no PR, starting this one" >&2
             RESOLVED="$SUB"
             break
@@ -77,8 +77,8 @@ nodes:
           fi
         done
 
-        # Fallback for continue: if no sub-issue has a PR, pick first open one
-        if [ -z "$RESOLVED" ] && [ "$INTENT" = "continue" ]; then
+        # Fallback for continue/close: if no sub-issue has a PR, pick first open one
+        if [ -z "$RESOLVED" ] && ([ "$INTENT" = "continue" ] || [ "$INTENT" = "close" ]); then
           for SUB in $SUB_ISSUES; do
             STATE=$(gh issue view "$SUB" --json state --jq '.state')
             if [ "$STATE" = "OPEN" ]; then
@@ -121,14 +121,28 @@ nodes:
   # Layer 1: Route based on intent
   - id: close-preview
     bash: |
-      ISSUE=$parse-intent.output.issue_number
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
       PADDED=$(printf "%02d" "$ISSUE")
+
       echo "Tearing down mh-preview-${ISSUE}..."
       docker compose -p "mh-preview-${ISSUE}" down -v 2>/dev/null || echo "No preview stack found"
-      PR_NUM=$(gh pr list --head "feat/issue-${ISSUE}" --json number --jq '.[0].number // empty')
-      if [ -n "$PR_NUM" ]; then
-        gh pr merge "$PR_NUM" --merge --delete-branch || echo "PR not mergeable (check approval status)"
+
+      # Find the PR (branch includes a slug suffix, so use search prefix match)
+      PR_NUM=$(gh pr list --search "head:feat/issue-${ISSUE}-" --json number --jq '.[0].number // empty')
+      if [ -z "$PR_NUM" ]; then
+        echo "ERROR: No PR found for issue #$ISSUE"
+        exit 1
       fi
+
+      # Merge to main — only proceed to Done if this succeeds
+      if ! gh pr merge "$PR_NUM" --merge --delete-branch; then
+        echo "ERROR: PR #$PR_NUM could not be merged (check approval status or conflicts)"
+        exit 1
+      fi
+      echo "PR #$PR_NUM merged successfully"
+
+      # Move the sub-issue to Done (never the epic — it stays In Progress)
       ITEM_ID=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
         | jq -r ".items[] | select(.content.number == $ISSUE and .content.type == \"Issue\") | .id")
       if [ -n "$ITEM_ID" ]; then
@@ -139,7 +153,7 @@ nodes:
           --single-select-option-id 98236657
         echo "Moved issue #$ISSUE to Done"
       fi
-      gh issue comment "$ISSUE" --body "Dark factory: preview torn down, PR merged (if approved). Issue work complete."
+      gh issue comment "$ISSUE" --body "Dark factory: preview torn down, PR #${PR_NUM} merged. Issue complete."
       echo "CLOSED"
     depends_on: [parse-intent, fetch-issue]
     when: "$parse-intent.output.intent == 'close'"
