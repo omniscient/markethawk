@@ -135,7 +135,8 @@ nodes:
         exit 1
       fi
 
-      # Merge to main — only proceed to Done if this succeeds
+      # Mark ready (factory creates PRs as drafts) then merge to main
+      gh pr ready "$PR_NUM" 2>/dev/null || true
       if ! gh pr merge "$PR_NUM" --merge --delete-branch; then
         echo "ERROR: PR #$PR_NUM could not be merged (check approval status or conflicts)"
         exit 1
