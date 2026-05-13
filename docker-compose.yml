@@ -292,6 +292,25 @@ services:
     profiles:
       - factory
 
+  # Backlog Scheduler — polls GitHub board and dispatches dark factory runs
+  backlog-scheduler:
+    build:
+      context: ./dark-factory
+      dockerfile: Dockerfile
+    container_name: backlog-scheduler
+    restart: unless-stopped
+    entrypoint: ["/opt/dark-factory/scheduler.sh"]
+    env_file:
+      - path: .archon/.env
+        required: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/workspace/project:ro
+    networks:
+      - factory-network
+    profiles:
+      - scheduler
+
 volumes:
   postgres_data:
     external: true

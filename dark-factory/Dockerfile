@@ -63,11 +63,12 @@ RUN git clone https://github.com/coleam00/Archon.git /opt/archon && \
 # Workspace directory
 RUN mkdir -p /workspace
 
-# Copy entrypoint, preview template, and seed data
+# Copy entrypoint, scheduler, preview template, and seed data
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY scheduler.sh /opt/dark-factory/scheduler.sh
 COPY docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
 COPY seed_preview.sql /opt/dark-factory/seed_preview.sql
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
 
 WORKDIR /workspace
 
