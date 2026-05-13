@@ -182,7 +182,7 @@ dependencies_met() {
   local issue_num="$1"
   local board_items="$2"
   local body
-  body=$(gh issue view "$issue_num" --json body -q '.body' 2>/dev/null) || return 0
+  body=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" --json body -q '.body' 2>/dev/null) || return 0
   local deps
   deps=$(echo "$body" | grep -oP 'Depends on:\s*#\K\d+' || true)
   if [ -z "$deps" ]; then
@@ -202,13 +202,13 @@ dependencies_met() {
 get_new_comments() {
   local issue_num="$1"
   local comments
-  comments=$(gh issue view "$issue_num" --json comments -q '.comments' 2>/dev/null) || { echo "[]"; return; }
+  comments=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" --json comments -q '.comments' 2>/dev/null) || { echo "[]"; return; }
 
   local factory_idx
   factory_idx=$(echo "$comments" | jq 'map(.body) | to_entries | map(select(.value | test("Posted by MarketHawk Dark Factory"))) | last | .key // -1')
 
   if [ "$factory_idx" = "-1" ]; then
-    echo "[]"
+    echo "$comments"
     return
   fi
 
@@ -273,10 +273,10 @@ while true; do
   # Fetch board state
   BOARD_ITEMS=$(fetch_board_items 2>/dev/null) || { echo "[$(date -u +%FT%TZ)] error=gh_api_failed"; sleep "$POLL_INTERVAL"; continue; }
 
-  IN_REVIEW=$(get_items_by_status "$BOARD_ITEMS" "In Review")
+  IN_REVIEW=$(get_items_by_status "$BOARD_ITEMS" "In review")
   BLOCKED=$(get_items_by_status "$BOARD_ITEMS" "Blocked")
   READY=$(get_items_by_status "$BOARD_ITEMS" "Ready")
-  IN_PROGRESS=$(get_items_by_status "$BOARD_ITEMS" "In Progress")
+  IN_PROGRESS=$(get_items_by_status "$BOARD_ITEMS" "In progress")
 
   IN_PROGRESS_COUNT=$(echo "$IN_PROGRESS" | jq 'length')
   IN_REVIEW_COUNT=$(echo "$IN_REVIEW" | jq 'length')
