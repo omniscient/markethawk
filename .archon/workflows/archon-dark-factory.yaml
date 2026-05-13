@@ -201,7 +201,7 @@ nodes:
       fi
       gh issue comment "$ISSUE" --body "Dark factory: preview torn down, PR #${PR_NUM} merged. Issue complete."
       echo "CLOSED"
-    depends_on: [parse-intent, fetch-issue, close-announce]
+    depends_on: [parse-intent, fetch-issue]
     when: "$parse-intent.output.intent == 'close'"
     timeout: 30000
 
@@ -219,7 +219,7 @@ nodes:
         git checkout -b "$BRANCH"
       fi
       echo "$BRANCH"
-    depends_on: [parse-intent, fetch-issue, acknowledge-continue]
+    depends_on: [parse-intent, fetch-issue]
     when: "$parse-intent.output.intent != 'close'"
     timeout: 15000
 
