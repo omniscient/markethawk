@@ -118,7 +118,52 @@ nodes:
     depends_on: [parse-intent]
     timeout: 60000
 
+  # Layer 0.5: Acknowledge feedback (continue flow only)
+  - id: summarize-feedback
+    prompt: |
+      You are reviewing feedback on a code implementation. Below is the issue and PR data.
+      Focus only on human-authored feedback — ignore any comments from "Dark Factory" or other bots.
+      Summarize the feedback in 2-3 sentences covering what changes the reviewer wants made.
+      If there is no meaningful human feedback, respond with: {"summary": "No specific feedback found."}
+
+      Issue and PR data:
+      $fetch-issue.output
+
+      Output ONLY valid JSON, nothing else:
+      {"summary": "<2-3 sentence summary>"}
+    allowed_tools: []
+    model: haiku
+    depends_on: [fetch-issue]
+    when: "$parse-intent.output.intent == 'continue'"
+    output_format:
+      type: object
+      properties:
+        summary:
+          type: string
+      required: [summary]
+
+  - id: acknowledge-continue
+    bash: |
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      SUMMARY="$summarize-feedback.output.summary"
+      echo "Acknowledging feedback for issue #${ISSUE}..."
+      gh issue comment "$ISSUE" --body "Resuming work — Feedback understood: ${SUMMARY}"
+      echo "Acknowledged feedback for issue #${ISSUE}"
+    depends_on: [summarize-feedback]
+    when: "$parse-intent.output.intent == 'continue'"
+    timeout: 15000
+
   # Layer 1: Route based on intent
+  - id: close-announce
+    bash: |
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      echo "Closing issue #${ISSUE}: merging PR and tearing down preview..."
+      gh issue comment "$ISSUE" --body "Merging PR and tearing down preview environment."
+      echo "Announced close for issue #${ISSUE}"
+    depends_on: [fetch-issue]
+    when: "$parse-intent.output.intent == 'close'"
+    timeout: 15000
+
   - id: close-preview
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
@@ -156,7 +201,7 @@ nodes:
       fi
       gh issue comment "$ISSUE" --body "Dark factory: preview torn down, PR #${PR_NUM} merged. Issue complete."
       echo "CLOSED"
-    depends_on: [parse-intent, fetch-issue]
+    depends_on: [parse-intent, fetch-issue, close-announce]
     when: "$parse-intent.output.intent == 'close'"
     timeout: 30000
 
@@ -166,6 +211,7 @@ nodes:
       INTENT=$parse-intent.output.intent
       SLUG=$(echo $fetch-issue.output | jq -r '.title // "feature"' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
       BRANCH="feat/issue-${ISSUE}-${SLUG}"
+      echo "Setting up branch for issue #${ISSUE}..."
 
       if [ "$INTENT" = "continue" ]; then
         git fetch origin "$BRANCH" 2>/dev/null && git checkout "$BRANCH" || git checkout -b "$BRANCH"
@@ -173,7 +219,7 @@ nodes:
         git checkout -b "$BRANCH"
       fi
       echo "$BRANCH"
-    depends_on: [parse-intent, fetch-issue]
+    depends_on: [parse-intent, fetch-issue, acknowledge-continue]
     when: "$parse-intent.output.intent != 'close'"
     timeout: 15000
 
@@ -245,6 +291,7 @@ nodes:
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
       PADDED=$(printf "%02d" "$ISSUE")
       BRANCH=$(git branch --show-current)
+      echo "Pushing branch and creating/updating PR for issue #${ISSUE}..."
 
       git push -u origin "$BRANCH"
 
@@ -287,6 +334,7 @@ nodes:
   - id: status-in-review
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      echo "Moving issue #${ISSUE} to In Review..."
       ITEM_ID=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
         | jq -r ".items[] | select(.content.number == $ISSUE and .content.type == \"Issue\") | .id")
       if [ -n "$ITEM_ID" ]; then
@@ -310,6 +358,7 @@ nodes:
       PADDED=$(printf "%02d" "$ISSUE")
       INTENT=$parse-intent.output.intent
       BRANCH=$(git branch --show-current)
+      echo "Posting summary to issue #${ISSUE}..."
 
       PR_NUM=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number // empty')
       PR_LINE=""
