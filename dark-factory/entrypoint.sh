@@ -41,7 +41,7 @@ fi
 
 # --- Extract issue number and intent immediately (no AI needed) ---
 ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1)
-INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close)' | head -1 | tr '[:upper:]' '[:lower:]')
+INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan)' | head -1 | tr '[:upper:]' '[:lower:]')
 INTENT=${INTENT:-fix}
 
 # --- Helper: look up project board item for this issue ---
@@ -62,7 +62,7 @@ set_board_status() {
 }
 
 # --- Move to "In Progress" immediately (skip for close) ---
-if [ -n "$ISSUE_NUM" ] && [ "$INTENT" != "close" ]; then
+if [ -n "$ISSUE_NUM" ] && [ "$INTENT" != "close" ] && [ "$INTENT" != "refine" ] && [ "$INTENT" != "plan" ]; then
   echo "Moving issue #$ISSUE_NUM to In Progress..."
   set_board_status "$STATUS_IN_PROGRESS" || echo "WARNING: Could not update project board"
 fi
@@ -71,9 +71,23 @@ fi
 on_failure() {
   local EXIT_CODE=$?
   if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
-    echo "Dark factory failed (exit $EXIT_CODE). Moving issue #$ISSUE_NUM back to Ready..."
-    set_board_status "$STATUS_BLOCKED" 2>/dev/null || true
-    gh issue comment "$ISSUE_NUM" --body "## Dark Factory Run — Failed
+    if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ]; then
+      echo "Refinement pipeline failed (exit $EXIT_CODE) for issue #$ISSUE_NUM"
+      gh issue comment "$ISSUE_NUM" --body "## Refinement Pipeline — Failed
+
+The refinement pipeline encountered an error (exit code $EXIT_CODE) and could not complete.
+
+\`\`\`bash
+# Retry
+docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
+\`\`\`
+
+---
+*Posted by MarketHawk Refinement Pipeline*" 2>/dev/null || true
+    else
+      echo "Dark factory failed (exit $EXIT_CODE). Moving issue #$ISSUE_NUM back to Ready..."
+      set_board_status "$STATUS_BLOCKED" 2>/dev/null || true
+      gh issue comment "$ISSUE_NUM" --body "## Dark Factory Run — Failed
 
 The dark factory encountered an error (exit code $EXIT_CODE) and could not complete.
 Issue has been moved to **Blocked**.
@@ -85,6 +99,7 @@ docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
 
 ---
 *Posted by MarketHawk Dark Factory*" 2>/dev/null || true
+    fi
   fi
 }
 trap on_failure ERR
