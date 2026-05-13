@@ -208,3 +208,93 @@ ${comment_text}"
     *) echo "SKIP" ;;
   esac
 }
+
+# --- Main loop ---
+echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
+
+while true; do
+  DISPATCHED=""
+
+  # Fetch board state
+  BOARD_ITEMS=$(fetch_board_items 2>/dev/null) || { echo "[$(date -u +%FT%TZ)] error=gh_api_failed"; sleep "$POLL_INTERVAL"; continue; }
+
+  IN_REVIEW=$(get_items_by_status "$BOARD_ITEMS" "In Review")
+  BLOCKED=$(get_items_by_status "$BOARD_ITEMS" "Blocked")
+  READY=$(get_items_by_status "$BOARD_ITEMS" "Ready")
+  IN_PROGRESS=$(get_items_by_status "$BOARD_ITEMS" "In Progress")
+
+  IN_PROGRESS_COUNT=$(echo "$IN_PROGRESS" | jq 'length')
+  IN_REVIEW_COUNT=$(echo "$IN_REVIEW" | jq 'length')
+
+  # Read WIP limits
+  WIP_DATA=$(fetch_wip_limits)
+  MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
+  MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
+
+  # --- Priority 1: In Review items with new comments ---
+  for item in $(echo "$IN_REVIEW" | jq -c '.[]'); do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+
+    NEW_COMMENTS=$(get_new_comments "$ISSUE")
+    COMMENT_COUNT=$(echo "$NEW_COMMENTS" | jq 'length')
+    if [ "$COMMENT_COUNT" -eq 0 ]; then continue; fi
+
+    TITLE=$(echo "$item" | jq -r '.content.title')
+    VERDICT=$(classify_comments "$ISSUE" "$TITLE" "$NEW_COMMENTS")
+
+    case "$VERDICT" in
+      MERGE)
+        dispatch "Close issue #${ISSUE}"
+        DISPATCHED="Close issue #${ISSUE}"
+        ;;
+      CONTINUE)
+        if ! is_issue_running "$ISSUE"; then
+          dispatch "Continue issue #${ISSUE}"
+          DISPATCHED="Continue issue #${ISSUE}"
+          reset_retry "$ISSUE"
+        fi
+        ;;
+      SKIP) ;;
+    esac
+  done
+
+  # --- Priority 2: Blocked items (retry) ---
+  for item in $(echo "$BLOCKED" | jq -c '.[]'); do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+
+    RETRIES=$(get_retry_count "$ISSUE")
+    if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then continue; fi
+
+    increment_retry "$ISSUE"
+    dispatch "Fix issue #${ISSUE}"
+    DISPATCHED="Fix issue #${ISSUE}"
+  done
+
+  # --- Priority 3: Ready items (new work) ---
+  for item in $(echo "$READY" | jq -c '.[]'); do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+    if [ "$IN_PROGRESS_COUNT" -ge "$MAX_IN_PROGRESS" ]; then break; fi
+    if [ "$IN_REVIEW_COUNT" -ge "$MAX_IN_REVIEW" ]; then break; fi
+    if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+
+    dispatch "Fix issue #${ISSUE}"
+    DISPATCHED="Fix issue #${ISSUE}"
+  done
+
+  # --- Log cycle summary ---
+  if [ -n "$DISPATCHED" ]; then
+    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} dispatched=\"${DISPATCHED}\""
+  else
+    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} skip=nothing_to_do"
+  fi
+
+  sleep "$POLL_INTERVAL"
+done
