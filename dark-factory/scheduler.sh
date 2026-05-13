@@ -151,3 +151,60 @@ dependencies_met() {
   done <<< "$deps"
   return 0
 }
+
+# --- Comment interpretation ---
+get_new_comments() {
+  local issue_num="$1"
+  local comments
+  comments=$(gh issue view "$issue_num" --json comments -q '.comments' 2>/dev/null) || { echo "[]"; return; }
+
+  local factory_idx
+  factory_idx=$(echo "$comments" | jq 'map(.body) | to_entries | map(select(.value | test("Posted by MarketHawk Dark Factory"))) | last | .key // -1')
+
+  if [ "$factory_idx" = "-1" ]; then
+    echo "[]"
+    return
+  fi
+
+  local start_idx=$((factory_idx + 1))
+  local total
+  total=$(echo "$comments" | jq 'length')
+  if [ "$start_idx" -ge "$total" ]; then
+    echo "[]"
+    return
+  fi
+
+  echo "$comments" | jq --argjson s "$start_idx" '.[$s:]'
+}
+
+classify_comments() {
+  local issue_num="$1"
+  local title="$2"
+  local comments_json="$3"
+
+  local comment_text
+  comment_text=$(echo "$comments_json" | jq -r '.[] | "[\(.author.login)] \(.body)"')
+
+  local prompt
+  prompt="You are a PR comment classifier. Read the comments below and decide
+the intent. Reply with exactly one word: MERGE, CONTINUE, or SKIP.
+
+MERGE — the reviewer approves the PR (e.g. \"looks good\", \"ship it\",
+\"approved\", \"LGTM\", thumbs up, ready to merge)
+CONTINUE — the reviewer wants changes (e.g. \"fix the tests\",
+\"can you rename X\", \"this needs error handling\", specific feedback)
+SKIP — the comment is informational, a question, or unclear intent
+(e.g. \"interesting approach\", \"what does this do?\", bot comments)
+
+PR #${issue_num}: ${title}
+Comments since last factory run:
+${comment_text}"
+
+  local result
+  result=$(echo "$prompt" | claude -p --model haiku 2>/dev/null | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+
+  case "$result" in
+    MERGE|CONTINUE|SKIP) echo "$result" ;;
+    *) echo "SKIP" ;;
+  esac
+}
