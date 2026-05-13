@@ -1,9 +1,9 @@
 name: archon-dark-factory
 description: |
   Use when: Running inside the dark-factory Docker container to implement a GitHub issue.
-  Triggers: "Fix issue", "Continue issue", "Close issue".
-  Does: Parses intent -> fetches issue context -> branches -> implements with TDD ->
-        spins up preview stack -> validates against preview -> pushes and creates PR.
+  Triggers: "Fix issue", "Continue issue", "Close issue", "Refine issue", "Plan issue".
+  Does: Parses intent -> fetches issue context -> branches -> implements/refines/plans ->
+        spins up preview stack (implement only) -> validates -> pushes and creates PR/spec/plan.
   NOT for: Running outside the dark-factory container.
 
 provider: claude
@@ -18,12 +18,12 @@ nodes:
     prompt: |
       Parse this command and extract two things:
       1. The GitHub issue number
-      2. The intent: "new" (first time working on this issue), "continue" (iterate on existing work), or "close" (merge and tear down)
+      2. The intent: "new" (first time working on this issue), "continue" (iterate on existing work), "close" (merge and tear down), "refine" (generate a design spec), or "plan" (generate an implementation plan)
 
       Command: $ARGUMENTS
 
       Output ONLY valid JSON, nothing else:
-      {"issue_number": <int>, "intent": "<new|continue|close>"}
+      {"issue_number": <int>, "intent": "<new|continue|close|refine|plan>"}
     allowed_tools: []
     model: haiku
     output_format:
@@ -33,7 +33,7 @@ nodes:
           type: integer
         intent:
           type: string
-          enum: [new, continue, close]
+          enum: [new, continue, close, refine, plan]
       required: [issue_number, intent]
 
   - id: fetch-issue
@@ -174,14 +174,86 @@ nodes:
       fi
       echo "$BRANCH"
     depends_on: [parse-intent, fetch-issue]
-    when: "$parse-intent.output.intent != 'close'"
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 15000
+
+  # Refinement branch setup (refine/issue-N-slug)
+  - id: setup-refine-branch
+    bash: |
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      SLUG=$(echo $fetch-issue.output | jq -r '.title // "feature"' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
+      BRANCH="refine/issue-${ISSUE}-${SLUG}"
+
+      EXISTING=$(git branch -r --list "origin/$BRANCH" 2>/dev/null)
+      if [ -n "$EXISTING" ]; then
+        git fetch origin "$BRANCH" && git checkout "$BRANCH"
+      else
+        git checkout -b "$BRANCH"
+      fi
+      echo "$BRANCH"
+    depends_on: [parse-intent, fetch-issue]
+    when: "$parse-intent.output.intent == 'refine' || $parse-intent.output.intent == 'plan'"
+    timeout: 15000
+
+  # Layer 2a: Refine — generate spec via multi-agent brainstorming
+  - id: refine
+    command: dark-factory-refine
+    depends_on: [setup-refine-branch, fetch-issue]
+    when: "$parse-intent.output.intent == 'refine'"
+    idle_timeout: 600000
+
+  # Layer 2b: Plan — generate implementation plan with architect review
+  - id: plan
+    command: dark-factory-plan
+    depends_on: [setup-refine-branch, fetch-issue]
+    when: "$parse-intent.output.intent == 'plan'"
+    idle_timeout: 600000
+
+  # Push refine branch after spec generation
+  - id: refine-push
+    bash: |
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      BRANCH=$(git branch --show-current)
+
+      git push -u origin "$BRANCH"
+      echo "Pushed $BRANCH for issue #$ISSUE"
+    depends_on: [refine]
+    when: "$parse-intent.output.intent == 'refine'"
+    timeout: 30000
+
+  # Push plan branch and advance issue to Ready
+  - id: plan-push-and-advance
+    bash: |
+      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      BRANCH=$(git branch --show-current)
+
+      git push -u origin "$BRANCH"
+
+      # Move issue to Ready
+      ITEM_ID=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
+        | jq -r ".items[] | select(.content.number == $ISSUE and .content.type == \"Issue\") | .id")
+      if [ -n "$ITEM_ID" ]; then
+        gh project item-edit \
+          --project-id PVT_kwHOAAFds84BWh4w \
+          --id "$ITEM_ID" \
+          --field-id PVTSSF_lAHOAAFds84BWh4wzhR1VaA \
+          --single-select-option-id 61e4505c
+        echo "Moved issue #$ISSUE to Ready"
+      fi
+
+      gh issue comment "$ISSUE" --body "Refinement pipeline complete. Spec and plan are on branch \`$BRANCH\`. Issue moved to **Ready** for implementation.
+
+      ---
+      *Posted by MarketHawk Refinement Pipeline*"
+    depends_on: [plan]
+    when: "$parse-intent.output.intent == 'plan'"
+    timeout: 30000
 
   # Layer 2: Implement the feature (status set to "In Progress" by entrypoint or epic resolver)
   - id: implement
     command: dark-factory-implement
     depends_on: [setup-branch, fetch-issue]
-    when: "$parse-intent.output.intent != 'close'"
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     idle_timeout: 600000
 
   # Layer 3: Spin up preview and validate
@@ -229,13 +301,13 @@ nodes:
       docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
       exit 1
     depends_on: [implement]
-    when: "$parse-intent.output.intent != 'close'"
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 300000
 
   - id: validate
     command: dark-factory-validate
     depends_on: [preview-up]
-    when: "$parse-intent.output.intent != 'close'"
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     idle_timeout: 300000
 
   # Layer 4: Push and create PR
@@ -280,7 +352,7 @@ nodes:
         echo "Created PR: $PR_URL"
       fi
     depends_on: [validate]
-    when: "$parse-intent.output.intent != 'close'"
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 30000
 
   # Layer 5: Move to "In review" and post report
@@ -300,7 +372,7 @@ nodes:
         echo "WARNING: Issue #$ISSUE not found on project board"
       fi
     depends_on: [push-and-pr]
-    when: "$parse-intent.output.intent != 'close'"
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 15000
 
   - id: report
@@ -360,5 +432,5 @@ nodes:
 
       echo "Report posted to issue #${ISSUE}"
     depends_on: [status-in-review]
-    when: "$parse-intent.output.intent != 'close'"
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 15000
