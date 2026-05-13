@@ -1,0 +1,4 @@
+# Dark factory build context — only include what the Dockerfile needs
+*
+!dark-factory/
+!.claude/skills/refinement/

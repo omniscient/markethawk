@@ -1,12 +1,41 @@
+# Backlog Scheduler Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build a Docker-based Kanban flow controller that polls the GitHub project board every 30 seconds and dispatches dark factory runs based on board state.
+
+**Architecture:** A single bash script (`scheduler.sh`) runs an infinite polling loop. Each cycle reads board state via `gh`, classifies PR comments via `claude -p` (Haiku), and dispatches dark factory containers via `docker compose`. A new `backlog-scheduler` Docker service reuses the existing dark-factory image with an entrypoint override.
+
+**Tech Stack:** Bash, `gh` CLI (GitHub Projects GraphQL API), `claude` CLI (Haiku model), `jq`, Docker CLI
+
+---
+
+## File Structure
+
+| File | Action | Responsibility |
+|------|--------|----------------|
+| `dark-factory/scheduler.sh` | Create | Polling loop, board state reading, comment classification, dispatch logic, retry tracking |
+| `dark-factory/Dockerfile` | Modify | Copy `scheduler.sh` into image |
+| `docker-compose.yml` | Modify | Add `backlog-scheduler` service under `scheduler` profile |
+
+---
+
+### Task 1: Create `scheduler.sh` — Configuration and Helpers
+
+**Files:**
+- Create: `dark-factory/scheduler.sh`
+
+- [ ] **Step 1: Create the script with configuration block and environment validation**
+
+```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
 # --- Configuration ---
-POLL_INTERVAL="${POLL_INTERVAL:-60}"
+POLL_INTERVAL="${POLL_INTERVAL:-30}"
 SKIP_LABELS="needs-discussion,epic"
 MAX_RETRIES="${MAX_RETRIES:-3}"
 STATE_FILE="/tmp/scheduler-state.json"
-RATE_LIMIT_FLOOR="${RATE_LIMIT_FLOOR:-200}"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -18,12 +47,6 @@ STATUS_IN_PROGRESS="47fc9ee4"
 STATUS_IN_REVIEW="df73e18b"
 STATUS_BLOCKED="93d87b2f"
 STATUS_DONE="98236657"
-STATUS_BACKLOG="f75ad846"
-STATUS_REFINED="0c79ebe5"
-
-# Refinement pipeline configuration
-REFINE_WIP_LIMIT="${REFINE_WIP_LIMIT:-2}"
-REFINE_SKIP_LABELS="needs-discussion,epic,spec-pending-review"
 
 # --- Validate required environment ---
 if [ -z "${GH_TOKEN:-}" ]; then
@@ -39,25 +62,13 @@ fi
 if [ ! -f "$STATE_FILE" ]; then
   echo '{}' > "$STATE_FILE"
 fi
+```
 
-# --- Rate limit guard ---
-check_rate_limit() {
-  local rate_json
-  rate_json=$(gh api rate_limit --jq '.resources.graphql' 2>/dev/null) || return 0
-  local remaining reset_at
-  remaining=$(echo "$rate_json" | jq -r '.remaining')
-  reset_at=$(echo "$rate_json" | jq -r '.reset')
-  if [ "$remaining" -le "$RATE_LIMIT_FLOOR" ]; then
-    local now
-    now=$(date +%s)
-    local wait=$((reset_at - now + 5))
-    if [ "$wait" -gt 0 ]; then
-      echo "[$(date -u +%FT%TZ)] rate_limit remaining=${remaining} sleeping=${wait}s until_reset"
-      sleep "$wait"
-    fi
-  fi
-}
+- [ ] **Step 2: Add helper functions for retry tracking**
 
+Append to `dark-factory/scheduler.sh`:
+
+```bash
 # --- Retry tracking ---
 get_retry_count() {
   local issue_num="$1"
@@ -80,92 +91,56 @@ reset_retry() {
   tmp=$(mktemp)
   jq --arg n "$issue_num" 'del(.[$n])' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
 }
+```
 
+- [ ] **Step 3: Add helper function to check for running dark-factory containers**
+
+Append to `dark-factory/scheduler.sh`:
+
+```bash
 # --- Duplicate dispatch prevention ---
 is_issue_running() {
   local issue_num="$1"
   docker ps --format '{{.Command}}' 2>/dev/null | grep -q "#${issue_num}" && return 0
   return 1
 }
+```
 
-count_refine_running() {
-  docker ps --format '{{.Command}}' 2>/dev/null | grep -cE 'Refine issue|Plan issue' || true
-}
+- [ ] **Step 4: Add dispatch helper**
 
-has_refine_skip_label() {
-  local item="$1"
-  local labels
-  labels=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
-  IFS=',' read -ra SKIP_ARRAY <<< "$REFINE_SKIP_LABELS"
-  for skip in "${SKIP_ARRAY[@]}"; do
-    if echo "$labels" | grep -qi "$skip"; then
-      return 0
-    fi
-  done
-  return 1
-}
+Append to `dark-factory/scheduler.sh`:
 
-has_new_comment_after_report() {
-  local issue_num="$1"
-  local report_marker="$2"
-  local comments
-  comments=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" --json comments -q '.comments' 2>/dev/null) || { echo "no"; return; }
-
-  local report_idx
-  report_idx=$(echo "$comments" | jq "map(.body) | to_entries | map(select(.value | test(\"$report_marker\"))) | last | .key // -1")
-
-  if [ "$report_idx" = "-1" ]; then
-    echo "no"
-    return
-  fi
-
-  local total
-  total=$(echo "$comments" | jq 'length')
-  local next_idx=$((report_idx + 1))
-  if [ "$next_idx" -lt "$total" ]; then
-    echo "yes"
-  else
-    echo "no"
-  fi
-}
-
+```bash
 # --- Dispatch ---
 dispatch() {
   local command="$1"
   echo "Dispatching: $command"
   docker compose -f /workspace/project/docker-compose.yml --profile factory run -d --rm dark-factory "$command"
 }
+```
 
+- [ ] **Step 5: Commit**
+
+```bash
+git add dark-factory/scheduler.sh
+git commit -m "feat(scheduler): add configuration, helpers, and dispatch logic (issue #2)"
+```
+
+---
+
+### Task 2: Board State Reading
+
+**Files:**
+- Modify: `dark-factory/scheduler.sh`
+
+- [ ] **Step 1: Add function to fetch all board items with their status and labels**
+
+Append to `dark-factory/scheduler.sh`:
+
+```bash
 # --- Board state ---
 fetch_board_items() {
-  local raw
-  raw=$(gh api graphql -f query='
-    query {
-      node(id: "'"$PROJECT_ID"'") {
-        ... on ProjectV2 {
-          items(first: 50) {
-            nodes {
-              fieldValueByName(name: "Status") {
-                ... on ProjectV2ItemFieldSingleSelectValue { name }
-              }
-              content {
-                ... on Issue {
-                  number
-                  title
-                  labels(first: 10) { nodes { name } }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  ')
-  echo "$raw" | jq '{items: [.data.node.items.nodes[]
-    | select(.content.number != null)
-    | {content: {number: .content.number, title: .content.title, type: "Issue"},
-       labels: [.content.labels.nodes[].name],
-       status: .fieldValueByName.name}]}'
+  gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --format json --limit 200
 }
 
 get_items_by_status() {
@@ -191,7 +166,13 @@ get_issue_number() {
   local item="$1"
   echo "$item" | jq -r '.content.number'
 }
+```
 
+- [ ] **Step 2: Add WIP limit reading via GraphQL**
+
+Append to `dark-factory/scheduler.sh`:
+
+```bash
 # --- WIP limits ---
 fetch_wip_limits() {
   local result
@@ -223,13 +204,19 @@ get_column_limit() {
     echo "999"
   fi
 }
+```
 
+- [ ] **Step 3: Add dependency checking**
+
+Append to `dark-factory/scheduler.sh`:
+
+```bash
 # --- Dependency checking ---
 dependencies_met() {
   local issue_num="$1"
   local board_items="$2"
   local body
-  body=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" --json body -q '.body' 2>/dev/null) || return 0
+  body=$(gh issue view "$issue_num" --json body -q '.body' 2>/dev/null) || return 0
   local deps
   deps=$(echo "$body" | grep -oP 'Depends on:\s*#\K\d+' || true)
   if [ -z "$deps" ]; then
@@ -244,18 +231,38 @@ dependencies_met() {
   done <<< "$deps"
   return 0
 }
+```
 
+- [ ] **Step 4: Commit**
+
+```bash
+git add dark-factory/scheduler.sh
+git commit -m "feat(scheduler): add board state reading, WIP limits, and dependency checks (issue #2)"
+```
+
+---
+
+### Task 3: Comment Classification
+
+**Files:**
+- Modify: `dark-factory/scheduler.sh`
+
+- [ ] **Step 1: Add function to detect new human comments on a PR**
+
+Append to `dark-factory/scheduler.sh`:
+
+```bash
 # --- Comment interpretation ---
 get_new_comments() {
   local issue_num="$1"
   local comments
-  comments=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" --json comments -q '.comments' 2>/dev/null) || { echo "[]"; return; }
+  comments=$(gh issue view "$issue_num" --json comments -q '.comments' 2>/dev/null) || { echo "[]"; return; }
 
   local factory_idx
   factory_idx=$(echo "$comments" | jq 'map(.body) | to_entries | map(select(.value | test("Posted by MarketHawk Dark Factory"))) | last | .key // -1')
 
   if [ "$factory_idx" = "-1" ]; then
-    echo "$comments"
+    echo "[]"
     return
   fi
 
@@ -269,7 +276,13 @@ get_new_comments() {
 
   echo "$comments" | jq --argjson s "$start_idx" '.[$s:]'
 }
+```
 
+- [ ] **Step 2: Add Claude Haiku classification function**
+
+Append to `dark-factory/scheduler.sh`:
+
+```bash
 classify_comments() {
   local issue_num="$1"
   local title="$2"
@@ -301,83 +314,51 @@ ${comment_text}"
     *) echo "SKIP" ;;
   esac
 }
+```
 
-# --- Fetch WIP limits once at startup (cached until restart) ---
-WIP_DATA=$(fetch_wip_limits)
-MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
-MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
-echo "WIP limits: in_progress=${MAX_IN_PROGRESS} in_review=${MAX_IN_REVIEW}"
+- [ ] **Step 3: Commit**
 
+```bash
+git add dark-factory/scheduler.sh
+git commit -m "feat(scheduler): add comment detection and Haiku classification (issue #2)"
+```
+
+---
+
+### Task 4: Main Polling Loop
+
+**Files:**
+- Modify: `dark-factory/scheduler.sh`
+
+- [ ] **Step 1: Add the main loop with the priority waterfall**
+
+Append to `dark-factory/scheduler.sh`:
+
+```bash
 # --- Main loop ---
 echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
 
 while true; do
   DISPATCHED=""
 
-  # Guard against rate limit exhaustion (REST call, doesn't cost GraphQL points)
-  check_rate_limit
-
   # Fetch board state
   BOARD_ITEMS=$(fetch_board_items 2>/dev/null) || { echo "[$(date -u +%FT%TZ)] error=gh_api_failed"; sleep "$POLL_INTERVAL"; continue; }
 
-  IN_REVIEW=$(get_items_by_status "$BOARD_ITEMS" "In review")
+  IN_REVIEW=$(get_items_by_status "$BOARD_ITEMS" "In Review")
   BLOCKED=$(get_items_by_status "$BOARD_ITEMS" "Blocked")
   READY=$(get_items_by_status "$BOARD_ITEMS" "Ready")
-  IN_PROGRESS=$(get_items_by_status "$BOARD_ITEMS" "In progress")
-
-  BACKLOG=$(get_items_by_status "$BOARD_ITEMS" "Backlog")
-  REFINED=$(get_items_by_status "$BOARD_ITEMS" "Refined")
+  IN_PROGRESS=$(get_items_by_status "$BOARD_ITEMS" "In Progress")
 
   IN_PROGRESS_COUNT=$(echo "$IN_PROGRESS" | jq 'length')
   IN_REVIEW_COUNT=$(echo "$IN_REVIEW" | jq 'length')
-  BACKLOG_COUNT=$(echo "$BACKLOG" | jq 'length')
-  REFINED_COUNT=$(echo "$REFINED" | jq 'length')
-  REFINE_RUNNING=$(count_refine_running)
 
-  # --- Priority 0: Backlog items (refinement) ---
-  while IFS= read -r item; do
-    [ -n "$DISPATCHED" ] && break
-    ISSUE=$(get_issue_number "$item")
-
-    # Handle spec-pending-review items first (before skip-label check would filter them)
-    ITEM_LABELS=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
-    if echo "$ITEM_LABELS" | grep -qi "spec-pending-review"; then
-      if ! is_issue_running "$ISSUE" && [ "$REFINE_RUNNING" -lt "$REFINE_WIP_LIMIT" ]; then
-        HAS_NEW=$(has_new_comment_after_report "$ISSUE" "Posted by MarketHawk Refinement Pipeline")
-        if [ "$HAS_NEW" = "yes" ]; then
-          gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --remove-label "spec-pending-review" 2>/dev/null || true
-          dispatch "Refine issue #${ISSUE}"
-          DISPATCHED="Refine issue #${ISSUE}"
-          REFINE_RUNNING=$((REFINE_RUNNING + 1))
-        fi
-      fi
-      continue
-    fi
-
-    if has_refine_skip_label "$item"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
-    if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
-
-    dispatch "Refine issue #${ISSUE}"
-    DISPATCHED="Refine issue #${ISSUE}"
-    REFINE_RUNNING=$((REFINE_RUNNING + 1))
-  done < <(echo "$BACKLOG" | jq -c '.[]')
-
-  # --- Priority 0.5: Refined items (plan generation) ---
-  while IFS= read -r item; do
-    [ -n "$DISPATCHED" ] && break
-    ISSUE=$(get_issue_number "$item")
-    if has_refine_skip_label "$item"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
-    if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
-
-    dispatch "Plan issue #${ISSUE}"
-    DISPATCHED="Plan issue #${ISSUE}"
-    REFINE_RUNNING=$((REFINE_RUNNING + 1))
-  done < <(echo "$REFINED" | jq -c '.[]')
+  # Read WIP limits
+  WIP_DATA=$(fetch_wip_limits)
+  MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
+  MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
 
   # --- Priority 1: In Review items with new comments ---
-  while IFS= read -r item; do
+  for item in $(echo "$IN_REVIEW" | jq -c '.[]'); do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
@@ -403,10 +384,10 @@ while true; do
         ;;
       SKIP) ;;
     esac
-  done < <(echo "$IN_REVIEW" | jq -c '.[]')
+  done
 
   # --- Priority 2: Blocked items (retry) ---
-  while IFS= read -r item; do
+  for item in $(echo "$BLOCKED" | jq -c '.[]'); do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
@@ -418,10 +399,10 @@ while true; do
     increment_retry "$ISSUE"
     dispatch "Fix issue #${ISSUE}"
     DISPATCHED="Fix issue #${ISSUE}"
-  done < <(echo "$BLOCKED" | jq -c '.[]')
+  done
 
   # --- Priority 3: Ready items (new work) ---
-  while IFS= read -r item; do
+  for item in $(echo "$READY" | jq -c '.[]'); do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
@@ -432,15 +413,138 @@ while true; do
 
     dispatch "Fix issue #${ISSUE}"
     DISPATCHED="Fix issue #${ISSUE}"
-  done < <(echo "$READY" | jq -c '.[]')
+  done
 
   # --- Log cycle summary ---
-  BUDGET=$(gh api rate_limit --jq '.resources.graphql | "\(.used)/\(.limit)"' 2>/dev/null) || BUDGET="?"
   if [ -n "$DISPATCHED" ]; then
-    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} dispatched=\"${DISPATCHED}\" graphql=${BUDGET}"
+    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} dispatched=\"${DISPATCHED}\""
   else
-    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} skip=nothing_to_do graphql=${BUDGET}"
+    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} skip=nothing_to_do"
   fi
 
   sleep "$POLL_INTERVAL"
 done
+```
+
+- [ ] **Step 2: Make the script executable**
+
+```bash
+chmod +x dark-factory/scheduler.sh
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add dark-factory/scheduler.sh
+git commit -m "feat(scheduler): add main polling loop with priority waterfall (issue #2)"
+```
+
+---
+
+### Task 5: Dockerfile and Docker Compose Updates
+
+**Files:**
+- Modify: `dark-factory/Dockerfile:66-70`
+- Modify: `docker-compose.yml:293` (insert after dark-factory service)
+
+- [ ] **Step 1: Add `scheduler.sh` to the Dockerfile**
+
+In `dark-factory/Dockerfile`, after the line that copies `entrypoint.sh`, add the copy for `scheduler.sh`:
+
+```dockerfile
+COPY scheduler.sh /opt/dark-factory/scheduler.sh
+```
+
+And after the `chmod` line for `entrypoint.sh`, add:
+
+```dockerfile
+RUN chmod +x /opt/dark-factory/scheduler.sh
+```
+
+The relevant section should become:
+
+```dockerfile
+# Copy entrypoint, preview template, seed data, and scheduler
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY scheduler.sh /opt/dark-factory/scheduler.sh
+COPY docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
+COPY seed_preview.sql /opt/dark-factory/seed_preview.sql
+RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
+```
+
+- [ ] **Step 2: Add `backlog-scheduler` service to `docker-compose.yml`**
+
+Insert after the `dark-factory` service block (after line 293) and before the `volumes:` block:
+
+```yaml
+  # Backlog Scheduler — polls GitHub board and dispatches dark factory runs
+  backlog-scheduler:
+    build:
+      context: ./dark-factory
+      dockerfile: Dockerfile
+    container_name: backlog-scheduler
+    restart: unless-stopped
+    entrypoint: ["/opt/dark-factory/scheduler.sh"]
+    env_file:
+      - path: .archon/.env
+        required: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/workspace/project:ro
+    networks:
+      - factory-network
+    profiles:
+      - scheduler
+```
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add dark-factory/Dockerfile docker-compose.yml
+git commit -m "feat(scheduler): add backlog-scheduler service to Docker stack (issue #2)"
+```
+
+---
+
+### Task 6: Manual Smoke Test
+
+- [ ] **Step 1: Build the image**
+
+```bash
+docker compose --profile scheduler build backlog-scheduler
+```
+
+Expected: Build completes successfully, `scheduler.sh` is copied into the image.
+
+- [ ] **Step 2: Verify the script is in the image**
+
+```bash
+docker compose --profile scheduler run --rm --entrypoint cat backlog-scheduler /opt/dark-factory/scheduler.sh | head -5
+```
+
+Expected: First 5 lines of `scheduler.sh` printed.
+
+- [ ] **Step 3: Start the scheduler and watch one cycle**
+
+```bash
+docker compose --profile scheduler up -d backlog-scheduler
+docker compose logs -f backlog-scheduler
+```
+
+Expected: See the startup message `Backlog scheduler started (poll every 30s)` followed by a log line like:
+```
+[2026-05-13T...Z] in_progress=N/M in_review=N/M skip=nothing_to_do
+```
+
+- [ ] **Step 4: Stop the scheduler**
+
+```bash
+docker compose --profile scheduler down
+```
+
+- [ ] **Step 5: Final commit (if any fixups were needed)**
+
+```bash
+git add -A
+git commit -m "fix(scheduler): smoke test fixups (issue #2)"
+```

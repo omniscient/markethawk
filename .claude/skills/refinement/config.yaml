@@ -1,0 +1,11 @@
+# .claude/skills/refinement/config.yaml
+refine:
+  wip_limit: 2
+  skip_labels:
+    - needs-discussion
+    - epic
+    - spec-pending-review
+  min_issue_body_length: 20
+
+plan:
+  auto_advance_to_ready: true
