@@ -61,7 +61,7 @@ Fix issues inline.
 
 ## Subagent Invocation
 
-To ask the product owner a question, spawn a subagent with:
+Use the Agent tool to spawn a product-owner subagent for each question:
 - Description: "Product owner: <short question summary>"
 - Prompt: The full content of `product-owner-prompt.md` with $ISSUE_CONTEXT, $QA_HISTORY, and $QUESTION replaced
 - The subagent should have access to Read, Grep, and Glob tools for codebase exploration

@@ -34,6 +34,9 @@ Flag any: "TBD", "TODO", "implement later", "add appropriate error handling", "s
 
 ## Output Format
 
+Your response must follow this exact structure:
+
+```
 ## Architect Review
 
 **Status:** Approved | Issues Found
@@ -43,6 +46,7 @@ Flag any: "TBD", "TODO", "implement later", "add appropriate error handling", "s
 
 **Recommendations (advisory, do not block approval):**
 - [suggestions]
+```
 
 ## Context
 
