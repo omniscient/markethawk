@@ -232,7 +232,7 @@ while true; do
   MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
 
   # --- Priority 1: In Review items with new comments ---
-  for item in $(echo "$IN_REVIEW" | jq -c '.[]'); do
+  while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
@@ -258,10 +258,10 @@ while true; do
         ;;
       SKIP) ;;
     esac
-  done
+  done < <(echo "$IN_REVIEW" | jq -c '.[]')
 
   # --- Priority 2: Blocked items (retry) ---
-  for item in $(echo "$BLOCKED" | jq -c '.[]'); do
+  while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
@@ -273,10 +273,10 @@ while true; do
     increment_retry "$ISSUE"
     dispatch "Fix issue #${ISSUE}"
     DISPATCHED="Fix issue #${ISSUE}"
-  done
+  done < <(echo "$BLOCKED" | jq -c '.[]')
 
   # --- Priority 3: Ready items (new work) ---
-  for item in $(echo "$READY" | jq -c '.[]'); do
+  while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
@@ -287,7 +287,7 @@ while true; do
 
     dispatch "Fix issue #${ISSUE}"
     DISPATCHED="Fix issue #${ISSUE}"
-  done
+  done < <(echo "$READY" | jq -c '.[]')
 
   # --- Log cycle summary ---
   if [ -n "$DISPATCHED" ]; then
