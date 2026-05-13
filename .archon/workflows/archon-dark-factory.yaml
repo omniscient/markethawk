@@ -244,16 +244,29 @@ nodes:
         -f dark-factory/docker-compose.preview.yml \
         up -d --build
 
-      echo "Initializing database schema..."
-      docker compose -p "mh-preview-${ISSUE}" \
+      echo "Checking database state..."
+      TABLE_COUNT=$(docker compose -p "mh-preview-${ISSUE}" \
         -f dark-factory/docker-compose.preview.yml \
-        exec -T backend python -c 'from app.core.database import Base, engine; from app.models import *; from sqlalchemy import inspect; tables = inspect(engine).get_table_names(); Base.metadata.create_all(bind=engine) if not tables else None; print("Created tables" if not tables else "Tables exist")'
-      docker compose -p "mh-preview-${ISSUE}" \
-        -f dark-factory/docker-compose.preview.yml \
-        exec -T backend python -m alembic stamp head
-      docker compose -p "mh-preview-${ISSUE}" \
-        -f dark-factory/docker-compose.preview.yml \
-        exec -T backend python -m alembic upgrade head
+        exec -T postgres psql -U postgres -d stockscanner -tAc \
+        "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" 2>/dev/null || echo "0")
+
+      if [ "${TABLE_COUNT:-0}" -gt 0 ]; then
+        echo "Existing DB detected (${TABLE_COUNT} tables) — skipping create_all and stamp head, running alembic upgrade head only..."
+        docker compose -p "mh-preview-${ISSUE}" \
+          -f dark-factory/docker-compose.preview.yml \
+          exec -T backend python -m alembic upgrade head
+      else
+        echo "Fresh DB — running full bootstrap (create_all, stamp head, upgrade head)..."
+        docker compose -p "mh-preview-${ISSUE}" \
+          -f dark-factory/docker-compose.preview.yml \
+          exec -T backend python -c 'from app.core.database import Base, engine; from app.models import *; Base.metadata.create_all(bind=engine); print("Tables created")'
+        docker compose -p "mh-preview-${ISSUE}" \
+          -f dark-factory/docker-compose.preview.yml \
+          exec -T backend python -m alembic stamp head
+        docker compose -p "mh-preview-${ISSUE}" \
+          -f dark-factory/docker-compose.preview.yml \
+          exec -T backend python -m alembic upgrade head
+      fi
 
       PREVIEW_NET="mh-preview-${ISSUE}_preview-network"
       docker network connect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
