@@ -141,6 +141,28 @@ def _make_canned_polygon_news_response(tickers: list[str] | None = None) -> dict
 
 
 @pytest.fixture
+def mock_futures_provider():
+    """
+    Replace the 'ibkr' provider in DataProviderFactory with a MagicMock that
+    reports as available and supports futures. Restores the real provider on teardown.
+    """
+    mock = MagicMock()
+    mock.name = "ibkr"
+    mock.supported_asset_classes = ["futures"]
+    mock.is_available.return_value = (True, "Ready (mock)")
+
+    original = DataProviderFactory._providers.get("ibkr")
+    DataProviderFactory._providers["ibkr"] = mock
+
+    yield mock
+
+    if original is not None:
+        DataProviderFactory._providers["ibkr"] = original
+    else:
+        DataProviderFactory._providers.pop("ibkr", None)
+
+
+@pytest.fixture
 def mock_news_provider():
     """
     Patch httpx.Client.get so poll_massive_news never calls the real Polygon API.
