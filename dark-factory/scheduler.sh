@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # --- Configuration ---
-POLL_INTERVAL="${POLL_INTERVAL:-30}"
+POLL_INTERVAL="${POLL_INTERVAL:-60}"
 SKIP_LABELS="needs-discussion,epic"
 MAX_RETRIES="${MAX_RETRIES:-3}"
 STATE_FILE="/tmp/scheduler-state.json"
@@ -228,6 +228,12 @@ ${comment_text}"
   esac
 }
 
+# --- Fetch WIP limits once at startup (cached until restart) ---
+WIP_DATA=$(fetch_wip_limits)
+MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
+MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
+echo "WIP limits: in_progress=${MAX_IN_PROGRESS} in_review=${MAX_IN_REVIEW}"
+
 # --- Main loop ---
 echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
 
@@ -247,11 +253,6 @@ while true; do
 
   IN_PROGRESS_COUNT=$(echo "$IN_PROGRESS" | jq 'length')
   IN_REVIEW_COUNT=$(echo "$IN_REVIEW" | jq 'length')
-
-  # Read WIP limits
-  WIP_DATA=$(fetch_wip_limits)
-  MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
-  MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
 
   # --- Priority 1: In Review items with new comments ---
   while IFS= read -r item; do
