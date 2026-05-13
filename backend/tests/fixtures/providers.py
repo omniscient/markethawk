@@ -67,3 +67,27 @@ def mock_polygon_provider():
         DataProviderFactory._providers["massive"] = original
     else:
         DataProviderFactory._providers.pop("massive", None)
+
+
+@pytest.fixture
+def mock_futures_provider():
+    """
+    Replace the 'ibkr' provider in DataProviderFactory with a MagicMock that
+    returns canned futures data.  Restores the real provider on teardown.
+    """
+    mock = MagicMock()
+    mock.name = "ibkr"
+    mock.supported_asset_classes = ["futures"]
+    mock.is_available.return_value = (True, "Ready (mock)")
+    mock.get_historical_bars.side_effect = lambda symbol, **kwargs: _make_canned_bars(symbol)
+    mock.get_ticker_details.return_value = {}
+
+    original = DataProviderFactory._providers.get("ibkr")
+    DataProviderFactory._providers["ibkr"] = mock
+
+    yield mock
+
+    if original is not None:
+        DataProviderFactory._providers["ibkr"] = original
+    else:
+        DataProviderFactory._providers.pop("ibkr", None)
