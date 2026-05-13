@@ -1,14 +1,20 @@
 """
 Provider mock helpers.
 Patches DataProviderFactory so no real Polygon calls are made during tests.
+Also provides news article seeding and a mock for the Polygon news HTTP call.
 """
 
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+from typing import Optional
 
 import pytest
+from sqlalchemy.orm import Session
+
+import uuid as _uuid
 
 from app.providers import DataProviderFactory
+from app.models.news_article import NewsArticle
 
 
 def _make_canned_bars(ticker: str, count: int = 5) -> list[dict]:
@@ -67,3 +73,86 @@ def mock_polygon_provider():
         DataProviderFactory._providers["massive"] = original
     else:
         DataProviderFactory._providers.pop("massive", None)
+
+
+def seed_news_articles(
+    db: Session,
+    count: int = 3,
+    tickers: Optional[list[str]] = None,
+) -> list[NewsArticle]:
+    """
+    Insert `count` NewsArticle rows into `db`.
+    If `tickers` is provided each article is tagged with all of them;
+    otherwise articles cycle through ["AAPL", "MSFT", "NVDA"].
+    Returns the list of created rows.
+    """
+    default_tickers = ["AAPL", "MSFT", "NVDA"]
+    base_time = datetime.now(timezone.utc) - timedelta(hours=count)
+    rows = []
+    for i in range(count):
+        article_tickers = tickers if tickers is not None else [default_tickers[i % len(default_tickers)]]
+        row = NewsArticle(
+            title=f"Test Article {i + 1}: Market Update",
+            author="Test Author",
+            published_utc=(base_time + timedelta(hours=i)).replace(tzinfo=None),
+            article_url=f"https://test.example.com/news/{_uuid.uuid4()}",
+            image_url=f"https://test.example.com/images/{i + 1}.jpg",
+            description=f"Description for test article {i + 1}.",
+            provider="Test Provider",
+            tickers=article_tickers,
+        )
+        db.add(row)
+        rows.append(row)
+    db.flush()
+    return rows
+
+
+def _make_canned_polygon_news_response(tickers: list[str] | None = None) -> dict:
+    """Return a fake Polygon /v2/reference/news JSON response body."""
+    if tickers is None:
+        tickers = ["AAPL"]
+    now = datetime.now(timezone.utc)
+    return {
+        "results": [
+            {
+                "title": "Canned News Article 1",
+                "author": "Polygon Test",
+                "published_utc": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "article_url": "https://polygon.test/news/canned-1",
+                "image_url": "https://polygon.test/images/canned-1.jpg",
+                "description": "Canned article 1 description.",
+                "publisher": {"name": "PolygonTest"},
+                "tickers": tickers,
+            },
+            {
+                "title": "Canned News Article 2",
+                "author": "Polygon Test",
+                "published_utc": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "article_url": "https://polygon.test/news/canned-2",
+                "image_url": None,
+                "description": "Canned article 2 description.",
+                "publisher": {"name": "PolygonTest"},
+                "tickers": tickers,
+            },
+        ],
+        "status": "OK",
+        "count": 2,
+    }
+
+
+@pytest.fixture
+def mock_news_provider():
+    """
+    Patch httpx.Client.get so poll_massive_news never calls the real Polygon API.
+    Yields the mock for optional assertion in tests.
+    """
+    import json
+    from unittest.mock import MagicMock
+
+    fake_response = MagicMock()
+    fake_response.status_code = 200
+    fake_response.json.return_value = _make_canned_polygon_news_response()
+    fake_response.raise_for_status = MagicMock()
+
+    with patch("httpx.Client.get", return_value=fake_response) as mock_get:
+        yield mock_get
