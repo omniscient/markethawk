@@ -69,3 +69,85 @@ dispatch() {
   echo "Dispatching: $command"
   docker compose -f /workspace/project/docker-compose.yml --profile factory run -d --rm dark-factory "$command"
 }
+
+# --- Board state ---
+fetch_board_items() {
+  gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --format json --limit 200
+}
+
+get_items_by_status() {
+  local items="$1"
+  local status_name="$2"
+  echo "$items" | jq -c "[.items[] | select(.status == \"$status_name\") | select(.content.type == \"Issue\")]"
+}
+
+has_skip_label() {
+  local item="$1"
+  local labels
+  labels=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
+  IFS=',' read -ra SKIP_ARRAY <<< "$SKIP_LABELS"
+  for skip in "${SKIP_ARRAY[@]}"; do
+    if echo "$labels" | grep -qi "$skip"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+get_issue_number() {
+  local item="$1"
+  echo "$item" | jq -r '.content.number'
+}
+
+# --- WIP limits ---
+fetch_wip_limits() {
+  local result
+  result=$(gh api graphql -f query='
+    query {
+      node(id: "'"$PROJECT_ID"'") {
+        ... on ProjectV2 {
+          field(name: "Status") {
+            ... on ProjectV2SingleSelectField {
+              options { id name description }
+            }
+          }
+        }
+      }
+    }
+  ' 2>/dev/null) || true
+  echo "$result"
+}
+
+get_column_limit() {
+  local wip_data="$1"
+  local option_id="$2"
+  local desc
+  desc=$(echo "$wip_data" | jq -r --arg id "$option_id" \
+    '.data.node.field.options[] | select(.id == $id) | .description // ""' 2>/dev/null)
+  if echo "$desc" | grep -qoP 'limit:\s*\K\d+'; then
+    echo "$desc" | grep -oP 'limit:\s*\K\d+'
+  else
+    echo "999"
+  fi
+}
+
+# --- Dependency checking ---
+dependencies_met() {
+  local issue_num="$1"
+  local board_items="$2"
+  local body
+  body=$(gh issue view "$issue_num" --json body -q '.body' 2>/dev/null) || return 0
+  local deps
+  deps=$(echo "$body" | grep -oP 'Depends on:\s*#\K\d+' || true)
+  if [ -z "$deps" ]; then
+    return 0
+  fi
+  while IFS= read -r dep_num; do
+    local dep_status
+    dep_status=$(echo "$board_items" | jq -r ".items[] | select(.content.number == $dep_num) | .status" 2>/dev/null)
+    if [ "$dep_status" != "Done" ]; then
+      return 1
+    fi
+  done <<< "$deps"
+  return 0
+}
