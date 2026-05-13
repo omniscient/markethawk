@@ -279,8 +279,8 @@ services:
   # Dark Factory — autonomous development agent (run on demand)
   dark-factory:
     build:
-      context: ./dark-factory
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dark-factory/Dockerfile
     container_name: markethawk-dark-factory
     env_file:
       - path: .archon/.env
@@ -295,8 +295,8 @@ services:
   # Backlog Scheduler — polls GitHub board and dispatches dark factory runs
   backlog-scheduler:
     build:
-      context: ./dark-factory
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dark-factory/Dockerfile
     container_name: backlog-scheduler
     restart: unless-stopped
     entrypoint: ["/opt/dark-factory/scheduler.sh"]
