@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from app.services.scanner import ScannerService
 from app.models.stock_aggregate import StockAggregate
+from app.models.system_config import SystemConfig
 
 
 def _make_daily_bar(ticker, timestamp_utc, close, volume):
@@ -23,7 +24,8 @@ def _make_daily_bar(ticker, timestamp_utc, close, volume):
     return b
 
 
-def _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_volume):
+def _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_volume,
+                             system_config_rows=None):
     """Return a mock DB session wired for run_pre_market_scan."""
     from datetime import timedelta
     from zoneinfo import ZoneInfo
@@ -35,15 +37,22 @@ def _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_
         for i, (c, v) in enumerate(zip(daily_closes, daily_volumes))
     ]
 
+    # Default: no system_config rows → scanner falls back to static 4× defaults
+    cfg_rows = system_config_rows if system_config_rows is not None else []
+
     db = MagicMock()
 
     def query_side_effect(model):
         mock_q = MagicMock()
         mock_q.filter.return_value = mock_q
         mock_q.order_by.return_value = mock_q
-        if model is StockAggregate:
+        if model is SystemConfig:
+            mock_q.all.return_value = cfg_rows
+        elif model is StockAggregate:
             mock_q.all.return_value = daily_bars
+            mock_q.scalar.return_value = pm_volume
         else:
+            # func.sum(StockAggregate.volume) path
             mock_q.scalar.return_value = pm_volume
         return mock_q
 
@@ -192,3 +201,119 @@ def test_liquidity_hunt_for_date_wrapper_exists_in_new_module():
     import asyncio
     from app.services.liquidity_hunt import run_liquidity_hunt_scan_for_date
     assert asyncio.iscoroutinefunction(run_liquidity_hunt_scan_for_date)
+
+
+# ---------------------------------------------------------------------------
+# TimesFM anomaly score integration tests
+# ---------------------------------------------------------------------------
+
+def test_pre_market_scan_includes_anomaly_indicators_when_timesfm_unavailable():
+    """When TimesFM is unavailable, indicators still include the anomaly fields (None/static_4x)."""
+    ticker = "METRIC"
+    event_date = date(2025, 4, 1)
+    daily_closes = [100.0] * 25
+    daily_volumes = [1_000_000] * 25
+    pm_volume = 5_000_000  # 5x → passes static 4x threshold
+
+    db = _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_volume)
+
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+         patch.object(ScannerService, 'calculate_day_metrics', return_value={
+             "closing_price": 102.0, "pre_market_close": 101.0,
+             "opening_price": 101.0, "regular_high": 103.0, "regular_low": 99.0,
+         }), \
+         patch.object(ScannerService, '_save_event', return_value={"id": 1}) as mock_save:
+
+        asyncio.run(ScannerService.run_pre_market_scan([ticker], db, event_date=event_date))
+
+    indicators = mock_save.call_args.kwargs["indicators"]
+    assert "volume_anomaly_score" in indicators
+    assert "predicted_volume_p50" in indicators
+    assert "predicted_volume_p90" in indicators
+    assert indicators["volume_threshold_method"] == "static_4x"
+    # TimesFM not installed → score is None
+    assert indicators["volume_anomaly_score"] is None
+
+
+def test_pre_market_scan_uses_timesfm_threshold_when_enabled():
+    """Phase 1b: with timesfm_enabled=true, a stock below 4x but with z-score >= 2.0 is detected."""
+    ticker = "LOWVOL"
+    event_date = date(2025, 4, 2)
+    daily_closes = [50.0] * 25
+    daily_volumes = [2_000_000] * 25
+    # pre_market_volume is only 2x avg (< 4x) — would fail static threshold
+    pm_volume = 4_000_000
+
+    # Inject system_config rows enabling TimesFM
+    def _make_cfg(key, value):
+        row = MagicMock(spec=SystemConfig)
+        row.key = key
+        row.value = value
+        return row
+
+    cfg_rows = [
+        _make_cfg('timesfm_enabled', 'true'),
+        _make_cfg('timesfm_anomaly_threshold', '2.0'),
+        _make_cfg('timesfm_min_history_bars', '10'),
+        _make_cfg('timesfm_fallback_multiplier', '4.0'),
+    ]
+
+    db = _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_volume,
+                                 system_config_rows=cfg_rows)
+
+    # Provide a mocked forecast that gives anomaly_score = 3.0 (≥ 2.0 → passes)
+    mock_forecast = {"mean": 1_000_000.0, "std": 1_000_000.0, "p50": 900_000.0, "p90": 2_000_000.0}
+
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+         patch.object(ScannerService, 'calculate_day_metrics', return_value={
+             "closing_price": 52.0, "pre_market_close": 51.0,
+             "opening_price": 51.0, "regular_high": 53.0, "regular_low": 49.0,
+         }), \
+         patch('app.services.scanner.get_volume_forecast', return_value=mock_forecast), \
+         patch.object(ScannerService, '_save_event', return_value={"id": 2}) as mock_save:
+
+        results = asyncio.run(ScannerService.run_pre_market_scan([ticker], db, event_date=event_date))
+
+    # anomaly_score = (4_000_000 - 1_000_000) / 1_000_000 = 3.0 ≥ 2.0 → detected
+    mock_save.assert_called_once()
+    indicators = mock_save.call_args.kwargs["indicators"]
+    assert indicators["volume_threshold_method"] == "timesfm"
+    assert indicators["volume_anomaly_score"] == 3.0
+    assert len(results) == 1
+
+
+def test_pre_market_scan_static_fallback_when_timesfm_score_below_threshold():
+    """Phase 1b: with timesfm_enabled=true but anomaly_score < 2.0, event is not saved."""
+    ticker = "QUIET"
+    event_date = date(2025, 4, 3)
+    daily_closes = [50.0] * 25
+    daily_volumes = [1_000_000] * 25
+    pm_volume = 1_200_000  # only 1.2x avg → score would be low
+
+    def _make_cfg(key, value):
+        row = MagicMock(spec=SystemConfig)
+        row.key = key
+        row.value = value
+        return row
+
+    cfg_rows = [
+        _make_cfg('timesfm_enabled', 'true'),
+        _make_cfg('timesfm_anomaly_threshold', '2.0'),
+        _make_cfg('timesfm_min_history_bars', '10'),
+        _make_cfg('timesfm_fallback_multiplier', '4.0'),
+    ]
+
+    db = _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_volume,
+                                 system_config_rows=cfg_rows)
+
+    # Forecast gives score = (1_200_000 - 1_000_000) / 500_000 = 0.4 → below 2.0
+    mock_forecast = {"mean": 1_000_000.0, "std": 500_000.0, "p50": 950_000.0, "p90": 1_500_000.0}
+
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+         patch('app.services.scanner.get_volume_forecast', return_value=mock_forecast), \
+         patch.object(ScannerService, '_save_event', return_value={"id": 3}) as mock_save:
+
+        results = asyncio.run(ScannerService.run_pre_market_scan([ticker], db, event_date=event_date))
+
+    mock_save.assert_not_called()
+    assert results == []

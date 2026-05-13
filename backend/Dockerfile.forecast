@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir "timesfm[torch]"
+
+COPY . .
+
+CMD ["celery", "-A", "app.core.celery_app:celery_app", "worker", "-Q", "forecasting", "--concurrency=1", "--loglevel=info"]
