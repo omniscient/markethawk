@@ -313,10 +313,11 @@ while true; do
   done < <(echo "$READY" | jq -c '.[]')
 
   # --- Log cycle summary ---
+  BUDGET=$(gh api rate_limit --jq '.resources.graphql | "\(.used)/\(.limit)"' 2>/dev/null) || BUDGET="?"
   if [ -n "$DISPATCHED" ]; then
-    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} dispatched=\"${DISPATCHED}\""
+    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} dispatched=\"${DISPATCHED}\" graphql=${BUDGET}"
   else
-    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} skip=nothing_to_do"
+    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} skip=nothing_to_do graphql=${BUDGET}"
   fi
 
   sleep "$POLL_INTERVAL"
