@@ -18,8 +18,10 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.monitored_stock import MonitoredStock
 from app.models.ticker_reference import TickerReference
 from app.models.stock_split import StockSplit
+from app.models.system_config import SystemConfig
 from app.services.catalyst_parser import CatalystParser
 from app.services.event_helpers import generate_event_summary, compute_event_severity
+from app.services.timeseries_forecast import get_volume_forecast, compute_anomaly_score
 
 
 class ScannerService:
@@ -259,6 +261,18 @@ class ScannerService:
         day_end_utc = (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
         hist_start_utc = (day_start_et - timedelta(days=90)).astimezone(timezone.utc).replace(tzinfo=None)
 
+        # Read TimesFM config once before the ticker loop
+        _timesfm_config_keys = [
+            'timesfm_enabled', 'timesfm_anomaly_threshold',
+            'timesfm_min_history_bars', 'timesfm_fallback_multiplier',
+        ]
+        _cfg_rows = db.query(SystemConfig).filter(SystemConfig.key.in_(_timesfm_config_keys)).all()
+        _cfg = {r.key: r.value for r in _cfg_rows}
+        timesfm_enabled = _cfg.get('timesfm_enabled', 'false').lower() == 'true'
+        anomaly_threshold = float(_cfg.get('timesfm_anomaly_threshold', '2.0'))
+        min_history_bars = int(_cfg.get('timesfm_min_history_bars', '30'))
+        fallback_multiplier = float(_cfg.get('timesfm_fallback_multiplier', '4.0'))
+
         enrichment_batch = await asyncio.to_thread(
             ScannerService._get_batch_enrichment_data, tickers, event_date, db
         )
@@ -301,8 +315,24 @@ class ScannerService:
 
                 relative_volume = pre_market_volume / avg_volume_20d if avg_volume_20d > 0 else 0
 
+                # TimesFM anomaly score — Phase 1a/1b
+                forecast = (
+                    get_volume_forecast(ticker, volumes[-60:])
+                    if len(volumes) >= min_history_bars
+                    else None
+                )
+                anomaly_score = compute_anomaly_score(pre_market_volume, forecast)
+
+                # Phase 1b: dynamic threshold when enabled and score available
+                if timesfm_enabled and anomaly_score is not None:
+                    volume_spike_ok = anomaly_score >= anomaly_threshold
+                    threshold_method = 'timesfm'
+                else:
+                    volume_spike_ok = pre_market_volume > (avg_volume_20d * fallback_multiplier)
+                    threshold_method = 'static_4x'
+
                 criteria_met = {
-                    "volume_spike": pre_market_volume > (avg_volume_20d * 4),
+                    "volume_spike": volume_spike_ok,
                     "minimum_volume": pre_market_volume > 100000,
                     "liquidity": avg_volume_20d > 500000,
                 }
@@ -323,6 +353,10 @@ class ScannerService:
                         "gap_pct": round(gap_pct, 4),
                         "fade_from_high_pct": round(fade_from_high_pct, 4),
                         "day_range_pct": round(day_range_pct, 4),
+                        "volume_anomaly_score": round(anomaly_score, 4) if anomaly_score is not None else None,
+                        "predicted_volume_p50": round(forecast["p50"]) if forecast else None,
+                        "predicted_volume_p90": round(forecast["p90"]) if forecast else None,
+                        "volume_threshold_method": threshold_method,
                     }
 
                     enrichment = enrichment_batch.get(ticker.upper(), {})

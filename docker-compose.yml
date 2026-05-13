@@ -311,6 +311,33 @@ services:
     profiles:
       - scheduler
 
+  # TimesFM forecast worker — dedicated Celery worker for the 'forecasting' queue.
+  # The 200M-parameter model requires ~32GB RAM; limit is set to 36GB for headroom.
+  # Model weights (~800MB) are downloaded once from Hugging Face and cached in a volume.
+  forecast-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.forecast
+    container_name: stockscanner-forecast-worker
+    command: celery -A app.core.celery_app:celery_app worker -Q forecasting --concurrency=1 --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 36G
+    volumes:
+      - timesfm_cache:/root/.cache/huggingface
+    networks:
+      - stockscanner-network
+    profiles:
+      - forecasting
+
 volumes:
   postgres_data:
     external: true
@@ -327,6 +354,7 @@ volumes:
   ib_gateway_settings:
     external: true
     name: markethawk_ib_gateway_settings
+  timesfm_cache:
 
 
 networks:
