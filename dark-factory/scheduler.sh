@@ -6,6 +6,7 @@ POLL_INTERVAL="${POLL_INTERVAL:-30}"
 SKIP_LABELS="needs-discussion,epic"
 MAX_RETRIES="${MAX_RETRIES:-3}"
 STATE_FILE="/tmp/scheduler-state.json"
+RATE_LIMIT_FLOOR="${RATE_LIMIT_FLOOR:-200}"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -32,6 +33,24 @@ fi
 if [ ! -f "$STATE_FILE" ]; then
   echo '{}' > "$STATE_FILE"
 fi
+
+# --- Rate limit guard ---
+check_rate_limit() {
+  local rate_json
+  rate_json=$(gh api rate_limit --jq '.resources.graphql' 2>/dev/null) || return 0
+  local remaining reset_at
+  remaining=$(echo "$rate_json" | jq -r '.remaining')
+  reset_at=$(echo "$rate_json" | jq -r '.reset')
+  if [ "$remaining" -le "$RATE_LIMIT_FLOOR" ]; then
+    local now
+    now=$(date +%s)
+    local wait=$((reset_at - now + 5))
+    if [ "$wait" -gt 0 ]; then
+      echo "[$(date -u +%FT%TZ)] rate_limit remaining=${remaining} sleeping=${wait}s until_reset"
+      sleep "$wait"
+    fi
+  fi
+}
 
 # --- Retry tracking ---
 get_retry_count() {
@@ -214,6 +233,9 @@ echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
 
 while true; do
   DISPATCHED=""
+
+  # Guard against rate limit exhaustion (REST call, doesn't cost GraphQL points)
+  check_rate_limit
 
   # Fetch board state
   BOARD_ITEMS=$(fetch_board_items 2>/dev/null) || { echo "[$(date -u +%FT%TZ)] error=gh_api_failed"; sleep "$POLL_INTERVAL"; continue; }
