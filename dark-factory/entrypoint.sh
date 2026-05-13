@@ -36,6 +36,8 @@ if [ -z "$ARGUMENTS" ]; then
   echo "Usage: docker compose --profile factory run --rm dark-factory \"Fix issue #3\""
   echo "       docker compose --profile factory run --rm dark-factory \"Continue issue #3\""
   echo "       docker compose --profile factory run --rm dark-factory \"Close issue #3\""
+  echo "       docker compose --profile factory run --rm dark-factory \"Refine issue #3\""
+  echo "       docker compose --profile factory run --rm dark-factory \"Plan issue #3\""
   exit 1
 fi
 

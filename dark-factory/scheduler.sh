@@ -89,7 +89,7 @@ is_issue_running() {
 }
 
 count_refine_running() {
-  docker ps --format '{{.Command}}' 2>/dev/null | grep -c '"Refine issue\|"Plan issue' || echo "0"
+  docker ps --format '{{.Command}}' 2>/dev/null | grep -cE 'Refine issue|Plan issue' || true
 }
 
 has_refine_skip_label() {
@@ -338,22 +338,25 @@ while true; do
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
-    if has_refine_skip_label "$item"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
-    if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
-    # Check for spec-pending-review items with new human comments (re-run refinement)
+    # Handle spec-pending-review items first (before skip-label check would filter them)
     ITEM_LABELS=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
     if echo "$ITEM_LABELS" | grep -qi "spec-pending-review"; then
-      HAS_NEW=$(has_new_comment_after_report "$ISSUE" "Posted by MarketHawk Refinement Pipeline")
-      if [ "$HAS_NEW" = "yes" ]; then
-        gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --remove-label "spec-pending-review" 2>/dev/null || true
-        dispatch "Refine issue #${ISSUE}"
-        DISPATCHED="Refine issue #${ISSUE}"
-        REFINE_RUNNING=$((REFINE_RUNNING + 1))
+      if ! is_issue_running "$ISSUE" && [ "$REFINE_RUNNING" -lt "$REFINE_WIP_LIMIT" ]; then
+        HAS_NEW=$(has_new_comment_after_report "$ISSUE" "Posted by MarketHawk Refinement Pipeline")
+        if [ "$HAS_NEW" = "yes" ]; then
+          gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --remove-label "spec-pending-review" 2>/dev/null || true
+          dispatch "Refine issue #${ISSUE}"
+          DISPATCHED="Refine issue #${ISSUE}"
+          REFINE_RUNNING=$((REFINE_RUNNING + 1))
+        fi
       fi
       continue
     fi
+
+    if has_refine_skip_label "$item"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+    if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
     dispatch "Refine issue #${ISSUE}"
     DISPATCHED="Refine issue #${ISSUE}"
@@ -364,7 +367,7 @@ while true; do
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
-    if has_skip_label "$item"; then continue; fi
+    if has_refine_skip_label "$item"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
