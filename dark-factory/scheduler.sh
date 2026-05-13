@@ -91,7 +91,7 @@ dispatch() {
 
 # --- Board state ---
 fetch_board_items() {
-  gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --format json --limit 200
+  gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --format json --limit 30
 }
 
 get_items_by_status() {
