@@ -18,6 +18,12 @@ STATUS_IN_PROGRESS="47fc9ee4"
 STATUS_IN_REVIEW="df73e18b"
 STATUS_BLOCKED="93d87b2f"
 STATUS_DONE="98236657"
+STATUS_BACKLOG="f75ad846"
+STATUS_REFINED="0c79ebe5"
+
+# Refinement pipeline configuration
+REFINE_WIP_LIMIT="${REFINE_WIP_LIMIT:-2}"
+REFINE_SKIP_LABELS="needs-discussion,epic,spec-pending-review"
 
 # --- Validate required environment ---
 if [ -z "${GH_TOKEN:-}" ]; then
@@ -80,6 +86,47 @@ is_issue_running() {
   local issue_num="$1"
   docker ps --format '{{.Command}}' 2>/dev/null | grep -q "#${issue_num}" && return 0
   return 1
+}
+
+count_refine_running() {
+  docker ps --format '{{.Command}}' 2>/dev/null | grep -c '"Refine issue\|"Plan issue' || echo "0"
+}
+
+has_refine_skip_label() {
+  local item="$1"
+  local labels
+  labels=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
+  IFS=',' read -ra SKIP_ARRAY <<< "$REFINE_SKIP_LABELS"
+  for skip in "${SKIP_ARRAY[@]}"; do
+    if echo "$labels" | grep -qi "$skip"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+has_new_comment_after_report() {
+  local issue_num="$1"
+  local report_marker="$2"
+  local comments
+  comments=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" --json comments -q '.comments' 2>/dev/null) || { echo "no"; return; }
+
+  local report_idx
+  report_idx=$(echo "$comments" | jq "map(.body) | to_entries | map(select(.value | test(\"$report_marker\"))) | last | .key // -1")
+
+  if [ "$report_idx" = "-1" ]; then
+    echo "no"
+    return
+  fi
+
+  local total
+  total=$(echo "$comments" | jq 'length')
+  local next_idx=$((report_idx + 1))
+  if [ "$next_idx" -lt "$total" ]; then
+    echo "yes"
+  else
+    echo "no"
+  fi
 }
 
 # --- Dispatch ---
@@ -278,8 +325,53 @@ while true; do
   READY=$(get_items_by_status "$BOARD_ITEMS" "Ready")
   IN_PROGRESS=$(get_items_by_status "$BOARD_ITEMS" "In progress")
 
+  BACKLOG=$(get_items_by_status "$BOARD_ITEMS" "Backlog")
+  REFINED=$(get_items_by_status "$BOARD_ITEMS" "Refined")
+
   IN_PROGRESS_COUNT=$(echo "$IN_PROGRESS" | jq 'length')
   IN_REVIEW_COUNT=$(echo "$IN_REVIEW" | jq 'length')
+  BACKLOG_COUNT=$(echo "$BACKLOG" | jq 'length')
+  REFINED_COUNT=$(echo "$REFINED" | jq 'length')
+  REFINE_RUNNING=$(count_refine_running)
+
+  # --- Priority 0: Backlog items (refinement) ---
+  while IFS= read -r item; do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_refine_skip_label "$item"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+    if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
+
+    # Check for spec-pending-review items with new human comments (re-run refinement)
+    ITEM_LABELS=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
+    if echo "$ITEM_LABELS" | grep -qi "spec-pending-review"; then
+      HAS_NEW=$(has_new_comment_after_report "$ISSUE" "Posted by MarketHawk Refinement Pipeline")
+      if [ "$HAS_NEW" = "yes" ]; then
+        gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --remove-label "spec-pending-review" 2>/dev/null || true
+        dispatch "Refine issue #${ISSUE}"
+        DISPATCHED="Refine issue #${ISSUE}"
+        REFINE_RUNNING=$((REFINE_RUNNING + 1))
+      fi
+      continue
+    fi
+
+    dispatch "Refine issue #${ISSUE}"
+    DISPATCHED="Refine issue #${ISSUE}"
+    REFINE_RUNNING=$((REFINE_RUNNING + 1))
+  done < <(echo "$BACKLOG" | jq -c '.[]')
+
+  # --- Priority 0.5: Refined items (plan generation) ---
+  while IFS= read -r item; do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+    if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
+
+    dispatch "Plan issue #${ISSUE}"
+    DISPATCHED="Plan issue #${ISSUE}"
+    REFINE_RUNNING=$((REFINE_RUNNING + 1))
+  done < <(echo "$REFINED" | jq -c '.[]')
 
   # --- Priority 1: In Review items with new comments ---
   while IFS= read -r item; do
@@ -342,9 +434,9 @@ while true; do
   # --- Log cycle summary ---
   BUDGET=$(gh api rate_limit --jq '.resources.graphql | "\(.used)/\(.limit)"' 2>/dev/null) || BUDGET="?"
   if [ -n "$DISPATCHED" ]; then
-    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} dispatched=\"${DISPATCHED}\" graphql=${BUDGET}"
+    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} dispatched=\"${DISPATCHED}\" graphql=${BUDGET}"
   else
-    echo "[$(date -u +%FT%TZ)] in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} skip=nothing_to_do graphql=${BUDGET}"
+    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} skip=nothing_to_do graphql=${BUDGET}"
   fi
 
   sleep "$POLL_INTERVAL"
