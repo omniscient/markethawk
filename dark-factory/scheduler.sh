@@ -91,7 +91,34 @@ dispatch() {
 
 # --- Board state ---
 fetch_board_items() {
-  gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --format json --limit 30
+  local raw
+  raw=$(gh api graphql -f query='
+    query {
+      node(id: "'"$PROJECT_ID"'") {
+        ... on ProjectV2 {
+          items(first: 50) {
+            nodes {
+              fieldValueByName(name: "Status") {
+                ... on ProjectV2ItemFieldSingleSelectValue { name }
+              }
+              content {
+                ... on Issue {
+                  number
+                  title
+                  labels(first: 10) { nodes { name } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ')
+  echo "$raw" | jq '{items: [.data.node.items.nodes[]
+    | select(.content.number != null)
+    | {content: {number: .content.number, title: .content.title, type: "Issue"},
+       labels: [.content.labels.nodes[].name],
+       status: .fieldValueByName.name}]}'
 }
 
 get_items_by_status() {
