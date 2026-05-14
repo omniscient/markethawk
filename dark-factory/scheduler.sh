@@ -284,21 +284,40 @@ the intent. Reply with exactly one word: MERGE, CONTINUE, or SKIP.
 
 MERGE — the reviewer approves the PR (e.g. \"looks good\", \"ship it\",
 \"approved\", \"LGTM\", thumbs up, ready to merge)
-CONTINUE — the reviewer wants changes (e.g. \"fix the tests\",
-\"can you rename X\", \"this needs error handling\", specific feedback)
-SKIP — the comment is informational, a question, or unclear intent
-(e.g. \"interesting approach\", \"what does this do?\", bot comments)
+CONTINUE — the reviewer wants changes, asks questions about the implementation,
+raises concerns, or requests any action (e.g. \"fix the tests\",
+\"can you rename X\", \"is this fixable?\", \"should we do X or Y?\",
+\"this needs error handling\", any feedback that needs a response)
+SKIP — the comment is purely from a bot or automated system, with no
+human-authored content requiring action
+
+When in doubt between CONTINUE and SKIP, choose CONTINUE.
 
 PR #${issue_num}: ${title}
 Comments since last factory run:
 ${comment_text}"
 
   local result
-  result=$(echo "$prompt" | claude -p --model haiku 2>/dev/null | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+  result=$(echo "$prompt" | claude -p --model haiku 2>&1)
+  local exit_code=$?
+  local cleaned
+  cleaned=$(echo "$result" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
 
-  case "$result" in
-    MERGE|CONTINUE|SKIP) echo "$result" ;;
-    *) echo "SKIP" ;;
+  if [ "$exit_code" -ne 0 ] || [ -z "$cleaned" ]; then
+    echo "  classify_comments #${issue_num}: API error (exit=$exit_code), defaulting to SKIP" >&2
+    echo "SKIP"
+    return
+  fi
+
+  case "$cleaned" in
+    MERGE|CONTINUE|SKIP)
+      echo "  classify_comments #${issue_num}: verdict=${cleaned}" >&2
+      echo "$cleaned"
+      ;;
+    *)
+      echo "  classify_comments #${issue_num}: unexpected response '${cleaned}', defaulting to SKIP" >&2
+      echo "SKIP"
+      ;;
   esac
 }
 
