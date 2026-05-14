@@ -346,6 +346,10 @@ while true; do
         HAS_NEW=$(has_new_comment_after_report "$ISSUE" "Posted by MarketHawk Refinement Pipeline")
         if [ "$HAS_NEW" = "yes" ]; then
           gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --remove-label "spec-pending-review" 2>/dev/null || true
+          gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "🔄 **Refinement Pipeline** — Re-running with new feedback.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
           dispatch "Refine issue #${ISSUE}"
           DISPATCHED="Refine issue #${ISSUE}"
           REFINE_RUNNING=$((REFINE_RUNNING + 1))
@@ -358,6 +362,10 @@ while true; do
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
+    gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "🧠 **Refinement Pipeline** — Starting brainstorming and spec generation.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
     dispatch "Refine issue #${ISSUE}"
     DISPATCHED="Refine issue #${ISSUE}"
     REFINE_RUNNING=$((REFINE_RUNNING + 1))
@@ -371,6 +379,10 @@ while true; do
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
+    gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "📋 **Refinement Pipeline** — Starting plan generation and architect validation.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
     dispatch "Plan issue #${ISSUE}"
     DISPATCHED="Plan issue #${ISSUE}"
     REFINE_RUNNING=$((REFINE_RUNNING + 1))
