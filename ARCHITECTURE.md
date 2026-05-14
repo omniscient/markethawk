@@ -58,10 +58,10 @@ A full pre-market scan proceeds as follows:
 
 | File | Responsibility |
 |------|---------------|
-| `scanner.py` | Core scan orchestration: `ScannerService`, `calculate_day_metrics()`, semaphore-bounded async fetch. |
+| `scanner.py` | Core scan orchestration: `ScannerService`, `calculate_day_metrics()`, `_get_batch_enrichment_data()` (returns 3-tuple with ES/NQ market context and sector ETF pct changes), Phase 2a 19-key feature enrichment in `run_pre_market_scan()`. |
 | `stock_data.py` | Historical OHLCV fetch, gap percentage calculation, per-ticker session flag logic. |
 | `discovery_service.py` | Bulk ticker sync from Polygon: paginated reference data, rate-limit-aware batching. |
-| `catalyst_parser.py` | Batch 72-hour news analysis for catalyst detection. Joins articles to tickers in memory. |
+| `catalyst_parser.py` | Batch 72-hour news analysis for catalyst detection. Joins articles to tickers in memory. Returns `latest_article_utc` per ticker for catalyst recency enrichment. |
 | `futures_data.py` | Futures contract data (ES, NQ, etc.), rollover date tracking. |
 | `chart_indicators.py` | Technical indicator computation (e.g., VWAP, moving averages) for chart endpoints. |
 | `journal_service.py` | Trade journal CRUD operations. |

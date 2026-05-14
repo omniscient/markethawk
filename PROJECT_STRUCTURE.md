@@ -55,10 +55,10 @@ MarketHawk/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlistAdd / ActiveWatchlistUpdate / ActiveWatchlistItem
 │   │   │   └── stock.py                # Pydantic request/response models
 │   │   ├── services/
-│   │   │   ├── scanner.py              # Core scan logic; ScannerService; asyncio.Semaphore(10)
+│   │   │   ├── scanner.py              # Core scan logic; ScannerService; Phase 2a 19-key feature enrichment per signal
 │   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags
 │   │   │   ├── discovery_service.py    # Bulk ticker sync from Polygon; rate-limit-aware paging
-│   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis for catalyst detection
+│   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis; returns latest_article_utc for recency enrichment
 │   │   │   ├── futures_data.py         # Futures contract data and rollover logic
 │   │   │   ├── chart_indicators.py     # Technical indicators (VWAP, MAs) for chart endpoints
 │   │   │   ├── journal_service.py      # Trade journal CRUD

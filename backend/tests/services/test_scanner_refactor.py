@@ -72,7 +72,7 @@ def test_pre_market_scan_detects_spike_from_db():
 
     db = _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_volume)
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value=({ticker: {}}, {}, {})), \
          patch.object(ScannerService, 'calculate_day_metrics', return_value={
              "closing_price": 102.0, "pre_market_close": 101.0,
              "opening_price": 101.0, "regular_high": 103.0, "regular_low": 99.0,
@@ -96,7 +96,7 @@ def test_pre_market_scan_skips_insufficient_daily_bars():
 
     db = _mock_db_for_pre_market(ticker, event_date, [100.0] * 5, [1_000_000] * 5, 5_000_000)
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value=({ticker: {}}, {}, {})), \
          patch.object(ScannerService, '_save_event') as mock_save:
 
         results = asyncio.run(ScannerService.run_pre_market_scan([ticker], db, event_date=event_date))
@@ -147,7 +147,7 @@ def test_oversold_bounce_detects_rsi_crossover():
     mock_q.all.return_value = daily_bars
     db.query.return_value = mock_q
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value=({ticker: {}}, {}, {})), \
          patch.object(ScannerService, 'calculate_day_metrics', return_value={
              "closing_price": 100.0, "pre_market_close": 99.0,
              "opening_price": 100.0, "regular_high": 101.0, "regular_low": 99.0,
@@ -176,7 +176,7 @@ def test_oversold_bounce_skips_with_insufficient_bars():
     mock_q.all.return_value = daily_bars
     db.query.return_value = mock_q
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value=({ticker: {}}, {}, {})), \
          patch.object(ScannerService, '_save_event') as mock_save:
 
         results = asyncio.run(
@@ -217,7 +217,7 @@ def test_pre_market_scan_includes_anomaly_indicators_when_timesfm_unavailable():
 
     db = _mock_db_for_pre_market(ticker, event_date, daily_closes, daily_volumes, pm_volume)
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value=({ticker: {}}, {}, {})), \
          patch.object(ScannerService, 'calculate_day_metrics', return_value={
              "closing_price": 102.0, "pre_market_close": 101.0,
              "opening_price": 101.0, "regular_high": 103.0, "regular_low": 99.0,
@@ -264,7 +264,7 @@ def test_pre_market_scan_uses_timesfm_threshold_when_enabled():
     # Provide a mocked forecast that gives anomaly_score = 3.0 (≥ 2.0 → passes)
     mock_forecast = {"mean": 1_000_000.0, "std": 1_000_000.0, "p50": 900_000.0, "p90": 2_000_000.0}
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value=({ticker: {}}, {}, {})), \
          patch.object(ScannerService, 'calculate_day_metrics', return_value={
              "closing_price": 52.0, "pre_market_close": 51.0,
              "opening_price": 51.0, "regular_high": 53.0, "regular_low": 49.0,
@@ -309,7 +309,7 @@ def test_pre_market_scan_static_fallback_when_timesfm_score_below_threshold():
     # Forecast gives score = (1_200_000 - 1_000_000) / 500_000 = 0.4 → below 2.0
     mock_forecast = {"mean": 1_000_000.0, "std": 500_000.0, "p50": 950_000.0, "p90": 1_500_000.0}
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value={ticker: {}}), \
+    with patch.object(ScannerService, '_get_batch_enrichment_data', return_value=({ticker: {}}, {}, {})), \
          patch('app.services.scanner.get_volume_forecast', return_value=mock_forecast), \
          patch.object(ScannerService, '_save_event', return_value={"id": 3}) as mock_save:
 
