@@ -4,10 +4,10 @@ Scanner Service - Pre-market volume scanning logic.
 
 import logging
 import asyncio
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime, date, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 from app.utils.session import get_market_today
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional, Tuple
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from sqlalchemy import func, desc, or_
 
 from app.models.scanner_event import ScannerEvent
 from app.models.stock_aggregate import StockAggregate
+from app.models.futures_aggregate import FuturesAggregate
 from app.models.monitored_stock import MonitoredStock
 from app.models.ticker_reference import TickerReference
 from app.models.stock_split import StockSplit
@@ -22,6 +23,24 @@ from app.models.system_config import SystemConfig
 from app.services.catalyst_parser import CatalystParser
 from app.services.event_helpers import generate_event_summary, compute_event_severity
 from app.services.timeseries_forecast import get_volume_forecast, compute_anomaly_score
+
+_ET = ZoneInfo("America/New_York")
+
+_SECTOR_ETF_MAP: Dict[str, str] = {
+    "Technology": "XLK",
+    "Financials": "XLF",
+    "Health Care": "XLV",
+    "Consumer Discretionary": "XLY",
+    "Consumer Staples": "XLP",
+    "Energy": "XLE",
+    "Industrials": "XLI",
+    "Materials": "XLB",
+    "Real Estate": "XLRE",
+    "Utilities": "XLU",
+    "Communication Services": "XLC",
+}
+
+_SECTOR_ETF_SYMBOLS = list(_SECTOR_ETF_MAP.values())
 
 
 class ScannerService:
@@ -139,16 +158,26 @@ class ScannerService:
         return metrics
 
     @staticmethod
-    def _get_batch_enrichment_data(tickers: List[str], event_date: date, db: Session) -> Dict[str, Dict[str, Any]]:
-        """Fetch common enrichment data for a list of tickers in one batch."""
+    def _get_batch_enrichment_data(
+        tickers: List[str], event_date: date, db: Session
+    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any], Dict[str, Optional[float]]]:
+        """Fetch common enrichment data for a list of tickers in one batch.
+
+        Returns a 3-tuple: (ticker_batch_data, market_context_dict, sector_etf_pct_dict)
+        """
+        day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
+        day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
+        day_end_utc = (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
+        prev_day_start_utc = (day_start_et - timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
+
         # 1. Fetch MonitoredStock records
         monitored_records = db.query(MonitoredStock).filter(MonitoredStock.ticker.in_(tickers)).all()
         monitored_map = {r.ticker: r for r in monitored_records}
-        
+
         # 2. Fetch TickerReference records
         ref_records = db.query(TickerReference).filter(TickerReference.ticker.in_(tickers)).all()
         ref_map = {r.ticker: r for r in ref_records}
-        
+
         # 3. Recent Splits
         six_months_prior = event_date - timedelta(days=180)
         split_records = db.query(StockSplit).filter(
@@ -156,31 +185,123 @@ class ScannerService:
             StockSplit.execution_date <= event_date,
             StockSplit.execution_date >= six_months_prior
         ).order_by(desc(StockSplit.execution_date)).all()
-        
+
         split_map = {}
         for s in split_records:
             if s.ticker not in split_map:
                 split_map[s.ticker] = s.execution_date.isoformat()
-        
+
         # 4. Catalyst lookup via optimized batch analyzer
         catalyst_batch = CatalystParser.batch_analyze(tickers, event_date, db)
-        
+
         batch_data = {}
         for ticker in tickers:
             t_upper = ticker.upper()
             monitored = monitored_map.get(t_upper)
             ref = ref_map.get(t_upper)
-            cat = catalyst_batch.get(t_upper, {"tags": [], "summary": None})
-            
+            cat = catalyst_batch.get(t_upper, {"tags": [], "summary": None, "latest_article_utc": None})
+
             batch_data[t_upper] = {
                 "market_cap": float(monitored.market_cap) if monitored and monitored.market_cap else None,
                 "outstanding_shares": float(ref.share_class_shares_outstanding) if ref and ref.share_class_shares_outstanding else None,
                 "recent_split_date": split_map.get(t_upper),
                 "catalyst_tags": cat.get("tags", []),
                 "catalyst_summary": cat.get("summary"),
+                "catalyst_latest_utc": cat.get("latest_article_utc"),
+                "sector": ref.sector if ref else None,
             }
-            
-        return batch_data
+
+        # 5. ES/NQ market context — two most recent daily bars per symbol
+        market_context_dict: Dict[str, Any] = {
+            "es_pct_from_prev_close": None,
+            "nq_pct_from_prev_close": None,
+            "market_context": None,
+        }
+        try:
+            futures_bars = (
+                db.query(FuturesAggregate)
+                .filter(
+                    FuturesAggregate.symbol.in_(["ES", "NQ"]),
+                    FuturesAggregate.timespan == "day",
+                    FuturesAggregate.timestamp < day_end_utc,
+                )
+                .order_by(FuturesAggregate.symbol, FuturesAggregate.timestamp.desc())
+                .all()
+            )
+            symbol_bars: Dict[str, list] = {}
+            for bar in futures_bars:
+                symbol_bars.setdefault(bar.symbol, []).append(bar)
+
+            pct_changes: Dict[str, float] = {}
+            for sym in ("ES", "NQ"):
+                bars = symbol_bars.get(sym, [])
+                if len(bars) >= 2:
+                    current = float(bars[0].close)
+                    previous = float(bars[1].close)
+                    if previous > 0:
+                        pct_changes[sym] = round((current - previous) / previous * 100, 4)
+
+            if "ES" in pct_changes:
+                market_context_dict["es_pct_from_prev_close"] = pct_changes["ES"]
+            if "NQ" in pct_changes:
+                market_context_dict["nq_pct_from_prev_close"] = pct_changes["NQ"]
+
+            if "ES" in pct_changes and "NQ" in pct_changes:
+                es, nq = pct_changes["ES"], pct_changes["NQ"]
+                if es > 0.1 and nq > 0.1:
+                    market_context_dict["market_context"] = "risk_on"
+                elif es < -0.1 and nq < -0.1:
+                    market_context_dict["market_context"] = "risk_off"
+                else:
+                    market_context_dict["market_context"] = "neutral"
+        except Exception:
+            pass
+
+        # 6. Sector ETF pre-market bars
+        sector_etf_pct_dict: Dict[str, Optional[float]] = {s: None for s in _SECTOR_ETF_SYMBOLS}
+        try:
+            etf_daily = (
+                db.query(StockAggregate)
+                .filter(
+                    StockAggregate.ticker.in_(_SECTOR_ETF_SYMBOLS),
+                    StockAggregate.timespan == "day",
+                    StockAggregate.timestamp >= prev_day_start_utc,
+                    StockAggregate.timestamp < day_start_utc,
+                )
+                .order_by(StockAggregate.ticker, StockAggregate.timestamp.desc())
+                .all()
+            )
+            etf_prev_closes: Dict[str, float] = {}
+            for bar in etf_daily:
+                if bar.ticker not in etf_prev_closes:
+                    etf_prev_closes[bar.ticker] = float(bar.close)
+
+            etf_pm = (
+                db.query(StockAggregate)
+                .filter(
+                    StockAggregate.ticker.in_(_SECTOR_ETF_SYMBOLS),
+                    StockAggregate.timespan == "minute",
+                    StockAggregate.is_pre_market == True,
+                    StockAggregate.timestamp >= day_start_utc,
+                    StockAggregate.timestamp < day_end_utc,
+                )
+                .order_by(StockAggregate.ticker, StockAggregate.timestamp.asc())
+                .all()
+            )
+            etf_last_bar: Dict[str, StockAggregate] = {}
+            for bar in etf_pm:
+                etf_last_bar[bar.ticker] = bar  # ascending order → last write wins
+
+            for etf_sym in _SECTOR_ETF_SYMBOLS:
+                if etf_sym in etf_last_bar and etf_sym in etf_prev_closes:
+                    current = float(etf_last_bar[etf_sym].close)
+                    prev = etf_prev_closes[etf_sym]
+                    if prev > 0:
+                        sector_etf_pct_dict[etf_sym] = round((current - prev) / prev * 100, 4)
+        except Exception:
+            pass
+
+        return batch_data, market_context_dict, sector_etf_pct_dict
 
     @staticmethod
     def _save_event(
@@ -273,7 +394,7 @@ class ScannerService:
         min_history_bars = int(_cfg.get('timesfm_min_history_bars', '30'))
         fallback_multiplier = float(_cfg.get('timesfm_fallback_multiplier', '4.0'))
 
-        enrichment_batch = await asyncio.to_thread(
+        enrichment_batch, market_context_dict, sector_etf_pct_dict = await asyncio.to_thread(
             ScannerService._get_batch_enrichment_data, tickers, event_date, db
         )
 
@@ -365,6 +486,102 @@ class ScannerService:
                             pre_market_volume / enrichment["outstanding_shares"] * 100, 4
                         )
 
+                    # --- Phase 2a feature enrichment ---
+
+                    # Market context (batch-level, zero cost here)
+                    indicators["es_pct_from_prev_close"] = market_context_dict.get("es_pct_from_prev_close")
+                    indicators["nq_pct_from_prev_close"] = market_context_dict.get("nq_pct_from_prev_close")
+                    indicators["market_context"] = market_context_dict.get("market_context")
+
+                    # Sector features
+                    _sector = enrichment.get("sector")
+                    _sector_etf = _SECTOR_ETF_MAP.get(_sector) if _sector else None
+                    indicators["sector"] = _sector
+                    indicators["sector_etf"] = _sector_etf
+                    indicators["sector_etf_pct_change"] = (
+                        sector_etf_pct_dict.get(_sector_etf) if _sector_etf else None
+                    )
+
+                    # Timing features — derived from last pre-market bar, never datetime.now()
+                    _last_pre = (
+                        db.query(StockAggregate)
+                        .filter(
+                            StockAggregate.ticker == ticker,
+                            StockAggregate.timespan == "minute",
+                            StockAggregate.is_pre_market == True,
+                            StockAggregate.timestamp >= day_start_utc,
+                            StockAggregate.timestamp < day_end_utc,
+                        )
+                        .order_by(desc(StockAggregate.timestamp))
+                        .first()
+                    )
+                    if _last_pre:
+                        _bar_ts = _last_pre.timestamp
+                        if _bar_ts.tzinfo is None:
+                            _bar_ts = _bar_ts.replace(tzinfo=timezone.utc)
+                        _bar_ts_et = _bar_ts.astimezone(_ET)
+                        _pm_open_et = datetime.combine(event_date, time(4, 0), tzinfo=_ET)
+                        indicators["minutes_since_premarket_open"] = round(
+                            (_bar_ts_et - _pm_open_et).total_seconds() / 60, 2
+                        )
+                        indicators["day_of_week"] = _bar_ts_et.weekday()
+                        indicators["is_monday"] = _bar_ts_et.weekday() == 0
+                        indicators["is_friday"] = _bar_ts_et.weekday() == 4
+                    else:
+                        indicators["minutes_since_premarket_open"] = None
+                        indicators["day_of_week"] = None
+                        indicators["is_monday"] = False
+                        indicators["is_friday"] = False
+
+                    # Volatility regime — ATR_10 percentile rank within 60-day window
+                    _atr_rank: Optional[float] = None
+                    _vol_regime: Optional[str] = None
+                    if len(daily_bars) >= 11:
+                        _df = pd.DataFrame([{
+                            "H": float(b.high), "L": float(b.low), "C": float(b.close)
+                        } for b in daily_bars])
+                        _df["tr"] = pd.DataFrame({
+                            "a": _df["H"] - _df["L"],
+                            "b": (_df["H"] - _df["C"].shift(1)).abs(),
+                            "c": (_df["L"] - _df["C"].shift(1)).abs(),
+                        }).max(axis=1)
+                        _df["atr10"] = _df["tr"].rolling(window=10).mean()
+                        _window = _df["atr10"].dropna().tail(60)
+                        if len(_window) >= 10:
+                            _rank_pct = _window.rank(pct=True).iloc[-1]
+                            _atr_rank = round(float(_rank_pct) * 100, 2)
+                            if _rank_pct < 0.25:
+                                _vol_regime = "compressed"
+                            elif _rank_pct > 0.75:
+                                _vol_regime = "expanded"
+                            else:
+                                _vol_regime = "normal"
+                    indicators["atr_percentile_rank"] = _atr_rank
+                    indicators["volatility_regime"] = _vol_regime
+
+                    # Catalyst enrichment features
+                    _cat_tags = enrichment.get("catalyst_tags", [])
+                    _cat_latest = enrichment.get("catalyst_latest_utc")
+                    indicators["has_news_catalyst"] = bool(_cat_tags)
+                    indicators["catalyst_tag_count"] = len(_cat_tags)
+                    if _cat_latest is not None and _last_pre is not None:
+                        _ref_ts = _last_pre.timestamp
+                        if _ref_ts.tzinfo is None:
+                            _ref_ts = _ref_ts.replace(tzinfo=timezone.utc)
+                        if _cat_latest.tzinfo is None:
+                            _cat_latest = _cat_latest.replace(tzinfo=timezone.utc)
+                        indicators["catalyst_recency_hours"] = round(
+                            (_ref_ts - _cat_latest).total_seconds() / 3600, 2
+                        )
+                    else:
+                        indicators["catalyst_recency_hours"] = None
+
+                    # TimesFM price forecast keys (deferred — Phase 1 dependency #20)
+                    indicators["price_direction"] = None
+                    indicators["price_confidence"] = None
+                    indicators["price_forecast_4h"] = None
+                    indicators["price_forecast_1d"] = None
+
                     event_dict = ScannerService._save_event(
                         db=db,
                         ticker=ticker,
@@ -398,7 +615,7 @@ class ScannerService:
         day_end_utc = (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
         hist_start_utc = (day_start_et - timedelta(days=90)).astimezone(timezone.utc).replace(tzinfo=None)
 
-        enrichment_batch = await asyncio.to_thread(
+        enrichment_batch, _, _ = await asyncio.to_thread(
             ScannerService._get_batch_enrichment_data, tickers, event_date, db
         )
 
