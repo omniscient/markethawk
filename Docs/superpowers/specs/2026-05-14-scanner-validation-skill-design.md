@@ -25,7 +25,7 @@ From the issue and Q&A refinement:
 6. Progress is persisted in `Docs/scanner-validation/{scanner_type}_progress.json` (session cursor only: current day, signal index, in-progress day verdicts).
 7. Completed verdicts are written to a new `signal_reviews` PostgreSQL table via a new API endpoint.
 8. At session completion, the skill automatically generates and prints a summary report. The report is also available on demand via `/validate-scanner report` (reads from the progress JSON and DB).
-9. The skill works for all scanner types: `pre_market_volume_spike`, `oversold_bounce`, `liquidity_hunt` (and its variants `liquidity_hunt_pre`, `liquidity_hunt_post`).
+9. The skill works for all scanner types: `pre_market_volume_spike`, `oversold_bounce`, `liquidity_hunt` (alias for `liquidity_hunt_pre` + `liquidity_hunt_post`), `live_volume_spike`, `live_price_move`. The live scanner types (`live_volume_spike`, `live_price_move`) produce events only during live sessions and will likely return no results for historical date ranges — the skill should warn the user if a live type is requested.
 10. Invocation supports both positional args (`/validate-scanner pre_market_volume_spike 2025-01-01 2025-01-31`) and interactive prompting if args are omitted.
 11. `/api/scanner/results` must accept `start_date` and `end_date` query parameters to enable per-day event fetching.
 
@@ -221,4 +221,4 @@ However, several thresholds ARE runtime-configurable via the `SystemConfig` tabl
 - **Lightweight Charts (TradingView) supports scroll-to-date** — the `scrollToPosition` or `setVisibleRange` API is available. If the library version doesn't support this, a visible range parameter can approximate it. (To verify: check frontend/package.json for the `lightweight-charts` version.)
 - **All scanner types share the `indicators` and `criteria_met` JSONB structure** — the signal summary block can render any key-value pairs without schema-specific logic. If a scanner type stores indicators under different keys, the summary will still display them correctly (generic rendering).
 - **The user is authenticated** (no auth system exists in this codebase) — the `reviewed_by` field in `SignalReview` is nullable and reserved for future use.
-- **`PATCH /api/system/config` exists and accepts the `SystemConfig` keys listed in Alternatives C** — verify this during implementation by checking `backend/app/routers/system.py`. If the endpoint doesn't support arbitrary key patching, the live-apply enhance path falls back to suggestion-only mode.
+- **`PATCH /api/system/config` exists and accepts arbitrary key-value payloads** — confirmed at `backend/app/routers/system.py:188`. Live-apply enhance for `SystemConfig`-backed params (TimesFM thresholds) works without fallback.
