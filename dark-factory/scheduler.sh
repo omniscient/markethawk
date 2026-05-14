@@ -84,12 +84,12 @@ reset_retry() {
 # --- Duplicate dispatch prevention ---
 is_issue_running() {
   local issue_num="$1"
-  docker ps --format '{{.Command}}' 2>/dev/null | grep -q "#${issue_num}" && return 0
+  docker ps --no-trunc --format '{{.Command}}' 2>/dev/null | grep -q "#${issue_num}" && return 0
   return 1
 }
 
 count_refine_running() {
-  docker ps --format '{{.Command}}' 2>/dev/null | grep -cE 'Refine issue|Plan issue' || true
+  docker ps --no-trunc --format '{{.Command}}' 2>/dev/null | grep -cE 'Refine issue|Plan issue' || true
 }
 
 has_refine_skip_label() {
