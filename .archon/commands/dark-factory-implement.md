@@ -72,7 +72,45 @@ If the change requires a new SQLAlchemy model:
 - [ ] All changes committed
 - [ ] Implementation summary written to `$ARTIFACTS_DIR/implementation.md`
 
-## Phase 4: REPORT
+## Phase 4: DOCUMENT
+
+1. Read the file list from `$ARTIFACTS_DIR/implementation.md` (all files created/modified in Phase 3).
+   Cross-check: `git diff main...HEAD --name-only` for completeness.
+2. Classify each path against this mapping to produce the list of `(doc_file, section)` pairs to update:
+
+   | Changed file pattern | Documentation target | Section |
+   |---|---|---|
+   | `backend/app/models/*.py` | `ARCHITECTURE.md` | Database Models table |
+   | `backend/app/models/*.py` | `PROJECT_STRUCTURE.md` | `models/` directory entry |
+   | `backend/app/routers/*.py` | `ARCHITECTURE.md` | Routers table |
+   | `backend/app/routers/*.py` | `PROJECT_STRUCTURE.md` | `routers/` directory entry |
+   | `backend/app/services/*.py` | `ARCHITECTURE.md` | Services table |
+   | `backend/app/services/*.py` | `PROJECT_STRUCTURE.md` | `services/` directory entry |
+   | `frontend/src/pages/*.tsx` | `ARCHITECTURE.md` | Pages table |
+   | `.env.example` | `ENV_VARIABLES.md` | Relevant section |
+   | `docker-compose.yml` (new service added/removed) | `ARCHITECTURE.md` | Service Topology section |
+   | `CLAUDE.md`-affecting changes (new port, command, pattern) | `CLAUDE.md` | Relevant section |
+
+   Rules:
+   - If a path matches no pattern, skip it.
+   - If a file was modified but nothing added/removed (e.g. only existing model fields changed), still read the current doc row and update it if the description is now inaccurate.
+   - If a file was deleted, remove the corresponding doc row.
+   - `CLAUDE.md` is only touched if the change adds/removes a developer-facing command, port, or architectural pattern. This is rare and requires explicit judgment.
+   - `Docs/database-schema.md` is auto-generated — never edit it.
+
+3. If no pairs matched, skip this phase entirely (no docs commit needed).
+4. For each `(doc_file, section)` pair:
+   a. Read the current section in full
+   b. Read the changed source file(s) that triggered this pair
+   c. Write the updated section content: add a new row, update an existing row, or remove a deleted entry. Read surrounding entries and match their style (inline comments, column widths, etc.)
+5. Commit all doc changes: `git commit -m "docs: update architecture map for <feature-slug>"` — derive `<feature-slug>` from the branch name (e.g. `feat/issue-12-new-router` → `new-router`).
+
+### PHASE_4_CHECKPOINT
+- [ ] `git diff main...HEAD --name-only` run and classified against the mapping table
+- [ ] All matched doc sections updated
+- [ ] `docs:` commit created (or phase explicitly skipped — no matches)
+
+## Phase 5: REPORT
 
 Write a summary of what was implemented to `$ARTIFACTS_DIR/implementation.md`:
 - Files created/modified
