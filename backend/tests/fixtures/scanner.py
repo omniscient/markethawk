@@ -3,9 +3,10 @@ Scanner seed helpers — runs and events.
 Each function inserts rows and flushes; the caller's transaction provides rollback.
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 from sqlalchemy.orm import Session
 from app.models import ScannerRun, ScannerEvent
+from app.utils.session import get_market_today
 
 
 def seed_scanner_runs(
@@ -40,7 +41,7 @@ def seed_scanner_events(
     if tickers is None:
         tickers = ["AAPL", "MSFT", "NVDA", "MRNA", "BNTX"]
 
-    today = date.today()
+    today = get_market_today()
     # Build unique (ticker, event_date, scanner_type) combinations
     specs = [
         ("AAPL", today, "pre_market_volume_spike"),
