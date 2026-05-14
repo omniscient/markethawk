@@ -50,7 +50,7 @@ class CatalystParser:
             NewsArticle.published_utc <= end_time
         ).all()
         
-        results = {t.upper(): {"tags": [], "summary": None} for t in tickers}
+        results = {t.upper(): {"tags": [], "summary": None, "latest_article_utc": None} for t in tickers}
         ticker_set = set(t.upper() for t in tickers)
         
         # Map articles to tickers
@@ -91,7 +91,8 @@ class CatalystParser:
             
             results[ticker] = {
                 "tags": list(tags),
-                "summary": summary
+                "summary": summary,
+                "latest_article_utc": recent_news[0].published_utc,
             }
             
         return results
