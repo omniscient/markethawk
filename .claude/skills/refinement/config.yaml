@@ -8,4 +8,8 @@ refine:
   min_issue_body_length: 20
 
 plan:
-  auto_advance_to_ready: true
+  auto_advance_to_ready: false
+  skip_labels:
+    - needs-discussion
+    - epic
+    - plan-pending-review

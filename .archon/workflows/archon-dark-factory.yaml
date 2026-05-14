@@ -267,39 +267,14 @@ nodes:
     when: "$parse-intent.output.intent == 'refine'"
     timeout: 30000
 
-  # Push plan branch and advance issue to Ready
+  # Push plan branch (no longer auto-advances to Ready — plan-pending-review gate)
   - id: plan-push-and-advance
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       BRANCH=$(git branch --show-current)
 
       git push -u origin "$BRANCH"
-
-      # Move issue to Ready
-      ITEM_ID=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
-        | jq -r ".items[] | select(.content.number == $ISSUE and .content.type == \"Issue\") | .id")
-      if [ -n "$ITEM_ID" ]; then
-        gh project item-edit \
-          --project-id PVT_kwHOAAFds84BWh4w \
-          --id "$ITEM_ID" \
-          --field-id PVTSSF_lAHOAAFds84BWh4wzhR1VaA \
-          --single-select-option-id 61e4505c
-        echo "Moved issue #$ISSUE to Ready"
-      fi
-
-      gh issue comment "$ISSUE" --body "## Refinement Pipeline — Ready for Implementation
-
-      **Branch:** [\`$BRANCH\`](https://github.com/omniscient/markethawk/tree/$BRANCH)
-
-      Spec and implementation plan are committed on this branch. Issue moved to **Ready** — the dark factory will pick it up for implementation.
-
-      ### Next Steps
-
-      - ⏳ **Wait** — the backlog scheduler will dispatch implementation automatically
-      - 🚀 **Manual start** — run: \`docker compose --profile factory run --rm dark-factory \"Fix issue #${ISSUE}\"\`
-
-      ---
-      *Posted by MarketHawk Refinement Pipeline*"
+      echo "Pushed $BRANCH for issue #$ISSUE (plan-pending-review gate — not advancing to Ready)"
     depends_on: [plan]
     when: "$parse-intent.output.intent == 'plan'"
     timeout: 30000

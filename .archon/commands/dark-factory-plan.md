@@ -48,22 +48,47 @@ Proceed to publish.
 
 ## Phase 4: PUBLISH
 
-1. Commit the plan
-2. Post a summary comment on the issue:
+1. Determine the current branch name: `BRANCH=$(git branch --show-current)`
+2. Build GitHub links:
+   - Plan link: `https://github.com/omniscient/markethawk/blob/$BRANCH/<plan-file-path>`
+   - Branch link: `https://github.com/omniscient/markethawk/tree/$BRANCH`
+3. Commit the plan
+4. Post a summary comment on the issue:
    ```
    ## Refinement Pipeline — Plan Generated
 
-   **Plan:** `<plan-file-path>`
-   **Branch:** `<branch-name>`
+   **Plan:** [<plan-file-path>](https://github.com/omniscient/markethawk/blob/<BRANCH>/<plan-file-path>)
+   **Branch:** [`<BRANCH>`](https://github.com/omniscient/markethawk/tree/<BRANCH>)
    **Tasks:** <count> tasks, <total-steps> steps
 
    ### Task Overview
-   <numbered list of task names>
+   <numbered list of task names with a one-line description each>
+
+   ### Architect Review
+
+   Include the FULL dialogue from Phase 3. For each review cycle:
+
+   > **Cycle N:**
+   > **Verdict:** Approved / Issues Found
+   > **Feedback:** <the architect's full feedback>
+   > **Changes made:** <what you fixed, if any>
+
+   This lets the reviewer see what the architect flagged and how it was resolved.
+
+   ### Next Steps
+
+   - ✅ **Approve plan** — move the issue to the **Ready** column on the project board. The scheduler will automatically start implementation.
+   - ✏️ **Request changes** — leave a comment on this issue with your feedback, then re-run:
+     ```bash
+     docker compose --profile factory run --rm dark-factory "Plan issue #$ISSUE_NUM"
+     ```
+   - ❓ **Need to discuss** — add the `needs-discussion` label to pause automation.
 
    ---
    *Posted by MarketHawk Refinement Pipeline*
    ```
-3. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
+5. Add label: `gh issue edit $ISSUE_NUM --add-label plan-pending-review`
+6. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
    ```
    STATUS: PLAN_COMPLETE
    PLAN_PATH: <path>
