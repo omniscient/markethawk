@@ -1,7 +1,8 @@
 # Scanner Validation Skill — Design Spec
 
 **Date:** 2026-05-14  
-**Issue:** [#5 — Scanner validation skill: guided day-by-day QA walkthrough](https://github.com/omniscient/markethawk/issues/5)
+**Issue:** [#5 — Scanner validation skill: guided day-by-day QA walkthrough](https://github.com/omniscient/markethawk/issues/5)  
+**Status:** Pending Review
 
 ## Overview
 
@@ -18,7 +19,7 @@ From the issue and Q&A refinement:
 5. The user can assign one verdict per signal:
    - **confirm** — signal was valid
    - **reject** — false positive, with a reason category (noise, too_late, stale_data, split_artifact, threshold_too_loose, other)
-   - **enhance** — correct detection but criteria could be tightened, with a threshold suggestion (structured object: threshold name, current value, proposed value, rationale)
+   - **enhance** — correct detection but criteria could be tightened. For `SystemConfig`-backed thresholds, the skill can patch the value immediately via `PATCH /api/system/config` and re-scan that day to show before/after impact. For hardcoded thresholds, it records a structured suggestion (threshold name, current value, proposed value, rationale) for offline review.
    - **skip** — pass without recording
    - **quit** — save cursor and exit cleanly
 6. Progress is persisted in `Docs/scanner-validation/{scanner_type}_progress.json` (session cursor only: current day, signal index, in-progress day verdicts).
@@ -195,7 +196,18 @@ Pure DB storage has no natural place for in-progress session state (which signal
 
 ### C — "Enhance" as live code edits (as originally specified in the issue)
 
-The issue proposed: propose a code change to `scanner.py`, apply it, re-run the day, show the diff. Investigation found that `ScannerConfig` is not wired to the live scanner — all thresholds are hard-coded. Making the skill edit `scanner.py` mid-session is high blast radius for a QA tool. Instead, enhance records a structured suggestion object. The session summary prints a ranked change list that the user (or an Archon workflow) can act on deliberately. This is safer and still actionable. Option C adopted.
+The issue proposed: propose a code change to `scanner.py`, apply it, re-run the day, show the diff. Making the skill edit `scanner.py` mid-session is high blast radius for a QA tool — a mistake corrupts production code. Rejected.
+
+However, several thresholds ARE runtime-configurable via the `SystemConfig` table and the existing `PATCH /api/system/config` endpoint — no source edit needed:
+
+| Config key | Default | Description |
+|---|---|---|
+| `timesfm_fallback_multiplier` | 4.0 | Volume multiplier when TimesFM is off |
+| `timesfm_anomaly_threshold` | 2.0 | Score cutoff when TimesFM is enabled |
+| `timesfm_min_history_bars` | 30 | Minimum history bars required |
+| `timesfm_enabled` | false | Use ML model vs static multiplier |
+
+**Chosen approach (hybrid)**: For `SystemConfig`-backed params, enhance can patch the value, re-scan the day via `POST /api/scanner/run`, and show before/after event counts. For hardcoded inline thresholds in `scanner.py` (e.g. `pre_market_volume > 100000`, `avg_volume_20d > 500000`, RSI bounds), the skill records a structured suggestion object only — the session summary prints a ranked change list that the user or an Archon workflow can act on deliberately. The cursor JSON captures both applied changes and pending suggestions.
 
 ## Open Questions
 
@@ -209,3 +221,4 @@ The issue proposed: propose a code change to `scanner.py`, apply it, re-run the 
 - **Lightweight Charts (TradingView) supports scroll-to-date** — the `scrollToPosition` or `setVisibleRange` API is available. If the library version doesn't support this, a visible range parameter can approximate it. (To verify: check frontend/package.json for the `lightweight-charts` version.)
 - **All scanner types share the `indicators` and `criteria_met` JSONB structure** — the signal summary block can render any key-value pairs without schema-specific logic. If a scanner type stores indicators under different keys, the summary will still display them correctly (generic rendering).
 - **The user is authenticated** (no auth system exists in this codebase) — the `reviewed_by` field in `SignalReview` is nullable and reserved for future use.
+- **`PATCH /api/system/config` exists and accepts the `SystemConfig` keys listed in Alternatives C** — verify this during implementation by checking `backend/app/routers/system.py`. If the endpoint doesn't support arbitrary key patching, the live-apply enhance path falls back to suggestion-only mode.
