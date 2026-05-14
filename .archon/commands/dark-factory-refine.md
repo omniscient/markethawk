@@ -74,15 +74,28 @@ Follow the process in `orchestrator-prompt.md`:
 
 ## Phase 6: PUBLISH
 
-1. Post a summary comment on the issue:
+1. Determine the current branch name: `BRANCH=$(git branch --show-current)`
+2. Build GitHub links:
+   - Spec link: `https://github.com/omniscient/markethawk/blob/$BRANCH/<spec-file-path>` (e.g. `Docs/superpowers/specs/2026-05-13-topic-design.md`)
+   - Branch link: `https://github.com/omniscient/markethawk/tree/$BRANCH`
+3. Post a summary comment on the issue:
    ```
    ## Refinement Pipeline — Spec Generated
 
-   **Spec:** `<spec-file-path>`
-   **Branch:** `<branch-name>`
+   **Spec:** [<spec-file-path>](https://github.com/omniscient/markethawk/blob/<BRANCH>/<spec-file-path>)
+   **Branch:** [`<BRANCH>`](https://github.com/omniscient/markethawk/tree/<BRANCH>)
 
    ### Summary
    <2-3 sentence overview>
+
+   ### Brainstorming Q&A
+
+   Include the FULL dialogue from Phase 4. For each question-answer pair:
+
+   > **Q:** <the question you asked>
+   > **A:** <the product owner's answer>
+
+   This lets the reviewer see the reasoning and assumptions behind the spec.
 
    ### Requirements
    <bulleted list of key requirements>
@@ -93,11 +106,20 @@ Follow the process in `orchestrator-prompt.md`:
    ### Assumptions
    <bulleted list if any>
 
+   ### Next Steps
+
+   - ✅ **Approve spec** — move the issue to the **Refined** column on the project board. The scheduler will automatically trigger plan generation.
+   - ✏️ **Request changes** — leave a comment on this issue with your feedback, then re-run:
+     ```bash
+     docker compose --profile factory run --rm dark-factory "Refine issue #$ISSUE_NUM"
+     ```
+   - ❓ **Need to discuss** — add the `needs-discussion` label to pause automation.
+
    ---
    *Posted by MarketHawk Refinement Pipeline*
    ```
-2. Add label: `gh issue edit $ISSUE_NUM --add-label spec-pending-review`
-3. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
+4. Add label: `gh issue edit $ISSUE_NUM --add-label spec-pending-review`
+5. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
    ```
    STATUS: SPEC_COMPLETE
    SPEC_PATH: <path>

@@ -287,7 +287,16 @@ nodes:
         echo "Moved issue #$ISSUE to Ready"
       fi
 
-      gh issue comment "$ISSUE" --body "Refinement pipeline complete. Spec and plan are on branch \`$BRANCH\`. Issue moved to **Ready** for implementation.
+      gh issue comment "$ISSUE" --body "## Refinement Pipeline — Ready for Implementation
+
+      **Branch:** [\`$BRANCH\`](https://github.com/omniscient/markethawk/tree/$BRANCH)
+
+      Spec and implementation plan are committed on this branch. Issue moved to **Ready** — the dark factory will pick it up for implementation.
+
+      ### Next Steps
+
+      - ⏳ **Wait** — the backlog scheduler will dispatch implementation automatically
+      - 🚀 **Manual start** — run: \`docker compose --profile factory run --rm dark-factory \"Fix issue #${ISSUE}\"\`
 
       ---
       *Posted by MarketHawk Refinement Pipeline*"

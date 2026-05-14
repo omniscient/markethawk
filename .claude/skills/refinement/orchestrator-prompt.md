@@ -15,12 +15,14 @@ You are a brainstorming agent that refines raw GitHub issues into complete desig
 Ask questions one at a time to refine the idea. For each question:
 1. Formulate a clear, specific question (prefer multiple choice when possible)
 2. Spawn a product-owner subagent with the question and full context
-3. Record the answer
+3. Record the question AND answer as a pair — you will include the full Q&A log in the published comment
 4. If the product owner returns `UNCERTAIN: <reason>`:
    - Post a comment on the issue with the question, context gathered so far, and what you need to proceed
    - Add `needs-discussion` label to the issue
    - Exit immediately
 5. Continue until you have enough information to write the spec
+
+**Important:** Maintain a running Q&A log throughout this phase. Every question you asked and every answer received must be included verbatim in the final issue comment so the reviewer can assess the reasoning behind the spec.
 
 Focus questions on:
 - Purpose and success criteria
@@ -56,8 +58,13 @@ Fix issues inline.
 
 ### Phase 6: Publish
 1. Commit the spec to the current branch
-2. Post a summary comment on the issue with the spec highlights
-3. Add `spec-pending-review` label to the issue
+2. Build GitHub links for the spec file and branch (using `https://github.com/omniscient/markethawk/blob/<branch>/<path>`)
+3. Post a summary comment on the issue including:
+   - Links to spec file and branch on GitHub
+   - The full Q&A log from Phase 2 (every question and answer)
+   - Key requirements, chosen approach, and assumptions
+   - A "Next Steps" section explaining how to approve, request changes, or pause
+4. Add `spec-pending-review` label to the issue
 
 ## Subagent Invocation
 
