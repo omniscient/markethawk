@@ -37,6 +37,33 @@ VALUES
   (1, 'META', 'stocks', 'massive')
 ON CONFLICT DO NOTHING;
 
+-- Universe: Sector ETFs
+INSERT INTO stock_universes (id, name, description, criteria, is_active)
+VALUES (
+  2,
+  'Sector ETFs',
+  '11 SPDR sector ETFs for pre-market momentum context',
+  '{"type": "sector_etfs"}',
+  true
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sector ETF universe tickers
+INSERT INTO stock_universe_tickers (universe_id, ticker, asset_class, data_source)
+VALUES
+  (2, 'XLK',  'stocks', 'massive'),
+  (2, 'XLF',  'stocks', 'massive'),
+  (2, 'XLV',  'stocks', 'massive'),
+  (2, 'XLY',  'stocks', 'massive'),
+  (2, 'XLP',  'stocks', 'massive'),
+  (2, 'XLE',  'stocks', 'massive'),
+  (2, 'XLI',  'stocks', 'massive'),
+  (2, 'XLB',  'stocks', 'massive'),
+  (2, 'XLRE', 'stocks', 'massive'),
+  (2, 'XLU',  'stocks', 'massive'),
+  (2, 'XLC',  'stocks', 'massive')
+ON CONFLICT DO NOTHING;
+
 -- Scanner config: Pre-Market Volume scanner
 INSERT INTO scanner_configs (id, name, description, scanner_type, parameters, criteria, is_active)
 VALUES (
