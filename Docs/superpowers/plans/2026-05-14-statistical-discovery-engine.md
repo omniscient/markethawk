@@ -223,7 +223,7 @@ Expected: `['signal_analysis_runs', 'signal_clusters']`
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/app/models/signal_analysis_run.py backend/app/models/signal_cluster.py backend/app/models/scanner_event.py backend/app/models/__init__.py backend/alembic/versions/
+git add backend/app/models/signal_analysis_run.py backend/app/models/signal_cluster.py backend/app/models/scanner_event.py backend/app/models/__init__.py backend/app/alembic/versions/
 git commit -m "feat(discovery): add SignalAnalysisRun, SignalCluster models and migration"
 ```
 
@@ -681,26 +681,19 @@ git commit -m "feat(discovery): add StatisticalDiscoveryService with unit tests"
 
 - [ ] **Step 1: Add task to tasks.py**
 
-At the top of `backend/app/tasks.py`, add imports after existing imports:
-
-```python
-from app.models.signal_analysis_run import SignalAnalysisRun
-from app.models.signal_cluster import SignalCluster
-from app.models.scanner_outcome_summary import ScannerOutcomeSummary
-from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
-from app.services.statistical_discovery import StatisticalDiscoveryService
-import pandas as pd
-```
-
-At the end of `backend/app/tasks.py`, append:
+At the end of `backend/app/tasks.py`, append (all model/service imports are local inside the function body, matching the existing pattern in this file — see lines 763, 822):
 
 ```python
 @celery_app.task(bind=True, max_retries=1, name='app.tasks.analyze_signal_features')
 def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
-    """
-    Runs the full statistical discovery pipeline against completed signal outcomes.
-    Requires at least 500 complete events; marks run as failed otherwise.
-    """
+    import pandas as pd
+    from app.models.scanner_event import ScannerEvent
+    from app.models.signal_analysis_run import SignalAnalysisRun
+    from app.models.signal_cluster import SignalCluster
+    from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+    from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
+    from app.services.statistical_discovery import StatisticalDiscoveryService
+
     db: Session = SessionLocal()
     try:
         run = SignalAnalysisRun(
@@ -1290,12 +1283,12 @@ export interface AnalysisTriggerResponse {
 
 export async function fetchCorrelations(scannerType?: string): Promise<CorrelationResponse> {
   const params = scannerType ? `?scanner_type=${encodeURIComponent(scannerType)}` : '';
-  const response = await apiClient.get<CorrelationResponse>(`/api/outcomes/correlations${params}`);
+  const response = await apiClient.get<CorrelationResponse>(`/outcomes/correlations${params}`);
   return response.data;
 }
 
 export async function fetchLatestAnalysis(): Promise<LatestAnalysisResponse> {
-  const response = await apiClient.get<LatestAnalysisResponse>('/api/outcomes/analysis/latest');
+  const response = await apiClient.get<LatestAnalysisResponse>('/outcomes/analysis/latest');
   return response.data;
 }
 
@@ -1307,7 +1300,7 @@ export async function triggerAnalysis(
   if (scannerType) params.append('scanner_type', scannerType);
   if (k) params.append('k', String(k));
   const query = params.toString() ? `?${params.toString()}` : '';
-  const response = await apiClient.post<AnalysisTriggerResponse>(`/api/outcomes/analyze${query}`);
+  const response = await apiClient.post<AnalysisTriggerResponse>(`/outcomes/analyze${query}`);
   return response.data;
 }
 ```
