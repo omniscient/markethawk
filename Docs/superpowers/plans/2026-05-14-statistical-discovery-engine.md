@@ -1475,6 +1475,7 @@ After the existing `useQuery` calls inside the `EdgeExplorer` component body, ad
     mutationFn: () => triggerAnalysis(scannerType || undefined),
     onSuccess: (data) => {
       alert(`Analysis triggered. Task ID: ${data.task_id}`);
+      refetchCorr();
     },
   });
 ```
