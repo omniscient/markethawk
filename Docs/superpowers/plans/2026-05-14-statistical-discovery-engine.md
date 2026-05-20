@@ -732,11 +732,12 @@ def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
 
         rows = query.all()
 
-        if len(rows) < 500:
+        unique_event_ids = {r.event_id for r in rows}
+        if len(unique_event_ids) < 500:
             run.status = "failed"
-            run.error_message = f"Insufficient data (n={len(rows)}, min=500)"
+            run.error_message = f"Insufficient data (n={len(unique_event_ids)} events, min=500)"
             db.commit()
-            logger.info("analyze_signal_features: insufficient data (%d rows)", len(rows))
+            logger.info("analyze_signal_features: insufficient data (%d events)", len(unique_event_ids))
             return
 
         # --- Build feature matrix ---
@@ -801,7 +802,7 @@ def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
             )
 
         run.status = "completed"
-        run.event_count = len(rows)
+        run.event_count = len(unique_event_ids)
         run.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
         logger.info("analyze_signal_features: completed (events=%d)", len(rows))
@@ -1064,9 +1065,13 @@ def test_latest_returns_feature_weights_and_clusters(db: Session):
 # ---------------------------------------------------------------------------
 
 def test_trigger_analysis_returns_202(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
-    response = client.post("/api/outcomes/analyze")
-    app.dependency_overrides.clear()
+    from unittest.mock import patch
+    mock_result = type("R", (), {"id": "test-task-123"})()
+    with patch("app.tasks.analyze_signal_features") as mock_task:
+        mock_task.delay.return_value = mock_result
+        app.dependency_overrides[get_db] = lambda: db
+        response = client.post("/api/outcomes/analyze")
+        app.dependency_overrides.clear()
     assert response.status_code == 202
     data = response.json()
     assert "task_id" in data
