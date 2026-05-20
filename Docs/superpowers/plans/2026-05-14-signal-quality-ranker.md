@@ -342,22 +342,27 @@ def upgrade() -> None:
         "ON scanner_events (signal_quality_score DESC NULLS LAST)"
     )
     # 3. Seed SystemConfig rows — ON CONFLICT DO NOTHING so existing values survive
-    default_weights = json.dumps({
+    #    Use sa.text() with bound params to avoid f-string interpolation in SQL.
+    import json as _json
+    default_weights = _json.dumps({
         "volume_spike_ratio": 0.35,
         "gap_pct": 0.25,
         "relative_volume": 0.20,
         "volume_anomaly_score": 0.15,
         "float_rotation_pct": 0.05,
     })
-    op.execute(
-        f"""
-        INSERT INTO system_config (key, value)
-        VALUES
-            ('signal_ranker_enabled', 'true'),
-            ('signal_ranker_weights', '{default_weights}'),
-            ('signal_ranker_version', '0.1.0-baseline')
-        ON CONFLICT (key) DO NOTHING
-        """
+    conn = op.get_bind()
+    conn.execute(
+        sa.text(
+            "INSERT INTO system_config (key, value) VALUES "
+            "(:k1, :v1), (:k2, :v2), (:k3, :v3) "
+            "ON CONFLICT (key) DO NOTHING"
+        ),
+        {
+            "k1": "signal_ranker_enabled",  "v1": "true",
+            "k2": "signal_ranker_weights",  "v2": default_weights,
+            "k3": "signal_ranker_version",  "v3": "0.1.0-baseline",
+        },
     )
 
 
@@ -402,7 +407,7 @@ git commit -m "feat(ranker): add signal_quality_score column, index, and seed Sy
 
 ### Step 3.1 — Write failing test
 
-Add to `backend/tests/api/test_scanner.py` or a new test in `backend/tests/services/test_scanner_refactor.py`:
+Add to `backend/tests/api/test_scanner.py` (these are integration tests that use the real `db` fixture; do NOT add them to `test_scanner_refactor.py`, which is a unit-test file using mocks with no `db` fixture):
 
 ```python
 def test_save_event_sets_signal_quality_score(db: Session):
@@ -414,7 +419,7 @@ def test_save_event_sets_signal_quality_score(db: Session):
     indicators = {"volume_spike_ratio": 10.0, "gap_pct": 5.0}
     weights = {"volume_spike_ratio": 0.35, "gap_pct": 0.25}
 
-    result = ScannerService._save_event(
+    ScannerService._save_event(
         db=db,
         ticker="TST",
         event_date=today,
@@ -425,7 +430,7 @@ def test_save_event_sets_signal_quality_score(db: Session):
         ranker_enabled=True,
         ranker_weights=weights,
     )
-    db.flush()
+    # _save_event calls db.flush() internally — no need to flush again
 
     from app.models.scanner_event import ScannerEvent
     event = db.query(ScannerEvent).filter(
@@ -441,7 +446,7 @@ def test_save_event_skips_score_when_disabled(db: Session):
     from app.utils.session import get_market_today
 
     today = get_market_today()
-    result = ScannerService._save_event(
+    ScannerService._save_event(
         db=db,
         ticker="TST2",
         event_date=today,
@@ -452,7 +457,6 @@ def test_save_event_skips_score_when_disabled(db: Session):
         ranker_enabled=False,
         ranker_weights={},
     )
-    db.flush()
 
     from app.models.scanner_event import ScannerEvent
     event = db.query(ScannerEvent).filter(ScannerEvent.ticker == "TST2").first()
@@ -461,7 +465,7 @@ def test_save_event_skips_score_when_disabled(db: Session):
 
 Run (expect failures):
 ```bash
-cd backend && python -m pytest tests/services/test_scanner_refactor.py::test_save_event_sets_signal_quality_score -v
+cd backend && python -m pytest tests/api/test_scanner.py::test_save_event_sets_signal_quality_score -v
 # Expected: FAILED — TypeError (unexpected kwargs) or AttributeError
 ```
 
@@ -473,11 +477,17 @@ cd backend && python -m pytest tests/services/test_scanner_refactor.py::test_sav
 from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
 ```
 
-**Update `_save_event` signature** — add two new keyword params at the end (use `Optional` for consistency with the rest of `scanner.py`):
+**Update typing import** — `Optional` is not currently in `scanner.py`'s typing import. Update the existing line:
+```python
+# Before:
+from typing import Dict, Any, List
+# After:
+from typing import Dict, Any, List, Optional
+```
+
+**Update `_save_event` signature** — add two new keyword params at the end:
 
 ```python
-from typing import Dict, Any, List, Optional
-
 @staticmethod
 def _save_event(
     db: Session,
@@ -503,17 +513,20 @@ def _save_event(
         score = compute_signal_quality_score(indicators, ranker_weights)
 ```
 
-**Set score on new event** — include `signal_quality_score` in `model_data` before the constructor call (consistent with how `metadata_` is handled in the same block):
+**Set score on new event** — add ONE line (`model_data["signal_quality_score"] = score`) inside the existing new-event block. Do NOT remove any surrounding lines. The full replacement for the new-event branch (all other lines are already in the codebase — only the `signal_quality_score` line is new):
 
 ```python
     model_data = event_dict.copy()
     model_data["metadata_"] = model_data.pop("metadata")
-    model_data["signal_quality_score"] = score      # ← add this line
+    model_data["signal_quality_score"] = score      # ← this line is new; all others are existing
     new_event = ScannerEvent(**model_data)
     db.add(new_event)
+    db.flush()                                      # ← existing line, keep it
+    event_dict["id"] = new_event.id                 # ← existing line, keep it
+    # keep any other existing lines here (e.g. evaluate_scanner_alerts.delay if present)
 ```
 
-**Set score on existing event** — add `existing.signal_quality_score = score` *before* the existing `db.flush()` call (do not add a second flush):
+**Set score on existing event** — add `existing.signal_quality_score = score` *before* the existing `db.flush()` call. The full replacement block including the context lines that must be preserved (do NOT remove `event_dict["id"] = existing.id`):
 
 ```python
     for key, value in event_dict.items():
@@ -521,8 +534,9 @@ def _save_event(
             setattr(existing, "metadata_", value)
         else:
             setattr(existing, key, value)
-    existing.signal_quality_score = score   # ← add before the existing db.flush()
+    existing.signal_quality_score = score   # ← add before db.flush()
     db.flush()
+    event_dict["id"] = existing.id          # ← keep this line unchanged
 ```
 
 **Load ranker config in `run_pre_market_scan`** — use `load_ranker_config(db)` (already imported), replacing any need for raw query blocks. Add immediately after the TimesFM `_cfg` dict is built (after `_cfg = {r.key: r.value for r in _cfg_rows}`):
@@ -553,10 +567,16 @@ def _save_event(
                     )
 ```
 
-**Call site 2 — `run_oversold_bounce_scan`** — add a `load_ranker_config(db)` call at the start of this method too (after `enrichment_batch = await asyncio.to_thread(...)`):
+**Call site 2 — `run_oversold_bounce_scan`** — `run_oversold_bounce_scan` has no TimesFM block. Add `load_ranker_config(db)` immediately after the `enrichment_batch = await asyncio.to_thread(...)` call at the top of the method, before the ticker loop:
 
 ```python
-    ranker_enabled, ranker_weights, _ = load_ranker_config(db)
+    enrichment_batch = await asyncio.to_thread(
+        ScannerService._get_batch_enrichment_data, tickers, event_date, db
+    )
+    ranker_enabled, ranker_weights, _ = load_ranker_config(db)   # ← add this line
+
+    for ticker in tickers:
+        # ... existing ticker loop
 ```
 
 Then update the call site:
@@ -578,17 +598,45 @@ Then update the call site:
                     )
 ```
 
+**Also update `liquidity_hunt.py` call sites** — `backend/app/services/liquidity_hunt.py` has two additional `_save_event` calls (for `liquidity_hunt_pre` and `liquidity_hunt_post`). Without updating these, liquidity hunt events will always have `signal_quality_score = NULL`. Add `load_ranker_config(db)` at the start of `LiquidityHuntScanner.run()` (the method that calls `_save_event` twice), then pass the ranker kwargs to both call sites:
+
+```python
+# At the start of LiquidityHuntScanner.run() (after db is available):
+ranker_enabled, ranker_weights, _ = load_ranker_config(db)
+
+# At both _save_event call sites (liquidity_hunt_pre and liquidity_hunt_post):
+event_dict = ScannerService._save_event(
+    db=db,
+    ticker=ticker,
+    event_date=event_date,
+    scanner_type="liquidity_hunt_pre",  # or "liquidity_hunt_post"
+    indicators=indicators,
+    criteria_met=criteria_met,
+    enrichment=enrichment,
+    previous_close=...,
+    opening_price=...,
+    closing_price=...,
+    ranker_enabled=ranker_enabled,
+    ranker_weights=ranker_weights,
+)
+```
+
+Add the import at the top of `liquidity_hunt.py`:
+```python
+from app.services.signal_ranker import load_ranker_config
+```
+
 ### Step 3.3 — Verify tests pass
 
 ```bash
-cd backend && python -m pytest tests/services/test_scanner_refactor.py -v
-# Expected: all pass
+cd backend && python -m pytest tests/api/test_scanner.py -v
+# Expected: all pass (including the two new scorer tests)
 ```
 
 ### Step 3.4 — Commit
 
 ```bash
-git add backend/app/services/scanner.py
+git add backend/app/services/scanner.py backend/app/services/liquidity_hunt.py
 git commit -m "feat(ranker): integrate signal quality scorer into batch scanner"
 ```
 
@@ -770,10 +818,10 @@ def get_scanner_results(
 ):
 ```
 
-Update the sorting block to handle `signal_quality_score` with NULLS LAST. SQLAlchemy 2.0 uses `.nulls_last()` chained method:
+**Replace the entire existing sort block** with the following (`.nulls_last()` is SQLAlchemy 2.0 chained method; the new unified block handles all columns including `signal_quality_score`):
 
 ```python
-    # Sorting
+    # Sorting — REPLACE the entire try/except block that currently exists here
     try:
         if sort_by:
             sort_col = getattr(ScannerEvent, sort_by, ScannerEvent.created_at)
@@ -790,7 +838,19 @@ Update the sorting block to handle `signal_quality_score` with NULLS LAST. SQLAl
 
 ### Step 5.4 — Add distribution endpoint
 
-Add to `backend/app/routers/scanner.py` after the `get_edge_distribution` endpoint:
+First, add the following to the module-level imports at the top of `backend/app/routers/scanner.py`:
+
+```python
+# Add ScannerOutcomeSummary to the existing from app.models import line:
+from app.models import ScannerEvent, ScannerRun, ..., ScannerOutcomeSummary
+
+# Add load_ranker_config alongside other service imports (or at the end of the imports block):
+from app.services.signal_ranker import load_ranker_config
+```
+
+Do NOT use local imports inside the function body for either of these.
+
+Then add the endpoint after the `get_edge_distribution` endpoint:
 
 ```python
 @router.get("/signal-quality-distribution")
@@ -805,8 +865,6 @@ def get_signal_quality_distribution(
     Returns avg eod_pct_change and follow_through rate per decile.
     Only events with completed ScannerOutcomeSummary rows are included.
     """
-    from app.models import ScannerOutcomeSummary
-    from sqlalchemy import func, case
 
     query = (
         db.query(
@@ -863,8 +921,8 @@ def get_signal_quality_distribution(
         })
 
     # Embed signal_ranker_version so frontend doesn't need a separate API call
-    from app.services.signal_ranker import load_ranker_config as _load_ranker_cfg
-    _, _, ranker_version = _load_ranker_cfg(db)
+    # (load_ranker_config is imported at the module level — see Step 5.4 import instruction above)
+    _, _, ranker_version = load_ranker_config(db)
 
     return {"deciles": deciles, "ranker_version": ranker_version}
 ```
@@ -1042,6 +1100,19 @@ Also verify `sortOrder` default is `'desc'` (check the existing `useState` for `
 const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 ```
 
+**Pre-existing bug to fix in `onSort`**: The existing `onSort` callback in `Scanner.tsx` only toggles `sortOrder` when the same column is clicked — it does not update `sortBy` when a *different* column is selected. Since Score is now the default, clicking e.g. "Date" column header will toggle the sort order without actually switching to date sort. Fix the `onSort` handler to also set `sortBy`:
+
+```typescript
+const onSort = (column: string) => {
+  if (column === sortBy) {
+    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+  } else {
+    setSortBy(column);
+    setSortOrder('desc');
+  }
+};
+```
+
 ### Step 7.3 — TypeScript check
 
 ```bash
@@ -1064,31 +1135,28 @@ git commit -m "feat(ranker): replace criteria_met badge with score badge; defaul
 
 ### Step 8.1 — Add distribution query and chart
 
-**Add import** for distribution function at top of `EdgeExplorer.tsx`:
+**Update the existing `../api/scanner` import** — `EdgeExplorer.tsx` already imports `fetchScannerConfigs` from `'../api/scanner'`. Do NOT add a second import line. Update the existing one to add `fetchSignalQualityDistribution`:
 
 ```typescript
+// Before (example — find the actual line and add fetchSignalQualityDistribution):
+import { fetchScannerConfigs } from '../api/scanner';
+// After:
 import { fetchScannerConfigs, fetchSignalQualityDistribution } from '../api/scanner';
 ```
 
-**Add Recharts imports** — add `ComposedChart`, `Bar`, `Line`, `LineChart` to the existing recharts import:
+**Update the existing Recharts import** — `EdgeExplorer.tsx` already imports `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `ResponsiveContainer`, `ScatterChart`, `Scatter`, `ZAxis`, `Cell`, `Legend`, `AreaChart`, `Area` from recharts. Do NOT add a second import statement. Merge `ComposedChart`, `Bar`, `Line` into the existing import:
 
 ```typescript
+// Before (existing — add ComposedChart, Bar, Line at end):
 import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ScatterChart,
-  Scatter,
-  ZAxis,
-  Cell,
-  Legend,
-  AreaChart,
-  Area,
-  ComposedChart,
-  Bar,
-  Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ScatterChart, Scatter, ZAxis, Cell, Legend, AreaChart, Area,
+} from 'recharts';
+// After:
+import {
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  ScatterChart, Scatter, ZAxis, Cell, Legend, AreaChart, Area,
+  ComposedChart, Bar, Line,
 } from 'recharts';
 ```
 
