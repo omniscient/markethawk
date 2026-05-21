@@ -21,7 +21,7 @@ MarketHawk/
 │   │   ├── models/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlist — manually curated live-observation list (soft limit 50)
 │   │   │   ├── scanner_run.py          # ScannerRun — one row per scan execution
-│   │   │   ├── scanner_event.py        # ScannerEvent — tickers that passed criteria (also written by live scanner)
+│   │   │   ├── scanner_event.py        # ScannerEvent — tickers that passed criteria; carries signal_quality_score (Float, indexed DESC NULLS LAST)
 │   │   │   ├── scanner_config.py       # ScannerConfig — saved parameter sets
 │   │   │   ├── stock_universe.py       # StockUniverse — named ticker groups
 │   │   │   ├── stock_universe_ticker.py # StockUniverseTicker — universe membership
@@ -42,7 +42,7 @@ MarketHawk/
 │   │   │   ├── signal_cluster.py       # SignalCluster — K-means cluster archetype per analysis run; centroid + return_profile
 │   │   │   └── __init__.py             # Re-exports all models (required for Alembic autogenerate)
 │   │   ├── routers/
-│   │   │   ├── scanner.py              # /api/scanner/* — run, results, history
+│   │   │   ├── scanner.py              # /api/scanner/* — run, results (sort by signal_quality_score), history, signal-quality-distribution
 │   │   │   ├── universe.py             # /api/universe/* — CRUD for universes
 │   │   │   ├── stocks.py               # /api/stocks/* — historical data, ticker search
 │   │   │   ├── news.py                 # /api/news/* — news articles and preferences
@@ -58,7 +58,7 @@ MarketHawk/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlistAdd / ActiveWatchlistUpdate / ActiveWatchlistItem
 │   │   │   └── stock.py                # Pydantic request/response models
 │   │   ├── services/
-│   │   │   ├── scanner.py              # Core scan logic; ScannerService; Phase 2a 19-key feature enrichment per signal
+│   │   │   ├── scanner.py              # Core scan logic; ScannerService; Phase 2a 19-key feature enrichment; loads signal ranker config once per scan
 │   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags
 │   │   │   ├── discovery_service.py    # Bulk ticker sync from Polygon; rate-limit-aware paging
 │   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis; returns latest_article_utc for recency enrichment
@@ -71,6 +71,7 @@ MarketHawk/
 │   │   │   ├── stats.py                # Aggregate statistics for dashboard metrics
 │   │   │   ├── event_helpers.py        # ScannerEvent construction and querying utilities
 │   │   │   ├── statistical_discovery.py # Phase 2b: pure-Python statistical analysis (correlation, SHAP, K-means); no DB dependencies
+│   │   │   ├── signal_ranker.py        # Phase 2c: compute_signal_quality_score() + load_ranker_config(); weights from SystemConfig
 │   │   │   └── __init__.py
 │   │   ├── providers/
 │   │   │   ├── base.py                 # MarketDataProvider abstract interface
