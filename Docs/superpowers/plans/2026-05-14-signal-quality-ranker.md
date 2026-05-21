@@ -117,12 +117,9 @@ LivePublisher.fire_alert_if_new()
    def upgrade() -> None:
        op.add_column('scanner_events',
            sa.Column('signal_quality_score', sa.Float(), nullable=True))
-       op.create_index(
-           'idx_scanner_events_score',
-           'scanner_events',
-           ['signal_quality_score'],
-           unique=False,
-           postgresql_ops={'signal_quality_score': 'DESC NULLS LAST'},
+       # Use raw SQL for DESC NULLS LAST — Alembic's postgresql_ops is for operator classes only
+       op.execute(
+           "CREATE INDEX idx_scanner_events_score ON scanner_events (signal_quality_score DESC NULLS LAST)"
        )
        op.execute("""
            INSERT INTO system_config (key, value, updated_at)
@@ -135,7 +132,7 @@ LivePublisher.fire_alert_if_new()
    
    def downgrade() -> None:
        op.execute("DELETE FROM system_config WHERE key IN ('signal_ranker_enabled', 'signal_ranker_weights', 'signal_ranker_version')")
-       op.drop_index('idx_scanner_events_score', table_name='scanner_events')
+       op.execute("DROP INDEX IF EXISTS idx_scanner_events_score")
        op.drop_column('scanner_events', 'signal_quality_score')
    ```
 
@@ -153,7 +150,7 @@ LivePublisher.fire_alert_if_new()
 
 8. **Commit**:
    ```bash
-   git add backend/app/models/scanner_event.py backend/app/alembic/versions/<rev>_add_signal_quality_score.py
+   git add backend/app/models/scanner_event.py backend/app/alembic/versions/*_add_signal_quality_score.py
    git commit -m "feat(ranker): add signal_quality_score column and migration"
    ```
 
@@ -415,27 +412,16 @@ LivePublisher.fire_alert_if_new()
    ) -> Dict[str, Any]:
    ```
 
-   In the `event_dict` construction, add `"signal_quality_score"` alongside the existing keys:
+   In the `event_dict` construction, add **only this one key** to the existing dict literal — do not replace or rewrite any other part of `_save_event`. The full dict already has all other keys; add the new entry at the end:
    ```python
-   event_dict = {
-       "ticker": ticker,
-       "event_date": event_date,
-       "scanner_type": scanner_type,
-       "summary": summary,
-       "severity": severity,
-       "previous_close": previous_close,
-       "opening_price": opening_price,
-       "closing_price": closing_price,
-       "indicators": indicators,
-       "criteria_met": criteria_met,
-       "metadata": enrichment,
-       "signal_quality_score": signal_quality_score,   # ← new
-   }
+   # Inside the existing event_dict literal — add this one line only:
+   "signal_quality_score": signal_quality_score,   # ← new key; all other keys unchanged
    ```
 
    No other changes to `_save_event` body are needed:
    - **Existing-event branch**: the `for key, value in event_dict.items(): setattr(existing, key, value)` loop already handles `signal_quality_score` because it is a real column (not a special-cased key like `metadata`).
    - **New-event branch**: `model_data = event_dict.copy()` + `model_data["metadata_"] = model_data.pop("metadata")` already propagates `signal_quality_score` automatically since it is not the renamed `metadata` key.
+   - The `evaluate_scanner_alerts.delay(...)` call and all other existing logic in `_save_event` must remain untouched.
 
    c. In `run_pre_market_scan`, load ranker config immediately after the TimesFM config block (around line 399 in `scanner.py`). Insert one line after the existing `fallback_multiplier = ...` assignment:
    ```python
@@ -920,6 +906,7 @@ LivePublisher.fire_alert_if_new()
    
    export interface SignalQualityDistributionResponse {
      deciles: SignalQualityDecile[];
+     signal_ranker_version: string;
    }
    
    export const getSignalQualityDistribution = async (params: {
@@ -932,7 +919,7 @@ LivePublisher.fire_alert_if_new()
      if (params.start_date) query.append('start_date', params.start_date);
      if (params.end_date) query.append('end_date', params.end_date);
      const response = await apiClient.get<SignalQualityDistributionResponse>(
-       `/api/scanner/signal-quality-distribution?${query.toString()}`
+       `/scanner/signal-quality-distribution?${query.toString()}`
      );
      return response.data;
    };
@@ -1028,36 +1015,32 @@ LivePublisher.fire_alert_if_new()
 
 **TDD steps**:
 
-1. **Add import** — `frontend/src/pages/EdgeExplorer.tsx`:
+1. **Add imports** — `frontend/src/pages/EdgeExplorer.tsx`:
+
+   Add to the existing `../api/scanner` import:
    ```typescript
    import {
+     /* existing imports */,
      getSignalQualityDistribution,
      SignalQualityDecile,
+     SignalQualityDistributionResponse,
    } from '../api/scanner';
+   ```
+   (`SignalQualityDistributionResponse` already has `signal_ranker_version: string` from Task 6 — no interface edits needed here.)
+
+   **Merge** `ComposedChart`, `Bar`, and `Line` into the existing `recharts` import destructuring — do NOT add a second `import ... from 'recharts'` line, which would cause a `no-duplicate-imports` TypeScript/ESLint error:
+   ```typescript
+   // Find the existing recharts import and extend it, e.g.:
    import {
+     /* existing recharts imports */,
      ComposedChart,
      Bar,
      Line,
-     XAxis,
-     YAxis,
-     CartesianGrid,
-     Tooltip,
-     Legend,
-     ResponsiveContainer,
    } from 'recharts';
    ```
-   (Add any Recharts imports not already present to the existing import line.)
+   (`XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `Legend`, `ResponsiveContainer` are already imported from recharts — only add the three new names.)
 
-2. **Update `SignalQualityDistributionResponse` interface** — `frontend/src/api/scanner.ts`:
-   Add `signal_ranker_version: string` to the response interface:
-   ```typescript
-   export interface SignalQualityDistributionResponse {
-     deciles: SignalQualityDecile[];
-     signal_ranker_version: string;
-   }
-   ```
-
-3. **Add query** — inside the `EdgeExplorer` component, alongside existing queries. Pass only `scanner_type` — the existing component has `scannerType` and `ticker` state but no explicit `startDate`/`endDate` state variables:
+2. **Add query** — inside the `EdgeExplorer` component, alongside existing queries. Pass only `scanner_type` — the existing component has `scannerType` and `ticker` state but no explicit `startDate`/`endDate` state variables:
    ```typescript
    const { data: qualityDist, isLoading: loadingQualityDist } = useQuery({
      queryKey: ['signalQualityDistribution', scannerType],
@@ -1066,8 +1049,9 @@ LivePublisher.fire_alert_if_new()
      }),
    });
    ```
+   **Do NOT** add `loadingQualityDist` to the existing `const isLoading = loadingStats || loadingDist` line. The chart uses its own inline loading state so it loads independently from the rest of the page.
 
-4. **Add chart section** — in the JSX, after the existing charts block:
+3. **Add chart section** — inside the `isLoading` guarded `<>...</>` block in `EdgeExplorer.tsx`, after the last existing `<Card>` element but **before** its closing `</>`. Do NOT place it outside (after) that closing `</>` — the chart must be inside the guarded block so the component structure is valid, even though the chart uses its own inline loading state via `loadingQualityDist`:
    ```tsx
    <Card title="Signal Quality Validation" icon={TrendingUp as any}>
      {loadingQualityDist ? (
