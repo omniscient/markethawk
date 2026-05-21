@@ -14,21 +14,24 @@ import Card from '../components/ui/Card';
 import MetricCard from '../components/ui/MetricCard';
 import {
   XAxis,
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  ScatterChart, 
-  Scatter, 
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ScatterChart,
+  Scatter,
   ZAxis,
   Cell,
   Legend,
   AreaChart,
-  Area
+  Area,
+  ComposedChart,
+  Bar,
+  Line,
 } from 'recharts';
 
 // API functions
-import { fetchScannerConfigs } from '../api/scanner';
+import { fetchScannerConfigs, getSignalQualityDistribution } from '../api/scanner';
 import CorrelationHeatmap from '../components/CorrelationHeatmap';
 import { fetchCorrelations, triggerAnalysis } from '../api/analysis';
 
@@ -83,6 +86,13 @@ const EdgeExplorer: React.FC = () => {
       alert(`Analysis triggered. Task ID: ${data.task_id}`);
       refetchCorr();
     },
+  });
+
+  const { data: qualityDist, isLoading: loadingQualityDist } = useQuery({
+    queryKey: ['signalQualityDistribution', scannerType],
+    queryFn: () => getSignalQualityDistribution({
+      scanner_type: scannerType || undefined,
+    }),
   });
 
   const isLoading = loadingStats || loadingDist;
@@ -334,6 +344,53 @@ const EdgeExplorer: React.FC = () => {
                 </div>
               )}
             </div>
+          </Card>
+
+          <Card title="Signal Quality Validation" icon={TrendingUp as any}>
+            {loadingQualityDist ? (
+              <div className="flex items-center justify-center h-48 text-gray-500">Loading…</div>
+            ) : !qualityDist?.deciles?.length ? (
+              <div className="flex items-center justify-center h-48 text-gray-500 text-sm">
+                No outcome data yet — scores will appear here once ScannerOutcomeSummary rows are complete.
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 mb-3">
+                  Weight set:{' '}
+                  <span className="font-mono">{qualityDist.signal_ranker_version}</span>
+                </p>
+                <ResponsiveContainer width="100%" height={260}>
+                  <ComposedChart data={qualityDist.deciles} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="decile" tick={{ fill: '#9CA3AF', fontSize: 10 }} />
+                    <YAxis
+                      yAxisId="left"
+                      tickFormatter={(v) => `${v.toFixed(1)}%`}
+                      tick={{ fill: '#9CA3AF', fontSize: 10 }}
+                      label={{ value: 'Avg EOD %', angle: -90, position: 'insideLeft', fill: '#6B7280', fontSize: 11 }}
+                    />
+                    <YAxis
+                      yAxisId="right"
+                      orientation="right"
+                      tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+                      tick={{ fill: '#9CA3AF', fontSize: 10 }}
+                      label={{ value: 'Follow-through', angle: 90, position: 'insideRight', fill: '#6B7280', fontSize: 11 }}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'avg_eod_pct') return [`${value?.toFixed(2)}%`, 'Avg EOD %'];
+                        if (name === 'follow_through_rate') return [`${(value * 100).toFixed(1)}%`, 'Follow-through'];
+                        return [value, name];
+                      }}
+                    />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="avg_eod_pct" fill="#3B82F6" name="avg_eod_pct" radius={[2, 2, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="follow_through_rate" stroke="#10B981" dot={false} name="follow_through_rate" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </>
+            )}
           </Card>
         </>
       )}
