@@ -4,7 +4,7 @@ ScannerEvent SQLAlchemy model.
 
 from datetime import datetime, timezone
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, ForeignKey, Uuid as UUID, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, Float, ForeignKey, Uuid as UUID, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import Base
@@ -40,6 +40,8 @@ class ScannerEvent(Base):
     signal_cluster_id = Column(
         Integer, ForeignKey("signal_clusters.id"), nullable=True, index=True
     )
+
+    signal_quality_score = Column(Float, nullable=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

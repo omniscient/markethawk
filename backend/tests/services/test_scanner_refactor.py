@@ -8,6 +8,12 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.system_config import SystemConfig
 
 
+def test_scanner_event_model_has_signal_quality_score():
+    """Model column exists before any scorer is wired up."""
+    from app.models.scanner_event import ScannerEvent
+    assert hasattr(ScannerEvent, 'signal_quality_score')
+
+
 def _make_daily_bar(ticker, timestamp_utc, close, volume):
     b = StockAggregate()
     b.ticker = ticker
