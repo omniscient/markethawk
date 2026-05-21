@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.models.scanner_event import ScannerEvent
 from app.services.event_helpers import generate_event_summary, compute_event_severity
+from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
 from live_scanner.bar_aggregator import MinuteBar, ET
 from live_scanner.conditions import ConditionResult
 
@@ -175,6 +176,16 @@ class LivePublisher:
         """
         today = bar.minute_ts.astimezone(ET).date()
 
+        # Fresh config read each event — live scanner is long-running; weights may change
+        score = None
+        try:
+            with Session(self._engine) as cfg_session:
+                ranker_cfg = load_ranker_config(cfg_session)
+            if ranker_cfg.get("enabled") and ranker_cfg.get("weights"):
+                score = compute_signal_quality_score(condition.indicators, ranker_cfg["weights"])
+        except Exception:
+            logger.debug("LivePublisher: signal ranker config load failed — scoring skipped")
+
         event = ScannerEvent(
             uuid=uuid_module.uuid4(),
             ticker=bar.symbol,
@@ -187,6 +198,7 @@ class LivePublisher:
             indicators=condition.indicators,
             criteria_met=condition.criteria_met,
             metadata_={"source": "live_scanner", "session": bar.session},
+            signal_quality_score=score,
         )
 
         with Session(self._engine) as session:
