@@ -29,6 +29,8 @@ from app.models.trading_strategy import TradingStrategy
 from app.models.auto_trade_order import AutoTradeOrder
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.signal_analysis_run import SignalAnalysisRun
+from app.models.signal_cluster import SignalCluster
 
 __all__ = [
     "StockUniverse",
@@ -60,4 +62,6 @@ __all__ = [
     "AutoTradeOrder",
     "ScannerOutcomeSnapshot",
     "ScannerOutcomeSummary",
+    "SignalAnalysisRun",
+    "SignalCluster",
 ]
