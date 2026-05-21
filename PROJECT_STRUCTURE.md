@@ -38,6 +38,8 @@ MarketHawk/
 │   │   │   ├── market_holiday.py       # MarketHoliday — NYSE/NASDAQ holiday calendar
 │   │   │   ├── trade.py                # Trade — journal entries
 │   │   │   ├── universe_quality_report.py # UniverseQualityReport — data quality audits
+│   │   │   ├── signal_analysis_run.py  # SignalAnalysisRun — Phase 2b analysis execution anchor; stores correlation_matrix + feature_weights as JSONB
+│   │   │   ├── signal_cluster.py       # SignalCluster — K-means cluster archetype per analysis run; centroid + return_profile
 │   │   │   └── __init__.py             # Re-exports all models (required for Alembic autogenerate)
 │   │   ├── routers/
 │   │   │   ├── scanner.py              # /api/scanner/* — run, results, history
@@ -49,6 +51,7 @@ MarketHawk/
 │   │   │   ├── journal.py              # /api/journal/* — trade journal CRUD
 │   │   │   ├── watchlist.py            # /api/watchlist/* — active watchlist CRUD
 │   │   │   ├── health.py               # GET /health — liveness probe
+│   │   │   ├── outcomes.py             # /api/outcomes/* — scorecard, signals, backfill; Phase 2b: analyze, correlations, analysis/latest
 │   │   │   ├── system.py               # /api/system/* — configuration and status
 │   │   │   └── __init__.py
 │   │   ├── schemas/
@@ -67,6 +70,7 @@ MarketHawk/
 │   │   │   ├── data_quality.py         # Quality checks; UniverseQualityReport generation
 │   │   │   ├── stats.py                # Aggregate statistics for dashboard metrics
 │   │   │   ├── event_helpers.py        # ScannerEvent construction and querying utilities
+│   │   │   ├── statistical_discovery.py # Phase 2b: pure-Python statistical analysis (correlation, SHAP, K-means); no DB dependencies
 │   │   │   └── __init__.py
 │   │   ├── providers/
 │   │   │   ├── base.py                 # MarketDataProvider abstract interface
@@ -88,7 +92,8 @@ MarketHawk/
 │   │   │   ├── stocks.ts               # Stocks and universe API calls
 │   │   │   ├── news.ts                 # News API calls
 │   │   │   ├── system.ts               # System/health API calls
-│   │   │   └── watchlist.ts            # Active watchlist CRUD + React Query hooks
+│   │   │   ├── watchlist.ts            # Active watchlist CRUD + React Query hooks
+│   │   │   └── analysis.ts             # Phase 2b: fetchCorrelations, fetchLatestAnalysis, triggerAnalysis
 │   │   ├── components/
 │   │   │   ├── UniverseFormModal.tsx   # Create/edit universe modal
 │   │   │   ├── UniverseDetailsModal.tsx # Universe detail view modal
