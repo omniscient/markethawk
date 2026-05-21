@@ -107,7 +107,7 @@ const Scanner: React.FC = () => {
   const [scanEndDate, setScanEndDate] = useState<string>(lastCompletedWeekday());
   const [scanResults, setScanResults] = useState<any>(null);
   const [scanError, setScanError] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<string>('created_at');
+  const [sortBy, setSortBy] = useState<string>('signal_quality_score');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Fetch scanner configurations
