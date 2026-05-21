@@ -15,6 +15,8 @@ import sqlalchemy as sa
 from app.utils.session import get_market_today
 from app.core.database import get_db
 from app.models import MonitoredStock, ScannerEvent, ScannerConfig, ScannerRun
+from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.system_config import SystemConfig
 from app.schemas import (
     ScannerRunRequest,
     ScannerRunResponse,
@@ -341,7 +343,7 @@ def get_scanner_results(
     scanner_type: Optional[str] = None,
     event_type: Optional[str] = None, # Alias for backward compat
     universe_id: Optional[int] = None,
-    sort_by: Optional[str] = "created_at",
+    sort_by: Optional[str] = "signal_quality_score",
     sort_order: Optional[str] = "desc",
     limit: int = 100,
     offset: int = 0,
@@ -374,17 +376,14 @@ def get_scanner_results(
     # Sorting logic
     try:
         if sort_by:
-            # Handle metadata mapping if needed (e.g., frontend sends a legacy col name)
-            # For now, we prefer sorting by fixed columns. 
-            # If they want to sort by indicators, we'd need -> JSON logic.
             sort_attr = getattr(ScannerEvent, sort_by, ScannerEvent.created_at)
-            
             if sort_order.lower() == "desc":
-                query = query.order_by(sort_attr.desc())
+                order_expr = sort_attr.desc().nulls_last()
             else:
-                query = query.order_by(sort_attr.asc())
+                order_expr = sort_attr.asc().nulls_last()
+            query = query.order_by(order_expr)
         else:
-            query = query.order_by(ScannerEvent.created_at.desc())
+            query = query.order_by(ScannerEvent.signal_quality_score.desc().nulls_last())
     except Exception:
         query = query.order_by(ScannerEvent.created_at.desc())
 
@@ -393,6 +392,74 @@ def get_scanner_results(
     )
 
     return results
+
+
+@router.get("/signal-quality-distribution")
+def get_signal_quality_distribution(
+    scanner_type: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns avg eod_pct_change and follow_through rate per score decile for EdgeExplorer.
+    Deciles are bucketed as strings: '0.0-0.1', '0.1-0.2', ..., '0.9-1.0'.
+    Only events with both a signal_quality_score and a completed ScannerOutcomeSummary are included.
+    """
+    from sqlalchemy import func, case, cast as sa_cast
+    from sqlalchemy.types import Float as SAFloat
+
+    ranker_version = db.query(SystemConfig).filter(
+        SystemConfig.key == "signal_ranker_version"
+    ).first()
+    version = ranker_version.value if ranker_version else "unknown"
+
+    query = (
+        db.query(
+            ScannerEvent.signal_quality_score,
+            ScannerOutcomeSummary.eod_pct_change,
+            ScannerOutcomeSummary.follow_through,
+        )
+        .join(ScannerOutcomeSummary, ScannerOutcomeSummary.scanner_event_id == ScannerEvent.id)
+        .filter(ScannerEvent.signal_quality_score.isnot(None))
+    )
+    if scanner_type:
+        query = query.filter(ScannerEvent.scanner_type == scanner_type)
+    if start_date:
+        query = query.filter(ScannerEvent.event_date >= start_date)
+    if end_date:
+        query = query.filter(ScannerEvent.event_date <= end_date)
+
+    rows = query.all()
+
+    # Bucket into deciles
+    buckets: dict[str, dict] = {}
+    for label in [f"{i/10:.1f}-{(i+1)/10:.1f}" for i in range(10)]:
+        buckets[label] = {"count": 0, "eod_sum": 0.0, "ft_sum": 0, "eod_count": 0, "ft_count": 0}
+
+    for score, eod_pct, follow_through in rows:
+        idx = min(int(float(score) * 10), 9)
+        label = f"{idx/10:.1f}-{(idx+1)/10:.1f}"
+        b = buckets[label]
+        b["count"] += 1
+        if eod_pct is not None:
+            b["eod_sum"] += float(eod_pct)
+            b["eod_count"] += 1
+        if follow_through is not None:
+            b["ft_sum"] += int(follow_through)
+            b["ft_count"] += 1
+
+    deciles = [
+        {
+            "decile": label,
+            "count": b["count"],
+            "avg_eod_pct": round(b["eod_sum"] / b["eod_count"], 3) if b["eod_count"] > 0 else None,
+            "follow_through_rate": round(b["ft_sum"] / b["ft_count"], 3) if b["ft_count"] > 0 else None,
+        }
+        for label, b in buckets.items()
+    ]
+
+    return {"deciles": deciles, "signal_ranker_version": version}
 
 
 @router.get("/stats", response_model=ScannerStatsResponse)

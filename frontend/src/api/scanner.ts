@@ -15,7 +15,9 @@ export interface ScannerEvent {
   previous_close?: number;
   opening_price?: number;
   closing_price?: number;
-  
+
+  signal_quality_score?: number | null;
+
   indicators: Record<string, any>;
   criteria_met: Record<string, any>;
   metadata: Record<string, any>;
@@ -680,6 +682,33 @@ export const clearScannerEvents = async (ticker: string): Promise<ClearEventsRes
  * Extract a human-readable message from an Axios error.
  * Callers can still use this for local inline error display.
  */
+export interface SignalQualityDecile {
+  decile: string;
+  count: number;
+  avg_eod_pct: number | null;
+  follow_through_rate: number | null;
+}
+
+export interface SignalQualityDistributionResponse {
+  deciles: SignalQualityDecile[];
+  signal_ranker_version: string;
+}
+
+export const getSignalQualityDistribution = async (params: {
+  scanner_type?: string;
+  start_date?: string;
+  end_date?: string;
+} = {}): Promise<SignalQualityDistributionResponse> => {
+  const query = new URLSearchParams();
+  if (params.scanner_type) query.append('scanner_type', params.scanner_type);
+  if (params.start_date) query.append('start_date', params.start_date);
+  if (params.end_date) query.append('end_date', params.end_date);
+  const response = await apiClient.get<SignalQualityDistributionResponse>(
+    `/scanner/signal-quality-distribution?${query.toString()}`
+  );
+  return response.data;
+};
+
 export const handleApiError = (error: any): string => {
   if (error.response) {
     return error.response.data?.detail ?? error.response.statusText;

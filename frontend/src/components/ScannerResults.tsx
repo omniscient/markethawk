@@ -208,7 +208,13 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                   currentOrder={sortOrder} 
                   onSort={onSort} 
                 />
-                <th className="py-3 px-4">Score</th>
+                <SortableHeader
+                  label="Score"
+                  sortKey="signal_quality_score"
+                  currentSort={sortBy}
+                  currentOrder={sortOrder}
+                  onSort={onSort}
+                />
               </tr>
             </thead>
             <tbody>
@@ -252,15 +258,10 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     </span>
                   </td>
                   <td className="py-4 px-4 bg-gray-800 rounded-r-xl">
-                    <div className="flex items-center space-x-2">
-                       <span className={`px-2 py-1 rounded text-xs font-black ${Object.values(event.criteria_met || {}).every(Boolean)
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-yellow-500/20 text-yellow-400'
-                        }`}>
-                        {Object.values(event.criteria_met || {}).filter(Boolean).length}/
-                        {Object.values(event.criteria_met || {}).length}
-                      </span>
-                    </div>
+                    <ScoreQualityBadge
+                      score={event.signal_quality_score ?? null}
+                      criteriaMet={event.criteria_met}
+                    />
                   </td>
                 </tr>
               ))}
@@ -340,6 +341,39 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({
         </div>
       </div>
     </th>
+  );
+};
+
+interface ScoreQualityBadgeProps {
+  score: number | null | undefined;
+  criteriaMet: Record<string, any>;
+}
+
+const ScoreQualityBadge: React.FC<ScoreQualityBadgeProps> = ({ score, criteriaMet }) => {
+  const criteriaRatio = `${Object.values(criteriaMet || {}).filter(Boolean).length}/${Object.values(criteriaMet || {}).length}`;
+
+  if (score == null) {
+    return (
+      <span className="text-gray-500 font-mono text-xs" title={criteriaRatio}>—</span>
+    );
+  }
+
+  let colorClass: string;
+  if (score >= 0.7) {
+    colorClass = 'bg-green-500/20 text-green-400 border-green-500/30';
+  } else if (score >= 0.4) {
+    colorClass = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+  } else {
+    colorClass = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+  }
+
+  return (
+    <span
+      className={`px-2 py-1 rounded text-xs font-black border ${colorClass}`}
+      title={criteriaRatio}
+    >
+      {score.toFixed(2)}
+    </span>
   );
 };
 

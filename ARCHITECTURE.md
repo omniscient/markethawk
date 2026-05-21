@@ -58,7 +58,8 @@ A full pre-market scan proceeds as follows:
 
 | File | Responsibility |
 |------|---------------|
-| `scanner.py` | Core scan orchestration: `ScannerService`, `calculate_day_metrics()`, `_get_batch_enrichment_data()` (returns 3-tuple with ES/NQ market context and sector ETF pct changes), Phase 2a 19-key feature enrichment in `run_pre_market_scan()`. |
+| `scanner.py` | Core scan orchestration: `ScannerService`, `calculate_day_metrics()`, `_get_batch_enrichment_data()` (returns 3-tuple with ES/NQ market context and sector ETF pct changes), Phase 2a 19-key feature enrichment in `run_pre_market_scan()`. Loads `signal_ranker_config` once per scan; passes to `_save_event()` for scoring. |
+| `signal_ranker.py` | Phase 2c signal quality scorer. `compute_signal_quality_score()` — weighted sum of normalized indicators (re-normalizes over present features). `load_ranker_config()` — reads `signal_ranker_enabled`, `signal_ranker_weights`, `signal_ranker_version` from `SystemConfig`. Weights updatable without redeploy. |
 | `stock_data.py` | Historical OHLCV fetch, gap percentage calculation, per-ticker session flag logic. |
 | `discovery_service.py` | Bulk ticker sync from Polygon: paginated reference data, rate-limit-aware batching. |
 | `catalyst_parser.py` | Batch 72-hour news analysis for catalyst detection. Joins articles to tickers in memory. Returns `latest_article_utc` per ticker for catalyst recency enrichment. |
@@ -84,7 +85,7 @@ A full pre-market scan proceeds as follows:
 
 | File | Endpoints |
 |------|-----------|
-| `scanner.py` | `/api/scanner/run`, `/api/scanner/results`, `/api/scanner/history` |
+| `scanner.py` | `/api/scanner/run`, `/api/scanner/results` (default sort: `signal_quality_score DESC`), `/api/scanner/history`, `/api/scanner/signal-quality-distribution` |
 | `universe.py` | `/api/universe/*` — CRUD for stock universes and memberships |
 | `stocks.py` | `/api/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/news/*` — news articles and preferences |
@@ -102,7 +103,7 @@ A full pre-market scan proceeds as follows:
 |-------|-------|---------|
 | `ActiveWatchlist` | `active_watchlist` | Manually curated symbols under live observation. Soft limit: 50. Fields: `symbol`, `security_type` (STK/FUT), `exchange`, `notes`, `added_at`. |
 | `ScannerRun` | `scanner_runs` | One row per scan execution; stores timing, config snapshot, hit count |
-| `ScannerEvent` | `scanner_events` | One row per ticker that passed all criteria in a run. Also written by the live scanner for `live_volume_spike` and `live_price_move` events. |
+| `ScannerEvent` | `scanner_events` | One row per ticker that passed all criteria in a run. Carries `signal_quality_score` (Float, indexed DESC NULLS LAST) computed at write time by `signal_ranker.py`. Also written by the live scanner. |
 | `ScannerConfig` | `scanner_configs` | Saved scanner parameter sets |
 | `StockUniverse` | `stock_universes` | Named groups of tickers (e.g., "Russell 2000 Small Caps") |
 | `StockUniverseTicker` | `stock_universe_tickers` | Universe membership records |
@@ -135,10 +136,10 @@ A full pre-market scan proceeds as follows:
 | Page | Route | Purpose |
 |------|-------|---------|
 | `Dashboard` | `/` | System metrics, recent alerts, market status |
-| `Scanner` | `/scanner` | Run scans, view results, configure criteria |
+| `Scanner` | `/scanner` | Run scans, view results (default sort: signal quality score), configure criteria |
 | `PreMarketMovers` | `/movers/pre-market` | Real-time pre-market volume leaders |
 | `Universes` | `/universes` | Create and manage stock universes |
-| `EdgeExplorer` | `/edge-explorer` | Historical scanner hit rates, outcome distributions, and feature correlation heatmap (Phase 2b) |
+| `EdgeExplorer` | `/edge-explorer` | Historical scanner hit rates, outcome distributions, feature correlation heatmap (Phase 2b), and Signal Quality Validation chart — avg EOD % and follow-through rate per score decile (Phase 2c) |
 | `ActiveWatchlist` | `/watchlist` | Live-monitored symbols: add/remove, real-time price + session data, alert badges. Connects to `/api/live/ws/watchlist` WebSocket. |
 | `Journal` | `/journal` | Trade journal entry and review |
 | `Alerts` | `/alerts` | Alert configuration and history |

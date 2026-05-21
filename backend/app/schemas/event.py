@@ -22,7 +22,9 @@ class ScannerEventResponse(BaseModel):
     previous_close: Optional[float] = None
     opening_price: Optional[float] = None
     closing_price: Optional[float] = None
-    
+
+    signal_quality_score: Optional[float] = None
+
     indicators: Dict[str, Any] = Field(default_factory=dict)
     criteria_met: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict, alias="metadata_")

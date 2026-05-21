@@ -23,6 +23,7 @@ from app.models.system_config import SystemConfig
 from app.services.catalyst_parser import CatalystParser
 from app.services.event_helpers import generate_event_summary, compute_event_severity
 from app.services.timeseries_forecast import get_volume_forecast, compute_anomaly_score
+from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
 
 _ET = ZoneInfo("America/New_York")
 
@@ -314,14 +315,20 @@ class ScannerService:
         enrichment: Dict[str, Any],
         previous_close: float = None,
         opening_price: float = None,
-        closing_price: float = None
+        closing_price: float = None,
+        ranker_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generalized method to save or update a ScannerEvent."""
-        
+
         # Calculate summary and severity
         summary = generate_event_summary(scanner_type, indicators)
         severity = compute_event_severity(scanner_type, indicators)
-        
+
+        # Compute signal quality score if ranker is enabled
+        score = None
+        if ranker_config and ranker_config.get("enabled") and ranker_config.get("weights"):
+            score = compute_signal_quality_score(indicators, ranker_config["weights"])
+
         # Prepare data dict
         event_dict = {
             "ticker": ticker,
@@ -334,7 +341,8 @@ class ScannerService:
             "closing_price": closing_price,
             "indicators": indicators,
             "criteria_met": criteria_met,
-            "metadata": enrichment
+            "metadata": enrichment,
+            "signal_quality_score": score,
         }
         
         # Check for existing event
@@ -393,6 +401,9 @@ class ScannerService:
         anomaly_threshold = float(_cfg.get('timesfm_anomaly_threshold', '2.0'))
         min_history_bars = int(_cfg.get('timesfm_min_history_bars', '30'))
         fallback_multiplier = float(_cfg.get('timesfm_fallback_multiplier', '4.0'))
+
+        # Read signal ranker config once before the ticker loop
+        ranker_config = load_ranker_config(db)
 
         enrichment_batch, market_context_dict, sector_etf_pct_dict = await asyncio.to_thread(
             ScannerService._get_batch_enrichment_data, tickers, event_date, db
@@ -593,6 +604,7 @@ class ScannerService:
                         previous_close=previous_close,
                         opening_price=day_metrics["opening_price"],
                         closing_price=day_metrics["closing_price"],
+                        ranker_config=ranker_config,
                     )
                     results.append(event_dict)
             except Exception as e:
@@ -614,6 +626,10 @@ class ScannerService:
         day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
         day_end_utc = (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
         hist_start_utc = (day_start_et - timedelta(days=90)).astimezone(timezone.utc).replace(tzinfo=None)
+
+        # Read signal ranker config once before the ticker loop
+        # Oversold bounce uses a reduced feature set; scorer re-normalizes over present features
+        ranker_config = load_ranker_config(db)
 
         enrichment_batch, _, _ = await asyncio.to_thread(
             ScannerService._get_batch_enrichment_data, tickers, event_date, db
@@ -718,6 +734,7 @@ class ScannerService:
                         previous_close=float(today['prev_close']),
                         opening_price=float(today['Open']),
                         closing_price=float(today['Close']),
+                        ranker_config=ranker_config,
                     )
                     results.append(event_dict)
             except Exception as e:

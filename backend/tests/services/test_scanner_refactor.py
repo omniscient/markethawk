@@ -8,6 +8,12 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.system_config import SystemConfig
 
 
+def test_scanner_event_model_has_signal_quality_score():
+    """Model column exists before any scorer is wired up."""
+    from app.models.scanner_event import ScannerEvent
+    assert hasattr(ScannerEvent, 'signal_quality_score')
+
+
 def _make_daily_bar(ticker, timestamp_utc, close, volume):
     b = StockAggregate()
     b.ticker = ticker
@@ -152,6 +158,7 @@ def test_oversold_bounce_detects_rsi_crossover():
              "closing_price": 100.0, "pre_market_close": 99.0,
              "opening_price": 100.0, "regular_high": 101.0, "regular_low": 99.0,
          }), \
+         patch('app.services.scanner.load_ranker_config', return_value={"enabled": False, "weights": {}, "version": "test"}), \
          patch.object(ScannerService, '_save_event', return_value={"id": 2}) as mock_save:
 
         results = asyncio.run(
@@ -177,6 +184,7 @@ def test_oversold_bounce_skips_with_insufficient_bars():
     db.query.return_value = mock_q
 
     with patch.object(ScannerService, '_get_batch_enrichment_data', return_value=({ticker: {}}, {}, {})), \
+         patch('app.services.scanner.load_ranker_config', return_value={"enabled": False, "weights": {}, "version": "test"}), \
          patch.object(ScannerService, '_save_event') as mock_save:
 
         results = asyncio.run(
