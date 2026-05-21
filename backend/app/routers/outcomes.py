@@ -22,6 +22,16 @@ from app.schemas.outcome import (
     BackfillResponse,
     SignalListResponse,
 )
+from app.models.signal_analysis_run import SignalAnalysisRun
+from app.models.signal_cluster import SignalCluster
+from app.schemas.analysis import (
+    AnalysisTriggerResponse,
+    CorrelationResponse,
+    LatestAnalysisResponse,
+    ClusterSummary,
+    ClusterReturnInterval,
+    FeatureWeight,
+)
 from app.services.stats import StatsService
 from app.services.data_readiness import DataReadinessService
 from app.services.outcome_service import OutcomeService
@@ -204,4 +214,89 @@ def backfill_outcomes(
         snapshots_created=snapshots_created,
         events_processed=len(events),
         scanner_type=request.scanner_type,
+    )
+
+
+@router.post("/analyze", status_code=202, response_model=AnalysisTriggerResponse)
+def trigger_signal_analysis(
+    scanner_type: Optional[str] = None,
+    k: int = 6,
+    db: Session = Depends(get_db),
+):
+    from app.tasks import analyze_signal_features
+    result = analyze_signal_features.delay(scanner_type=scanner_type, k=k)
+    return AnalysisTriggerResponse(task_id=result.id)
+
+
+@router.get("/correlations", response_model=CorrelationResponse)
+def get_correlations(
+    scanner_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    query = (
+        db.query(SignalAnalysisRun)
+        .filter(SignalAnalysisRun.status == "completed")
+        .order_by(SignalAnalysisRun.created_at.desc())
+    )
+    if scanner_type:
+        query = query.filter(SignalAnalysisRun.scanner_type == scanner_type)
+    run = query.first()
+    if not run:
+        raise HTTPException(status_code=404, detail="No completed analysis run found")
+
+    matrix = run.correlation_matrix or {}
+    return CorrelationResponse(
+        run_id=run.id,
+        scanner_type=run.scanner_type,
+        event_count=run.event_count or 0,
+        completed_at=run.completed_at,
+        features=matrix.get("features", []),
+        intervals=matrix.get("intervals", []),
+        pearson=matrix.get("pearson", []),
+        spearman=matrix.get("spearman", []),
+    )
+
+
+@router.get("/analysis/latest", response_model=LatestAnalysisResponse)
+def get_latest_analysis(
+    db: Session = Depends(get_db),
+):
+    run = (
+        db.query(SignalAnalysisRun)
+        .filter(SignalAnalysisRun.status == "completed")
+        .order_by(SignalAnalysisRun.created_at.desc())
+        .first()
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="No completed analysis run found")
+
+    clusters_db = (
+        db.query(SignalCluster)
+        .filter(SignalCluster.analysis_run_id == run.id)
+        .order_by(SignalCluster.cluster_index)
+        .all()
+    )
+
+    clusters = []
+    for c in clusters_db:
+        return_profile = {}
+        for interval_key, metrics in (c.return_profile or {}).items():
+            return_profile[interval_key] = ClusterReturnInterval(**metrics)
+        clusters.append(
+            ClusterSummary(
+                id=c.id,
+                label=c.label,
+                event_count=c.event_count,
+                centroid=c.centroid or {},
+                return_profile=return_profile,
+            )
+        )
+
+    weights = [FeatureWeight(**w) for w in (run.feature_weights or [])]
+
+    return LatestAnalysisResponse(
+        run_id=run.id,
+        completed_at=run.completed_at,
+        feature_weights=weights,
+        clusters=clusters,
     )

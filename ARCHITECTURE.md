@@ -70,6 +70,7 @@ A full pre-market scan proceeds as follows:
 | `data_quality.py` | Quality checks and `UniverseQualityReport` generation. |
 | `stats.py` | Aggregate statistics helpers for dashboard metrics. |
 | `event_helpers.py` | Utility functions for `ScannerEvent` construction and querying. |
+| `statistical_discovery.py` | Pure-Python statistical analysis service: `build_feature_matrix`, `compute_correlations` (Pearson + Spearman), `compute_shap_weights` (LightGBM + SHAP), `run_kmeans`, `compute_conditional_stats`, `generate_label`. No DB dependencies; accepts DataFrames, returns typed dicts. |
 
 ### Providers (`app/providers/`)
 
@@ -93,6 +94,7 @@ A full pre-market scan proceeds as follows:
 | `watchlist.py` | `/api/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |
 | `health.py` | `GET /health` — liveness probe |
 | `system.py` | `/api/system/*` — configuration, status |
+| `outcomes.py` | `/api/outcomes/*` — scorecard, intervals, distribution, edge decay, signals, event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
 
 ### Database Models (`app/models/`)
 
@@ -117,6 +119,8 @@ A full pre-market scan proceeds as follows:
 | `MarketHoliday` | `market_holidays` | NYSE/NASDAQ holiday calendar |
 | `Trade` | `trades` | Trade journal entries |
 | `UniverseQualityReport` | `universe_quality_reports` | Data quality audit results per universe |
+| `SignalAnalysisRun` | `signal_analysis_runs` | Anchor table for each statistical analysis execution; stores `correlation_matrix` and `feature_weights` as JSONB, status, event count |
+| `SignalCluster` | `signal_clusters` | One K-means cluster archetype per analysis run; stores centroid, return_profile (per-interval stats), event count, auto-generated label |
 
 ## Frontend Architecture
 
@@ -134,7 +138,7 @@ A full pre-market scan proceeds as follows:
 | `Scanner` | `/scanner` | Run scans, view results, configure criteria |
 | `PreMarketMovers` | `/movers/pre-market` | Real-time pre-market volume leaders |
 | `Universes` | `/universes` | Create and manage stock universes |
-| `EdgeExplorer` | `/edge-explorer` | Historical scanner hit rates and outcome distributions |
+| `EdgeExplorer` | `/edge-explorer` | Historical scanner hit rates, outcome distributions, and feature correlation heatmap (Phase 2b) |
 | `ActiveWatchlist` | `/watchlist` | Live-monitored symbols: add/remove, real-time price + session data, alert badges. Connects to `/api/live/ws/watchlist` WebSocket. |
 | `Journal` | `/journal` | Trade journal entry and review |
 | `Alerts` | `/alerts` | Alert configuration and history |
@@ -258,6 +262,7 @@ Defined in `app/tasks.py`, scheduled via `app/core/celery_app.py`:
 | `refresh_universe_stocks` | Beat schedule | Refresh stock data for active universes |
 | `sync_fundamental_data` | Beat schedule (weekly) | Bulk ticker reference sync from Polygon |
 | `update_daily_metrics` | Beat schedule (daily, after close) | Compute and store daily metric snapshots |
+| `analyze_signal_features` | Beat schedule (11:00 UTC weekdays) / on-demand via `POST /api/outcomes/analyze` | Phase 2b statistical discovery: correlation, SHAP feature weights, K-means clustering. Requires ≥500 complete events. Persists results to `signal_analysis_runs` and `signal_clusters`. |
 
 Redis is used as both the Celery broker and result backend. Worker and beat run as separate containers so the scheduler doesn't compete with task execution.
 

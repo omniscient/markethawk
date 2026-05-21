@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   BarChart2,
   TrendingUp,
@@ -29,6 +29,8 @@ import {
 
 // API functions
 import { fetchScannerConfigs } from '../api/scanner';
+import CorrelationHeatmap from '../components/CorrelationHeatmap';
+import { fetchCorrelations, triggerAnalysis } from '../api/analysis';
 
 const EdgeExplorer: React.FC = () => {
   const [period, setPeriod] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
@@ -67,6 +69,20 @@ const EdgeExplorer: React.FC = () => {
       if (!response.ok) return { events: [] };
       return response.json();
     }
+  });
+
+  const { data: correlations, isLoading: loadingCorr, refetch: refetchCorr } = useQuery({
+    queryKey: ['correlations', scannerType],
+    queryFn: () => fetchCorrelations(scannerType || undefined),
+    retry: false,
+  });
+
+  const triggerMutation = useMutation({
+    mutationFn: () => triggerAnalysis(scannerType || undefined),
+    onSuccess: (data) => {
+      alert(`Analysis triggered. Task ID: ${data.task_id}`);
+      refetchCorr();
+    },
   });
 
   const isLoading = loadingStats || loadingDist;
@@ -287,6 +303,36 @@ const EdgeExplorer: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </Card>
+
+          {/* Feature Correlations */}
+          <Card title="Feature Correlations" icon={BarChart2 as any}>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-gray-400 text-xs">
+                  Correlation between signal features and subsequent returns.
+                </p>
+                <button
+                  onClick={() => triggerMutation.mutate()}
+                  disabled={triggerMutation.isPending}
+                  className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md bg-gray-700 hover:bg-financial-blue text-white transition-all disabled:opacity-50"
+                >
+                  {triggerMutation.isPending ? 'Queuing...' : 'Run Analysis'}
+                </button>
+              </div>
+
+              {loadingCorr ? (
+                <div className="flex items-center justify-center h-32 text-gray-500 text-xs">
+                  Loading correlation data...
+                </div>
+              ) : correlations ? (
+                <CorrelationHeatmap data={correlations} />
+              ) : (
+                <div className="flex items-center justify-center h-32 text-gray-500 text-xs text-center">
+                  No analysis data yet. Run analysis to populate this panel.
+                </div>
+              )}
             </div>
           </Card>
         </>
