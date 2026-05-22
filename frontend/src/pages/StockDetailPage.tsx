@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   ArrowLeft, 
@@ -35,12 +35,15 @@ import { runScannerRange } from '../api/scanner';
 const StockDetailPage: React.FC = () => {
   const { ticker } = useParams<{ ticker: string }>();
   const symbol = ticker?.toUpperCase() || '';
+  const [searchParams] = useSearchParams();
   const [period, setPeriod] = React.useState(localStorage.getItem('stock_detail_period') || '1y');
   const [timespan, setTimespan] = React.useState(localStorage.getItem('stock_detail_timespan') || 'day');
   const [wsResolution, setWsResolution] = React.useState<'minute' | 'second'>(
     (localStorage.getItem('stock_detail_ws_res') as 'minute' | 'second') || 'minute'
   );
-  const [highlightDate, setHighlightDate] = React.useState<string | undefined>(undefined);
+  const [highlightDate, setHighlightDate] = React.useState<string | undefined>(
+    searchParams.get('date') ?? undefined
+  );
   const [catchingUp, setCatchingUp] = React.useState(false);
   const [showST, setShowST] = React.useState(localStorage.getItem('show_double_st') === 'true');
   const [scanDialogOpen, setScanDialogOpen] = React.useState(false);
