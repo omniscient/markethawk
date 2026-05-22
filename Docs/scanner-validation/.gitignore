@@ -1,0 +1,2 @@
+# Ignore runtime cursor files — verdicts are canonical in the DB
+*.json
