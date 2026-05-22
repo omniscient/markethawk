@@ -4,11 +4,13 @@ Runs against a real Postgres DB (via testcontainers).
 """
 
 import pytest
+from datetime import timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
 from app.core.database import get_db
+from app.utils.session import get_market_today
 from tests.fixtures.core import seed_universes, seed_tickers, seed_scanner_configs, seed_monitored_stocks
 from tests.fixtures.scanner import seed_scanner_runs, seed_scanner_events
 
@@ -276,3 +278,53 @@ def test_stats_today_events(db: Session):
     data = response.json()
     # seed_scanner_events seeds events on today's date — at least 5 of them
     assert data["todayEvents"] >= 5
+
+
+# ---------------------------------------------------------------------------
+# GET /api/scanner/results — date range filters
+# ---------------------------------------------------------------------------
+
+
+def test_results_filter_by_start_date(db: Session):
+    seed_scanner_events(db)
+    today = get_market_today()
+    today_str = str(today)
+
+    app.dependency_overrides[get_db] = lambda: db
+    response = client.get(f"/api/scanner/results?start_date={today_str}")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) > 0
+    assert all(e["event_date"] >= today_str for e in data)
+
+
+def test_results_filter_by_end_date(db: Session):
+    seed_scanner_events(db)
+    today = get_market_today()
+    two_days_ago = str(today - timedelta(days=2))
+
+    app.dependency_overrides[get_db] = lambda: db
+    response = client.get(f"/api/scanner/results?end_date={two_days_ago}")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) > 0
+    assert all(e["event_date"] <= two_days_ago for e in data)
+
+
+def test_results_filter_by_date_range(db: Session):
+    seed_scanner_events(db)
+    today = get_market_today()
+    yesterday = str(today - timedelta(days=1))
+
+    app.dependency_overrides[get_db] = lambda: db
+    response = client.get(f"/api/scanner/results?start_date={yesterday}&end_date={yesterday}")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) > 0
+    assert all(e["event_date"] == yesterday for e in data)

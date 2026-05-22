@@ -2,11 +2,11 @@
 Scanner router - endpoints for running and viewing scanner results.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from sqlalchemy import cast
 from sqlalchemy.dialects.postgresql import JSONB
@@ -347,6 +347,8 @@ def get_scanner_results(
     sort_order: Optional[str] = "desc",
     limit: int = 100,
     offset: int = 0,
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
 ):
     """Get scanner results with filtering."""
@@ -368,10 +370,15 @@ def get_scanner_results(
 
     if universe_id:
         query = query.join(
-            MonitoredStock, 
-            (ScannerEvent.ticker == MonitoredStock.ticker) & 
+            MonitoredStock,
+            (ScannerEvent.ticker == MonitoredStock.ticker) &
             (MonitoredStock.universe_id == universe_id)
         )
+
+    if start_date:
+        query = query.filter(ScannerEvent.event_date >= start_date)
+    if end_date:
+        query = query.filter(ScannerEvent.event_date <= end_date)
 
     # Sorting logic
     try:
