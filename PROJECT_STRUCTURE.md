@@ -40,6 +40,7 @@ MarketHawk/
 │   │   │   ├── universe_quality_report.py # UniverseQualityReport — data quality audits
 │   │   │   ├── signal_analysis_run.py  # SignalAnalysisRun — Phase 2b analysis execution anchor; stores correlation_matrix + feature_weights as JSONB
 │   │   │   ├── signal_cluster.py       # SignalCluster — K-means cluster archetype per analysis run; centroid + return_profile
+│   │   │   ├── signal_review.py        # SignalReview — user verdict (confirmed/rejected/enhanced) on a ScannerEvent; written by /validate-scanner skill
 │   │   │   └── __init__.py             # Re-exports all models (required for Alembic autogenerate)
 │   │   ├── routers/
 │   │   │   ├── scanner.py              # /api/scanner/* — run, results (sort by signal_quality_score), history, signal-quality-distribution
@@ -52,6 +53,7 @@ MarketHawk/
 │   │   │   ├── watchlist.py            # /api/watchlist/* — active watchlist CRUD
 │   │   │   ├── health.py               # GET /health — liveness probe
 │   │   │   ├── outcomes.py             # /api/outcomes/* — scorecard, signals, backfill; Phase 2b: analyze, correlations, analysis/latest
+│   │   │   ├── signal_reviews.py       # POST /api/signal-reviews (201); GET /api/signal-reviews?scanner_type= — verdict persistence for /validate-scanner skill
 │   │   │   ├── system.py               # /api/system/* — configuration and status
 │   │   │   └── __init__.py
 │   │   ├── schemas/
