@@ -85,7 +85,7 @@ A full pre-market scan proceeds as follows:
 
 | File | Endpoints |
 |------|-----------|
-| `scanner.py` | `/api/scanner/run`, `/api/scanner/results` (default sort: `signal_quality_score DESC`), `/api/scanner/history`, `/api/scanner/signal-quality-distribution` |
+| `scanner.py` | `/api/scanner/run`, `/api/scanner/results` (default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/scanner/history`, `/api/scanner/signal-quality-distribution` |
 | `universe.py` | `/api/universe/*` — CRUD for stock universes and memberships |
 | `stocks.py` | `/api/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/news/*` — news articles and preferences |
@@ -96,6 +96,7 @@ A full pre-market scan proceeds as follows:
 | `health.py` | `GET /health` — liveness probe |
 | `system.py` | `/api/system/*` — configuration, status |
 | `outcomes.py` | `/api/outcomes/*` — scorecard, intervals, distribution, edge decay, signals, event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
+| `signal_reviews.py` | `POST /api/signal-reviews` (201) — persist confirm/reject/enhanced verdict; `GET /api/signal-reviews?scanner_type=` — list reviews with joined event fields, `liquidity_hunt` alias expansion |
 
 ### Database Models (`app/models/`)
 
@@ -122,6 +123,7 @@ A full pre-market scan proceeds as follows:
 | `UniverseQualityReport` | `universe_quality_reports` | Data quality audit results per universe |
 | `SignalAnalysisRun` | `signal_analysis_runs` | Anchor table for each statistical analysis execution; stores `correlation_matrix` and `feature_weights` as JSONB, status, event count |
 | `SignalCluster` | `signal_clusters` | One K-means cluster archetype per analysis run; stores centroid, return_profile (per-interval stats), event count, auto-generated label |
+| `SignalReview` | `signal_reviews` | User-submitted verdict (confirmed/rejected/enhanced) on a `ScannerEvent`; FK → `scanner_events.id` CASCADE; supports `reject_reason` and `enhance_suggestion` JSONB. Written by `/validate-scanner` skill. |
 
 ## Frontend Architecture
 
@@ -143,7 +145,7 @@ A full pre-market scan proceeds as follows:
 | `ActiveWatchlist` | `/watchlist` | Live-monitored symbols: add/remove, real-time price + session data, alert badges. Connects to `/api/live/ws/watchlist` WebSocket. |
 | `Journal` | `/journal` | Trade journal entry and review |
 | `Alerts` | `/alerts` | Alert configuration and history |
-| `StockDetailPage` | `/stock/:ticker` | Per-ticker chart, metrics, and news |
+| `StockDetailPage` | `/stock/:ticker` | Per-ticker chart, metrics, and news. Supports `?date=YYYY-MM-DD` to initialise `highlightDate` and centre the chart on that date. |
 | `Settings` | `/settings` | System configuration |
 
 ### Charting Libraries

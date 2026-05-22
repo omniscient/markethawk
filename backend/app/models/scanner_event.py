@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import uuid
 from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, Float, ForeignKey, Uuid as UUID, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 
@@ -45,6 +46,8 @@ class ScannerEvent(Base):
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+    reviews = relationship("SignalReview", back_populates="event", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint('ticker', 'event_date', 'scanner_type', name='uq_scanner_event'),
