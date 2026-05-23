@@ -1,4 +1,4 @@
-# Standardize Error Handling Conventions Across Modules
+﻿# Standardize Error Handling Conventions Across Modules
 
 **Date:** 2026-05-23  
 **Status:** Pending Review  
@@ -27,6 +27,7 @@ Providers are equally inconsistent: `ibkr.py` and `massive.py` raise `RuntimeErr
 3. Enable Celery tasks to make retry decisions without pattern-matching on exception message strings
 4. Surface per-ticker scan failures as structured data on `ScannerRun` rather than silent log lines
 5. Map domain errors to consistent HTTP responses without leaking internal messages
+6. Carry structured context fields on exceptions so Seq log entries are filterable by exception type, provider, ticker, scanner, etc. — replacing unstructured message grepping
 
 ---
 
@@ -38,9 +39,10 @@ Define `backend/app/exceptions.py`:
 
 ```python
 class MarketHawkError(Exception):
-    def __init__(self, message: str, is_retryable: bool = False):
+    def __init__(self, message: str, is_retryable: bool = False, **context):
         super().__init__(message)
         self.is_retryable = is_retryable
+        self.context = context  # structured fields for Seq logging
 
 class ScanError(MarketHawkError):
     pass
@@ -53,6 +55,30 @@ class ProviderError(MarketHawkError):
 ```
 
 `is_retryable` is set at the raise site based on context — `DataFetchError("rate limited", is_retryable=True)` for a 429, `DataFetchError("ticker not found", is_retryable=False)` for a 404. No subclasses in this pass; subclasses (`RateLimitError`, `ProviderTimeoutError`, etc.) are added only when a caller genuinely needs to catch them separately.
+
+### Structured Logging Context for Seq
+
+Each exception type carries structured `**context` fields so that catch sites can log them as key-value pairs filterable in Seq, rather than buried in unstructured message strings.
+
+**Expected context fields per exception type:**
+
+| Exception | Fields | Example |
+|-----------|--------|---------|
+| `ScanError` | `scanner_type`, `universe_id`, `ticker`, `scan_id` | `ScanError("enrichment failed", scanner_type="liquidity_hunt_pre", ticker="AAPL", scan_id=42)` |
+| `DataFetchError` | `provider`, `symbol`, `timespan`, `date_range` | `DataFetchError("rate limited", is_retryable=True, provider="polygon", symbol="TSLA", timespan="minute")` |
+| `ProviderError` | `provider`, `endpoint`, `status_code` | `ProviderError("503 from Polygon", is_retryable=True, provider="polygon", endpoint="aggs", status_code=503)` |
+
+**Logging convention at catch sites:**
+
+```python
+except (ScanError, DataFetchError, ProviderError) as e:
+    logger.warning(
+        f"{type(e).__name__}: {e}",
+        extra={"error_type": type(e).__name__, "retryable": e.is_retryable, **e.context},
+    )
+```
+
+The `extra` dict is forwarded to Seq as structured properties, enabling filters like `error_type = 'ProviderError' AND provider = 'polygon' AND status_code = 503`. This replaces the current pattern of grepping log message strings.
 
 ### Provider Layer (`providers/ibkr.py`, `providers/massive.py`)
 
@@ -84,8 +110,12 @@ for ticker in tickers:
             "error_type": type(e).__name__,
             "message": str(e),
             "retryable": e.is_retryable,
+            **e.context,
         })
-        logger.warning(f"Ticker {ticker} failed: {e}")
+        logger.warning(
+            f"{type(e).__name__}: {e}",
+            extra={"error_type": type(e).__name__, "retryable": e.is_retryable, **e.context},
+        )
     # unexpected Exception propagates — structural failures abort the scan
 
 # persist failed_tickers on ScannerRun
