@@ -65,3 +65,11 @@ def test_pre_market_scanner_registered():
     desc = orchestrator._REGISTRY["pre_market_volume_spike"]
     assert desc.display_name == "Pre-Market Volume Spike"
     assert desc.supports_date_range is True
+
+
+def test_oversold_bounce_scanner_registered():
+    import app.services.oversold_bounce_scan  # noqa: F401
+    assert "oversold_bounce" in orchestrator._REGISTRY
+    desc = orchestrator._REGISTRY["oversold_bounce"]
+    assert desc.display_name == "Oversold Bounce"
+    assert desc.supports_date_range is True
