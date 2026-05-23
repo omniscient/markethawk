@@ -501,7 +501,7 @@ def sync_futures_aggregates(
         )
 
         result = loop.run_until_complete(
-            FuturesDataService.download_full_history(
+            FuturesDataService._download_full_history(
                 db=db,
                 symbol=symbol,
                 exchange=exchange,

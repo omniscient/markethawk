@@ -234,7 +234,6 @@ class StockDataService:
                 from_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
             df = FuturesDataService.get_continuous_series(
-                db=db,
                 symbol=symbol,
                 timespan=timespan,
                 multiplier=multiplier,

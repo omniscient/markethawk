@@ -5,6 +5,7 @@ IBKR is never called — the mock_futures_provider fixture intercepts all provid
 """
 
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -120,9 +121,8 @@ def test_history_returns_correct_shape(db: Session):
     seed_futures_contracts(db, symbol="ES", exchange="CME", count=1)
     seed_futures_aggregates(db, symbol="ES", contract_month="20250321", count=5)
 
-    app.dependency_overrides[get_db] = lambda: db
-    response = client.get("/api/futures/history/ES")
-    app.dependency_overrides.clear()
+    with patch("app.services.futures_data.SessionLocal", return_value=db):
+        response = client.get("/api/futures/history/ES")
 
     assert response.status_code == 200
     data = response.json()
@@ -139,9 +139,8 @@ def test_history_returns_correct_shape(db: Session):
 
 
 def test_history_empty_db_returns_zero_data_points(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
-    response = client.get("/api/futures/history/ZZ")
-    app.dependency_overrides.clear()
+    with patch("app.services.futures_data.SessionLocal", return_value=db):
+        response = client.get("/api/futures/history/ZZ")
 
     assert response.status_code == 200
     data = response.json()
@@ -154,9 +153,8 @@ def test_history_symbol_is_case_insensitive(db: Session):
     seed_futures_contracts(db, symbol="NQ", exchange="CME", count=1)
     seed_futures_aggregates(db, symbol="NQ", contract_month="20250321", count=3)
 
-    app.dependency_overrides[get_db] = lambda: db
-    response = client.get("/api/futures/history/nq")
-    app.dependency_overrides.clear()
+    with patch("app.services.futures_data.SessionLocal", return_value=db):
+        response = client.get("/api/futures/history/nq")
 
     assert response.status_code == 200
     data = response.json()
