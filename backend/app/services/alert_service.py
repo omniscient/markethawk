@@ -12,10 +12,10 @@ import json
 import logging
 import smtplib
 import ssl
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 from sqlalchemy.orm import Session
@@ -324,3 +324,78 @@ class NotificationDispatcher:
             "event_date": str(event.event_date),
             "indicators": event.indicators or {},
         }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Scanner Event Persistence
+# ──────────────────────────────────────────────────────────────────────────────
+
+def trigger_scanner_alert(event_id: int) -> None:
+    """Enqueue alert evaluation for a newly persisted ScannerEvent."""
+    from app.tasks import evaluate_scanner_alerts
+    evaluate_scanner_alerts.delay(event_id)
+
+
+def save_event(
+    db: Session,
+    ticker: str,
+    event_date: date,
+    scanner_type: str,
+    indicators: Dict[str, Any],
+    criteria_met: Dict[str, Any],
+    enrichment: Dict[str, Any],
+    previous_close: float = None,
+    opening_price: float = None,
+    closing_price: float = None,
+    ranker_config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Persist a ScannerEvent and enqueue alert evaluation for new events."""
+    from app.services.event_helpers import generate_event_summary, compute_event_severity
+    from app.services.signal_ranker import compute_signal_quality_score
+
+    summary = generate_event_summary(scanner_type, indicators)
+    severity = compute_event_severity(scanner_type, indicators)
+
+    score = None
+    if ranker_config and ranker_config.get("enabled") and ranker_config.get("weights"):
+        score = compute_signal_quality_score(indicators, ranker_config["weights"])
+
+    event_dict = {
+        "ticker": ticker,
+        "event_date": event_date,
+        "scanner_type": scanner_type,
+        "summary": summary,
+        "severity": severity,
+        "previous_close": previous_close,
+        "opening_price": opening_price,
+        "closing_price": closing_price,
+        "indicators": indicators,
+        "criteria_met": criteria_met,
+        "metadata": enrichment,
+        "signal_quality_score": score,
+    }
+
+    existing = db.query(ScannerEvent).filter(
+        ScannerEvent.ticker == ticker,
+        ScannerEvent.event_date == event_date,
+        ScannerEvent.scanner_type == scanner_type,
+    ).first()
+
+    if existing:
+        for key, value in event_dict.items():
+            if key == "metadata":
+                setattr(existing, "metadata_", value)
+            else:
+                setattr(existing, key, value)
+        db.flush()
+        event_dict["id"] = existing.id
+    else:
+        model_data = event_dict.copy()
+        model_data["metadata_"] = model_data.pop("metadata")
+        new_event = ScannerEvent(**model_data)
+        db.add(new_event)
+        db.flush()
+        event_dict["id"] = new_event.id
+        trigger_scanner_alert(new_event.id)
+
+    return event_dict

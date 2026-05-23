@@ -318,62 +318,13 @@ class ScannerService:
         closing_price: float = None,
         ranker_config: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Generalized method to save or update a ScannerEvent."""
-
-        # Calculate summary and severity
-        summary = generate_event_summary(scanner_type, indicators)
-        severity = compute_event_severity(scanner_type, indicators)
-
-        # Compute signal quality score if ranker is enabled
-        score = None
-        if ranker_config and ranker_config.get("enabled") and ranker_config.get("weights"):
-            score = compute_signal_quality_score(indicators, ranker_config["weights"])
-
-        # Prepare data dict
-        event_dict = {
-            "ticker": ticker,
-            "event_date": event_date,
-            "scanner_type": scanner_type,
-            "summary": summary,
-            "severity": severity,
-            "previous_close": previous_close,
-            "opening_price": opening_price,
-            "closing_price": closing_price,
-            "indicators": indicators,
-            "criteria_met": criteria_met,
-            "metadata": enrichment,
-            "signal_quality_score": score,
-        }
-        
-        # Check for existing event
-        existing = db.query(ScannerEvent).filter(
-            ScannerEvent.ticker == ticker,
-            ScannerEvent.event_date == event_date,
-            ScannerEvent.scanner_type == scanner_type
-        ).first()
-        
-        if existing:
-            for key, value in event_dict.items():
-                if key == "metadata":
-                    setattr(existing, "metadata_", value)
-                else:
-                    setattr(existing, key, value)
-            db.flush()
-            event_dict["id"] = existing.id
-        else:
-            # SQLAlchemy model uses 'metadata_' to avoid conflict with Base.metadata
-            model_data = event_dict.copy()
-            model_data["metadata_"] = model_data.pop("metadata")
-            new_event = ScannerEvent(**model_data)
-            db.add(new_event)
-            db.flush()
-            event_dict["id"] = new_event.id
-
-            # Trigger alert evaluation for new events
-            from app.tasks import evaluate_scanner_alerts
-            evaluate_scanner_alerts.delay(new_event.id)
-            
-        return event_dict
+        from app.services.alert_service import save_event
+        return save_event(
+            db=db, ticker=ticker, event_date=event_date, scanner_type=scanner_type,
+            indicators=indicators, criteria_met=criteria_met, enrichment=enrichment,
+            previous_close=previous_close, opening_price=opening_price,
+            closing_price=closing_price, ranker_config=ranker_config,
+        )
 
     @staticmethod
     async def run_pre_market_scan(
