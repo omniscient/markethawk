@@ -183,6 +183,13 @@ def create_app() -> FastAPI:
     app.include_router(outcomes_router)
     app.include_router(signal_reviews_router)
 
+    # Populate scan_orchestrator registry — must be after router includes.
+    # importlib avoids the local variable `app` shadowing the package name.
+    import importlib
+    importlib.import_module("app.services.pre_market_scan")
+    importlib.import_module("app.services.oversold_bounce_scan")
+    importlib.import_module("app.services.liquidity_hunt")
+
     # Log a clear warning at startup whenever trace-exposure mode is enabled
     _expose_traces = settings.ENVIRONMENT.lower() in ("development", "debug")
     if _expose_traces:

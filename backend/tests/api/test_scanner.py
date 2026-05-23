@@ -328,3 +328,28 @@ def test_results_filter_by_date_range(db: Session):
     data = response.json()
     assert len(data) > 0
     assert all(e["event_date"] == yesterday for e in data)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/scanner/types
+# ---------------------------------------------------------------------------
+
+
+def test_list_scanner_types():
+    import app.services.pre_market_scan  # noqa: F401
+    import app.services.oversold_bounce_scan  # noqa: F401
+    import app.services.liquidity_hunt  # noqa: F401
+
+    response = client.get("/api/scanner/types")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    keys = [item["key"] for item in data]
+    assert "pre_market_volume_spike" in keys
+    assert "oversold_bounce" in keys
+    assert "liquidity_hunt" in keys
+    assert "liquidity_hunt_pre" in keys
+    assert "liquidity_hunt_post" in keys
+    for item in data:
+        assert {"key", "display_name", "description", "supports_date_range"} == set(item)
+        assert isinstance(item["supports_date_range"], bool)
