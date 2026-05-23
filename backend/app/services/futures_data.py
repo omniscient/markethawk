@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.futures_rollover import FuturesRollover
 from app.models.futures_contract import FuturesContract
@@ -65,6 +66,20 @@ SYMBOL_EXCHANGE_MAP = {
 
 
 # ---------------------------------------------------------------------------
+# Module-level helpers
+# ---------------------------------------------------------------------------
+
+def _resolve_exchange(symbol: str) -> str:
+    """Return the exchange for a known futures symbol, raising ValueError if unknown."""
+    exchange = SYMBOL_EXCHANGE_MAP.get(symbol.upper())
+    if not exchange:
+        raise ValueError(
+            f"Unknown futures symbol '{symbol}'. Add it to SYMBOL_EXCHANGE_MAP."
+        )
+    return exchange
+
+
+# ---------------------------------------------------------------------------
 # FuturesDataService
 # ---------------------------------------------------------------------------
 
@@ -81,7 +96,7 @@ class FuturesDataService:
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    async def sync_contract_catalog(
+    async def _sync_contract_catalog(
         db: Session,
         symbol: str,
         exchange: str,
@@ -159,11 +174,59 @@ class FuturesDataService:
         return contracts
 
     # ------------------------------------------------------------------ #
+    #  Public interface                                                    #
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    async def sync_contracts(symbol: str) -> List[Dict[str, Any]]:
+        """
+        Refresh the contract catalog for `symbol` from IBKR.
+
+        Opens its own DB session and resolves exchange internally.
+        Returns the list of contracts found.
+        """
+        exchange = _resolve_exchange(symbol.upper())
+        db = SessionLocal()
+        try:
+            return await FuturesDataService._sync_contract_catalog(
+                db, symbol.upper(), exchange
+            )
+        finally:
+            db.close()
+
+    @staticmethod
+    def get_continuous_series(
+        symbol: str,
+        timespan: str = "day",
+        multiplier: int = 1,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """
+        Assemble and return a continuous (stitched) price series for a futures symbol.
+
+        Opens its own DB session. The returned DataFrame has columns:
+            timestamp, open, high, low, close, volume, vwap, contract_month
+        """
+        db = SessionLocal()
+        try:
+            return FuturesDataService._get_continuous_series_with_db(
+                db=db,
+                symbol=symbol,
+                timespan=timespan,
+                multiplier=multiplier,
+                from_date=from_date,
+                to_date=to_date,
+            )
+        finally:
+            db.close()
+
+    # ------------------------------------------------------------------ #
     #  Download                                                            #
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    async def download_contract(
+    async def _download_contract(
         db: Session,
         symbol: str,
         exchange: str,
@@ -359,7 +422,7 @@ class FuturesDataService:
         }
 
     @staticmethod
-    async def download_full_history(
+    async def _download_full_history(
         db: Session,
         symbol: str,
         exchange: str,
@@ -389,7 +452,7 @@ class FuturesDataService:
         )
 
         # Step 1: Build contract catalog
-        await FuturesDataService.sync_contract_catalog(db, symbol, exchange)
+        await FuturesDataService._sync_contract_catalog(db, symbol, exchange)
 
         # Step 2: Get all catalog entries in chronological order
         contracts = (
@@ -454,7 +517,7 @@ class FuturesDataService:
                 f"FuturesDataService: [{idx+1}/{total}] Downloading {symbol} {cm}..."
             )
 
-            result = await FuturesDataService.download_contract(
+            result = await FuturesDataService._download_contract(
                 db=db,
                 symbol=symbol,
                 exchange=exchange,
@@ -474,7 +537,7 @@ class FuturesDataService:
         logger.info(
             f"FuturesDataService: Detecting rollovers for {symbol}..."
         )
-        rollover_count = await FuturesDataService.detect_rollovers(
+        rollover_count = await FuturesDataService._detect_rollovers(
             db=db,
             symbol=symbol,
             exchange=exchange,
@@ -484,7 +547,7 @@ class FuturesDataService:
 
         # Step 4: Gap-fill pass — re-download any holes left by truncated downloads
         # or back-month contracts with limited IBKR history.
-        gap_result = await FuturesDataService.fill_data_gaps(
+        gap_result = await FuturesDataService._fill_data_gaps(
             db=db,
             symbol=symbol,
             exchange=exchange,
@@ -518,7 +581,7 @@ class FuturesDataService:
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    async def fill_data_gaps(
+    async def _fill_data_gaps(
         db: Session,
         symbol: str,
         exchange: str,
@@ -618,7 +681,7 @@ class FuturesDataService:
             )[:1]
 
             for contract in (candidates + just_expired):
-                result = await FuturesDataService.download_contract(
+                result = await FuturesDataService._download_contract(
                     db=db,
                     symbol=symbol,
                     exchange=exchange,
@@ -655,7 +718,7 @@ class FuturesDataService:
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    async def detect_rollovers(
+    async def _detect_rollovers(
         db: Session,
         symbol: str,
         exchange: str,
@@ -746,7 +809,7 @@ class FuturesDataService:
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def get_continuous_series(
+    def _get_continuous_series_with_db(
         db: Session,
         symbol: str,
         timespan: str = "day",
@@ -754,15 +817,7 @@ class FuturesDataService:
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
     ) -> pd.DataFrame:
-        """
-        Assemble and return a continuous (stitched) price series for a futures symbol.
-
-        The returned DataFrame has columns:
-            timestamp, open, high, low, close, volume, vwap, contract_month
-
-        The 'contract_month' column tells you which underlying contract each
-        bar came from  — useful for debugging or displaying rollover points.
-        """
+        """Internal implementation of continuous series assembly."""
         # 1. Load rollover table for this symbol
         rollovers = (
             db.query(FuturesRollover)
@@ -861,54 +916,6 @@ class FuturesDataService:
             df.reset_index(drop=True, inplace=True)
         
         return df
-
-    # ------------------------------------------------------------------ #
-    #  Convenience / Info                                                  #
-    # ------------------------------------------------------------------ #
-
-    @staticmethod
-    def get_contracts(db: Session, symbol: str) -> List[Dict[str, Any]]:
-        """Return all known contracts for a symbol with their download status."""
-        contracts = (
-            db.query(FuturesContract)
-            .filter(FuturesContract.symbol == symbol)
-            .order_by(FuturesContract.contract_month.asc())
-            .all()
-        )
-        return [
-            {
-                "symbol": c.symbol,
-                "exchange": c.exchange,
-                "contract_month": c.contract_month,
-                "expiry_date": c.expiry_date.isoformat() if c.expiry_date else None,
-                "con_id": c.con_id,
-                "is_expired": c.is_expired,
-                "data_downloaded": c.data_downloaded,
-                "first_bar_date": c.first_bar_date.isoformat() if c.first_bar_date else None,
-                "last_bar_date": c.last_bar_date.isoformat() if c.last_bar_date else None,
-            }
-            for c in contracts
-        ]
-
-    @staticmethod
-    def get_rollovers(db: Session, symbol: str) -> List[Dict[str, Any]]:
-        """Return all detected rollover events for a symbol."""
-        rollovers = (
-            db.query(FuturesRollover)
-            .filter(FuturesRollover.symbol == symbol)
-            .order_by(FuturesRollover.roll_date.asc())
-            .all()
-        )
-        return [
-            {
-                "symbol": r.symbol,
-                "from_contract": r.from_contract,
-                "to_contract": r.to_contract,
-                "roll_date": r.roll_date.isoformat() if r.roll_date else None,
-                "detection_method": r.detection_method,
-            }
-            for r in rollovers
-        ]
 
 
 # ---------------------------------------------------------------------------
