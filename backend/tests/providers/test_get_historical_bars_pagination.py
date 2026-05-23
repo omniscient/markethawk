@@ -30,9 +30,9 @@ PAGE_LIMIT = 3  # use a small limit so tests don't need hundreds of fake bars
 
 class TestGetHistoricalBarsPagination:
     def _call(self, provider, pages):
-        """Set up get_aggs to return successive pages, then call get_historical_bars."""
+        """Set up get_aggs to return successive pages, then call get_bars."""
         provider._client.get_aggs.side_effect = pages
-        return provider.get_historical_bars(
+        return provider.get_bars(
             symbol="AAPL",
             timespan="minute",
             multiplier=1,

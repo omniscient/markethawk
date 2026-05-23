@@ -184,5 +184,5 @@ def test_details_mock_provider_not_called_for_futures(db: Session, mock_polygon_
     app.dependency_overrides.clear()
 
     assert response.status_code == 200
-    mock_polygon_provider.get_historical_bars.assert_not_called()
+    mock_polygon_provider.get_bars.assert_not_called()
     mock_polygon_provider.get_ticker_details.assert_not_called()

@@ -60,7 +60,7 @@ class MassiveDataProvider(BaseDataProvider):
             return False, "Polygon client failed to initialize"
         return True, "Ready"
 
-    def get_historical_bars(
+    def get_bars(
         self,
         symbol: str,
         timespan: str,
@@ -161,6 +161,58 @@ class MassiveDataProvider(BaseDataProvider):
         except Exception as e:
             logger.error(f"MassiveDataProvider: Error fetching details for {symbol}: {e}")
             return {}
+
+    def get_snapshots(self, symbols: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Fetch market snapshots from Polygon and return normalized dicts.
+
+        Normalization (volume extraction, change_pct, prev_close) lives here
+        so callers never need to inspect raw Polygon snapshot objects.
+        """
+        if not self._client:
+            return []
+        try:
+            raw = self._client.get_snapshot_all(market_type="stocks") or []
+        except Exception as e:
+            logger.error(f"MassiveDataProvider: Error fetching snapshots: {e}")
+            return []
+
+        # Build a lookup set for optional symbol filtering
+        filter_set = {s.upper() for s in symbols} if symbols else None
+
+        results: List[Dict[str, Any]] = []
+        for s in raw:
+            if not hasattr(s, "ticker") or not hasattr(s, "prev_day"):
+                continue
+            if filter_set and s.ticker not in filter_set:
+                continue
+
+            day_vol = getattr(s.day, "volume", 0) or 0
+            min_acc_vol = getattr(s.min, "accumulated_volume", 0) or 0
+            volume = max(day_vol, min_acc_vol)
+
+            prev_close = getattr(s.prev_day, "close", 0) or getattr(s.prev_day, "c", 0)
+            if prev_close == 0:
+                continue
+
+            current_price = (
+                getattr(s.min, "close", 0)
+                or getattr(s.last_trade, "price", 0)
+                or getattr(s.last_trade, "p", 0)
+            )
+            if current_price == 0:
+                continue
+
+            results.append({
+                "ticker": s.ticker,
+                "price": float(current_price),
+                "change_pct": float(getattr(s, "todays_change_percent", 0) or 0),
+                "change_value": float(getattr(s, "todays_change", 0) or 0),
+                "volume": int(volume),
+                "prev_close": float(prev_close),
+            })
+
+        return results
 
     # ------------------------------------------------------------------ #
     #  Polygon-specific extras (not part of the base interface)           #
