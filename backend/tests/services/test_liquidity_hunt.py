@@ -433,7 +433,7 @@ def test_scan_fires_liquidity_hunt_pre():
          patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
          patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
          patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.scanner.ScannerService._save_event", return_value={"id": 1}) as mock_save:
+         patch("app.services.liquidity_hunt._save_event", return_value={"id": 1}) as mock_save:
 
         results = _run(run_liquidity_hunt_scan(
             ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
@@ -452,7 +452,7 @@ def test_scan_fires_both_variants():
          patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
          patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
          patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.scanner.ScannerService._save_event", return_value={"id": 1}) as mock_save:
+         patch("app.services.liquidity_hunt._save_event", return_value={"id": 1}) as mock_save:
 
         _run(run_liquidity_hunt_scan(
             ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
@@ -471,7 +471,7 @@ def test_scan_skips_ticker_when_sparse_history():
          patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
          patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=None), \
          patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.scanner.ScannerService._save_event") as mock_save:
+         patch("app.services.liquidity_hunt._save_event") as mock_save:
 
         results = _run(run_liquidity_hunt_scan(
             ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
@@ -489,7 +489,7 @@ def test_scan_skips_ticker_when_no_prior_close():
          patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
          patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
          patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.scanner.ScannerService._save_event") as mock_save:
+         patch("app.services.liquidity_hunt._save_event") as mock_save:
 
         results = _run(run_liquidity_hunt_scan(
             ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
@@ -509,7 +509,7 @@ def test_split_in_lookback_flag():
          patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
          patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
          patch("app.services.liquidity_hunt._get_enrichment", return_value=enrichment_with_split), \
-         patch("app.services.scanner.ScannerService._save_event", return_value={"id": 1}) as mock_save:
+         patch("app.services.liquidity_hunt._save_event", return_value={"id": 1}) as mock_save:
 
         _run(run_liquidity_hunt_scan(
             ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
@@ -532,7 +532,7 @@ def test_scan_fires_post_only_when_pre_does_not_qualify():
          patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
          patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
          patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.scanner.ScannerService._save_event", return_value={"id": 1}) as mock_save:
+         patch("app.services.liquidity_hunt._save_event", return_value={"id": 1}) as mock_save:
 
         results = _run(run_liquidity_hunt_scan(
             ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
@@ -561,7 +561,7 @@ def test_scan_fires_events_despite_high_regular_vol():
          patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
          patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
          patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.scanner.ScannerService._save_event") as mock_save:
+         patch("app.services.liquidity_hunt._save_event") as mock_save:
 
         _run(run_liquidity_hunt_scan(
             ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE

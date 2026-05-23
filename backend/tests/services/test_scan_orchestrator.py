@@ -73,3 +73,9 @@ def test_oversold_bounce_scanner_registered():
     desc = orchestrator._REGISTRY["oversold_bounce"]
     assert desc.display_name == "Oversold Bounce"
     assert desc.supports_date_range is True
+
+
+def test_liquidity_hunt_variants_registered():
+    import app.services.liquidity_hunt  # noqa: F401
+    for key in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
+        assert key in orchestrator._REGISTRY, f"Expected {key!r} in registry"
