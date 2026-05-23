@@ -79,9 +79,9 @@ MarketHawk/
 │   │   │   ├── signal_ranker.py        # Phase 2c: compute_signal_quality_score() + load_ranker_config(); weights from SystemConfig
 │   │   │   └── __init__.py
 │   │   ├── providers/
-│   │   │   ├── base.py                 # MarketDataProvider abstract interface
-│   │   │   ├── massive.py              # Polygon.io bulk operations (large-batch sync, backfill)
-│   │   │   ├── ibkr.py                 # ib_insync Interactive Brokers provider
+│   │   │   ├── base.py                 # BaseDataProvider sync abstract interface: get_bars, get_snapshots, get_ticker_details
+│   │   │   ├── massive.py              # Polygon.io provider: get_bars (paginated), get_snapshots (normalised), bulk sync/backfill
+│   │   │   ├── ibkr.py                 # ib_insync Interactive Brokers provider (futures-only; get_bars/get_snapshots are no-op stubs)
 │   │   │   └── __init__.py
 │   │   ├── main.py                     # FastAPI app factory; global error handler; router mounts
 │   │   └── tasks.py                    # All Celery task definitions

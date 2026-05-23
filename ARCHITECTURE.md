@@ -80,9 +80,9 @@ A full pre-market scan proceeds as follows:
 
 | File | Responsibility |
 |------|---------------|
-| `base.py` | `MarketDataProvider` abstract interface (fetch bars, tickers, news). |
-| `massive.py` | Polygon.io bulk operations: large-batch ticker sync, aggregate backfill. |
-| `ibkr.py` | `ib_insync`-based Interactive Brokers provider. Connects to the `ib-gateway` container on port 4002. |
+| `base.py` | `BaseDataProvider` sync abstract interface: `get_bars()`, `get_snapshots()`, `get_ticker_details()`. All providers must implement this contract. |
+| `massive.py` | Polygon.io provider: `get_bars()` (paginated OHLCV), `get_snapshots()` (normalised market snapshot dicts), large-batch ticker sync, aggregate backfill. |
+| `ibkr.py` | `ib_insync`-based Interactive Brokers provider. Futures-only (`get_bars`/`get_snapshots` return empty stubs). Connects to the `ib-gateway` container on port 4002. |
 
 ### Routers (`app/routers/`)
 
