@@ -60,6 +60,8 @@ MarketHawk/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlistAdd / ActiveWatchlistUpdate / ActiveWatchlistItem
 │   │   │   └── stock.py                # Pydantic request/response models
 │   │   ├── services/
+│   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags; is_futures_ticker(); get_historical_enriched() (coercion + indicators + guardrails)
+│   │   │   ├── universe_stats.py       # UniverseStatsService.compute() — universe aggregate stats (ticker count, bar count, date range, timespans)
 │   │   │   ├── scan_orchestrator.py    # Scanner registry (ScannerDescriptor, _REGISTRY, register, get_all, run); single dispatch entry point
 │   │   │   ├── pre_market_scan.py      # Self-registers "pre_market_volume_spike" in orchestrator
 │   │   │   ├── oversold_bounce_scan.py # Self-registers "oversold_bounce" in orchestrator

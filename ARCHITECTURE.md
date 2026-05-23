@@ -63,7 +63,8 @@ A full pre-market scan proceeds as follows:
 | `oversold_bounce_scan.py` | Self-registers `"oversold_bounce"` in the orchestrator. Delegates to `ScannerService.run_oversold_bounce_scan` (interim). |
 | `scanner.py` | `ScannerService` — `calculate_day_metrics()`, `_get_batch_enrichment_data()` (3-tuple with ES/NQ context and sector ETF changes), Phase 2a 19-key feature enrichment. `_save_event()` now delegates to `alert_service.save_event`. |
 | `signal_ranker.py` | Phase 2c signal quality scorer. `compute_signal_quality_score()` — weighted sum of normalized indicators (re-normalizes over present features). `load_ranker_config()` — reads `signal_ranker_enabled`, `signal_ranker_weights`, `signal_ranker_version` from `SystemConfig`. Weights updatable without redeploy. |
-| `stock_data.py` | Historical OHLCV fetch, gap percentage calculation, per-ticker session flag logic. |
+| `stock_data.py` | Historical OHLCV fetch, gap calculation, session flags. `is_futures_ticker()` — asset-class lookup. `get_historical_enriched()` — fetch + Decimal coercion + MAX_DATAPOINTS guard + indicator gating. |
+| `universe_stats.py` | `UniverseStatsService.compute()` — aggregate stats for one universe (ticker count, bar count, date range, timespans) across both StockAggregate and FuturesAggregate. Callable outside HTTP context. |
 | `discovery_service.py` | Bulk ticker sync from Polygon: paginated reference data, rate-limit-aware batching. |
 | `catalyst_parser.py` | Batch 72-hour news analysis for catalyst detection. Joins articles to tickers in memory. Returns `latest_article_utc` per ticker for catalyst recency enrichment. |
 | `futures_data.py` | 2-method public interface: `get_continuous_series(symbol, ...)` (stitched rollover series, self-managed session) and `sync_contracts(symbol)` (IBKR catalog refresh, exchange + session self-managed). Five write-path methods are `_`-prefixed private details. |
