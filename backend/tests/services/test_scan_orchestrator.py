@@ -57,3 +57,11 @@ def test_register_returns_descriptor():
     desc = ScannerDescriptor(key="ret", display_name="R", description="d", run=fn)
     returned = register(desc)
     assert returned is desc
+
+
+def test_pre_market_scanner_registered():
+    import app.services.pre_market_scan  # noqa: F401
+    assert "pre_market_volume_spike" in orchestrator._REGISTRY
+    desc = orchestrator._REGISTRY["pre_market_volume_spike"]
+    assert desc.display_name == "Pre-Market Volume Spike"
+    assert desc.supports_date_range is True
