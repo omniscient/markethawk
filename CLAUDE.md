@@ -298,3 +298,17 @@ Key variables: `POLYGON_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `SECRET_K
 - [ENV_VARIABLES.md](ENV_VARIABLES.md) — all env vars with defaults and descriptions
 - [POLYGON_RATE_LIMITS.md](POLYGON_RATE_LIMITS.md) — API plan tiers, rate limits, key endpoints
 - [deployment-guide.md](deployment-guide.md) — production hardening, backup, upgrade
+
+## Agent Skills
+
+### Issue tracker
+
+GitHub Issues on `omniscient/markethawk`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
