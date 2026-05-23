@@ -17,6 +17,8 @@ from sqlalchemy import func, desc
 
 from app.models.stock_aggregate import StockAggregate
 from app.models.futures_aggregate import FuturesAggregate
+from app.models.monitored_stock import MonitoredStock
+from app.services.chart_indicators import ChartIndicatorsService
 from app.providers import DataProviderFactory
 
 
@@ -550,3 +552,62 @@ class StockDataService:
         except Exception as e:
             logging.error(f"Error fetching pre-market movers: {e}")
             return []
+
+    @staticmethod
+    def is_futures_ticker(db: Session, ticker: str) -> bool:
+        """Return True if ticker is tracked as futures asset class."""
+        return (
+            db.query(MonitoredStock.id)
+            .filter(
+                MonitoredStock.ticker == ticker,
+                MonitoredStock.asset_class == "futures",
+                MonitoredStock.is_active == True,
+            )
+            .first()
+            is not None
+        )
+
+    @staticmethod
+    def get_historical_enriched(
+        db: Session,
+        ticker: str,
+        period: str,
+        timespan: str,
+        multiplier: int,
+    ) -> pd.DataFrame:
+        """Fetch, coerce, and optionally enrich with indicators.
+
+        - Dispatches to get_historical_from_db or get_futures_historical_from_db
+        - Applies pd.to_numeric() coercion (Decimal → float, required by orjson + indicators)
+        - Applies MAX_DATAPOINTS guardrail
+        - Applies INDICATOR_ROW_LIMIT guard and calls ChartIndicatorsService.add_indicators()
+        - Returns empty DataFrame on no data
+        Router remains responsible for compact serialization.
+        """
+        is_futures = StockDataService.is_futures_ticker(db, ticker)
+        if is_futures:
+            data = StockDataService.get_futures_historical_from_db(
+                db, ticker, period, timespan, multiplier
+            )
+        else:
+            data = StockDataService.get_historical_from_db(
+                db, ticker, period, timespan, multiplier
+            )
+
+        if data.empty:
+            return data
+
+        exclude_cols = ["Date", "marker_type", "contract_month"]
+        for col in data.columns:
+            if col not in exclude_cols:
+                data[col] = pd.to_numeric(data[col], errors="coerce")
+
+        MAX_DATAPOINTS = 500000
+        if len(data) > MAX_DATAPOINTS:
+            data = data.tail(MAX_DATAPOINTS)
+
+        INDICATOR_ROW_LIMIT = 3000
+        if timespan in ["minute", "hour"] and len(data) <= INDICATOR_ROW_LIMIT:
+            data = ChartIndicatorsService.add_indicators(data, is_intraday=True)
+
+        return data

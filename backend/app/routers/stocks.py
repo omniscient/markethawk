@@ -17,21 +17,6 @@ import orjson
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
 
-def _is_futures_ticker(db: Session, ticker: str) -> bool:
-    """Return True if this ticker is tracked as a futures asset class."""
-    from app.models import MonitoredStock
-    return (
-        db.query(MonitoredStock.id)
-        .filter(
-            MonitoredStock.ticker == ticker,
-            MonitoredStock.asset_class == "futures",
-            MonitoredStock.is_active == True,
-        )
-        .first()
-        is not None
-    )
-
-
 @router.get("/historical/{ticker}")
 def get_historical_data(
     ticker: str,
@@ -44,16 +29,7 @@ def get_historical_data(
     """Get historical stock data from DB."""
     ticker = ticker.upper()
     try:
-        is_futures = _is_futures_ticker(db, ticker)
-
-        if is_futures:
-            data = StockDataService.get_futures_historical_from_db(
-                db, ticker, period, timespan, multiplier
-            )
-        else:
-            data = StockDataService.get_historical_from_db(
-                db, ticker, period, timespan, multiplier
-            )
+        data = StockDataService.get_historical_enriched(db, ticker, period, timespan, multiplier)
 
         if data.empty:
             return {
@@ -65,24 +41,6 @@ def get_historical_data(
                 "data": [],
             }
 
-        # Vectorized numeric coercion — must happen before indicators to prevent 500 errors
-        # orjson is also strict and fails on decimal.Decimal (standard with PG NUMERIC).
-        exclude_cols = ["Date", "marker_type", "contract_month"]
-        for col in data.columns:
-            if col not in exclude_cols:
-                data[col] = pd.to_numeric(data[col], errors="coerce")
-
-        # Guardrail: Limit extremely large requests that could crash the browser
-        MAX_DATAPOINTS = 500000 
-        if len(data) > MAX_DATAPOINTS:
-             data = data.tail(MAX_DATAPOINTS)
-
-        # Add indicators only for intraday views with a manageable row count.
-        INDICATOR_ROW_LIMIT = 3000
-        if timespan in ["minute", "hour"] and len(data) <= INDICATOR_ROW_LIMIT:
-            from app.services.chart_indicators import ChartIndicatorsService
-            data = ChartIndicatorsService.add_indicators(data, is_intraday=True)
-
         # Vectorized serialization — avoid per-row Python loops over large DataFrames.
         data = data.reset_index()
         date_col = "Date" if "Date" in data.columns else "timestamp"
@@ -90,26 +48,24 @@ def get_historical_data(
         # COMPACT FORMAT OPTIMIZATION:
         # 1. Convert Timestamps to Unix Epoch (seconds)
         data["t"] = (pd.to_datetime(data[date_col], utc=True).astype('int64') // 10**9)
-        
+
         # 2. Map other columns to short keys
         mapping = {
-            "Open": "o", "High": "h", "Low": "l", "Close": "c", 
+            "Open": "o", "High": "h", "Low": "l", "Close": "c",
             "Volume": "v", "vwap": "w", "transactions": "n",
             "vwap_intraday": "wi", "marker_type": "mt", "contract_month": "cm"
         }
-        
+
         compact_data = {}
         compact_data["t"] = data["t"].tolist()
-        
+
         for col, short in mapping.items():
             if col in data.columns:
                 if col == "marker_type":
-                    # marker_type: keep None where blank/NaN
                     data[col] = data[col].where(data[col].notna() & (data[col] != ""), other=None)
-                
                 compact_data[short] = data[col].tolist()
 
-        # PERFORMANCE OPTIMIZATION: 
+        # PERFORMANCE OPTIMIZATION:
         # Always return columnar format for this endpoint as it's significantly more efficient.
         return ORJSONResponse({
             "ticker": ticker,
@@ -141,7 +97,7 @@ def refresh_stock_data(
     """Trigger a refresh of stock data from Polygon to DB."""
     try:
         ticker = ticker.upper()
-        if _is_futures_ticker(db, ticker):
+        if StockDataService.is_futures_ticker(db, ticker):
             return {"status": "skipped", "message": "Futures data is synced via IBKR, not Polygon."}
         result = StockDataService.refresh_stock_data(
             db, ticker, timespan, multiplier, full_history, period
@@ -176,7 +132,7 @@ def get_stock_detail_consolidated(
         pass  # Redis unavailable — fall through to live fetch
 
     try:
-        if _is_futures_ticker(db, ticker):
+        if StockDataService.is_futures_ticker(db, ticker):
             # Return cached info from MonitoredStock — no Polygon calls for futures
             from app.models import MonitoredStock
             from app.models.futures_aggregate import FuturesAggregate
@@ -304,7 +260,7 @@ def sync_missing_stock_aggregates(
     from app.services.futures_data import SYMBOL_EXCHANGE_MAP
 
     ticker = ticker.upper()
-    is_futures = _is_futures_ticker(db, ticker)
+    is_futures = StockDataService.is_futures_ticker(db, ticker)
     
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     today = now_utc.strftime("%Y-%m-%d")
