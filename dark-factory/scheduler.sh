@@ -365,7 +365,65 @@ while true; do
   REFINED_COUNT=$(echo "$REFINED" | jq 'length')
   REFINE_RUNNING=$(count_refine_running)
 
-  # --- Priority 0: Backlog items (refinement) ---
+  # --- Priority 1: In Review items with new comments (unblock existing work) ---
+  while IFS= read -r item; do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+
+    NEW_COMMENTS=$(get_new_comments "$ISSUE")
+    COMMENT_COUNT=$(echo "$NEW_COMMENTS" | jq 'length')
+    if [ "$COMMENT_COUNT" -eq 0 ]; then continue; fi
+
+    TITLE=$(echo "$item" | jq -r '.content.title')
+    VERDICT=$(classify_comments "$ISSUE" "$TITLE" "$NEW_COMMENTS")
+
+    case "$VERDICT" in
+      MERGE)
+        dispatch "Close issue #${ISSUE}"
+        DISPATCHED="Close issue #${ISSUE}"
+        ;;
+      CONTINUE)
+        if ! is_issue_running "$ISSUE"; then
+          dispatch "Continue issue #${ISSUE}"
+          DISPATCHED="Continue issue #${ISSUE}"
+          reset_retry "$ISSUE"
+        fi
+        ;;
+      SKIP) ;;
+    esac
+  done < <(echo "$IN_REVIEW" | jq -c '.[]')
+
+  # --- Priority 2: Ready items (implement what's already refined+planned) ---
+  while IFS= read -r item; do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+    if [ "$IN_PROGRESS_COUNT" -ge "$MAX_IN_PROGRESS" ]; then break; fi
+    if [ "$IN_REVIEW_COUNT" -ge "$MAX_IN_REVIEW" ]; then break; fi
+    if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+
+    dispatch "Fix issue #${ISSUE}"
+    DISPATCHED="Fix issue #${ISSUE}"
+  done < <(echo "$READY" | jq -c '.[]')
+
+  # --- Priority 3: Blocked items (retry stuck work) ---
+  while IFS= read -r item; do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+
+    RETRIES=$(get_retry_count "$ISSUE")
+    if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then continue; fi
+
+    increment_retry "$ISSUE"
+    dispatch "Fix issue #${ISSUE}"
+    DISPATCHED="Fix issue #${ISSUE}"
+  done < <(echo "$BLOCKED" | jq -c '.[]')
+
+  # --- Priority 4: Backlog items (refinement — prepare future work) ---
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
@@ -402,7 +460,7 @@ while true; do
     REFINE_RUNNING=$((REFINE_RUNNING + 1))
   done < <(echo "$BACKLOG" | jq -c '.[]')
 
-  # --- Priority 0.5: Refined items (plan generation) ---
+  # --- Priority 5: Refined items (plan generation — prepare future work) ---
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
@@ -418,64 +476,6 @@ while true; do
     DISPATCHED="Plan issue #${ISSUE}"
     REFINE_RUNNING=$((REFINE_RUNNING + 1))
   done < <(echo "$REFINED" | jq -c '.[]')
-
-  # --- Priority 1: In Review items with new comments ---
-  while IFS= read -r item; do
-    [ -n "$DISPATCHED" ] && break
-    ISSUE=$(get_issue_number "$item")
-    if has_skip_label "$item"; then continue; fi
-
-    NEW_COMMENTS=$(get_new_comments "$ISSUE")
-    COMMENT_COUNT=$(echo "$NEW_COMMENTS" | jq 'length')
-    if [ "$COMMENT_COUNT" -eq 0 ]; then continue; fi
-
-    TITLE=$(echo "$item" | jq -r '.content.title')
-    VERDICT=$(classify_comments "$ISSUE" "$TITLE" "$NEW_COMMENTS")
-
-    case "$VERDICT" in
-      MERGE)
-        dispatch "Close issue #${ISSUE}"
-        DISPATCHED="Close issue #${ISSUE}"
-        ;;
-      CONTINUE)
-        if ! is_issue_running "$ISSUE"; then
-          dispatch "Continue issue #${ISSUE}"
-          DISPATCHED="Continue issue #${ISSUE}"
-          reset_retry "$ISSUE"
-        fi
-        ;;
-      SKIP) ;;
-    esac
-  done < <(echo "$IN_REVIEW" | jq -c '.[]')
-
-  # --- Priority 2: Blocked items (retry) ---
-  while IFS= read -r item; do
-    [ -n "$DISPATCHED" ] && break
-    ISSUE=$(get_issue_number "$item")
-    if has_skip_label "$item"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
-
-    RETRIES=$(get_retry_count "$ISSUE")
-    if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then continue; fi
-
-    increment_retry "$ISSUE"
-    dispatch "Fix issue #${ISSUE}"
-    DISPATCHED="Fix issue #${ISSUE}"
-  done < <(echo "$BLOCKED" | jq -c '.[]')
-
-  # --- Priority 3: Ready items (new work) ---
-  while IFS= read -r item; do
-    [ -n "$DISPATCHED" ] && break
-    ISSUE=$(get_issue_number "$item")
-    if has_skip_label "$item"; then continue; fi
-    if [ "$IN_PROGRESS_COUNT" -ge "$MAX_IN_PROGRESS" ]; then break; fi
-    if [ "$IN_REVIEW_COUNT" -ge "$MAX_IN_REVIEW" ]; then break; fi
-    if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
-
-    dispatch "Fix issue #${ISSUE}"
-    DISPATCHED="Fix issue #${ISSUE}"
-  done < <(echo "$READY" | jq -c '.[]')
 
   # --- Log cycle summary ---
   BUDGET=$(gh api rate_limit --jq '.resources.graphql | "\(.used)/\(.limit)"' 2>/dev/null) || BUDGET="?"
