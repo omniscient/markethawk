@@ -88,6 +88,10 @@ is_issue_running() {
   return 1
 }
 
+count_factory_running() {
+  docker ps --format '{{.Names}}' 2>/dev/null | grep -c 'markethawk-dark-factory-run-' || true
+}
+
 count_refine_running() {
   docker ps --no-trunc --format '{{.Command}}' 2>/dev/null | grep -cE 'Refine issue|Plan issue' || true
 }
@@ -332,6 +336,14 @@ echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
 
 while true; do
   DISPATCHED=""
+
+  # Guard: only one factory container at a time (Claude Max rate limit)
+  FACTORY_RUNNING=$(count_factory_running)
+  if [ "$FACTORY_RUNNING" -gt 0 ]; then
+    echo "[$(date -u +%FT%TZ)] skip=factory_running count=${FACTORY_RUNNING}"
+    sleep "$POLL_INTERVAL"
+    continue
+  fi
 
   # Guard against rate limit exhaustion (REST call, doesn't cost GraphQL points)
   check_rate_limit

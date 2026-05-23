@@ -46,6 +46,18 @@ ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1)
 INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan)' | head -1 | tr '[:upper:]' '[:lower:]')
 INTENT=${INTENT:-fix}
 
+# --- Concurrency guard: only one factory container at a time ---
+MY_ID=$(cat /proc/self/cgroup 2>/dev/null | grep -oP '[a-f0-9]{64}' | head -1 || hostname)
+RUNNING=$(docker ps --format '{{.ID}} {{.Names}}' 2>/dev/null \
+  | grep 'markethawk-dark-factory-run-' \
+  | grep -v "${MY_ID:0:12}" \
+  | wc -l || echo "0")
+if [ "$RUNNING" -gt 0 ]; then
+  echo "ERROR: Another dark factory container is already running. Only one allowed at a time (Claude Max rate limit)." >&2
+  echo "       Use 'docker ps --filter name=dark-factory' to see it." >&2
+  exit 1
+fi
+
 # --- Helper: look up project board item for this issue ---
 find_board_item() {
   gh project item-list 1 --owner omniscient --format json --limit 200 \
