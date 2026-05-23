@@ -33,17 +33,9 @@ from app.schemas import (
     ClearEventsResponse,
 )
 from app.services import StockDataService
+from app.services.scanner import ScannerService
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
-
-
-def _last_completed_weekday() -> "date":
-    """Default scan date when none supplied — most recent completed weekday."""
-    from datetime import timedelta as _td
-    d = get_market_today() - _td(days=1)
-    while d.weekday() >= 5:  # Saturday=5, Sunday=6
-        d -= _td(days=1)
-    return d
 
 
 @router.post("/run", response_model=ScannerRunAsyncResponse, status_code=202)
@@ -61,8 +53,6 @@ def run_scanner(
     in flight — the response includes the live task_id so the client can
     reattach instead of starting a duplicate.
     """
-    import json
-    import redis as _redis
     from app.core.config import settings as _settings
     from app.tasks import run_universe_scan
 
@@ -72,40 +62,28 @@ def run_scanner(
             detail="universe_id is required (per-ticker scans go through /run-range)",
         )
 
-    # Concurrency guard: one scan per (universe, scanner_type)
-    r = _redis.Redis.from_url(_settings.REDIS_URL, decode_responses=True)
-    state_key = f"universe:{request.universe_id}:scan:{request.scanner_type}"
-    existing = r.get(state_key)
-    if existing:
-        try:
-            data = json.loads(existing)
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "message": "A scan is already running for this universe and scanner type",
-                    "scan_id": data.get("scan_id"),
-                    "task_id": (data.get("task_ids") or [None])[0],
-                    "started_at": data.get("started_at"),
-                },
-            )
-        except json.JSONDecodeError:
-            r.delete(state_key)  # corrupt key, clear and proceed
-
-    # Resolve date range (default = last completed weekday for both bounds)
-    start_date = request.start_date or _last_completed_weekday()
-    end_date = request.end_date or start_date
-    if end_date < start_date:
-        raise HTTPException(status_code=400, detail="end_date must not be before start_date")
-
-    # Verify universe has tickers before queueing — fail fast on misconfig.
-    ticker_count = (
-        db.query(MonitoredStock)
-        .filter(
-            MonitoredStock.universe_id == request.universe_id,
-            MonitoredStock.is_active.is_(True),
-        )
-        .count()
+    in_flight = ScannerService.check_concurrency(
+        _settings.REDIS_URL, request.universe_id, request.scanner_type
     )
+    if in_flight:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "A scan is already running for this universe and scanner type",
+                "scan_id": in_flight.get("scan_id"),
+                "task_id": (in_flight.get("task_ids") or [None])[0],
+                "started_at": in_flight.get("started_at"),
+            },
+        )
+
+    try:
+        start_date, end_date = ScannerService.resolve_date_range(
+            request.start_date, request.end_date
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    ticker_count = ScannerService.count_active_tickers(db, request.universe_id)
     if ticker_count == 0:
         raise HTTPException(
             status_code=400, detail="No tickers found in the selected universe"

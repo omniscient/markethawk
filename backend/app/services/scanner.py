@@ -159,6 +159,58 @@ class ScannerService:
         return metrics
 
     @staticmethod
+    def default_scan_date() -> date:
+        """Most recent completed trading weekday."""
+        from datetime import timedelta as _td
+        d = get_market_today() - _td(days=1)
+        while d.weekday() >= 5:
+            d -= _td(days=1)
+        return d
+
+    @staticmethod
+    def check_concurrency(redis_url: str, universe_id: int, scanner_type: str) -> Optional[dict]:
+        """Returns in-flight scan state dict if one exists, else None.
+        On corrupt Redis key: clears it and returns None.
+        """
+        import json
+        import redis as _redis
+        r = _redis.Redis.from_url(redis_url, decode_responses=True)
+        state_key = f"universe:{universe_id}:scan:{scanner_type}"
+        existing = r.get(state_key)
+        if existing:
+            try:
+                return json.loads(existing)
+            except json.JSONDecodeError:
+                r.delete(state_key)
+        return None
+
+    @staticmethod
+    def resolve_date_range(
+        start_date: Optional[date],
+        end_date: Optional[date],
+    ) -> tuple[date, date]:
+        """Apply date defaults and validate ordering.
+        Raises ValueError if end_date < start_date.
+        """
+        resolved_start = start_date or ScannerService.default_scan_date()
+        resolved_end = end_date or resolved_start
+        if resolved_end < resolved_start:
+            raise ValueError("end_date must not be before start_date")
+        return resolved_start, resolved_end
+
+    @staticmethod
+    def count_active_tickers(db: Session, universe_id: int) -> int:
+        """Count active tickers in a universe. Returns count (may be 0)."""
+        return (
+            db.query(MonitoredStock)
+            .filter(
+                MonitoredStock.universe_id == universe_id,
+                MonitoredStock.is_active.is_(True),
+            )
+            .count()
+        )
+
+    @staticmethod
     def _get_batch_enrichment_data(
         tickers: List[str], event_date: date, db: Session
     ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any], Dict[str, Optional[float]]]:
