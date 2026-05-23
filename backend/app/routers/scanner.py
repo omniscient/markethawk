@@ -37,6 +37,29 @@ from app.services.scanner import ScannerService
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
 
+def _last_completed_weekday() -> "date":
+    """Default scan date when none supplied — most recent completed weekday."""
+    from datetime import timedelta as _td
+    d = get_market_today() - _td(days=1)
+    while d.weekday() >= 5:  # Saturday=5, Sunday=6
+        d -= _td(days=1)
+    return d
+
+
+@router.get("/types")
+def list_scanner_types():
+    """Return all registered scanner types for frontend scanner pickers."""
+    from app.services.scan_orchestrator import get_all
+    return [
+        {
+            "key": d.key,
+            "display_name": d.display_name,
+            "description": d.description,
+            "supports_date_range": d.supports_date_range,
+        }
+        for d in get_all()
+    ]
+
 
 @router.post("/run", response_model=ScannerRunAsyncResponse, status_code=202)
 def run_scanner(

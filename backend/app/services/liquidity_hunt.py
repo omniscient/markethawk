@@ -26,7 +26,7 @@ from app.models.monitored_stock import MonitoredStock
 from app.models.ticker_reference import TickerReference
 from app.models.stock_split import StockSplit
 from app.services.catalyst_parser import CatalystParser
-from app.services.scanner import ScannerService
+from app.services.alert_service import save_event as _save_event
 from app.utils.session import get_market_today
 
 _ET = ZoneInfo("America/New_York")
@@ -528,7 +528,7 @@ async def run_liquidity_hunt_scan(
                         enrichment, event_date,
                         session_metrics["pre_vol"],
                     )
-                    event_dict = ScannerService._save_event(
+                    event_dict = _save_event(
                         db=db,
                         ticker=ticker,
                         event_date=event_date,
@@ -565,7 +565,7 @@ async def run_liquidity_hunt_scan(
                             enrichment, event_date,
                             session_metrics["post_vol"],
                         )
-                        event_dict = ScannerService._save_event(
+                        event_dict = _save_event(
                             db=db,
                             ticker=ticker,
                             event_date=event_date,
@@ -620,3 +620,27 @@ async def run_liquidity_hunt_scan_for_date(
     return await run_liquidity_hunt_scan(
         [ticker], db, start_date=event_date, end_date=event_date
     )
+
+
+# ── Orchestrator self-registration ────────────────────────────────────────────
+
+from app.services.scan_orchestrator import ScannerDescriptor, register
+
+
+async def _orchestrator_run(tickers: list, db: Any, event_date: date) -> list[dict]:
+    """Adapter: maps the standard ScannerFn signature to run_liquidity_hunt_scan."""
+    return await run_liquidity_hunt_scan(
+        tickers=tickers,
+        db=db,
+        start_date=event_date,
+        end_date=event_date,
+    )
+
+
+for _key, _display, _desc in [
+    ("liquidity_hunt", "Liquidity Hunt", "Intraday liquidity concentration scanner."),
+    ("liquidity_hunt_pre", "Liquidity Hunt (Pre-Market)", "Pre-market liquidity concentration scanner."),
+    ("liquidity_hunt_post", "Liquidity Hunt (Post-Market)", "Post-market liquidity concentration scanner."),
+]:
+    # All three keys share the same _orchestrator_run — run_liquidity_hunt_scan emits all variant types.
+    register(ScannerDescriptor(key=_key, display_name=_display, description=_desc, run=_orchestrator_run, supports_date_range=True))

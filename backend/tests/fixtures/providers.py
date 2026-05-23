@@ -60,9 +60,9 @@ def mock_polygon_provider():
     mock.name = "massive"
     mock.supported_asset_classes = ["stocks"]
     mock.is_available.return_value = (True, "Ready (mock)")
-    mock.get_historical_bars.side_effect = lambda symbol, **kwargs: _make_canned_bars(symbol)
+    mock.get_bars.side_effect = lambda symbol, **kwargs: _make_canned_bars(symbol)
     mock.get_ticker_details.side_effect = lambda symbol: _make_canned_ticker_details(symbol)
-    mock.get_aggregates = mock.get_historical_bars  # alias used by some callers
+    mock.get_snapshots.return_value = []
 
     original = DataProviderFactory._providers.get("massive")
     DataProviderFactory._providers["massive"] = mock

@@ -58,13 +58,16 @@ A full pre-market scan proceeds as follows:
 
 | File | Responsibility |
 |------|---------------|
-| `scanner.py` | Core scan orchestration: `ScannerService`, `calculate_day_metrics()`, `_get_batch_enrichment_data()` (returns 3-tuple with ES/NQ market context and sector ETF pct changes), Phase 2a 19-key feature enrichment in `run_pre_market_scan()`. Loads `signal_ranker_config` once per scan; passes to `_save_event()` for scoring. Static helpers: `default_scan_date()`, `check_concurrency()`, `resolve_date_range()`, `count_active_tickers()`. |
+| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks.py`. `get_all()` enumerates entries for `GET /api/scanner/types`. |
+| `pre_market_scan.py` | Self-registers `"pre_market_volume_spike"` in the orchestrator. Delegates to `ScannerService.run_pre_market_scan` (interim; body inlined in Task 8). |
+| `oversold_bounce_scan.py` | Self-registers `"oversold_bounce"` in the orchestrator. Delegates to `ScannerService.run_oversold_bounce_scan` (interim). |
+| `scanner.py` | `ScannerService` — `calculate_day_metrics()`, `_get_batch_enrichment_data()` (3-tuple with ES/NQ context and sector ETF changes), Phase 2a 19-key feature enrichment. `_save_event()` now delegates to `alert_service.save_event`. |
 | `signal_ranker.py` | Phase 2c signal quality scorer. `compute_signal_quality_score()` — weighted sum of normalized indicators (re-normalizes over present features). `load_ranker_config()` — reads `signal_ranker_enabled`, `signal_ranker_weights`, `signal_ranker_version` from `SystemConfig`. Weights updatable without redeploy. |
 | `stock_data.py` | Historical OHLCV fetch, gap calculation, session flags. `is_futures_ticker()` — asset-class lookup. `get_historical_enriched()` — fetch + Decimal coercion + MAX_DATAPOINTS guard + indicator gating. |
 | `universe_stats.py` | `UniverseStatsService.compute()` — aggregate stats for one universe (ticker count, bar count, date range, timespans) across both StockAggregate and FuturesAggregate. Callable outside HTTP context. |
 | `discovery_service.py` | Bulk ticker sync from Polygon: paginated reference data, rate-limit-aware batching. |
 | `catalyst_parser.py` | Batch 72-hour news analysis for catalyst detection. Joins articles to tickers in memory. Returns `latest_article_utc` per ticker for catalyst recency enrichment. |
-| `futures_data.py` | Futures contract data (ES, NQ, etc.), rollover date tracking. |
+| `futures_data.py` | 2-method public interface: `get_continuous_series(symbol, ...)` (stitched rollover series, self-managed session) and `sync_contracts(symbol)` (IBKR catalog refresh, exchange + session self-managed). Five write-path methods are `_`-prefixed private details. |
 | `chart_indicators.py` | Technical indicator computation (e.g., VWAP, moving averages) for chart endpoints. |
 | `journal_service.py` | Trade journal CRUD operations. |
 | `websocket_manager.py` | WebSocket connection pool; `broadcast()` to all connected clients. |
@@ -78,9 +81,9 @@ A full pre-market scan proceeds as follows:
 
 | File | Responsibility |
 |------|---------------|
-| `base.py` | `MarketDataProvider` abstract interface (fetch bars, tickers, news). |
-| `massive.py` | Polygon.io bulk operations: large-batch ticker sync, aggregate backfill. |
-| `ibkr.py` | `ib_insync`-based Interactive Brokers provider. Connects to the `ib-gateway` container on port 4002. |
+| `base.py` | `BaseDataProvider` sync abstract interface: `get_bars()`, `get_snapshots()`, `get_ticker_details()`. All providers must implement this contract. |
+| `massive.py` | Polygon.io provider: `get_bars()` (paginated OHLCV), `get_snapshots()` (normalised market snapshot dicts), large-batch ticker sync, aggregate backfill. |
+| `ibkr.py` | `ib_insync`-based Interactive Brokers provider. Futures-only (`get_bars`/`get_snapshots` return empty stubs). Connects to the `ib-gateway` container on port 4002. |
 
 ### Routers (`app/routers/`)
 
@@ -91,7 +94,7 @@ A full pre-market scan proceeds as follows:
 | `stocks.py` | `/api/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/news/*` — news articles and preferences |
 | `live_data.py` | `/api/live/ws/{ticker}/{resolution}` — per-symbol WebSocket; `/api/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts) |
-| `futures.py` | `/api/futures/*` — futures contracts, aggregates, rollovers |
+| `futures.py` | `/api/futures/*` — `GET /history/{symbol}`, `GET /contracts/{symbol}`, `GET /rollovers/{symbol}`, `POST /download/{symbol}` (catalog refresh), `GET /providers` |
 | `journal.py` | `/api/journal/*` — trade journal entries |
 | `watchlist.py` | `/api/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |
 | `health.py` | `GET /health` — liveness probe |

@@ -39,7 +39,7 @@ class StockDataService:
             end_date = datetime.now(timezone.utc)
             start_date = end_date - timedelta(days=days)
 
-            aggs = massive.get_historical_bars(
+            aggs = massive.get_bars(
                 symbol=ticker.upper(),
                 timespan="day",
                 multiplier=1,
@@ -87,7 +87,7 @@ class StockDataService:
             today_et = datetime.now(_ET)
 
             # Fetch minute-level data for extended hours
-            aggs = massive.get_historical_bars(
+            aggs = massive.get_bars(
                 symbol=ticker.upper(),
                 timespan="minute",
                 multiplier=1,
@@ -236,7 +236,6 @@ class StockDataService:
                 from_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
             df = FuturesDataService.get_continuous_series(
-                db=db,
                 symbol=symbol,
                 timespan=timespan,
                 multiplier=multiplier,
@@ -445,7 +444,7 @@ class StockDataService:
                 logging.error(f"Provider '{provider}' is not available.")
                 return []
 
-            return p.get_historical_bars(
+            return p.get_bars(
                 symbol=ticker.upper(),
                 timespan=timespan,
                 multiplier=multiplier,
@@ -475,15 +474,12 @@ class StockDataService:
         Filter by volume and return top movers by absolute percentage change.
         """
         try:
-            from app.providers.massive import MassiveDataProvider
             massive = DataProviderFactory.get("massive")
             if not massive.is_available():
                 logging.error("Massive (Polygon) provider not available")
                 return []
 
-            # get_snapshot_all is Polygon-specific — access via the concrete provider
-            assert isinstance(massive, MassiveDataProvider)
-            snapshots = massive.get_snapshot_all(market_type="stocks")
+            snapshots = massive.get_snapshots()
 
             if not snapshots:
                 logging.warning("No snapshots returned from Polygon")
@@ -491,42 +487,17 @@ class StockDataService:
 
             movers = []
             for s in snapshots:
-                # Basic validation
-                if not hasattr(s, 'ticker') or not hasattr(s, 'prev_day'):
-                    continue
-                
-                # Check volume (current day volume, which in pre-market includes pre-market trades)
-                # We check both day.volume and min.accumulated_volume because s.day.volume is often 0 in pre-market
-                day_vol = getattr(s.day, 'volume', 0) or 0
-                min_acc_vol = getattr(s.min, 'accumulated_volume', 0) or 0
-                volume = max(day_vol, min_acc_vol)
-                
-                if volume < min_volume:
-                    continue
-                
-                prev_close = getattr(s.prev_day, 'close', 0) or getattr(s.prev_day, 'c', 0)
-                if prev_close == 0:
-                    continue
-                
-                # Snapshot's todays_change_percent is the percentage change from previous close
-                change_percent = getattr(s, 'todays_change_percent', 0) or 0
-                
-                # If change is 0, we might still be in pre-market and it hasn't updated 
-                # but if there is volume, there should be a price.
-                # Use current minute close or last trade price
-                current_price = getattr(s.min, 'close', 0) or getattr(s.last_trade, 'price', 0) or getattr(s.last_trade, 'p', 0)
-                
-                if current_price == 0:
+                if s["volume"] < min_volume:
                     continue
 
                 movers.append({
-                    "ticker": s.ticker,
-                    "name": None,  # Snapshot doesn't include name, we'd need ticker details but that's a lot of calls
-                    "price": float(current_price),
-                    "change_percent": float(change_percent),
-                    "change_value": float(getattr(s, 'todays_change', 0)),
-                    "volume": int(volume),
-                    "prev_close": float(prev_close)
+                    "ticker": s["ticker"],
+                    "name": None,
+                    "price": s["price"],
+                    "change_percent": s["change_pct"],
+                    "change_value": s["change_value"],
+                    "volume": s["volume"],
+                    "prev_close": s["prev_close"],
                 })
 
             # Sort by absolute change percent descending

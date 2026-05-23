@@ -254,7 +254,7 @@ async def _sync_futures_range(
             f"  No local contracts for {symbol} in {from_date}→{to_date}. "
             "Falling back to full history download (will query IBKR catalog)."
         )
-        result = await FuturesDataService.download_full_history(
+        result = await FuturesDataService._download_full_history(
             db=db, symbol=symbol, exchange=exchange,
             timespan=timespan, multiplier=multiplier,
             force_refresh=False, from_date=from_date, to_date=to_date,
@@ -269,7 +269,7 @@ async def _sync_futures_range(
 
     total_added = 0
     for contract in contracts:
-        result = await FuturesDataService.download_contract(
+        result = await FuturesDataService._download_contract(
             db=db,
             symbol=symbol,
             exchange=exchange,

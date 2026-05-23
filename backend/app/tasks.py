@@ -501,7 +501,7 @@ def sync_futures_aggregates(
         )
 
         result = loop.run_until_complete(
-            FuturesDataService.download_full_history(
+            FuturesDataService._download_full_history(
                 db=db,
                 symbol=symbol,
                 exchange=exchange,
@@ -1356,8 +1356,10 @@ def run_universe_scan(
     """
     from datetime import date as _date, timedelta as _td
     from app.models.scanner_run import ScannerRun
-    from app.services.scanner import ScannerService
-    from app.services.liquidity_hunt import run_liquidity_hunt_scan
+    import app.services.pre_market_scan  # noqa: F401 — triggers self-registration
+    import app.services.oversold_bounce_scan  # noqa: F401
+    import app.services.liquidity_hunt  # noqa: F401
+    import app.services.scan_orchestrator as _orchestrator
 
     task_id = self.request.id
     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -1467,20 +1469,10 @@ def run_universe_scan(
                 "total_days": len(trading_days),
             })
 
-            day_diag: dict = {}
             try:
-                if scanner_type in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
-                    day_events = asyncio.run(run_liquidity_hunt_scan(
-                        tickers, db, start_date=day, end_date=day, diagnostics_out=day_diag,
-                    ))
-                elif scanner_type == "oversold_bounce":
-                    day_events = asyncio.run(
-                        ScannerService.run_oversold_bounce_scan(tickers, db, event_date=day)
-                    )
-                else:
-                    day_events = asyncio.run(
-                        ScannerService.run_pre_market_scan(tickers, db, event_date=day)
-                    )
+                day_events = asyncio.run(
+                    _orchestrator.run(scanner_type, tickers, db=db, event_date=day)
+                )
             except Exception as e:
                 cum["errors"] += 1
                 logger.exception("run_universe_scan: day %s failed", day)
@@ -1488,9 +1480,6 @@ def run_universe_scan(
                 continue
 
             events_total += len(day_events)
-            for k in ("evaluated", "no_data", "no_prior_close", "no_baseline",
-                      "errors", "fired_pre", "fired_post"):
-                cum[k] += int(day_diag.get(k, 0))
 
             run.events_detected = events_total
             db.commit()

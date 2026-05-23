@@ -10,7 +10,7 @@ class BaseDataProvider(ABC):
     """
     Abstract base class for all data providers.
 
-    All providers expose a consistent async interface so the rest of the system
+    All providers expose a consistent sync interface so the rest of the system
     is completely decoupled from any specific vendor.  Adding a 3rd provider
     only requires implementing this class and registering it with the factory.
     """
@@ -44,7 +44,7 @@ class BaseDataProvider(ABC):
     # ------------------------------------------------------------------ #
 
     @abstractmethod
-    async def get_historical_bars(
+    def get_bars(
         self,
         symbol: str,
         timespan: str,
@@ -81,7 +81,27 @@ class BaseDataProvider(ABC):
         ...
 
     @abstractmethod
-    async def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
+    def get_snapshots(self, symbols: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """
+        Fetch market snapshots, optionally filtered to a list of symbols.
+
+        Returns a list of dicts:
+            {
+                "ticker":       str,
+                "price":        float,
+                "change_pct":   float,   # % change from previous close
+                "change_value": float,   # absolute $ change from previous close
+                "volume":       int,
+                "prev_close":   float,
+            }
+
+        Providers that don't support snapshots (e.g. IBKR for futures) should
+        return an empty list rather than raising.
+        """
+        ...
+
+    @abstractmethod
+    def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
         """
         Fetch reference/fundamental info for a symbol.
 

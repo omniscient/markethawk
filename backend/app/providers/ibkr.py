@@ -156,42 +156,23 @@ class IBKRDataProvider(BaseDataProvider):
             return False, "Missing IBKR_HOST"
         return True, "Ready"
 
-    async def get_historical_bars(
+    def get_bars(
         self,
         symbol: str,
         timespan: str,
         multiplier: int,
         from_date: str,
         to_date: str,
-        what_to_show: str = "TRADES",
-        use_rth: bool = False,
         **kwargs,
     ) -> List[Dict[str, Any]]:
-        """
-        Fetch OHLCV bars from IBKR for a stock or generic contract.
+        """IBKR serves futures only; stock bars are not supported — return empty."""
+        return []
 
-        For futures, prefer get_futures_bars() which handles contract months.
-        """
-        if not IB_INSYNC_AVAILABLE:
-            return []
+    def get_snapshots(self, symbols: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """IBKR does not provide a snapshot feed; return empty."""
+        return []
 
-        ib = await self._get_connection()
-        if not ib:
-            return []
-
-        bar_size = self._resolve_bar_size(timespan, multiplier)
-        contract = Stock(symbol.upper(), "SMART", "USD")
-
-        return await self._fetch_bars_chunked(
-            contract=contract,
-            bar_size=bar_size,
-            from_date=from_date,
-            to_date=to_date,
-            what_to_show=what_to_show,
-            use_rth=use_rth,
-        )
-
-    async def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
+    def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
         """IBKR does not provide fundamental data in a convenient way; return empty."""
         return {}
 

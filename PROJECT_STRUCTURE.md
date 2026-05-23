@@ -48,7 +48,7 @@ MarketHawk/
 │   │   │   ├── stocks.py               # /api/stocks/* — historical data, ticker search
 │   │   │   ├── news.py                 # /api/news/* — news articles and preferences
 │   │   │   ├── live_data.py            # /api/live/ws/{ticker}/{resolution} — per-symbol WS; /api/live/ws/watchlist — watchlist-wide WS
-│   │   │   ├── futures.py              # /api/futures/* — contracts, aggregates, rollovers
+│   │   │   ├── futures.py              # /api/futures/* — history, contracts, rollovers, download (catalog refresh)
 │   │   │   ├── journal.py              # /api/journal/* — trade journal CRUD
 │   │   │   ├── watchlist.py            # /api/watchlist/* — active watchlist CRUD
 │   │   │   ├── health.py               # GET /health — liveness probe
@@ -60,12 +60,16 @@ MarketHawk/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlistAdd / ActiveWatchlistUpdate / ActiveWatchlistItem
 │   │   │   └── stock.py                # Pydantic request/response models
 │   │   ├── services/
-│   │   │   ├── scanner.py              # Core scan logic; ScannerService; Phase 2a 19-key feature enrichment; loads signal ranker config once per scan; static helpers: default_scan_date, check_concurrency, resolve_date_range, count_active_tickers
 │   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags; is_futures_ticker(); get_historical_enriched() (coercion + indicators + guardrails)
 │   │   │   ├── universe_stats.py       # UniverseStatsService.compute() — universe aggregate stats (ticker count, bar count, date range, timespans)
+│   │   │   ├── scan_orchestrator.py    # Scanner registry (ScannerDescriptor, _REGISTRY, register, get_all, run); single dispatch entry point
+│   │   │   ├── pre_market_scan.py      # Self-registers "pre_market_volume_spike" in orchestrator
+│   │   │   ├── oversold_bounce_scan.py # Self-registers "oversold_bounce" in orchestrator
+│   │   │   ├── scanner.py              # ScannerService; calculate_day_metrics; _save_event delegates to alert_service.save_event
+│   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags
 │   │   │   ├── discovery_service.py    # Bulk ticker sync from Polygon; rate-limit-aware paging
 │   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis; returns latest_article_utc for recency enrichment
-│   │   │   ├── futures_data.py         # Futures contract data and rollover logic
+│   │   │   ├── futures_data.py         # 2-method public interface: get_continuous_series, sync_contracts; private write-path helpers
 │   │   │   ├── chart_indicators.py     # Technical indicators (VWAP, MAs) for chart endpoints
 │   │   │   ├── journal_service.py      # Trade journal CRUD
 │   │   │   ├── websocket_manager.py    # WebSocket connection pool and broadcast
@@ -77,9 +81,9 @@ MarketHawk/
 │   │   │   ├── signal_ranker.py        # Phase 2c: compute_signal_quality_score() + load_ranker_config(); weights from SystemConfig
 │   │   │   └── __init__.py
 │   │   ├── providers/
-│   │   │   ├── base.py                 # MarketDataProvider abstract interface
-│   │   │   ├── massive.py              # Polygon.io bulk operations (large-batch sync, backfill)
-│   │   │   ├── ibkr.py                 # ib_insync Interactive Brokers provider
+│   │   │   ├── base.py                 # BaseDataProvider sync abstract interface: get_bars, get_snapshots, get_ticker_details
+│   │   │   ├── massive.py              # Polygon.io provider: get_bars (paginated), get_snapshots (normalised), bulk sync/backfill
+│   │   │   ├── ibkr.py                 # ib_insync Interactive Brokers provider (futures-only; get_bars/get_snapshots are no-op stubs)
 │   │   │   └── __init__.py
 │   │   ├── main.py                     # FastAPI app factory; global error handler; router mounts
 │   │   └── tasks.py                    # All Celery task definitions
