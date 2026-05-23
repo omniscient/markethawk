@@ -48,7 +48,7 @@ MarketHawk/
 │   │   │   ├── stocks.py               # /api/stocks/* — historical data, ticker search
 │   │   │   ├── news.py                 # /api/news/* — news articles and preferences
 │   │   │   ├── live_data.py            # /api/live/ws/{ticker}/{resolution} — per-symbol WS; /api/live/ws/watchlist — watchlist-wide WS
-│   │   │   ├── futures.py              # /api/futures/* — contracts, aggregates, rollovers
+│   │   │   ├── futures.py              # /api/futures/* — history, contracts, rollovers, download (catalog refresh)
 │   │   │   ├── journal.py              # /api/journal/* — trade journal CRUD
 │   │   │   ├── watchlist.py            # /api/watchlist/* — active watchlist CRUD
 │   │   │   ├── health.py               # GET /health — liveness probe
@@ -64,7 +64,7 @@ MarketHawk/
 │   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags
 │   │   │   ├── discovery_service.py    # Bulk ticker sync from Polygon; rate-limit-aware paging
 │   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis; returns latest_article_utc for recency enrichment
-│   │   │   ├── futures_data.py         # Futures contract data and rollover logic
+│   │   │   ├── futures_data.py         # 2-method public interface: get_continuous_series, sync_contracts; private write-path helpers
 │   │   │   ├── chart_indicators.py     # Technical indicators (VWAP, MAs) for chart endpoints
 │   │   │   ├── journal_service.py      # Trade journal CRUD
 │   │   │   ├── websocket_manager.py    # WebSocket connection pool and broadcast

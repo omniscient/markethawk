@@ -63,7 +63,7 @@ A full pre-market scan proceeds as follows:
 | `stock_data.py` | Historical OHLCV fetch, gap percentage calculation, per-ticker session flag logic. |
 | `discovery_service.py` | Bulk ticker sync from Polygon: paginated reference data, rate-limit-aware batching. |
 | `catalyst_parser.py` | Batch 72-hour news analysis for catalyst detection. Joins articles to tickers in memory. Returns `latest_article_utc` per ticker for catalyst recency enrichment. |
-| `futures_data.py` | Futures contract data (ES, NQ, etc.), rollover date tracking. |
+| `futures_data.py` | 2-method public interface: `get_continuous_series(symbol, ...)` (stitched rollover series, self-managed session) and `sync_contracts(symbol)` (IBKR catalog refresh, exchange + session self-managed). Five write-path methods are `_`-prefixed private details. |
 | `chart_indicators.py` | Technical indicator computation (e.g., VWAP, moving averages) for chart endpoints. |
 | `journal_service.py` | Trade journal CRUD operations. |
 | `websocket_manager.py` | WebSocket connection pool; `broadcast()` to all connected clients. |
@@ -90,7 +90,7 @@ A full pre-market scan proceeds as follows:
 | `stocks.py` | `/api/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/news/*` — news articles and preferences |
 | `live_data.py` | `/api/live/ws/{ticker}/{resolution}` — per-symbol WebSocket; `/api/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts) |
-| `futures.py` | `/api/futures/*` — futures contracts, aggregates, rollovers |
+| `futures.py` | `/api/futures/*` — `GET /history/{symbol}`, `GET /contracts/{symbol}`, `GET /rollovers/{symbol}`, `POST /download/{symbol}` (catalog refresh), `GET /providers` |
 | `journal.py` | `/api/journal/*` — trade journal entries |
 | `watchlist.py` | `/api/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |
 | `health.py` | `GET /health` — liveness probe |
