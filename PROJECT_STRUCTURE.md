@@ -60,7 +60,10 @@ MarketHawk/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlistAdd / ActiveWatchlistUpdate / ActiveWatchlistItem
 │   │   │   └── stock.py                # Pydantic request/response models
 │   │   ├── services/
-│   │   │   ├── scanner.py              # Core scan logic; ScannerService; Phase 2a 19-key feature enrichment; loads signal ranker config once per scan
+│   │   │   ├── scan_orchestrator.py    # Scanner registry (ScannerDescriptor, _REGISTRY, register, get_all, run); single dispatch entry point
+│   │   │   ├── pre_market_scan.py      # Self-registers "pre_market_volume_spike" in orchestrator
+│   │   │   ├── oversold_bounce_scan.py # Self-registers "oversold_bounce" in orchestrator
+│   │   │   ├── scanner.py              # ScannerService; calculate_day_metrics; _save_event delegates to alert_service.save_event
 │   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags
 │   │   │   ├── discovery_service.py    # Bulk ticker sync from Polygon; rate-limit-aware paging
 │   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis; returns latest_article_utc for recency enrichment

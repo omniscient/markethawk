@@ -46,6 +46,21 @@ def _last_completed_weekday() -> "date":
     return d
 
 
+@router.get("/types")
+def list_scanner_types():
+    """Return all registered scanner types for frontend scanner pickers."""
+    from app.services.scan_orchestrator import get_all
+    return [
+        {
+            "key": d.key,
+            "display_name": d.display_name,
+            "description": d.description,
+            "supports_date_range": d.supports_date_range,
+        }
+        for d in get_all()
+    ]
+
+
 @router.post("/run", response_model=ScannerRunAsyncResponse, status_code=202)
 def run_scanner(
     request: ScannerRunRequest,

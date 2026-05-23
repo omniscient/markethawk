@@ -325,3 +325,13 @@ def test_pre_market_scan_static_fallback_when_timesfm_score_below_threshold():
 
     mock_save.assert_not_called()
     assert results == []
+
+
+def test_save_event_importable_from_alert_service():
+    from app.services.alert_service import save_event
+    assert callable(save_event)
+
+
+def test_trigger_scanner_alert_importable_from_alert_service():
+    from app.services.alert_service import trigger_scanner_alert
+    assert callable(trigger_scanner_alert)

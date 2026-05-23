@@ -58,7 +58,10 @@ A full pre-market scan proceeds as follows:
 
 | File | Responsibility |
 |------|---------------|
-| `scanner.py` | Core scan orchestration: `ScannerService`, `calculate_day_metrics()`, `_get_batch_enrichment_data()` (returns 3-tuple with ES/NQ market context and sector ETF pct changes), Phase 2a 19-key feature enrichment in `run_pre_market_scan()`. Loads `signal_ranker_config` once per scan; passes to `_save_event()` for scoring. |
+| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks.py`. `get_all()` enumerates entries for `GET /api/scanner/types`. |
+| `pre_market_scan.py` | Self-registers `"pre_market_volume_spike"` in the orchestrator. Delegates to `ScannerService.run_pre_market_scan` (interim; body inlined in Task 8). |
+| `oversold_bounce_scan.py` | Self-registers `"oversold_bounce"` in the orchestrator. Delegates to `ScannerService.run_oversold_bounce_scan` (interim). |
+| `scanner.py` | `ScannerService` — `calculate_day_metrics()`, `_get_batch_enrichment_data()` (3-tuple with ES/NQ context and sector ETF changes), Phase 2a 19-key feature enrichment. `_save_event()` now delegates to `alert_service.save_event`. |
 | `signal_ranker.py` | Phase 2c signal quality scorer. `compute_signal_quality_score()` — weighted sum of normalized indicators (re-normalizes over present features). `load_ranker_config()` — reads `signal_ranker_enabled`, `signal_ranker_weights`, `signal_ranker_version` from `SystemConfig`. Weights updatable without redeploy. |
 | `stock_data.py` | Historical OHLCV fetch, gap percentage calculation, per-ticker session flag logic. |
 | `discovery_service.py` | Bulk ticker sync from Polygon: paginated reference data, rate-limit-aware batching. |
