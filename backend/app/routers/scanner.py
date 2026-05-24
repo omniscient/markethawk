@@ -6,8 +6,8 @@ from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import cast
 from sqlalchemy.dialects.postgresql import JSONB
 import sqlalchemy as sa
@@ -16,6 +16,8 @@ from app.utils.session import get_market_today
 from app.core.database import get_db
 from app.models import MonitoredStock, ScannerEvent, ScannerConfig, ScannerRun
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.signal_review import SignalReview
+from app.schemas.signal_review import SignalReviewRequest, SignalReviewResponse, SignalReviewStatsResponse
 from app.models.system_config import SystemConfig
 from app.schemas import (
     ScannerRunRequest,
@@ -353,7 +355,7 @@ def get_scanner_results(
     db: Session = Depends(get_db),
 ):
     """Get scanner results with filtering."""
-    query = db.query(ScannerEvent)
+    query = db.query(ScannerEvent).options(joinedload(ScannerEvent.reviews))
 
     if ticker:
         query = query.filter(ScannerEvent.ticker == ticker.upper())
@@ -707,3 +709,149 @@ def clear_scanner_events(
     )
     db.commit()
     return ClearEventsResponse(ticker=ticker, deleted_count=deleted)
+
+
+@router.post("/events/{event_uuid}/review", response_model=SignalReviewResponse, status_code=201)
+def create_event_review(
+    event_uuid: str,
+    payload: SignalReviewRequest,
+    db: Session = Depends(get_db),
+):
+    """Submit a verdict for a scanner event."""
+    try:
+        parsed_uuid = uuid.UUID(event_uuid)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid event UUID")
+
+    event = db.query(ScannerEvent).filter(ScannerEvent.uuid == parsed_uuid).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="ScannerEvent not found")
+
+    review = SignalReview(
+        scanner_event_id=event.id,
+        verdict=payload.verdict,
+        reject_reason=payload.reject_reason,
+        notes=payload.notes,
+        enhance_suggestion=payload.enhance_suggestion,
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+@router.get("/events/reviews", response_model=List[SignalReviewResponse])
+def list_event_reviews(
+    scanner_type: str = Query(...),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    verdict: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """List reviews with optional filters."""
+    query = (
+        db.query(SignalReview, ScannerEvent.ticker, ScannerEvent.event_date, ScannerEvent.scanner_type)
+        .join(ScannerEvent, SignalReview.scanner_event_id == ScannerEvent.id)
+    )
+    if scanner_type == "liquidity_hunt":
+        query = query.filter(ScannerEvent.scanner_type.in_(["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]))
+    else:
+        query = query.filter(ScannerEvent.scanner_type == scanner_type)
+    if start_date:
+        query = query.filter(ScannerEvent.event_date >= start_date)
+    if end_date:
+        query = query.filter(ScannerEvent.event_date <= end_date)
+    if verdict:
+        query = query.filter(SignalReview.verdict == verdict)
+
+    rows = query.order_by(ScannerEvent.event_date, ScannerEvent.ticker).all()
+
+    return [
+        SignalReviewResponse(
+            id=review.id,
+            scanner_event_id=review.scanner_event_id,
+            verdict=review.verdict,
+            reject_reason=review.reject_reason,
+            notes=review.notes,
+            enhance_suggestion=review.enhance_suggestion,
+            reviewed_at=review.reviewed_at,
+            reviewed_by=review.reviewed_by,
+            ticker=ticker,
+            event_date=str(event_date),
+            scanner_type=stype,
+        )
+        for review, ticker, event_date, stype in rows
+    ]
+
+
+@router.get("/reviews/stats", response_model=SignalReviewStatsResponse)
+def get_review_stats(
+    scanner_type: Optional[str] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Aggregate review stats: coverage, acceptance rate, by-type breakdown, top rejection reasons."""
+    from sqlalchemy import func, distinct
+
+    event_q = db.query(func.count(ScannerEvent.id))
+    review_q = db.query(SignalReview).join(ScannerEvent, SignalReview.scanner_event_id == ScannerEvent.id)
+
+    if scanner_type:
+        if scanner_type == "liquidity_hunt":
+            variants = ["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]
+            event_q = event_q.filter(ScannerEvent.scanner_type.in_(variants))
+            review_q = review_q.filter(ScannerEvent.scanner_type.in_(variants))
+        else:
+            event_q = event_q.filter(ScannerEvent.scanner_type == scanner_type)
+            review_q = review_q.filter(ScannerEvent.scanner_type == scanner_type)
+    if start_date:
+        event_q = event_q.filter(ScannerEvent.event_date >= start_date)
+        review_q = review_q.filter(ScannerEvent.event_date >= start_date)
+    if end_date:
+        event_q = event_q.filter(ScannerEvent.event_date <= end_date)
+        review_q = review_q.filter(ScannerEvent.event_date <= end_date)
+
+    total_events = event_q.scalar() or 0
+    reviewed_count = (
+        review_q.with_entities(func.count(distinct(SignalReview.scanner_event_id))).scalar() or 0
+    )
+
+    confirmed_count = review_q.filter(SignalReview.verdict == "confirmed").count()
+    rejected_count = review_q.filter(SignalReview.verdict == "rejected").count()
+    denominator = confirmed_count + rejected_count
+    acceptance_rate = round(confirmed_count / denominator, 3) if denominator > 0 else 0.0
+
+    by_type_rows = (
+        review_q.with_entities(
+            ScannerEvent.scanner_type,
+            SignalReview.verdict,
+            func.count(SignalReview.id),
+        )
+        .group_by(ScannerEvent.scanner_type, SignalReview.verdict)
+        .all()
+    )
+    type_map: dict = {}
+    for stype, v, cnt in by_type_rows:
+        if stype not in type_map:
+            type_map[stype] = {"scanner_type": stype, "total": 0, "confirmed": 0, "rejected": 0, "uncertain": 0, "enhanced": 0}
+        type_map[stype]["total"] += cnt
+        if v in type_map[stype]:
+            type_map[stype][v] += cnt
+
+    reason_rows = (
+        review_q.filter(SignalReview.reject_reason.isnot(None))
+        .with_entities(SignalReview.reject_reason, func.count(SignalReview.id))
+        .group_by(SignalReview.reject_reason)
+        .order_by(func.count(SignalReview.id).desc())
+        .limit(5)
+        .all()
+    )
+
+    return SignalReviewStatsResponse(
+        total_events=total_events,
+        reviewed_count=reviewed_count,
+        acceptance_rate=acceptance_rate,
+        by_scanner_type=list(type_map.values()),
+        top_rejection_reasons=[{"reason": r, "count": c} for r, c in reason_rows],
+    )

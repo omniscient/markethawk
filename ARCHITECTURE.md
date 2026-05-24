@@ -102,7 +102,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 
 | File | Endpoints |
 |------|-----------|
-| `scanner.py` | `/api/scanner/run`, `/api/scanner/results` (default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/scanner/history`, `/api/scanner/signal-quality-distribution` |
+| `scanner.py` | `/api/scanner/run`, `/api/scanner/results` (eager-loads reviews, default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/scanner/history`, `/api/scanner/signal-quality-distribution`, `POST /api/scanner/events/{uuid}/review` (submit verdict), `GET /api/scanner/events/reviews?scanner_type=` (list with `liquidity_hunt` alias), `GET /api/scanner/reviews/stats` (coverage, acceptance rate, by-type breakdown) |
 | `universe.py` | `/api/universe/*` — CRUD for stock universes and memberships |
 | `stocks.py` | `/api/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/news/*` — news articles and preferences |
@@ -113,7 +113,6 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `health.py` | `GET /health` — liveness probe |
 | `system.py` | `/api/system/*` — configuration, status |
 | `outcomes.py` | `/api/outcomes/*` — scorecard, intervals, distribution, edge decay, signals, event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
-| `signal_reviews.py` | `POST /api/signal-reviews` (201) — persist confirm/reject/enhanced verdict; `GET /api/signal-reviews?scanner_type=` — list reviews with joined event fields, `liquidity_hunt` alias expansion |
 
 ### Database Models (`app/models/`)
 
@@ -140,7 +139,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `UniverseQualityReport` | `universe_quality_reports` | Data quality audit results per universe |
 | `SignalAnalysisRun` | `signal_analysis_runs` | Anchor table for each statistical analysis execution; stores `correlation_matrix` and `feature_weights` as JSONB, status, event count |
 | `SignalCluster` | `signal_clusters` | One K-means cluster archetype per analysis run; stores centroid, return_profile (per-interval stats), event count, auto-generated label |
-| `SignalReview` | `signal_reviews` | User-submitted verdict (confirmed/rejected/enhanced) on a `ScannerEvent`; FK → `scanner_events.id` CASCADE; supports `reject_reason` and `enhance_suggestion` JSONB. Written by `/validate-scanner` skill. |
+| `SignalReview` | `signal_reviews` | User-submitted verdict (confirmed/rejected/enhanced/uncertain) on a `ScannerEvent`; FK → `scanner_events.id` CASCADE; supports `reject_reason` and `enhance_suggestion` JSONB. Written by `/validate-scanner` skill and frontend ReviewControls. Latest review exposed via `ScannerEvent.latest_review` @property. |
 
 ## Frontend Architecture
 
@@ -155,7 +154,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | Page | Route | Purpose |
 |------|-------|---------|
 | `Dashboard` | `/` | System metrics, recent alerts, market status |
-| `Scanner` | `/scanner` | Run scans, view results (default sort: signal quality score), configure criteria |
+| `Scanner` | `/scanner` | Run scans, view results (default sort: signal quality score), configure criteria. Inline ReviewControls per event (confirm/reject/uncertain) and SignalReviewStats card below scan history |
 | `PreMarketMovers` | `/movers/pre-market` | Real-time pre-market volume leaders |
 | `Universes` | `/universes` | Create and manage stock universes |
 | `EdgeExplorer` | `/edge-explorer` | Historical scanner hit rates, outcome distributions, feature correlation heatmap (Phase 2b), and Signal Quality Validation chart — avg EOD % and follow-through rate per score decile (Phase 2c) |

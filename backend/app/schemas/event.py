@@ -7,6 +7,8 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime, date
 import uuid
 
+from app.schemas.signal_review import SignalReviewResponse
+
 
 class ScannerEventResponse(BaseModel):
     """Full detailed schema for scanner event API responses."""
@@ -31,6 +33,8 @@ class ScannerEventResponse(BaseModel):
     
     created_at: datetime
     updated_at: datetime
+
+    latest_review: Optional[SignalReviewResponse] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

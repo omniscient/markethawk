@@ -16,6 +16,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import ScannerConfig from '../components/ScannerConfig';
 import ScannerResults from '../components/ScannerResults';
+import SignalReviewStats from '../components/SignalReviewStats';
 
 // API functions
 import {
@@ -705,6 +706,8 @@ const Scanner: React.FC = () => {
           )}
         </div>
       </Card>
+
+      <SignalReviewStats />
     </div>
   );
 };

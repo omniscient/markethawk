@@ -49,6 +49,12 @@ class ScannerEvent(Base):
 
     reviews = relationship("SignalReview", back_populates="event", cascade="all, delete-orphan")
 
+    @property
+    def latest_review(self):
+        if not self.reviews:
+            return None
+        return max(self.reviews, key=lambda r: r.reviewed_at)
+
     __table_args__ = (
         UniqueConstraint('ticker', 'event_date', 'scanner_type', name='uq_scanner_event'),
     )

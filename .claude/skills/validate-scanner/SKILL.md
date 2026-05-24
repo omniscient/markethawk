@@ -171,7 +171,7 @@ Verdict: _
 
 | Input | Action |
 |-------|--------|
-| `c` | Write `verdict=confirmed` to DB (POST /api/signal-reviews). Advance index. |
+| `c` | Write `verdict=confirmed` to DB (POST /api/scanner/events/{event_uuid}/review). Advance index. |
 | `r noise` / `r too_late` / `r stale_data` / `r split_artifact` / `r threshold_too_loose` / `r other` | Write `verdict=rejected, reject_reason=<reason>`. Advance. |
 | `r` (no reason) | Prompt: `Reason [noise/too_late/stale_data/split_artifact/threshold_too_loose/other]: ` then proceed as above. |
 | `e` | Run enhance flow (see §3c). Advance. |
@@ -180,10 +180,9 @@ Verdict: _
 
 **After each verdict (except skip/quit), POST to DB:**
 ```bash
-curl -s -X POST http://localhost:8000/api/signal-reviews \
+curl -s -X POST http://localhost:8000/api/scanner/events/{event_uuid}/review \
   -H "Content-Type: application/json" \
   -d '{
-    "scanner_event_id": {event_id},
     "verdict": "{verdict}",
     "reject_reason": "{reject_reason_or_null}",
     "notes": "{notes_or_null}",
@@ -290,7 +289,7 @@ Then run **Phase 5: Report**.
 
 2. Fetch all reviews from DB:
    ```bash
-   curl -s "http://localhost:8000/api/signal-reviews?scanner_type={scanner_type}&start_date={start_date}&end_date={end_date}" | python3 -m json.tool
+   curl -s "http://localhost:8000/api/scanner/events/reviews?scanner_type={scanner_type}&start_date={start_date}&end_date={end_date}" | python3 -m json.tool
    ```
 
 3. Print the report:
