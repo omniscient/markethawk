@@ -17,6 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.core.error_tracking import ErrorTrackerFactory
+from app.exceptions import MarketHawkError
 from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router, futures_router, alerts_router, watchlist_router, auto_trading_router, outcomes_router, signal_reviews_router
 from app.core.celery_app import celery_app as celery
 from app.services.websocket_manager import websocket_manager
@@ -197,6 +198,19 @@ def create_app() -> FastAPI:
             "⚠️  ENVIRONMENT=%s — stack traces ARE included in HTTP error responses. "
             "Never use this setting in production.",
             settings.ENVIRONMENT,
+        )
+
+    # Typed domain exception handler — must appear before the bare Exception handler.
+    @app.exception_handler(MarketHawkError)
+    async def markethawk_error_handler(request: Request, exc: MarketHawkError):
+        status_code = 503 if exc.is_retryable else 422
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "message": str(exc),
+                "error_type": type(exc).__name__,
+                "retryable": exc.is_retryable,
+            },
         )
 
     # Global Exception Handler

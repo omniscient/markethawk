@@ -37,7 +37,7 @@ def test_run_dispatches_to_registered_fn():
     today = date(2026, 5, 23)
     result = asyncio.run(run("mock_scan", ["AAPL"], db=None, event_date=today))
     assert result == expected
-    fn.assert_awaited_once_with(["AAPL"], None, today)
+    fn.assert_awaited_once_with(["AAPL"], None, today, scanner_run=None)
 
 
 def test_run_raises_for_unknown_type():

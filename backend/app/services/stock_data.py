@@ -19,6 +19,7 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.monitored_stock import MonitoredStock
 from app.services.chart_indicators import ChartIndicatorsService
+from app.exceptions import DataFetchError, ProviderError
 from app.providers import DataProviderFactory
 
 
@@ -30,8 +31,9 @@ class StockDataService:
         """Get historical stock data via the Massive (Polygon) provider."""
         try:
             massive = DataProviderFactory.get("massive")
-            if not massive.is_available():
-                logging.error("Massive provider not available - check POLYGON_API_KEY")
+            available, reason = massive.is_available()
+            if not available:
+                logging.error(f"Massive provider not available: {reason}")
                 return pd.DataFrame()
 
             # Convert period to days
@@ -77,8 +79,9 @@ class StockDataService:
         """Get pre-market/extended-hours data via the Massive (Polygon) provider."""
         try:
             massive = DataProviderFactory.get("massive")
-            if not massive.is_available():
-                logging.error("Massive provider not available - check POLYGON_API_KEY")
+            available, reason = massive.is_available()
+            if not available:
+                logging.error(f"Massive provider not available: {reason}")
                 return {}
 
             # Compute today in US/Eastern so the date boundary is always
@@ -127,8 +130,9 @@ class StockDataService:
         """Get stock details from the Massive (Polygon) provider."""
         try:
             massive = DataProviderFactory.get("massive")
-            if not massive.is_available():
-                logging.error("Massive provider not available - check POLYGON_API_KEY")
+            available, reason = massive.is_available()
+            if not available:
+                logging.error(f"Massive provider not available: {reason}")
                 return {}
 
             details = massive.get_ticker_details(ticker.upper())
@@ -277,8 +281,14 @@ class StockDataService:
         """
         try:
             massive = DataProviderFactory.get("massive")
-            if not massive.is_available():
-                return {"status": "error", "message": "Massive (Polygon) provider not available"}
+            available, reason = massive.is_available()
+            if not available:
+                raise DataFetchError(
+                    f"Massive (Polygon) provider not available: {reason}",
+                    provider="massive",
+                    symbol=ticker,
+                    is_retryable=False,
+                )
 
             ticker = ticker.upper()
             
@@ -413,10 +423,18 @@ class StockDataService:
             }
 
 
+        except DataFetchError:
+            db.rollback()
+            raise
         except Exception as e:
             logging.error(f"Error refreshing data for {ticker}: {e}")
             db.rollback()
-            return {"status": "error", "message": str(e)}
+            raise DataFetchError(
+                f"Error refreshing data for {ticker}: {e}",
+                provider="massive",
+                symbol=ticker,
+                is_retryable=True,
+            ) from e
 
     @staticmethod
     def get_aggregates(
@@ -440,8 +458,9 @@ class StockDataService:
         """
         try:
             p = DataProviderFactory.get(provider)
-            if not p.is_available():
-                logging.error(f"Provider '{provider}' is not available.")
+            available, reason = p.is_available()
+            if not available:
+                logging.error(f"Provider '{provider}' is not available: {reason}")
                 return []
 
             return p.get_bars(
@@ -456,6 +475,8 @@ class StockDataService:
                 paginate=paginate,
             )
 
+        except ProviderError:
+            raise
         except Exception as e:
             logging.exception(
                 f"❌ Provider fetch FAILED for {ticker} {timespan}×{multiplier} "
@@ -475,8 +496,9 @@ class StockDataService:
         """
         try:
             massive = DataProviderFactory.get("massive")
-            if not massive.is_available():
-                logging.error("Massive (Polygon) provider not available")
+            available, reason = massive.is_available()
+            if not available:
+                logging.error(f"Massive (Polygon) provider not available: {reason}")
                 return []
 
             snapshots = massive.get_snapshots()

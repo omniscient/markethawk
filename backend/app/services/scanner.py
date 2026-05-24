@@ -7,12 +7,13 @@ import asyncio
 from datetime import datetime, date, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 from app.utils.session import get_market_today
-from typing import Dict, Any, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Any, List, Optional, Tuple
 
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, or_
 
+from app.exceptions import MarketHawkError, ScanError, DataFetchError, ProviderError
 from app.models.scanner_event import ScannerEvent
 from app.models.stock_aggregate import StockAggregate
 from app.models.futures_aggregate import FuturesAggregate
@@ -24,6 +25,9 @@ from app.services.catalyst_parser import CatalystParser
 from app.services.event_helpers import generate_event_summary, compute_event_severity
 from app.services.timeseries_forecast import get_volume_forecast, compute_anomaly_score
 from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
+
+if TYPE_CHECKING:
+    from app.models.scanner_run import ScannerRun
 
 _ET = ZoneInfo("America/New_York")
 
@@ -307,8 +311,10 @@ class ScannerService:
                     market_context_dict["market_context"] = "risk_off"
                 else:
                     market_context_dict["market_context"] = "neutral"
-        except Exception:
-            pass
+        except (ScanError, DataFetchError, ProviderError) as e:
+            logging.warning("Market context enrichment failed (domain error): %s", e)
+        except Exception as e:
+            logging.warning("Market context enrichment failed (unexpected): %s", e)
 
         # 6. Sector ETF pre-market bars
         sector_etf_pct_dict: Dict[str, Optional[float]] = {s: None for s in _SECTOR_ETF_SYMBOLS}
@@ -351,8 +357,10 @@ class ScannerService:
                     prev = etf_prev_closes[etf_sym]
                     if prev > 0:
                         sector_etf_pct_dict[etf_sym] = round((current - prev) / prev * 100, 4)
-        except Exception:
-            pass
+        except (ScanError, DataFetchError, ProviderError) as e:
+            logging.warning("Sector ETF enrichment failed (domain error): %s", e)
+        except Exception as e:
+            logging.warning("Sector ETF enrichment failed (unexpected): %s", e)
 
         return batch_data, market_context_dict, sector_etf_pct_dict
 
@@ -380,13 +388,17 @@ class ScannerService:
 
     @staticmethod
     async def run_pre_market_scan(
-        tickers: List[str], db: Session, event_date: date = None
+        tickers: List[str],
+        db: Session,
+        event_date: date = None,
+        scanner_run: Optional["ScannerRun"] = None,
     ) -> List[Dict[str, Any]]:
         """Run extended hours volume spike scanner using DB aggregates."""
         if event_date is None:
             event_date = get_market_today()
 
         results = []
+        failed: List[Dict[str, Any]] = []
         _ET = ZoneInfo("America/New_York")
         day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
         day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
@@ -610,21 +622,39 @@ class ScannerService:
                         ranker_config=ranker_config,
                     )
                     results.append(event_dict)
-            except Exception as e:
-                logging.error(f"Error processing {ticker} in pre_market_scan: {e}")
+            except (ScanError, DataFetchError, ProviderError) as e:
+                logging.error(
+                    "pre_market_scan: domain error for %s: %s",
+                    ticker, e,
+                    extra={"ticker": ticker, "error_type": type(e).__name__},
+                )
+                failed.append({
+                    "ticker": ticker,
+                    "error_type": type(e).__name__,
+                    "message": str(e),
+                    "retryable": e.is_retryable,
+                })
+
+        if failed and scanner_run is not None:
+            scanner_run.failed_tickers = failed
+            db.add(scanner_run)
 
         db.commit()
         return results
 
     @staticmethod
     async def run_oversold_bounce_scan(
-        tickers: List[str], db: Session, event_date: date = None
+        tickers: List[str],
+        db: Session,
+        event_date: date = None,
+        scanner_run: Optional["ScannerRun"] = None,
     ) -> List[Dict[str, Any]]:
         """Run the Oversold Bounce (Dual RSI) scan using DB daily aggregates."""
         if event_date is None:
             event_date = get_market_today()
 
         results = []
+        failed: List[Dict[str, Any]] = []
         _ET = ZoneInfo("America/New_York")
         day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
         day_end_utc = (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
@@ -740,8 +770,22 @@ class ScannerService:
                         ranker_config=ranker_config,
                     )
                     results.append(event_dict)
-            except Exception as e:
-                logging.error(f"Error processing {ticker} oversold bounce: {e}")
+            except (ScanError, DataFetchError, ProviderError) as e:
+                logging.error(
+                    "oversold_bounce_scan: domain error for %s: %s",
+                    ticker, e,
+                    extra={"ticker": ticker, "error_type": type(e).__name__},
+                )
+                failed.append({
+                    "ticker": ticker,
+                    "error_type": type(e).__name__,
+                    "message": str(e),
+                    "retryable": e.is_retryable,
+                })
+
+        if failed and scanner_run is not None:
+            scanner_run.failed_tickers = failed
+            db.add(scanner_run)
 
         db.commit()
         return results

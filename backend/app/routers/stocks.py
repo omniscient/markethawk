@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from app.utils.session import get_market_today
 from app.core.database import get_db
+from app.exceptions import DataFetchError
 from app.services import StockDataService
 from typing import Optional, Union
 from fastapi.responses import ORJSONResponse
@@ -103,6 +104,9 @@ def refresh_stock_data(
             db, ticker, timespan, multiplier, full_history, period
         )
         return result
+    except DataFetchError as e:
+        status = 503 if e.is_retryable else 422
+        raise HTTPException(status_code=status, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error refreshing data: {str(e)}")
 

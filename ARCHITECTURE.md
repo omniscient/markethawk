@@ -54,6 +54,19 @@ A full pre-market scan proceeds as follows:
 | `celery_app.py` | Celery instance; beat schedule definitions (scan times, sync intervals). |
 | `error_tracking.py` | `ErrorTracker` protocol; `SeqErrorTracker` and `StdoutErrorTracker` implementations; MD5-based `ErrorId` generation. |
 
+### Exception Hierarchy (`app/exceptions.py`)
+
+Domain-typed exceptions raised at service/provider public boundaries so callers always know what to catch. Each carries `is_retryable: bool` (drives Celery retry logic) and structured context fields for Seq filtering.
+
+| Class | Raised by | Key context fields |
+|-------|-----------|--------------------|
+| `MarketHawkError` | Base — all domain errors | `is_retryable`, `**context` |
+| `ScanError` | `ScannerService` | `scanner_type`, `universe_id`, `ticker`, `scan_id` |
+| `DataFetchError` | `StockDataService` | `provider`, `symbol`, `timespan`, `date_range` |
+| `ProviderError` | `IBKRDataProvider`, `MassiveDataProvider`, `FuturesDataService` | `provider`, `endpoint`, `status_code` |
+
+`main.py` registers a `@app.exception_handler(MarketHawkError)` before the bare `Exception` handler: `is_retryable=True` → HTTP 503, `False` → HTTP 422.
+
 ### Services (`app/services/`)
 
 | File | Responsibility |
@@ -61,7 +74,7 @@ A full pre-market scan proceeds as follows:
 | `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks.py`. `get_all()` enumerates entries for `GET /api/scanner/types`. |
 | `pre_market_scan.py` | Self-registers `"pre_market_volume_spike"` in the orchestrator. Delegates to `ScannerService.run_pre_market_scan` (interim; body inlined in Task 8). |
 | `oversold_bounce_scan.py` | Self-registers `"oversold_bounce"` in the orchestrator. Delegates to `ScannerService.run_oversold_bounce_scan` (interim). |
-| `scanner.py` | `ScannerService` — `calculate_day_metrics()`, `_get_batch_enrichment_data()` (3-tuple with ES/NQ context and sector ETF changes), Phase 2a 19-key feature enrichment. `_save_event()` now delegates to `alert_service.save_event`. |
+| `scanner.py` | `ScannerService` — `calculate_day_metrics()`, `_get_batch_enrichment_data()` (3-tuple with ES/NQ context and sector ETF changes), Phase 2a 19-key feature enrichment. `_save_event()` delegates to `alert_service.save_event`. `run_pre_market_scan`/`run_oversold_bounce_scan` accept optional `scanner_run` param; per-ticker domain failures accumulated into `scanner_run.failed_tickers`. |
 | `signal_ranker.py` | Phase 2c signal quality scorer. `compute_signal_quality_score()` — weighted sum of normalized indicators (re-normalizes over present features). `load_ranker_config()` — reads `signal_ranker_enabled`, `signal_ranker_weights`, `signal_ranker_version` from `SystemConfig`. Weights updatable without redeploy. |
 | `stock_data.py` | Historical OHLCV fetch, gap calculation, session flags. `is_futures_ticker()` — asset-class lookup. `get_historical_enriched()` — fetch + Decimal coercion + MAX_DATAPOINTS guard + indicator gating. |
 | `universe_stats.py` | `UniverseStatsService.compute()` — aggregate stats for one universe (ticker count, bar count, date range, timespans) across both StockAggregate and FuturesAggregate. Callable outside HTTP context. |

@@ -13,6 +13,7 @@ from typing import Dict, Any, List, Optional
 from polygon import RESTClient
 
 from app.core.config import settings
+from app.exceptions import ProviderError
 from app.providers.base import BaseDataProvider
 
 logger = logging.getLogger(__name__)
@@ -132,13 +133,16 @@ class MassiveDataProvider(BaseDataProvider):
             return all_bars
 
         except Exception as e:
-            # Distinct from the "no bars returned" path so logs disambiguate
-            # API errors (rate limit, 5xx, network) from genuinely empty ranges.
             logger.exception(
                 f"❌ Polygon fetch FAILED for {symbol} {timespan}×{multiplier} "
                 f"({from_date} → {to_date}): {e}"
             )
-            return []
+            raise ProviderError(
+                f"Polygon fetch failed for {symbol} {timespan}×{multiplier}: {e}",
+                provider="massive",
+                endpoint="get_aggs",
+                is_retryable=True,
+            ) from e
 
     def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
         """Fetch fundamental / reference info from Polygon."""

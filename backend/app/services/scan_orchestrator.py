@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Optional
 
 ScannerFn = Callable[[list[str], Any, date], Awaitable[list[dict]]]
 
@@ -30,10 +30,11 @@ async def run(
     tickers: list[str],
     db: Any,
     event_date: date,
+    scanner_run: Optional[Any] = None,
 ) -> list[dict]:
     descriptor = _REGISTRY.get(scanner_type)
     if descriptor is None:
         raise ValueError(
             f"Unknown scanner type: {scanner_type!r}. Registered: {list(_REGISTRY)}"
         )
-    return await descriptor.run(tickers, db, event_date)
+    return await descriptor.run(tickers, db, event_date, scanner_run=scanner_run)

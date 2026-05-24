@@ -13,6 +13,7 @@ MarketHawk/
 │   │   ├── versions/                   # Migration scripts (one file per schema change)
 │   │   └── env.py                      # Alembic runtime config; imports models for autogenerate
 │   ├── app/
+│   │   ├── exceptions.py               # Domain exception hierarchy: MarketHawkError base + ScanError, DataFetchError, ProviderError subclasses; is_retryable flag drives Celery retry logic
 │   │   ├── core/
 │   │   │   ├── config.py               # Settings class; all env vars with typed defaults
 │   │   │   ├── database.py             # Async SQLAlchemy engine and session factory
@@ -20,7 +21,7 @@ MarketHawk/
 │   │   │   └── error_tracking.py       # ErrorTracker protocol; Seq + stdout implementations
 │   │   ├── models/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlist — manually curated live-observation list (soft limit 50)
-│   │   │   ├── scanner_run.py          # ScannerRun — one row per scan execution
+│   │   │   ├── scanner_run.py          # ScannerRun — one row per scan execution; failed_tickers JSONB for per-ticker domain failures
 │   │   │   ├── scanner_event.py        # ScannerEvent — tickers that passed criteria; carries signal_quality_score (Float, indexed DESC NULLS LAST)
 │   │   │   ├── scanner_config.py       # ScannerConfig — saved parameter sets
 │   │   │   ├── stock_universe.py       # StockUniverse — named ticker groups
