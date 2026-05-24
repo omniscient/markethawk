@@ -24,6 +24,35 @@ export interface ScannerEvent {
   
   created_at: string;
   updated_at: string;
+  latest_review?: SignalReview | null;
+}
+
+export interface SignalReview {
+  id: number;
+  scanner_event_id: number;
+  verdict: 'confirmed' | 'rejected' | 'enhanced' | 'uncertain';
+  reject_reason: string | null;
+  notes: string | null;
+  enhance_suggestion: Record<string, unknown> | null;
+  reviewed_at: string;
+  reviewed_by: string | null;
+}
+
+export type RejectionReason = 'too_late' | 'noise' | 'stale_data' | 'split_artifact';
+
+export interface SignalReviewStats {
+  total_events: number;
+  reviewed_count: number;
+  acceptance_rate: number;
+  by_scanner_type: Array<{
+    scanner_type: string;
+    total: number;
+    confirmed: number;
+    rejected: number;
+    uncertain: number;
+    enhanced: number;
+  }>;
+  top_rejection_reasons: Array<{ reason: string; count: number }>;
 }
 
 // Backward compatibility alias during transition
@@ -306,6 +335,23 @@ export const fetchScannerConfigs = async (): Promise<ScannerConfig[]> => {
 
 export const fetchScannerHistory = async (limit: number = 20): Promise<ScannerRunResponse[]> => {
   const response = await apiClient.get('/scanner/history', { params: { limit } });
+  return response.data;
+};
+
+export const submitReview = async (
+  eventUuid: string,
+  payload: { verdict: string; reject_reason?: string | null; notes?: string | null },
+): Promise<SignalReview> => {
+  const response = await apiClient.post(`/scanner/events/${eventUuid}/review`, payload);
+  return response.data;
+};
+
+export const fetchReviewStats = async (params?: {
+  scanner_type?: string;
+  start_date?: string;
+  end_date?: string;
+}): Promise<SignalReviewStats> => {
+  const response = await apiClient.get('/scanner/reviews/stats', { params });
   return response.data;
 };
 
