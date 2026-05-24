@@ -31,6 +31,7 @@ from sqlalchemy import func, text
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.exceptions import ProviderError
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.futures_rollover import FuturesRollover
 from app.models.futures_contract import FuturesContract
@@ -110,7 +111,12 @@ class FuturesDataService:
         ibkr = DataProviderFactory.get("ibkr")
         available, reason = ibkr.is_available()
         if not available:
-            raise RuntimeError(f"IBKR provider is not available: {reason}")
+            raise ProviderError(
+                f"IBKR provider is not available: {reason}",
+                provider="ibkr",
+                endpoint="_sync_contract_catalog",
+                is_retryable=True,
+            )
 
         logger.info(f"FuturesDataService: Syncing contract catalog for {symbol} ({exchange})...")
         contracts = await ibkr.get_futures_contracts(
@@ -120,9 +126,12 @@ class FuturesDataService:
         )
 
         if not contracts:
-            raise RuntimeError(
+            raise ProviderError(
                 f"IBKR returned no contracts for {symbol} on {exchange}. "
-                "TWS may be unreachable or the symbol/exchange is incorrect."
+                "TWS may be unreachable or the symbol/exchange is incorrect.",
+                provider="ibkr",
+                endpoint="get_futures_contracts",
+                is_retryable=True,
             )
 
         # Apply 10-year limit

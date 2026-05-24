@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.config import settings
+from app.exceptions import DataFetchError, ProviderError
 from app.models.ticker_reference import TickerReference
 from app.models.stock_aggregate import StockAggregate
 from app.services.stock_data import StockDataService
@@ -1226,14 +1227,20 @@ def run_range_scan(
         if fetch_missing_data:
             # Daily bars: need 90-day lookback before start for rolling metrics
             daily_period_days = (date.today() - (start - timedelta(days=90))).days
-            StockDataService.refresh_stock_data(
-                db, ticker, timespan='day', period=f"{daily_period_days}d"
-            )
+            try:
+                StockDataService.refresh_stock_data(
+                    db, ticker, timespan='day', period=f"{daily_period_days}d"
+                )
+            except (DataFetchError, ProviderError) as exc:
+                logger.warning("refresh_stock_data (day) failed for %s: %s", ticker, exc)
             # Minute bars: cover just the requested range
             minute_period_days = (date.today() - start).days + 5
-            StockDataService.refresh_stock_data(
-                db, ticker, timespan='minute', period=f"{minute_period_days}d"
-            )
+            try:
+                StockDataService.refresh_stock_data(
+                    db, ticker, timespan='minute', period=f"{minute_period_days}d"
+                )
+            except (DataFetchError, ProviderError) as exc:
+                logger.warning("refresh_stock_data (minute) failed for %s: %s", ticker, exc)
 
         scanner_map = {
             "pre_market_volume_spike": ScannerService.run_pre_market_scan_for_date,
@@ -1471,7 +1478,7 @@ def run_universe_scan(
 
             try:
                 day_events = asyncio.run(
-                    _orchestrator.run(scanner_type, tickers, db=db, event_date=day)
+                    _orchestrator.run(scanner_type, tickers, db=db, event_date=day, scanner_run=run)
                 )
             except Exception as e:
                 cum["errors"] += 1

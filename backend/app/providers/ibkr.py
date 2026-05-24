@@ -18,6 +18,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.core.config import settings
+from app.exceptions import ProviderError
 from app.providers.base import BaseDataProvider
 
 logger = logging.getLogger(__name__)
@@ -203,7 +204,12 @@ class IBKRDataProvider(BaseDataProvider):
 
         ib = await self._get_connection()
         if not ib:
-            return []
+            raise ProviderError(
+                "IBKR connection not available",
+                provider="ibkr",
+                endpoint="get_futures_contracts",
+                is_retryable=True,
+            )
 
         # Use a bare Future to request contract details for ALL expiries
         template = Future(symbol=symbol.upper(), exchange=exchange.upper())
@@ -216,7 +222,12 @@ class IBKRDataProvider(BaseDataProvider):
             )
         except Exception as e:
             logger.error(f"IBKRDataProvider: get_futures_contracts failed for {symbol}: {e}")
-            return []
+            raise ProviderError(
+                f"get_futures_contracts failed for {symbol}: {e}",
+                provider="ibkr",
+                endpoint="reqContractDetails",
+                is_retryable=True,
+            ) from e
 
         now = datetime.now(timezone.utc)
         contracts = []
@@ -281,7 +292,12 @@ class IBKRDataProvider(BaseDataProvider):
 
         ib = await self._get_connection()
         if not ib:
-            return []
+            raise ProviderError(
+                "IBKR connection not available",
+                provider="ibkr",
+                endpoint="get_futures_bars",
+                is_retryable=True,
+            )
 
         bar_size = self._resolve_bar_size(timespan, multiplier)
 
@@ -299,21 +315,29 @@ class IBKRDataProvider(BaseDataProvider):
                 timeout=30,
             )
             if not qualified:
-                logger.warning(
-                    f"IBKRDataProvider: Could not qualify {symbol} {contract_month}"
+                raise ProviderError(
+                    f"Could not qualify {symbol} {contract_month}",
+                    provider="ibkr",
+                    endpoint="qualifyContracts",
+                    is_retryable=False,
                 )
-                return []
             contract = qualified[0]
-        except asyncio.TimeoutError:
-            logger.error(
-                f"IBKRDataProvider: qualify timed out for {symbol} {contract_month}"
-            )
-            return []
+        except asyncio.TimeoutError as e:
+            raise ProviderError(
+                f"qualifyContracts timed out for {symbol} {contract_month}",
+                provider="ibkr",
+                endpoint="qualifyContracts",
+                is_retryable=True,
+            ) from e
+        except ProviderError:
+            raise
         except Exception as e:
-            logger.error(
-                f"IBKRDataProvider: qualify failed for {symbol} {contract_month}: {e}"
-            )
-            return []
+            raise ProviderError(
+                f"qualify failed for {symbol} {contract_month}: {e}",
+                provider="ibkr",
+                endpoint="qualifyContracts",
+                is_retryable=True,
+            ) from e
 
         return await self._fetch_bars_chunked(
             contract=contract,
@@ -378,8 +402,11 @@ class IBKRDataProvider(BaseDataProvider):
                         if _last_error
                         else "clientId may already be in use"
                     )
-                    raise ConnectionError(
-                        f"clientId={client_id} rejected — {reason}"
+                    raise ProviderError(
+                        f"clientId={client_id} rejected — {reason}",
+                        provider="ibkr",
+                        endpoint="connect",
+                        is_retryable=False,
                     )
 
                 self._connected = True
@@ -390,6 +417,8 @@ class IBKRDataProvider(BaseDataProvider):
                 )
                 return True
 
+            except ProviderError:
+                raise
             except Exception as e:
                 self._ib = None
                 self._connected = False
