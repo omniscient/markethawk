@@ -2,6 +2,7 @@ import React from 'react';
 import { Activity, AlertCircle, Info, ShieldAlert } from 'lucide-react';
 import { format } from 'date-fns';
 import Ticker from './Ticker';
+import ReviewControls from './ReviewControls';
 import { ScannerEvent } from '../api/scanner';
 
 interface RecentEventsProps {
@@ -61,9 +62,10 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
       <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-gray-400 border-b border-gray-700">
         <div className="col-span-2">Ticker</div>
         <div className="col-span-2">Date</div>
-        <div className="col-span-5">Summary</div>
+        <div className="col-span-4">Summary</div>
         <div className="col-span-2">Severity</div>
         <div className="col-span-1">Details</div>
+        <div className="col-span-1">Review</div>
       </div>
 
       {displayEvents.map((event) => (
@@ -80,7 +82,7 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
             {format(new Date(event.event_date.includes('T') ? event.event_date : `${event.event_date}T00:00:00`), 'MMM d')}
           </div>
 
-          <div className="col-span-5">
+          <div className="col-span-4">
             <p className="text-sm text-gray-200 truncate" title={event.summary}>
               {event.summary || `${event.scanner_type.replace(/_/g, ' ')} detected`}
             </p>
@@ -101,6 +103,13 @@ const RecentEvents: React.FC<RecentEventsProps> = ({
               {Object.values(event.criteria_met || {}).filter(Boolean).length}/
               {Object.values(event.criteria_met || {}).length}
             </span>
+          </div>
+
+          <div className="col-span-1 flex items-center justify-center">
+            <ReviewControls
+              eventUuid={event.uuid}
+              latestReview={event.latest_review ?? null}
+            />
           </div>
         </div>
       ))}
