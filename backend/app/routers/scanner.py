@@ -7,7 +7,7 @@ from typing import List, Optional
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import cast
 from sqlalchemy.dialects.postgresql import JSONB
 import sqlalchemy as sa
@@ -353,7 +353,7 @@ def get_scanner_results(
     db: Session = Depends(get_db),
 ):
     """Get scanner results with filtering."""
-    query = db.query(ScannerEvent)
+    query = db.query(ScannerEvent).options(joinedload(ScannerEvent.reviews))
 
     if ticker:
         query = query.filter(ScannerEvent.ticker == ticker.upper())
