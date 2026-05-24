@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Card from './ui/Card';
 import Ticker from './Ticker';
+import ReviewControls from './ReviewControls';
 import { ScannerEvent, ScannerDiagnostics } from '../api/scanner';
 
 interface ScannerResultsProps {
@@ -215,6 +216,7 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                   currentOrder={sortOrder}
                   onSort={onSort}
                 />
+                <th className="py-3 px-4">Review</th>
               </tr>
             </thead>
             <tbody>
@@ -257,10 +259,16 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                       {event.severity}
                     </span>
                   </td>
-                  <td className="py-4 px-4 bg-gray-800 rounded-r-xl">
+                  <td className="py-4 px-4 bg-gray-800">
                     <ScoreQualityBadge
                       score={event.signal_quality_score ?? null}
                       criteriaMet={event.criteria_met}
+                    />
+                  </td>
+                  <td className="py-4 px-4 bg-gray-800 rounded-r-xl">
+                    <ReviewControls
+                      eventUuid={event.uuid}
+                      latestReview={event.latest_review ?? null}
                     />
                   </td>
                 </tr>
