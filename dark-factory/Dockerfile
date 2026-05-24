@@ -67,7 +67,7 @@ RUN mkdir -p /workspace
 COPY dark-factory/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY dark-factory/scheduler.sh /opt/dark-factory/scheduler.sh
 COPY dark-factory/docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
-COPY dark-factory/seed_preview.sql /opt/dark-factory/seed_preview.sql
+COPY dark-factory/seed/ /opt/dark-factory/seed/
 COPY .claude/skills/refinement/ /opt/refinement-skills/
 RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
 

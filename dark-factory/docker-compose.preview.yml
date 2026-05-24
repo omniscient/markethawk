@@ -98,9 +98,12 @@ services:
   seed:
     image: postgres:15-alpine
     volumes:
-      - ./seed_preview.sql:/seed.sql:ro
+      - ./seed:/seed:ro
     entrypoint: >
-      sh -c "PGPASSWORD=preview_password psql -h postgres -U postgres -d stockscanner -f /seed.sql && echo 'Seed data loaded'"
+      sh -c "for f in /seed/*.sql; do
+        echo \"Running $$f...\";
+        PGPASSWORD=preview_password psql -h postgres -U postgres -d stockscanner -f \"$$f\";
+      done && echo 'All seed modules loaded'"
     depends_on:
       backend:
         condition: service_healthy
