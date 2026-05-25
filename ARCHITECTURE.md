@@ -357,3 +357,25 @@ sequenceDiagram
     UI->>API: POST /universe/{id}/refresh-stats  (per completed universe)
     UI->>UI: Invalidate React Query cache → reload universe list
 ```
+
+## Test Architecture
+
+### Test infrastructure (`backend/tests/`)
+
+The test suite uses **pytest** with a transaction-rollback isolation model:
+
+- **`tests/conftest.py`** — session-scoped `db_engine` creates the schema once; function-scoped `db` fixture wraps each test in a `connection.begin()` outer transaction and calls `session.begin_nested()` (SAVEPOINT). An `after_transaction_end` event listener restarts the savepoint after each `session.commit()`, so route handlers that call `db.commit()` emit `RELEASE SAVEPOINT` instead of a real `COMMIT`. The outer `transaction.rollback()` in teardown undoes everything.
+
+- **`tests/api/conftest.py`** — `autouse` fixture that wires `app.dependency_overrides[get_db] = lambda: db` for every API test, ensuring all route handlers use the test's isolated session.
+
+### Coverage configuration (`backend/pyproject.toml`)
+
+Coverage is measured with **pytest-cov** with a **60% minimum gate**. `app/tasks.py` (Celery workers requiring a broker) and `app/services/futures_data.py` (requiring live IBKR) are excluded from measurement — both are tested via integration QA rather than unit tests.
+
+### Test layers
+
+| Layer | Location | Isolation strategy |
+|-------|----------|--------------------|
+| Router integration | `tests/api/` | DI override → test session; SAVEPOINT rollback |
+| Service unit | `tests/services/` | `db.flush()` only, or `MagicMock`/`fakeredis` for external deps |
+| Pure-function | `tests/services/test_*_helpers.py` | No DB or external deps |

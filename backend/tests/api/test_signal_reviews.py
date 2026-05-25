@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.core.database import get_db
 from app.models.scanner_event import ScannerEvent
 from app.models.signal_review import SignalReview
 from tests.fixtures.scanner import seed_scanner_events
@@ -22,11 +21,9 @@ def _get_first_event(db: Session) -> ScannerEvent:
 
 def test_create_confirmed_review(db: Session):
     event = _get_first_event(db)
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
         "verdict": "confirmed",
     })
-    app.dependency_overrides.clear()
     assert response.status_code == 201
     data = response.json()
     assert data["verdict"] == "confirmed"
@@ -35,65 +32,53 @@ def test_create_confirmed_review(db: Session):
 
 def test_create_uncertain_review(db: Session):
     event = _get_first_event(db)
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
         "verdict": "uncertain",
         "notes": "Need to check chart",
     })
-    app.dependency_overrides.clear()
     assert response.status_code == 201
     assert response.json()["verdict"] == "uncertain"
 
 
 def test_create_rejected_review_requires_reason(db: Session):
     event = _get_first_event(db)
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
         "verdict": "rejected",
     })
-    app.dependency_overrides.clear()
     assert response.status_code == 422
 
 
 def test_create_rejected_review_with_reason(db: Session):
     event = _get_first_event(db)
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
         "verdict": "rejected",
         "reject_reason": "noise",
         "notes": "Volume spike was a data artifact",
     })
-    app.dependency_overrides.clear()
     assert response.status_code == 201
     assert response.json()["reject_reason"] == "noise"
 
 
 def test_create_review_invalid_uuid(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post("/api/scanner/events/not-a-uuid/review", json={
         "verdict": "confirmed",
     })
-    app.dependency_overrides.clear()
     assert response.status_code == 400
 
 
 def test_create_review_nonexistent_event(db: Session):
     fake_uuid = str(uuid_lib.uuid4())
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post(f"/api/scanner/events/{fake_uuid}/review", json={
         "verdict": "confirmed",
     })
-    app.dependency_overrides.clear()
     assert response.status_code == 404
 
 
 def test_create_review_invalid_verdict(db: Session):
     event = _get_first_event(db)
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
         "verdict": "maybe",
     })
-    app.dependency_overrides.clear()
     assert response.status_code == 422
 
 
@@ -103,9 +88,7 @@ def test_list_reviews_by_scanner_type(db: Session):
     db.add(review)
     db.flush()
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get(f"/api/scanner/events/reviews?scanner_type={event.scanner_type}")
-    app.dependency_overrides.clear()
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
@@ -119,9 +102,7 @@ def test_list_reviews_liquidity_hunt_alias(db: Session):
     db.add(review)
     db.flush()
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/scanner/events/reviews?scanner_type=liquidity_hunt")
-    app.dependency_overrides.clear()
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
@@ -133,18 +114,14 @@ def test_list_reviews_filter_by_verdict(db: Session):
     db.add(SignalReview(scanner_event_id=event.id, verdict="rejected", reject_reason="noise"))
     db.flush()
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get(f"/api/scanner/events/reviews?scanner_type={event.scanner_type}&verdict=confirmed")
-    app.dependency_overrides.clear()
     assert response.status_code == 200
     data = response.json()
     assert all(r["verdict"] == "confirmed" for r in data)
 
 
 def test_list_reviews_missing_scanner_type(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/scanner/events/reviews")
-    app.dependency_overrides.clear()
     assert response.status_code == 422
 
 
@@ -155,9 +132,7 @@ def test_review_stats(db: Session):
     db.add(SignalReview(scanner_event_id=events[2].id, verdict="uncertain"))
     db.flush()
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/scanner/reviews/stats")
-    app.dependency_overrides.clear()
     assert response.status_code == 200
     data = response.json()
     assert data["total_events"] > 0
@@ -174,9 +149,7 @@ def test_review_stats_with_scanner_type_filter(db: Session):
         db.add(SignalReview(scanner_event_id=e.id, verdict="confirmed"))
     db.flush()
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/scanner/reviews/stats?scanner_type=pre_market_volume_spike")
-    app.dependency_overrides.clear()
     assert response.status_code == 200
     data = response.json()
     assert data["reviewed_count"] > 0
@@ -188,9 +161,7 @@ def test_scanner_results_include_latest_review(db: Session):
     db.add(SignalReview(scanner_event_id=event.id, verdict="confirmed"))
     db.flush()
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get(f"/api/scanner/results?scanner_type={event.scanner_type}")
-    app.dependency_overrides.clear()
     assert response.status_code == 200
     data = response.json()
     reviewed = [e for e in data if e.get("latest_review") is not None]

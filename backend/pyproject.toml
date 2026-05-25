@@ -1,0 +1,20 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=60"
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "app/main.py",
+    "app/migrations/*",
+    # Celery background tasks — require a running broker; tested via integration QA
+    "app/tasks.py",
+    # Requires live IBKR connection — tested via manual QA and docker-status agent
+    "app/services/futures_data.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]

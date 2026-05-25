@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.core.database import get_db
 from tests.fixtures.providers import mock_futures_provider  # noqa: F401
 from tests.fixtures.futures import (
     seed_futures_contracts,
@@ -29,9 +28,7 @@ client = TestClient(app)
 def test_contracts_returns_correct_shape(db: Session):
     seed_futures_contracts(db, symbol="ES", exchange="CME", count=2)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/futures/contracts/ES")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -48,9 +45,7 @@ def test_contracts_returns_correct_shape(db: Session):
 def test_contracts_symbol_is_case_insensitive(db: Session):
     seed_futures_contracts(db, symbol="NQ", exchange="CME", count=1)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/futures/contracts/nq")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -59,9 +54,7 @@ def test_contracts_symbol_is_case_insensitive(db: Session):
 
 
 def test_contracts_empty_db_returns_zero(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/futures/contracts/ZZ")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -84,9 +77,7 @@ def test_rollovers_returns_correct_shape(db: Session):
         to_contract="20250620",
     )
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/futures/rollovers/ES")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -101,9 +92,7 @@ def test_rollovers_returns_correct_shape(db: Session):
 
 
 def test_rollovers_empty_db_returns_zero(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/futures/rollovers/ZZ")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
