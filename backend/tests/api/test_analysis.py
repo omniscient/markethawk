@@ -77,7 +77,7 @@ def test_trigger_analysis_returns_202(db: Session):
     mock_result = type("R", (), {"id": "test-task-123"})()
     with patch("app.tasks.analyze_signal_features") as mock_task:
         mock_task.delay.return_value = mock_result
-            response = client.post("/api/outcomes/analyze")
+        response = client.post("/api/outcomes/analyze")
         assert response.status_code == 202
     data = response.json()
     assert "task_id" in data
