@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from app.main import app
-from app.core.database import get_db
 
 client = TestClient(app)
 
@@ -15,11 +14,9 @@ def _make_db_mock(delete_count: int) -> MagicMock:
 
 def test_clear_events_returns_count():
     db = _make_db_mock(delete_count=2)
-    app.dependency_overrides[get_db] = lambda: db
 
     response = client.delete("/api/scanner/events/AAPL")
 
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     body = response.json()
@@ -30,11 +27,9 @@ def test_clear_events_returns_count():
 
 def test_clear_events_zero_when_none_exist():
     db = _make_db_mock(delete_count=0)
-    app.dependency_overrides[get_db] = lambda: db
 
     response = client.delete("/api/scanner/events/ZZZZ")
 
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json()["deleted_count"] == 0
@@ -45,11 +40,9 @@ def test_clear_events_does_not_affect_other_tickers():
     from app.models import ScannerEvent
 
     db = _make_db_mock(delete_count=1)
-    app.dependency_overrides[get_db] = lambda: db
 
     client.delete("/api/scanner/events/TSLA")
 
-    app.dependency_overrides.clear()
 
     # The filter must be called with the ScannerEvent.ticker == "TSLA" expression.
     # We verify filter was called (not called with "MSFT" or nothing).
@@ -59,11 +52,9 @@ def test_clear_events_does_not_affect_other_tickers():
 
 def test_clear_events_normalises_ticker_case():
     db = _make_db_mock(delete_count=1)
-    app.dependency_overrides[get_db] = lambda: db
 
     response = client.delete("/api/scanner/events/amzn")
 
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json()["ticker"] == "AMZN"

@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.core.database import get_db
 from tests.fixtures.core import seed_universes, seed_tickers, seed_monitored_stocks
 
 client = TestClient(app)
@@ -22,9 +21,7 @@ client = TestClient(app)
 def test_list_returns_only_active_universes(db: Session):
     seed_universes(db)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/list")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -36,9 +33,7 @@ def test_list_returns_only_active_universes(db: Session):
 
 
 def test_list_returns_empty_when_no_universes(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/list")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json() == []
@@ -47,9 +42,7 @@ def test_list_returns_empty_when_no_universes(db: Session):
 def test_list_response_shape(db: Session):
     seed_universes(db)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/list")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     universe = response.json()[0]
@@ -60,9 +53,7 @@ def test_list_response_shape(db: Session):
 def test_list_include_stats_false_returns_zero_counts(db: Session):
     seed_universes(db)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/list?include_stats=false")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     for u in response.json():
@@ -82,9 +73,7 @@ def test_create_universe_returns_new_record(db: Session):
         "criteria": {"sector": "tech"},
     }
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post("/api/universe/create", json=payload)
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -99,9 +88,7 @@ def test_create_universe_returns_new_record(db: Session):
 def test_create_universe_without_description(db: Session):
     payload = {"name": "Minimal Universe", "criteria": {}}
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post("/api/universe/create", json=payload)
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json()["name"] == "Minimal Universe"
@@ -117,9 +104,7 @@ def test_update_universe_name(db: Session):
     universes = seed_universes(db)
     uid = universes[0].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.put(f"/api/universe/{uid}", json={"name": "Updated Name"})
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json()["name"] == "Updated Name"
@@ -130,12 +115,10 @@ def test_update_universe_description_and_criteria(db: Session):
     universes = seed_universes(db)
     uid = universes[1].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.put(
         f"/api/universe/{uid}",
         json={"description": "New desc", "criteria": {"sector": "pharma"}},
     )
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -144,9 +127,7 @@ def test_update_universe_description_and_criteria(db: Session):
 
 
 def test_update_universe_not_found(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.put("/api/universe/99999", json={"name": "Ghost"})
-    app.dependency_overrides.clear()
 
     assert response.status_code == 404
 
@@ -160,26 +141,20 @@ def test_delete_universe_soft_deletes(db: Session):
     universes = seed_universes(db)
     uid = universes[0].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.delete(f"/api/universe/{uid}")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert "deleted" in response.json()["message"].lower()
 
     # Confirm it no longer appears in list
-    app.dependency_overrides[get_db] = lambda: db
     list_response = client.get("/api/universe/list")
-    app.dependency_overrides.clear()
 
     ids = [u["id"] for u in list_response.json()]
     assert uid not in ids
 
 
 def test_delete_universe_not_found(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.delete("/api/universe/99999")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 404
 
@@ -194,9 +169,7 @@ def test_get_universe_stocks_returns_seeded_stocks(db: Session):
     seed_monitored_stocks(db, universes)
     uid = universes[0].id  # Tech Stocks: AAPL, MSFT, NVDA
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get(f"/api/universe/{uid}/stocks")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     tickers = {s["ticker"] for s in response.json()}
@@ -207,9 +180,7 @@ def test_get_universe_stocks_empty_when_none(db: Session):
     universes = seed_universes(db)
     uid = universes[0].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get(f"/api/universe/{uid}/stocks")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json() == []
@@ -220,9 +191,7 @@ def test_get_universe_stocks_response_shape(db: Session):
     seed_monitored_stocks(db, universes)
     uid = universes[0].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get(f"/api/universe/{uid}/stocks")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     stock = response.json()[0]
@@ -236,9 +205,7 @@ def test_get_universe_stocks_response_shape(db: Session):
 
 
 def test_refresh_universe_not_found(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post("/api/universe/99999/refresh")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 404
 
@@ -247,9 +214,7 @@ def test_refresh_universe_returns_completed_status(db: Session):
     universes = seed_universes(db)
     uid = universes[0].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post(f"/api/universe/{uid}/refresh")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -267,9 +232,7 @@ def test_by_ticker_returns_universes_containing_ticker(db: Session):
     universes = seed_universes(db)
     seed_tickers(db, universes)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/by-ticker/AAPL")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     names = [u["name"] for u in response.json()]
@@ -281,9 +244,7 @@ def test_by_ticker_excludes_inactive_universes(db: Session):
     universes = seed_universes(db)
     seed_tickers(db, universes)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/by-ticker/AAPL")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     names = [u["name"] for u in response.json()]
@@ -293,9 +254,7 @@ def test_by_ticker_excludes_inactive_universes(db: Session):
 def test_by_ticker_returns_empty_for_unknown_ticker(db: Session):
     seed_universes(db)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/by-ticker/ZZZZ")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json() == []

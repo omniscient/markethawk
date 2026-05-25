@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.core.database import get_db
 from tests.fixtures.alerts import seed_alert_rules, seed_alert_delivery_logs
 
 client = TestClient(app)
@@ -20,9 +19,7 @@ client = TestClient(app)
 
 
 def test_stats_returns_correct_shape(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/stats")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -33,9 +30,7 @@ def test_stats_returns_correct_shape(db: Session):
 def test_stats_counts_active_rules(db: Session):
     seed_alert_rules(db)  # 3 active, 1 inactive
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/stats")
-    app.dependency_overrides.clear()
 
     data = response.json()
     assert data["active_rules"] == 3
@@ -46,9 +41,7 @@ def test_stats_delivery_rate_reflects_sent_vs_failed(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)  # 4 sent, 2 failed out of 6 total
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/stats")
-    app.dependency_overrides.clear()
 
     data = response.json()
     # 4 sent / 6 total = 66.7%
@@ -56,9 +49,7 @@ def test_stats_delivery_rate_reflects_sent_vs_failed(db: Session):
 
 
 def test_stats_empty_db_returns_100_delivery_rate(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/stats")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json()["delivery_rate"] == 100.0
@@ -72,9 +63,7 @@ def test_stats_empty_db_returns_100_delivery_rate(db: Session):
 def test_list_rules_returns_all_rules(db: Session):
     seed_alert_rules(db)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/rules")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -85,9 +74,7 @@ def test_list_rules_returns_all_rules(db: Session):
 
 
 def test_list_rules_empty_returns_empty_list(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/rules")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json() == []
@@ -96,9 +83,7 @@ def test_list_rules_empty_returns_empty_list(db: Session):
 def test_list_rules_response_shape(db: Session):
     seed_alert_rules(db)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/rules")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     rule = response.json()[0]
@@ -114,9 +99,7 @@ def test_list_rules_ordered_newest_first(db: Session):
     rules = seed_alert_rules(db)
     last_created_name = rules[-1].name  # last inserted = most recently created
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/rules")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json()[0]["name"] == last_created_name
@@ -137,9 +120,7 @@ def test_create_rule_returns_201_and_persists(db: Session):
         "channel_config": {},
     }
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post("/api/alerts/rules", json=payload)
-    app.dependency_overrides.clear()
 
     assert response.status_code == 201
     data = response.json()
@@ -152,9 +133,7 @@ def test_create_rule_returns_201_and_persists(db: Session):
 
 
 def test_create_rule_applies_defaults(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.post("/api/alerts/rules", json={})
-    app.dependency_overrides.clear()
 
     assert response.status_code == 201
     data = response.json()
@@ -168,10 +147,8 @@ def test_create_rule_applies_defaults(db: Session):
 def test_create_rule_appears_in_list(db: Session):
     payload = {"name": "Discoverable Rule"}
 
-    app.dependency_overrides[get_db] = lambda: db
     client.post("/api/alerts/rules", json=payload)
     list_response = client.get("/api/alerts/rules")
-    app.dependency_overrides.clear()
 
     names = [r["name"] for r in list_response.json()]
     assert "Discoverable Rule" in names
@@ -186,9 +163,7 @@ def test_update_rule_name(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.patch(f"/api/alerts/rules/{rule_id}", json={"name": "Renamed Rule"})
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json()["name"] == "Renamed Rule"
@@ -199,9 +174,7 @@ def test_update_rule_toggle_active(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id  # starts active
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.patch(f"/api/alerts/rules/{rule_id}", json={"is_active": False})
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json()["is_active"] is False
@@ -211,12 +184,10 @@ def test_update_rule_channels(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[1].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.patch(
         f"/api/alerts/rules/{rule_id}",
         json={"channels": ["webhook"], "channel_config": {"webhook_url": "https://example.com/hook"}},
     )
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -225,9 +196,7 @@ def test_update_rule_channels(db: Session):
 
 
 def test_update_rule_not_found(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.patch("/api/alerts/rules/99999", json={"name": "Ghost"})
-    app.dependency_overrides.clear()
 
     assert response.status_code == 404
 
@@ -241,9 +210,7 @@ def test_delete_rule_returns_204(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.delete(f"/api/alerts/rules/{rule_id}")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 204
 
@@ -252,19 +219,15 @@ def test_delete_rule_removes_from_list(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id
 
-    app.dependency_overrides[get_db] = lambda: db
     client.delete(f"/api/alerts/rules/{rule_id}")
     list_response = client.get("/api/alerts/rules")
-    app.dependency_overrides.clear()
 
     ids = [r["id"] for r in list_response.json()]
     assert rule_id not in ids
 
 
 def test_delete_rule_not_found(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.delete("/api/alerts/rules/99999")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 404
 
@@ -278,9 +241,7 @@ def test_list_logs_returns_seeded_entries(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/logs")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -288,9 +249,7 @@ def test_list_logs_returns_seeded_entries(db: Session):
 
 
 def test_list_logs_empty_returns_empty_list(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/logs")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json() == []
@@ -300,9 +259,7 @@ def test_list_logs_response_shape(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/logs")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     log = response.json()[0]
@@ -314,9 +271,7 @@ def test_list_logs_ordered_newest_first(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)  # first entry has newest delivered_at
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/logs")
-    app.dependency_overrides.clear()
 
     data = response.json()
     assert data[0]["ticker"] == "AAPL"  # most recently delivered
@@ -327,9 +282,7 @@ def test_list_logs_limit_param(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)  # 6 entries
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/logs?limit=3")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert len(response.json()) == 3
@@ -339,9 +292,7 @@ def test_list_logs_includes_failed_entries(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/alerts/logs")
-    app.dependency_overrides.clear()
 
     statuses = {log["status"] for log in response.json()}
     assert "sent" in statuses

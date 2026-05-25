@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.core.database import get_db
 from tests.fixtures.analysis import seed_completed_analysis_run
 
 client = TestClient(app)
@@ -15,17 +14,13 @@ client = TestClient(app)
 # ---------------------------------------------------------------------------
 
 def test_correlations_returns_404_when_no_run(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/outcomes/correlations")
-    app.dependency_overrides.clear()
     assert response.status_code == 404
 
 
 def test_correlations_returns_correct_shape(db: Session):
     seed_completed_analysis_run(db)
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/outcomes/correlations")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -40,9 +35,7 @@ def test_correlations_returns_correct_shape(db: Session):
 
 def test_correlations_filters_by_scanner_type(db: Session):
     seed_completed_analysis_run(db)
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/outcomes/correlations?scanner_type=nonexistent_type")
-    app.dependency_overrides.clear()
     assert response.status_code == 404
 
 
@@ -51,17 +44,13 @@ def test_correlations_filters_by_scanner_type(db: Session):
 # ---------------------------------------------------------------------------
 
 def test_latest_returns_404_when_no_run(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/outcomes/analysis/latest")
-    app.dependency_overrides.clear()
     assert response.status_code == 404
 
 
 def test_latest_returns_feature_weights_and_clusters(db: Session):
     seed_completed_analysis_run(db)
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/outcomes/analysis/latest")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()
@@ -88,9 +77,7 @@ def test_trigger_analysis_returns_202(db: Session):
     mock_result = type("R", (), {"id": "test-task-123"})()
     with patch("app.tasks.analyze_signal_features") as mock_task:
         mock_task.delay.return_value = mock_result
-        app.dependency_overrides[get_db] = lambda: db
-        response = client.post("/api/outcomes/analyze")
-        app.dependency_overrides.clear()
-    assert response.status_code == 202
+            response = client.post("/api/outcomes/analyze")
+        assert response.status_code == 202
     data = response.json()
     assert "task_id" in data

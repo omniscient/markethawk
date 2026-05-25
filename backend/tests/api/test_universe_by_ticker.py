@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from app.models import StockUniverse, StockUniverseTicker
-from app.core.database import get_db
 
 client = TestClient(app)
 
@@ -27,9 +26,7 @@ def test_returns_universes_for_ticker(db: Session):
     _seed(db, "Momentum", "AAPL")
     _seed(db, "Tech Picks", "AAPL")
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/by-ticker/AAPL")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     names = [u["name"] for u in response.json()]
@@ -38,9 +35,7 @@ def test_returns_universes_for_ticker(db: Session):
 
 
 def test_returns_empty_for_unknown_ticker(db: Session):
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/by-ticker/ZZZZ")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.json() == []
@@ -50,9 +45,7 @@ def test_excludes_inactive_universes(db: Session):
     _seed(db, "Active Universe", "MSFT", is_active=True)
     _seed(db, "Inactive Universe", "MSFT", is_active=False)
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/by-ticker/MSFT")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     names = [u["name"] for u in response.json()]
@@ -63,9 +56,7 @@ def test_excludes_inactive_universes(db: Session):
 def test_ticker_lookup_is_case_insensitive(db: Session):
     _seed(db, "Mixed Case", "NVDA")
 
-    app.dependency_overrides[get_db] = lambda: db
     response = client.get("/api/universe/by-ticker/nvda")
-    app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert len(response.json()) == 1
