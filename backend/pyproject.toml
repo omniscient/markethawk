@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=60"
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/main.py", "app/migrations/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]
