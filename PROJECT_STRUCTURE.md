@@ -88,7 +88,29 @@ MarketHawk/
 │   │   ├── main.py                     # FastAPI app factory; global error handler; router mounts
 │   │   └── tasks.py                    # All Celery task definitions
 │   ├── tests/
-│   │   └── api/                        # Pytest API integration tests
+│   │   ├── conftest.py                 # Session-scoped engine + function-scoped db fixture (SAVEPOINT isolation)
+│   │   ├── api/                        # Router integration tests (DI override via tests/api/conftest.py)
+│   │   │   ├── conftest.py             # Autouse fixture: app.dependency_overrides[get_db] = test session
+│   │   │   ├── test_alerts.py          # Alert rule CRUD + delivery log endpoints
+│   │   │   ├── test_auto_trading.py    # Strategy CRUD, order lifecycle, stats, config
+│   │   │   ├── test_health.py          # /api/health liveness check
+│   │   │   ├── test_journal.py         # Journal trade and entry endpoints
+│   │   │   ├── test_outcomes.py        # Outcome scorecard and snapshot endpoints
+│   │   │   ├── test_scanner.py         # Scanner run, results, history endpoints
+│   │   │   ├── test_stocks.py          # Historical OHLCV endpoint
+│   │   │   ├── test_universe.py        # Universe CRUD endpoints
+│   │   │   ├── test_watchlist.py       # Active watchlist CRUD (soft-limit enforcement)
+│   │   │   └── test_live_data.py       # Skipped (requires live IBKR)
+│   │   └── services/                   # Service-layer unit / integration tests
+│   │       ├── test_alert_service.py   # AlertRuleService: matching, cooldown
+│   │       ├── test_auto_trade_service.py  # AutoTradeExecutor: position math, guards, paper/live paths
+│   │       ├── test_chart_indicators.py    # ChartIndicatorsService: pure DataFrame transforms
+│   │       ├── test_data_quality_helpers.py # _score_to_grade, _grade_color, weekday counting
+│   │       ├── test_discovery_service.py   # DiscoveryService with mocked Polygon client
+│   │       ├── test_journal_service.py     # JournalService CRUD operations
+│   │       ├── test_normalization_helpers.py # _parse_date, _to_date_str round-trips
+│   │       ├── test_outcome_service.py     # OutcomeService: snapshot creation and capture
+│   │       └── test_split_adjustment.py    # SplitAdjustmentService: price-factor math
 │   ├── alembic.ini                     # Alembic configuration (points to DATABASE_URL)
 │   ├── requirements.txt                # Python dependencies
 │   └── Dockerfile                      # Backend container image
