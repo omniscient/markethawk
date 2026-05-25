@@ -4,7 +4,7 @@ import logging as _logging
 from typing import Generator
 from contextlib import contextmanager
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from testcontainers.postgres import PostgresContainer
 
@@ -56,6 +56,17 @@ def db(db_engine) -> Generator:
     connection = db_engine.connect()
     transaction = connection.begin()
     session = Session(bind=connection)
+    # Create a SAVEPOINT so session.commit() in route handlers releases the
+    # savepoint rather than committing to the real database. The event listener
+    # restarts a fresh SAVEPOINT after each release so subsequent commits within
+    # the same test also stay isolated. The outer transaction.rollback() undoes
+    # everything when the test finishes.
+    session.begin_nested()
+
+    @event.listens_for(session, "after_transaction_end")
+    def _restart_savepoint(session, transaction):
+        if transaction.nested and not transaction._parent.nested:
+            session.begin_nested()
 
     yield session
 
