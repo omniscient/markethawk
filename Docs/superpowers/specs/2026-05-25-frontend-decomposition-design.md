@@ -6,7 +6,7 @@
 
 ## Overview
 
-Five frontend pages exceed 680 LOC and mix state management, data fetching, business logic, and presentation in a single file. This refactor extracts each page into a directory of co-located panels and hooks so that a focused modification (e.g. "change how scan results display") requires reading ~200 LOC rather than 800+. No visible behaviour changes; this is a pure structural refactor.
+Five frontend pages exceed 680 LOC and mix state management, data fetching, business logic, and presentation in a single file. This refactor extracts each page into a directory of co-located panels and hooks so that a focused modification (e.g. "change how scan results display") requires reading ~200 LOC rather than 800+. No visible behaviour changes; this is a pure structural refactor delivered in a single PR.
 
 ## Problem
 
@@ -30,8 +30,8 @@ From the issue and Q&A:
 4. No file in the output exceeds ~250 LOC (target; hard limit 300 LOC).
 5. `npx tsc --noEmit` passes after every per-page extraction before moving to the next.
 6. Browser smoke-test each page before committing: confirm it renders and its primary interactions work.
-7. Delivered in two PRs: PR 1 = Scanner only (establishes the pattern); PR 2 = the remaining four pages.
-8. Inline sub-components in `AutoTrading.tsx` (`StatusBadge`, `StrategyRow`, `NumberField`, `ToggleField`, etc.) are treated as page-private helpers and co-located in `AutoTrading/` — not promoted to `components/`.
+7. All five pages are delivered in a single PR.
+8. Inline sub-components in `AutoTrading.tsx` (`StatusBadge`, `StrategyRow`, `NumberField`, `ToggleField`, etc.) are treated as page-private helpers and co-located in `AutoTrading/components.tsx` — not promoted to `components/`.
 9. Scope is the five named page files only. `UniverseFormModal.tsx` (492 LOC) and `QualityReportModal.tsx` (753 LOC) are out of scope.
 
 ## Architecture
@@ -41,17 +41,17 @@ From the issue and Q&A:
 ```
 pages/
   Scanner/
-    index.tsx           # Shell: layout + query orchestration only; delegates to panels
-    ScanConfigPanel.tsx # Universe selector, date range, scan trigger
-    LiveProgressPanel.tsx # WebSocket progress + status display
-    ResultsPanel.tsx    # Table, sorting, review controls
+    index.tsx              # Shell: layout + query orchestration only; delegates to panels
+    ScanConfigPanel.tsx    # Universe selector, date range, scan trigger
+    LiveProgressPanel.tsx  # WebSocket progress + status display
+    ResultsPanel.tsx       # Table, sorting, review controls
   AutoTrading/
     index.tsx
     StrategyPanel.tsx
     OrdersPanel.tsx
     AccountPanel.tsx
     ConfigPanel.tsx
-    components.tsx      # Page-private: StatusBadge, StrategyRow, NumberField, ToggleField, etc.
+    components.tsx         # Page-private: StatusBadge, StrategyRow, NumberField, ToggleField, etc.
   Alerts/
     index.tsx
     AlertRulesPanel.tsx
@@ -67,8 +67,8 @@ pages/
     WatchlistTable.tsx
     AlertBadges.tsx
 hooks/
-  useScannerState.ts    # Extracted: 15 useState + localStorage + WS (was inline in Scanner.tsx)
-  useWatchlistLive.ts   # Extracted: 206 LOC WS hook (was inline in ActiveWatchlist.tsx)
+  useScannerState.ts       # Extracted: 15 useState + localStorage persistence + WS ref
+  useWatchlistLive.ts      # Extracted: 206 LOC WS hook (was inline in ActiveWatchlist.tsx)
 ```
 
 ### Panel design rule
@@ -83,12 +83,11 @@ Panels own:
 - Presentation and user interactions for their domain
 - No direct API calls — receive data and callbacks via props
 
-### PR 1 — Scanner (template PR)
+### Single PR — all five pages
 
-Purpose: establish the directory/panel/hook pattern that PR 2 will follow.
+All pages are extracted in one PR. Recommended implementation order within the PR: Scanner first (establishes the directory/panel/hook pattern), then AutoTrading (largest, most benefit), then Alerts, StockDetailPage, ActiveWatchlist.
 
-**Files deleted:** `pages/Scanner.tsx`  
-**Files created:**
+**Scanner (830 → ~5 files):**
 
 | File | ~LOC | Responsibility |
 |------|------|----------------|
@@ -100,11 +99,7 @@ Purpose: establish the directory/panel/hook pattern that PR 2 will follow.
 
 `App.tsx` import updates: `import Scanner from './pages/Scanner'` resolves to `pages/Scanner/index.tsx` automatically — no router change needed.
 
-### PR 2 — Remaining four pages
-
-Follow the pattern from PR 1. Order of extraction within the PR: AutoTrading first (largest, most benefit), then Alerts, StockDetailPage, ActiveWatchlist.
-
-**AutoTrading (1,003 → ~5 files):**
+**AutoTrading (1,003 → ~6 files):**
 
 | File | ~LOC | Responsibility |
 |------|------|----------------|
@@ -144,17 +139,17 @@ Follow the pattern from PR 1. Order of extraction within the PR: AutoTrading fir
 
 ## Alternatives Considered
 
-### Option B: Extract to `components/PageName/` rather than `pages/PageName/`
+### Option A: Extract to `components/PageName/` rather than `pages/PageName/`
 
 The existing `components/` directory contains shared components (`ScannerResults`, `ScannerConfig`, `SignalReviewStats`) used by multiple pages. Moving page-private panels there would blur the shared/private distinction. **Rejected** in favour of co-location under `pages/`.
 
-### Option C: One large PR for all five pages
+### Option B: Two-PR split (Scanner first, then remaining four)
 
-Simpler delivery but a 4,000+ LOC PR is hard to review and introduces more risk of cross-page merge conflicts. **Rejected** in favour of the two-PR split.
+Reviewed with the product owner during the first refinement pass. **Rejected** — the owner explicitly prefers a single-shot refactor to deliver all five pages at once and avoid coordination overhead between PRs.
 
-### Option D: Shared utility extraction (NumberField, ToggleField, StatusBadge)
+### Option C: Shared utility extraction (NumberField, ToggleField, StatusBadge)
 
-`NumberField` is hardcoded to `focus:ring-financial-blue` and wired to the `stratForm` pattern; `ToggleField` requires a mandatory `description` prop not used elsewhere. Neither is generic enough to promote. Alerts uses `ToggleRight`/`ToggleLeft` icons inline without this abstraction. **Rejected** — keep page-private per the Q1 rule.
+`NumberField` is hardcoded to `focus:ring-financial-blue` and wired to the `stratForm` pattern; `ToggleField` requires a mandatory `description` prop not used elsewhere. Neither is generic enough to promote. **Rejected** — keep page-private in `AutoTrading/components.tsx`.
 
 ## Open Questions
 
@@ -177,9 +172,9 @@ Simpler delivery but a 4,000+ LOC PR is hard to review and introduces more risk 
 ## Acceptance Criteria
 
 - [ ] All five pages render correctly in the browser after extraction (golden path: load the page, confirm primary interactions work)
-- [ ] `npx tsc --noEmit` passes after each per-page extraction
+- [ ] `npx tsc --noEmit` passes after each per-page extraction within the PR
 - [ ] No file in the output exceeds 300 LOC
 - [ ] `App.tsx` router imports require no changes (directory index resolution)
 - [ ] Existing `components/ScannerResults.tsx`, `ScannerConfig.tsx`, `SignalReviewStats.tsx` are unchanged
 - [ ] `hooks/useScannerState.ts` and `hooks/useWatchlistLive.ts` are new standalone files
-- [ ] PR 1 covers Scanner only; PR 2 covers the remaining four pages
+- [ ] All five pages delivered in a single PR
