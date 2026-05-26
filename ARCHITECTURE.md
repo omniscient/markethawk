@@ -26,6 +26,11 @@ All services run as Docker containers on the `stockscanner-network` bridge netwo
                          │ flower:5555 ──> redis:6379               │
                          │ pgadmin:5050 ──> postgres:5432           │
                          │ seq:5380/5341 ──> seq_data volume        │
+                         │                                          │
+                         │ tweet-monitor:8001 ──> postgres:5432     │
+                         │                    ──> redis:6379        │
+                         │  (Playwright Chromium, triggered by      │
+                         │   celery-beat every 45s via HTTP POST)   │
                          └─────────────────────────────────────────┘
 ```
 
@@ -113,6 +118,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `health.py` | `GET /health` — liveness probe |
 | `system.py` | `/api/system/*` — configuration, status |
 | `outcomes.py` | `/api/outcomes/*` — scorecard, intervals, distribution, edge decay, signals, event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
+| `tweets.py` | `GET /api/tweets/recent` — recent TweetSignals (filter by classification/promoted); `WS /api/tweets/feed` — live WebSocket stream of all new tweet signals from Redis `tweet_signals:all` channel |
 
 ### Database Models (`app/models/`)
 
@@ -140,6 +146,8 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `SignalAnalysisRun` | `signal_analysis_runs` | Anchor table for each statistical analysis execution; stores `correlation_matrix` and `feature_weights` as JSONB, status, event count |
 | `SignalCluster` | `signal_clusters` | One K-means cluster archetype per analysis run; stores centroid, return_profile (per-interval stats), event count, auto-generated label |
 | `SignalReview` | `signal_reviews` | User-submitted verdict (confirmed/rejected/enhanced/uncertain) on a `ScannerEvent`; FK → `scanner_events.id` CASCADE; supports `reject_reason` and `enhance_suggestion` JSONB. Written by `/validate-scanner` skill and frontend ReviewControls. Latest review exposed via `ScannerEvent.latest_review` @property. |
+| `MonitoredAccount` | `monitored_accounts` | X (Twitter) accounts tracked by the tweet-monitor service. Stores `handle`, `platform`, `poll_interval_seconds`, `last_tweet_id` for dedup, and per-account `classification_config` JSONB for keyword overrides. |
+| `TweetSignal` | `tweet_signals` | One row per scraped tweet. Records `classification` (CALLOUT/CELEBRATION/UPDATE/RETWEET/UNKNOWN), `confidence` score, extracted `tickers`/`price_levels` JSONB, `direction`, and `promoted` flag. FK to `scanner_events` when promoted. |
 
 ## Frontend Architecture
 
