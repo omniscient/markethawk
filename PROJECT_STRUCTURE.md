@@ -89,7 +89,7 @@ MarketHawk/
 │   │   │   ├── ibkr.py                 # ib_insync Interactive Brokers provider (futures-only; get_bars/get_snapshots are no-op stubs)
 │   │   │   └── __init__.py
 │   │   ├── main.py                     # FastAPI app factory; global error handler; router mounts
-│   │   └── tasks.py                    # All Celery task definitions
+│   │   └── tasks/                      # Celery task package (sync.py, scanning.py, trading.py, quality.py)
 │   ├── tests/
 │   │   ├── conftest.py                 # Session-scoped engine + function-scoped db fixture (SAVEPOINT isolation)
 │   │   ├── api/                        # Router integration tests (DI override via tests/api/conftest.py)

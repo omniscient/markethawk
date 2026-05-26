@@ -68,7 +68,7 @@ routers/      — FastAPI route handlers (health, scanner, universe, stocks, new
 schemas/      — Pydantic request/response models
 services/     — Business logic (scanner.py, stock_data.py, discovery_service.py, chart_indicators.py)
 providers/    — External API integrations (Polygon, IBKR, base provider interface)
-tasks.py      — Celery background/scheduled tasks
+tasks/        — Celery background/scheduled tasks (sync.py, scanning.py, trading.py, quality.py)
 ```
 
 **Key models**: `ScannerEvent`, `ScannerRun`, `ScannerConfig`, `StockUniverse`, `StockUniverseTicker`, `MonitoredStock`, `StockAggregate`, `FuturesAggregate`, `NewsArticle`, `Trade`

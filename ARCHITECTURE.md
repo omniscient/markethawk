@@ -76,7 +76,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 
 | File | Responsibility |
 |------|---------------|
-| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks.py`. `get_all()` enumerates entries for `GET /api/scanner/types`. |
+| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks/scanning.py`. `get_all()` enumerates entries for `GET /api/scanner/types`. |
 | `pre_market_scan.py` | Self-registers `"pre_market_volume_spike"` in the orchestrator. Delegates to `ScannerService.run_pre_market_scan` (interim; body inlined in Task 8). |
 | `oversold_bounce_scan.py` | Self-registers `"oversold_bounce"` in the orchestrator. Delegates to `ScannerService.run_oversold_bounce_scan` (interim). |
 | `scanner.py` | `ScannerService` — `calculate_day_metrics()`, `_get_batch_enrichment_data()` (3-tuple with ES/NQ context and sector ETF changes), Phase 2a 19-key feature enrichment. `_save_event()` delegates to `alert_service.save_event`. `run_pre_market_scan`/`run_oversold_bounce_scan` accept optional `scanner_run` param; per-ticker domain failures accumulated into `scanner_run.failed_tickers`. |
@@ -281,15 +281,28 @@ The `_sync_loop` polls the DB every 30 seconds. Newly added symbols are subscrib
 
 ## Celery Task Architecture
 
-Defined in `app/tasks.py`, scheduled via `app/core/celery_app.py`:
+Defined in `app/tasks/` (package), scheduled via `app/core/celery_app.py`. All task decorators carry `name='app.tasks.<task_name>'` to preserve Celery string identity; beat schedule strings and `send_task` call sites are unchanged.
 
-| Task | Trigger | Purpose |
-|------|---------|---------|
-| `run_scanner` | Beat schedule / on-demand | Main scan execution |
-| `refresh_universe_stocks` | Beat schedule | Refresh stock data for active universes |
-| `sync_fundamental_data` | Beat schedule (weekly) | Bulk ticker reference sync from Polygon |
-| `update_daily_metrics` | Beat schedule (daily, after close) | Compute and store daily metric snapshots |
-| `analyze_signal_features` | Beat schedule (11:00 UTC weekdays) / on-demand via `POST /api/outcomes/analyze` | Phase 2b statistical discovery: correlation, SHAP feature weights, K-means clustering. Requires ≥500 complete events. Persists results to `signal_analysis_runs` and `signal_clusters`. |
+| Module | Task | Trigger | Purpose |
+|--------|------|---------|---------|
+| `sync.py` | `sync_tickers_batch` | On-demand | Paginated ticker sync from Polygon (recursive chain) |
+| `sync.py` | `sync_ticker_details` | On-demand (chain) | Per-ticker detail crawl with stop-flag support |
+| `sync.py` | `start_details_crawl` | On-demand | Kick off details crawler chain |
+| `sync.py` | `sync_stock_aggregates` | On-demand / Catch-Up | Download OHLCV bars for a ticker and date range |
+| `sync.py` | `sync_futures_aggregates` | On-demand / Catch-Up | Download IBKR futures history for a root symbol |
+| `sync.py` | `sync_stock_splits` | Beat (01:00 UTC daily) | Fetch 180-day splits from Polygon and apply adjustments |
+| `sync.py` | `poll_massive_news` | Beat (weekdays) | Poll Polygon news API per tracked tickers/universes |
+| `sync.py` | `trigger_tweet_monitor` | Beat (every 45s) | HTTP trigger for tweet-monitor microservice |
+| `scanning.py` | `run_universe_scan` | On-demand via `POST /api/scanner/runs` | Full universe scan over a date range with Redis progress |
+| `scanning.py` | `run_range_scan` | On-demand via `POST /api/scanner/scan` | Single-ticker scan over a date range |
+| `scanning.py` | `run_liquidity_hunt_scheduled` | Beat (02:00 UTC weekdays) | Nightly liquidity-hunt scan over all active configs |
+| `scanning.py` | `evaluate_scanner_alerts` | On scanner event create | Match alert rules; dispatch notifications; queue auto-trade |
+| `trading.py` | `execute_auto_trade` | Queued by `evaluate_scanner_alerts` | Run AutoTradeExecutor for a matched rule/event pair |
+| `trading.py` | `submit_approved_order` | On-demand via `POST /api/auto-trading/orders/{id}/approve` | Submit a pending AutoTradeOrder to IBKR |
+| `trading.py` | `poll_auto_trade_fills` | Beat (every minute, weekdays 09–23 UTC) | Poll IBKR fills; simulate paper exits; update Trade records |
+| `quality.py` | `analyze_universe_quality` | On-demand via `POST /api/universe/{id}/quality` | Run data-quality analysis and persist grade/score |
+| `quality.py` | `normalize_universe_quality` | On-demand via `POST /api/universe/{id}/normalize` | Fix data gaps/duplicates and re-run quality analysis |
+| `quality.py` | `analyze_signal_features` | Beat (11:00 UTC weekdays) / on-demand via `POST /api/outcomes/analyze` | Statistical discovery: correlation, SHAP, K-means clustering. Requires ≥500 complete events. |
 
 Redis is used as both the Celery broker and result backend. Worker and beat run as separate containers so the scheduler doesn't compete with task execution.
 
@@ -378,7 +391,7 @@ The test suite uses **pytest** with a transaction-rollback isolation model:
 
 ### Coverage configuration (`backend/pyproject.toml`)
 
-Coverage is measured with **pytest-cov** with a **60% minimum gate**. `app/tasks.py` (Celery workers requiring a broker) and `app/services/futures_data.py` (requiring live IBKR) are excluded from measurement — both are tested via integration QA rather than unit tests.
+Coverage is measured with **pytest-cov** with a **60% minimum gate**. `app/tasks/` (Celery workers requiring a broker) and `app/services/futures_data.py` (requiring live IBKR) are excluded from measurement — both are tested via integration QA rather than unit tests.
 
 ### Test layers
 
