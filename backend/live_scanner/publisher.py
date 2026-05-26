@@ -17,10 +17,8 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
-from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
+from app.core.database import SessionLocal
 from app.models.scanner_event import ScannerEvent
 from app.services.event_helpers import generate_event_summary, compute_event_severity
 from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
@@ -31,10 +29,9 @@ logger = logging.getLogger(__name__)
 
 
 class LivePublisher:
-    def __init__(self, redis_url: str, db_url: str):
+    def __init__(self, redis_url: str):
         self._redis_url = redis_url
         self._redis: aioredis.Redis | None = None
-        self._engine = create_engine(db_url, pool_pre_ping=True)
 
     async def connect(self):
         self._redis = aioredis.from_url(self._redis_url, decode_responses=True)
@@ -43,7 +40,6 @@ class LivePublisher:
     async def close(self):
         if self._redis:
             await self._redis.aclose()
-        self._engine.dispose()
 
     # ------------------------------------------------------------------
     # Tick / bar publishing
@@ -174,12 +170,14 @@ class LivePublisher:
         Synchronous DB write — runs via asyncio.to_thread.
         Returns the new ScannerEvent.id, or None if the event already existed.
         """
+        from sqlalchemy.exc import IntegrityError
+
         today = bar.minute_ts.astimezone(ET).date()
 
         # Fresh config read each event — live scanner is long-running; weights may change
         score = None
         try:
-            with Session(self._engine) as cfg_session:
+            with SessionLocal() as cfg_session:
                 ranker_cfg = load_ranker_config(cfg_session)
             if ranker_cfg.get("enabled") and ranker_cfg.get("weights"):
                 score = compute_signal_quality_score(condition.indicators, ranker_cfg["weights"])
@@ -201,7 +199,7 @@ class LivePublisher:
             signal_quality_score=score,
         )
 
-        with Session(self._engine) as session:
+        with SessionLocal() as session:
             try:
                 session.add(event)
                 session.commit()

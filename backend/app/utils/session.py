@@ -1,26 +1,41 @@
 """Trading session classification utilities."""
 
-from datetime import datetime, time, date, timezone
+from datetime import datetime, date, timezone
 from zoneinfo import ZoneInfo
 
 _ET = ZoneInfo("America/New_York")
 
+_SESSIONS = [
+    ("pre",     4 * 60,       9 * 60 + 30),
+    ("regular", 9 * 60 + 30,  16 * 60),
+    ("post",    16 * 60,       20 * 60),
+]
+
+
+def session_for_ts(ts: datetime) -> str:
+    """Return 'pre', 'regular', 'post', or 'closed' for a UTC or timezone-aware timestamp."""
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    et = ts.astimezone(_ET)
+    m = et.hour * 60 + et.minute
+    for name, start, end in _SESSIONS:
+        if start <= m < end:
+            return name
+    return "closed"
+
+
+def session_total_minutes(session: str) -> float:
+    """Total minutes in a named session (pre=330, regular=390, post=240)."""
+    for name, start, end in _SESSIONS:
+        if name == session:
+            return float(end - start)
+    return 390.0
+
 
 def classify_session(ts_utc: datetime) -> tuple[bool, bool]:
-    """Return (is_pre_market, is_after_market) for a UTC timestamp.
-
-    Session boundaries (US/Eastern):
-      pre-market:   4:00 AM – 9:29 AM
-      regular:      9:30 AM – 4:00 PM  (16:00 bar is the last regular bar)
-      after-market: 4:01 PM – 7:59 PM
-    """
-    if ts_utc.tzinfo is None:
-        ts_utc = ts_utc.replace(tzinfo=timezone.utc)
-    ts_et = ts_utc.astimezone(_ET)
-    h, m = ts_et.hour, ts_et.minute
-    is_pre  = (h >= 4 and h < 9) or (h == 9 and m < 30)
-    is_post = (h == 16 and m >= 1) or (h > 16 and h < 20)
-    return is_pre, is_post
+    """Deprecated. Use session_for_ts() instead. Returns (is_pre, is_post)."""
+    session = session_for_ts(ts_utc)
+    return session == "pre", session == "post"
 
 
 def get_market_now() -> datetime:
