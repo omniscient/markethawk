@@ -8,7 +8,7 @@ omit = [
     "app/main.py",
     "app/migrations/*",
     # Celery background tasks — require a running broker; tested via integration QA
-    "app/tasks.py",
+    "app/tasks/*.py",
     # Requires live IBKR connection — tested via manual QA and docker-status agent
     "app/services/futures_data.py",
 ]
