@@ -87,6 +87,7 @@ services:
       IBKR_HOST: ib-gateway
       IBKR_PORT: 4004
       IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
+      PYTHONDONTWRITEBYTECODE: "1"
       # Alerting & Push Notifications
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
@@ -106,7 +107,7 @@ services:
       ib-gateway:
         condition: service_started
     volumes:
-      - ./backend:/app
+      - ./backend:/app:ro
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -147,6 +148,7 @@ services:
       IBKR_HOST: ib-gateway
       IBKR_PORT: 4004
       IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
+      PYTHONDONTWRITEBYTECODE: "1"
       # Alerting & Push Notifications
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY}
@@ -164,7 +166,7 @@ services:
       ib-gateway:
         condition: service_started
     volumes:
-      - ./backend:/app
+      - ./backend:/app:ro
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -185,6 +187,7 @@ services:
       IBKR_HOST: ib-gateway
       IBKR_PORT: 4004
       IBKR_CLIENT_ID: 5   # dedicated clientId — never shares with backend or Celery
+      PYTHONDONTWRITEBYTECODE: "1"
     depends_on:
       postgres:
         condition: service_healthy
@@ -193,7 +196,7 @@ services:
       ib-gateway:
         condition: service_started
     volumes:
-      - ./backend:/app
+      - ./backend:/app:ro
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -212,13 +215,14 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PYTHONDONTWRITEBYTECODE: "1"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./backend:/app
+      - ./backend:/app:ro
     networks:
       - stockscanner-network
     restart: unless-stopped
