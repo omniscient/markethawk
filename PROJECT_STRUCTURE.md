@@ -82,6 +82,8 @@ MarketHawk/
 │   │   │   ├── event_helpers.py        # ScannerEvent construction and querying utilities
 │   │   │   ├── statistical_discovery.py # Phase 2b: pure-Python statistical analysis (correlation, SHAP, K-means); no DB dependencies
 │   │   │   ├── signal_ranker.py        # Phase 2c: compute_signal_quality_score() + load_ranker_config(); weights from SystemConfig
+│   │   │   ├── universe_orchestrator.py # Celery dispatch + Redis state for universe ops: discover_and_refresh, sync_missing_aggregates, sync_aggregates, queue_quality_analysis, queue_normalization
+│   │   │   ├── universe_export.py      # ZIP streaming for universe aggregate exports; no Celery/Redis; duck-typed request
 │   │   │   └── __init__.py
 │   │   ├── providers/
 │   │   │   ├── base.py                 # BaseDataProvider sync abstract interface: get_bars, get_snapshots, get_ticker_details

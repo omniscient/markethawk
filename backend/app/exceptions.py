@@ -121,3 +121,23 @@ class ProviderError(MarketHawkError):
         self.provider = provider
         self.endpoint = endpoint
         self.status_code = status_code
+
+
+class UniverseNotFoundError(MarketHawkError):
+    """Raised when a universe_id does not exist in the DB."""
+
+    def __init__(self, universe_id: int):
+        super().__init__(
+            f"Universe {universe_id} not found",
+            is_retryable=False,
+            universe_id=universe_id,
+        )
+        self.universe_id = universe_id
+
+
+class UniverseValidationError(MarketHawkError):
+    """Raised when universe state is invalid for the requested operation."""
+
+    def __init__(self, message: str, universe_id: int | None = None):
+        super().__init__(message, is_retryable=False, universe_id=universe_id)
+        self.universe_id = universe_id
