@@ -1676,3 +1676,16 @@ def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
         raise
     finally:
         db.close()
+
+
+@celery_app.task(bind=True, max_retries=2)
+def trigger_tweet_monitor(self):
+    """HTTP trigger for the tweet-monitor microservice (POST /poll)."""
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post("http://tweet-monitor:8000/poll")
+            response.raise_for_status()
+            return response.json()
+    except Exception as exc:
+        logger.warning(f"Tweet monitor poll failed: {exc}")
+        raise self.retry(exc=exc, countdown=10)

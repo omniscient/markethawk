@@ -42,6 +42,8 @@ MarketHawk/
 │   │   │   ├── signal_analysis_run.py  # SignalAnalysisRun — Phase 2b analysis execution anchor; stores correlation_matrix + feature_weights as JSONB
 │   │   │   ├── signal_cluster.py       # SignalCluster — K-means cluster archetype per analysis run; centroid + return_profile
 │   │   │   ├── signal_review.py        # SignalReview — user verdict (confirmed/rejected/enhanced/uncertain) on a ScannerEvent; latest_review @property exposed via ScannerEvent
+│   │   │   ├── monitored_account.py    # MonitoredAccount — X accounts tracked by tweet-monitor; handle, platform, poll_interval_seconds, last_tweet_id, classification_config JSONB
+│   │   │   ├── tweet_signal.py         # TweetSignal — one row per scraped tweet; classification, confidence, tickers/price_levels JSONB, promoted flag, FK → scanner_events
 │   │   │   └── __init__.py             # Re-exports all models (required for Alembic autogenerate)
 │   │   ├── routers/
 │   │   │   ├── scanner.py              # /api/scanner/* — run, results (eager-loads reviews), history, signal-quality-distribution; review endpoints: POST /events/{uuid}/review, GET /events/reviews, GET /reviews/stats
@@ -55,6 +57,7 @@ MarketHawk/
 │   │   │   ├── health.py               # GET /health — liveness probe
 │   │   │   ├── outcomes.py             # /api/outcomes/* — scorecard, signals, backfill; Phase 2b: analyze, correlations, analysis/latest
 │   │   │   ├── system.py               # /api/system/* — configuration and status
+│   │   │   ├── tweets.py               # GET /api/tweets/recent — TweetSignals; WS /api/tweets/feed — live Redis pub/sub stream
 │   │   │   └── __init__.py
 │   │   ├── schemas/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlistAdd / ActiveWatchlistUpdate / ActiveWatchlistItem

@@ -19,6 +19,7 @@ from app.core.database import engine, Base
 from app.core.error_tracking import ErrorTrackerFactory
 from app.exceptions import MarketHawkError
 from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router, futures_router, alerts_router, watchlist_router, auto_trading_router, outcomes_router
+from app.routers.tweets import router as tweets_router
 from app.core.celery_app import celery_app as celery
 from app.services.websocket_manager import websocket_manager
 
@@ -182,6 +183,7 @@ def create_app() -> FastAPI:
     app.include_router(watchlist_router)
     app.include_router(auto_trading_router)
     app.include_router(outcomes_router)
+    app.include_router(tweets_router)
 
     # Populate scan_orchestrator registry — must be after router includes.
     # importlib avoids the local variable `app` shadowing the package name.

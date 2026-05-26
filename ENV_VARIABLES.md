@@ -56,6 +56,22 @@ These control the `ib-gateway` container and the backend's connection to it. All
 
 ---
 
+## Tweet Monitor Variables
+
+Read by the `tweet-monitor` container (`services/tweet-monitor/app/config.py`). Cookies must be
+rotated manually approximately every 30 days.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `X_AUTH_TOKEN` | — | `auth_token` cookie value from a logged-in x.com session. Required for authenticated scraping. |
+| `X_CSRF_TOKEN` | — | `ct0` cookie value (CSRF token) from x.com. Required alongside `X_AUTH_TOKEN`. |
+| `PROMOTION_THRESHOLD` | `0.7` | Minimum classifier confidence for a CALLOUT tweet to be promoted to a `ScannerEvent`. |
+| `BROWSER_MAX_AGE_MINUTES` | `30` | Force-restart Playwright browser after this many minutes. |
+| `BROWSER_MAX_MEMORY_MB` | `512` | Force-restart browser if process memory exceeds this limit. |
+| `POLL_TIMEOUT_SECONDS` | `25` | Maximum wall-clock time for a single `/poll` cycle. |
+
+---
+
 ## Frontend Variables
 
 Set in the `frontend` service's environment block in `docker-compose.yml`, or in `frontend/.env.local` for manual setup.

@@ -233,9 +233,22 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     />
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase border border-gray-700 px-1.5 py-0.5 rounded-md bg-gray-900/50">
-                      {event.scanner_type.replace(/_/g, ' ')}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase border border-gray-700 px-1.5 py-0.5 rounded-md bg-gray-900/50">
+                        {event.scanner_type.replace(/_/g, ' ')}
+                      </span>
+                      {event.scanner_type === 'social_callout' && event.metadata?.tweet_url && (
+                        <a
+                          href={event.metadata?.tweet_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-financial-blue hover:underline truncate max-w-[120px]"
+                          title={`@${event.metadata?.source_account ?? ''}`}
+                        >
+                          @{event.metadata?.source_account ?? 'unknown'}
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td className="py-4 px-4 bg-gray-800 max-w-xs">
                     <p className="text-sm font-medium text-gray-200 line-clamp-1" title={event.summary}>
