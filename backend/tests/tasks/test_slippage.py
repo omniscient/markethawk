@@ -1,7 +1,7 @@
 # backend/tests/tasks/test_slippage.py
 from decimal import Decimal
 from unittest.mock import ANY, MagicMock, patch
-import app.tasks as tasks_module
+import app.tasks.trading as tasks_module
 
 
 def _make_order(entry_price_target=100.0, max_slippage_pct=0.5):
@@ -23,7 +23,7 @@ class TestCheckEntrySlippage:
     def _run(self, order, fill_price, mock_record=None):
         db = MagicMock()
         now = MagicMock()
-        with patch("app.tasks._record_entry_fill") as mock_fill:
+        with patch("app.tasks.trading._record_entry_fill") as mock_fill:
             tasks_module._check_entry_slippage(order, fill_price, now, db)
             return mock_fill, db, now
 
