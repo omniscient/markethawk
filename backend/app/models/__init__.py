@@ -32,6 +32,8 @@ from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.signal_analysis_run import SignalAnalysisRun
 from app.models.signal_cluster import SignalCluster
 from app.models.signal_review import SignalReview
+from app.models.monitored_account import MonitoredAccount
+from app.models.tweet_signal import TweetSignal
 
 __all__ = [
     "StockUniverse",
@@ -66,4 +68,6 @@ __all__ = [
     "SignalAnalysisRun",
     "SignalCluster",
     "SignalReview",
+    "MonitoredAccount",
+    "TweetSignal",
 ]

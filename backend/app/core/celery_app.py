@@ -37,4 +37,10 @@ celery_app.conf.beat_schedule = {
         'task': 'app.tasks.analyze_signal_features',
         'schedule': crontab(minute='0', hour='11', day_of_week='1-5'),
     },
+    # Tweet monitor: trigger every 45 seconds (expires in 40s to prevent pile-up)
+    'trigger-tweet-monitor': {
+        'task': 'app.tasks.trigger_tweet_monitor',
+        'schedule': 45.0,
+        'options': {'expires': 40},
+    },
 }

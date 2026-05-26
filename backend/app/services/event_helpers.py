@@ -25,6 +25,12 @@ SUMMARY_GENERATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
         f"{ind.get('price_move_pct', 0):+.2f}% from prior close "
         f"(${ind.get('prior_close', 0):.2f} → ${ind.get('current_price', 0):.2f})"
     ),
+    "social_callout": lambda ind: (
+        f"@{ind.get('source_account', '?')} {ind.get('direction', '')} callout"
+        + (f" ${ind.get('price_entry', 0):.2f}" if ind.get('price_entry') else "")
+        + (f" → ${ind.get('price_target', 0):.2f}" if ind.get('price_target') else "")
+        + f" (conf {ind.get('confidence', 0):.0%})"
+    ),
 }
 
 # Severity calculators for each scanner type
@@ -60,6 +66,11 @@ SEVERITY_CALCULATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
     "live_price_move": lambda ind: (
         "high" if abs(ind.get('price_move_pct', 0)) > 5
         else "medium" if abs(ind.get('price_move_pct', 0)) > 2
+        else "low"
+    ),
+    "social_callout": lambda ind: (
+        "high" if ind.get('confidence', 0) > 0.9
+        else "medium" if ind.get('confidence', 0) > 0.7
         else "low"
     ),
 }

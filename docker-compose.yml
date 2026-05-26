@@ -338,6 +338,37 @@ services:
     profiles:
       - forecasting
 
+  tweet-monitor:
+    build:
+      context: ./services/tweet-monitor
+      dockerfile: Dockerfile
+    container_name: markethawk-tweet-monitor
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      SEQ_URL: http://seq:5341
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PROMOTION_THRESHOLD: ${PROMOTION_THRESHOLD:-0.7}
+      BROWSER_MAX_AGE_MINUTES: ${BROWSER_MAX_AGE_MINUTES:-30}
+      BROWSER_MAX_MEMORY_MB: ${BROWSER_MAX_MEMORY_MB:-512}
+      POLL_TIMEOUT_SECONDS: ${POLL_TIMEOUT_SECONDS:-25}
+      X_AUTH_TOKEN: ${X_AUTH_TOKEN:-}
+      X_CSRF_TOKEN: ${X_CSRF_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - stockscanner-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
 volumes:
   postgres_data:
     external: true
