@@ -2,7 +2,7 @@
 from decimal import Decimal
 from unittest.mock import ANY, MagicMock, patch
 from app.providers.massive import MassiveDataProvider
-import app.tasks as tasks_module
+import app.tasks.trading as tasks_module
 
 
 def _make_provider(client=None):
@@ -91,7 +91,7 @@ class TestSimulatePaperExit:
         mock_provider.get_snapshot_price.return_value = snapshot_price
 
         with patch("app.providers.DataProviderFactory") as mock_factory, \
-             patch("app.tasks._record_exit_fill") as mock_exit:
+             patch("app.tasks.trading._record_exit_fill") as mock_exit:
             mock_factory.get_or_none.return_value = mock_provider
             tasks_module._simulate_paper_exit(order, db, now)
             return mock_exit
@@ -136,7 +136,7 @@ class TestSimulatePaperExit:
         db = MagicMock()
         now = MagicMock()
         with patch("app.providers.DataProviderFactory") as mock_factory, \
-             patch("app.tasks._record_exit_fill") as mock_exit:
+             patch("app.tasks.trading._record_exit_fill") as mock_exit:
             mock_factory.get_or_none.return_value = None
             tasks_module._simulate_paper_exit(order, db, now)
             mock_exit.assert_not_called()
