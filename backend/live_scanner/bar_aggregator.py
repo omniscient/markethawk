@@ -10,32 +10,9 @@ from datetime import datetime, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
+from app.utils.session import session_for_ts, session_total_minutes
+
 ET = ZoneInfo("America/New_York")
-
-# Session windows expressed as (name, start_minute, end_minute) in ET minutes-from-midnight
-_SESSIONS = [
-    ("pre",     4 * 60,      9 * 60 + 30),
-    ("regular", 9 * 60 + 30, 16 * 60),
-    ("post",    16 * 60,     20 * 60),
-]
-
-
-def session_for_ts(ts: datetime) -> str:
-    """Return the trading session name for a UTC timestamp."""
-    et = ts.astimezone(ET)
-    m = et.hour * 60 + et.minute
-    for name, start, end in _SESSIONS:
-        if start <= m < end:
-            return name
-    return "closed"
-
-
-def session_total_minutes(session: str) -> float:
-    """Total minutes in a session (used to project full-session volume)."""
-    for name, start, end in _SESSIONS:
-        if name == session:
-            return float(end - start)
-    return 390.0  # fallback to regular session length
 
 
 @dataclass
