@@ -157,22 +157,25 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 
 - **Server state**: React Query (`@tanstack/react-query`). All API calls go through the `api/` layer.
 - **UI state**: local `useState`. No global client-side state store.
-- **WebSocket**: managed in `hooks/` with reconnect logic.
+- **WebSocket**: managed in `hooks/` with reconnect logic (`useScannerWs.ts`, `useWatchlistLive.ts`).
 
 ### Pages
 
-| Page | Route | Purpose |
-|------|-------|---------|
-| `Dashboard` | `/` | System metrics, recent alerts, market status |
-| `Scanner` | `/scanner` | Run scans, view results (default sort: signal quality score), configure criteria. Inline ReviewControls per event (confirm/reject/uncertain) and SignalReviewStats card below scan history |
-| `PreMarketMovers` | `/movers/pre-market` | Real-time pre-market volume leaders |
-| `Universes` | `/universes` | Create and manage stock universes |
-| `EdgeExplorer` | `/edge-explorer` | Historical scanner hit rates, outcome distributions, feature correlation heatmap (Phase 2b), and Signal Quality Validation chart — avg EOD % and follow-through rate per score decile (Phase 2c) |
-| `ActiveWatchlist` | `/watchlist` | Live-monitored symbols: add/remove, real-time price + session data, alert badges. Connects to `/api/live/ws/watchlist` WebSocket. |
-| `Journal` | `/journal` | Trade journal entry and review |
-| `Alerts` | `/alerts` | Alert configuration and history |
-| `StockDetailPage` | `/stock/:ticker` | Per-ticker chart, metrics, and news. Supports `?date=YYYY-MM-DD` to initialise `highlightDate` and centre the chart on that date. |
-| `Settings` | `/settings` | System configuration |
+Each page is a co-located directory (`pages/PageName/index.tsx` + panel files). The shell `index.tsx` owns all React Query calls and state; panels receive data via props only.
+
+| Page | Route | Files | Purpose |
+|------|-------|-------|---------|
+| `Dashboard` | `/` | `Dashboard.tsx` | System metrics, recent alerts, market status |
+| `Scanner` | `/scanner` | `Scanner/` (index, ScanConfigPanel, ScanStatusCard, LiveProgressPanel, ResultsPanel) | Run scans, view results, configure criteria |
+| `PreMarketMovers` | `/movers/pre-market` | `PreMarketMovers.tsx` | Real-time pre-market volume leaders |
+| `Universes` | `/universes` | `Universes.tsx` | Create and manage stock universes |
+| `EdgeExplorer` | `/edge-explorer` | `EdgeExplorer.tsx` | Historical hit rates, correlations, signal quality |
+| `ActiveWatchlist` | `/watchlist` | `ActiveWatchlist/` (index, WatchlistTable, AlertBadges) | Live-monitored symbols with real-time price + session data |
+| `Journal` | `/journal` | `Journal.tsx` | Trade journal entry and review |
+| `Alerts` | `/alerts` | `Alerts/` (index, AlertRulesPanel, AlertRuleModal, AlertLogsPanel, ChannelConfigPanel) | Alert configuration and delivery history |
+| `StockDetailPage` | `/stock/:ticker` | `StockDetailPage/` (index, ChartPanel, MetadataPanel, ScannerHistoryPanel) | Per-ticker chart, metrics, and news. Supports `?date=YYYY-MM-DD` |
+| `AutoTrading` | `/trading` | `AutoTrading/` (index, StrategyPanel, OrdersPanel, AccountPanel, ConfigPanel, components) | Strategy management, order approval, IBKR account |
+| `Settings` | `/settings` | `Settings.tsx` | System configuration |
 
 ### Charting Libraries
 
