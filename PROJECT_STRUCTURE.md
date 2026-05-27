@@ -136,16 +136,40 @@ MarketHawk/
 │   │   │   └── ...                     # Other reusable components
 │   │   ├── pages/
 │   │   │   ├── Dashboard.tsx           # System metrics, recent alerts, market status
-│   │   │   ├── Scanner.tsx             # Run scans, view results, configure criteria
+│   │   │   ├── Scanner/                # Co-located directory — shell + panels
+│   │   │   │   ├── index.tsx           # Shell: all queries, mutations, WS lifecycle
+│   │   │   │   ├── ScanConfigPanel.tsx # Header, date controls, config grid, scan history
+│   │   │   │   ├── ScanStatusCard.tsx  # Status/metrics sidebar card
+│   │   │   │   ├── LiveProgressPanel.tsx # In-flight WS progress display
+│   │   │   │   └── ResultsPanel.tsx    # Scan results + signal review stats
+│   │   │   ├── AutoTrading/            # Co-located directory
+│   │   │   │   ├── index.tsx           # Shell: all queries, mutations, modal state
+│   │   │   │   ├── StrategyPanel.tsx   # Strategy list card
+│   │   │   │   ├── OrdersPanel.tsx     # Orders table with filter pills
+│   │   │   │   ├── AccountPanel.tsx    # IBKR account, breakdown, config cards
+│   │   │   │   ├── ConfigPanel.tsx     # Strategy create/edit modal
+│   │   │   │   └── components.tsx      # Shared constants, helpers, sub-components
+│   │   │   ├── Alerts/                 # Co-located directory
+│   │   │   │   ├── index.tsx           # Shell: all queries, mutations, modal state
+│   │   │   │   ├── AlertRulesPanel.tsx # Alert rule list card
+│   │   │   │   ├── AlertRuleModal.tsx  # Create/edit rule modal form
+│   │   │   │   ├── AlertLogsPanel.tsx  # AlertActivityCard (sidebar) + AlertLogsPanel (full table)
+│   │   │   │   └── ChannelConfigPanel.tsx # Browser push registration card
+│   │   │   ├── StockDetailPage/        # Co-located directory
+│   │   │   │   ├── index.tsx           # Shell: all queries, mutations, state, handlers
+│   │   │   │   ├── ChartPanel.tsx      # Chart card + controls + market profile/extended hours
+│   │   │   │   ├── MetadataPanel.tsx   # News feed + trader plan checklist
+│   │   │   │   └── ScannerHistoryPanel.tsx # Event history + force scan dialog
+│   │   │   ├── ActiveWatchlist/        # Co-located directory
+│   │   │   │   ├── index.tsx           # Shell: watchlist query + live WS, AddSymbolForm
+│   │   │   │   ├── WatchlistTable.tsx  # PriceCell, SessionCell, WatchlistRow, table
+│   │   │   │   └── AlertBadges.tsx     # LiveAlert severity badge
 │   │   │   ├── PreMarketMovers.tsx     # Real-time pre-market volume leaders
 │   │   │   ├── Universes.tsx           # Create and manage stock universes
 │   │   │   ├── EdgeExplorer.tsx        # Historical scanner hit rates and outcome distributions
-│   │   │   ├── ActiveWatchlist.tsx     # Live-monitored symbols; real-time price/session/alerts via WS
 │   │   │   ├── Journal.tsx             # Trade journal entry and review
-│   │   │   ├── Alerts.tsx              # Alert configuration and history
-│   │   │   ├── StockDetailPage.tsx     # Per-ticker chart, metrics, and news
 │   │   │   └── Settings.tsx            # System configuration
-│   │   ├── hooks/                      # Custom React hooks
+│   │   ├── hooks/                      # Custom React hooks (useScannerState, useScannerWs, useWatchlistLive, …)
 │   │   ├── App.tsx                     # Router and layout wrapper
 │   │   └── main.tsx                    # React entry point
 │   ├── package.json
