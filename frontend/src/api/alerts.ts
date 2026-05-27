@@ -1,9 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
-});
+import { apiClient as api } from './client';
 
 export interface AlertRule {
   id: number;
@@ -49,7 +45,7 @@ export const useAlertStats = () => {
   return useQuery<AlertStats>({
     queryKey: ['alerts', 'stats'],
     queryFn: async () => {
-      const { data } = await api.get('/api/alerts/stats');
+      const { data } = await api.get('/alerts/stats');
       return data;
     },
     refetchInterval: 30000, // Refresh every 30s
@@ -62,7 +58,7 @@ export const useAlertRules = () => {
   return useQuery<AlertRule[]>({
     queryKey: ['alerts', 'rules'],
     queryFn: async () => {
-      const { data } = await api.get('/api/alerts/rules');
+      const { data } = await api.get('/alerts/rules');
       return data;
     },
   });
@@ -72,7 +68,7 @@ export const useCreateAlertRule = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (newRule: Partial<AlertRule>) => {
-      const { data } = await api.post('/api/alerts/rules', newRule);
+      const { data } = await api.post('/alerts/rules', newRule);
       return data;
     },
     onSuccess: () => {
@@ -86,7 +82,7 @@ export const useUpdateAlertRule = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<AlertRule> & { id: number }) => {
-      const { data } = await api.patch(`/api/alerts/rules/${id}`, updates);
+      const { data } = await api.patch(`/alerts/rules/${id}`, updates);
       return data;
     },
     onSuccess: () => {
@@ -100,7 +96,7 @@ export const useDeleteAlertRule = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      await api.delete(`/api/alerts/rules/${id}`);
+      await api.delete(`/alerts/rules/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts', 'rules'] });
@@ -112,7 +108,7 @@ export const useDeleteAlertRule = () => {
 export const useTestAlertRule = () => {
   return useMutation({
     mutationFn: async (id: number) => {
-      const { data } = await api.post(`/api/alerts/rules/${id}/test`);
+      const { data } = await api.post(`/alerts/rules/${id}/test`);
       return data;
     },
   });
@@ -124,7 +120,7 @@ export const useAlertLogs = (limit = 20) => {
   return useQuery<AlertLog[]>({
     queryKey: ['alerts', 'logs', limit],
     queryFn: async () => {
-      const { data } = await api.get(`/api/alerts/logs?limit=${limit}`);
+      const { data } = await api.get(`/alerts/logs?limit=${limit}`);
       return data;
     },
     refetchInterval: 10000, // Refresh every 10s
@@ -150,7 +146,7 @@ export const usePushSubscription = () => {
   const subscribeMutation = useMutation({
     mutationFn: async () => {
       // 1. Get VAPID public key
-      const { data: { public_key } } = await api.get('/api/alerts/push/vapid-key');
+      const { data: { public_key } } = await api.get('/alerts/push/vapid-key');
 
       // 2. Ensure service worker is registered and active before subscribing
       await navigator.serviceWorker.register('/sw.js');
@@ -172,7 +168,7 @@ export const usePushSubscription = () => {
       });
 
       // 5. Save to backend
-      await api.post('/api/alerts/push/subscribe', subscription);
+      await api.post('/alerts/push/subscribe', subscription);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts', 'stats'] });
@@ -184,7 +180,7 @@ export const usePushSubscription = () => {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
       if (subscription) {
-        await api.delete('/api/alerts/push/unsubscribe', { data: { endpoint: subscription.endpoint } });
+        await api.delete('/alerts/push/unsubscribe', { data: { endpoint: subscription.endpoint } });
         await subscription.unsubscribe();
       }
     },

@@ -1,9 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
-});
+import { apiClient as api } from './client';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,7 +106,7 @@ export const useStrategies = (activeOnly = false) =>
   useQuery<TradingStrategy[]>({
     queryKey: ['trading', 'strategies', activeOnly],
     queryFn: async () => {
-      const { data } = await api.get('/api/trading/strategies', {
+      const { data } = await api.get('/trading/strategies', {
         params: activeOnly ? { active_only: true } : {},
       });
       return data;
@@ -121,7 +117,7 @@ export const useCreateStrategy = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Partial<TradingStrategy>) => {
-      const { data } = await api.post('/api/trading/strategies', payload);
+      const { data } = await api.post('/trading/strategies', payload);
       return data as TradingStrategy;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['trading', 'strategies'] }),
@@ -132,7 +128,7 @@ export const useUpdateStrategy = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...rest }: Partial<TradingStrategy> & { id: number }) => {
-      const { data } = await api.patch(`/api/trading/strategies/${id}`, rest);
+      const { data } = await api.patch(`/trading/strategies/${id}`, rest);
       return data as TradingStrategy;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['trading', 'strategies'] }),
@@ -143,7 +139,7 @@ export const useDeleteStrategy = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      await api.delete(`/api/trading/strategies/${id}`);
+      await api.delete(`/trading/strategies/${id}`);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['trading', 'strategies'] }),
   });
@@ -161,7 +157,7 @@ export const useAutoTradeOrders = (params?: {
   useQuery<AutoTradeOrder[]>({
     queryKey: ['trading', 'orders', params],
     queryFn: async () => {
-      const { data } = await api.get('/api/trading/orders', { params });
+      const { data } = await api.get('/trading/orders', { params });
       return data;
     },
     refetchInterval: 30000,
@@ -171,7 +167,7 @@ export const useApproveOrder = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      const { data } = await api.post(`/api/trading/orders/${id}/approve`);
+      const { data } = await api.post(`/trading/orders/${id}/approve`);
       return data as AutoTradeOrder;
     },
     onSuccess: () => {
@@ -185,7 +181,7 @@ export const useRejectOrder = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
-      const { data } = await api.post(`/api/trading/orders/${id}/reject`, { reason });
+      const { data } = await api.post(`/trading/orders/${id}/reject`, { reason });
       return data as AutoTradeOrder;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['trading', 'orders'] }),
@@ -196,7 +192,7 @@ export const useCancelOrder = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      const { data } = await api.post(`/api/trading/orders/${id}/cancel`);
+      const { data } = await api.post(`/trading/orders/${id}/cancel`);
       return data as AutoTradeOrder;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['trading', 'orders'] }),
@@ -209,7 +205,7 @@ export const useTradingStats = (days = 30) =>
   useQuery<TradingStats>({
     queryKey: ['trading', 'stats', days],
     queryFn: async () => {
-      const { data } = await api.get('/api/trading/stats', { params: { days } });
+      const { data } = await api.get('/trading/stats', { params: { days } });
       return data;
     },
     refetchInterval: 60000,
@@ -219,7 +215,7 @@ export const useTradingConfig = () =>
   useQuery<TradingConfig>({
     queryKey: ['trading', 'config'],
     queryFn: async () => {
-      const { data } = await api.get('/api/trading/config');
+      const { data } = await api.get('/trading/config');
       return data;
     },
   });
@@ -228,7 +224,7 @@ export const useUpdateTradingConfig = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Partial<TradingConfig>) => {
-      const { data } = await api.patch('/api/trading/config', payload);
+      const { data } = await api.patch('/trading/config', payload);
       return data as TradingConfig;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['trading', 'config'] }),
@@ -239,7 +235,7 @@ export const useAccountSummary = () =>
   useQuery<AccountSummary>({
     queryKey: ['trading', 'account'],
     queryFn: async () => {
-      const { data } = await api.get('/api/trading/account');
+      const { data } = await api.get('/trading/account');
       return data;
     },
     refetchInterval: 30000,
