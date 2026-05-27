@@ -15,6 +15,7 @@ from app.routers.alerts import router as alerts_router
 from app.routers.watchlist import router as watchlist_router
 from app.routers.auto_trading import router as auto_trading_router
 from app.routers.outcomes import router as outcomes_router
+from app.routers.auth import router as auth_router
 __all__ = [
     "health_router",
     "scanner_router",
@@ -29,4 +30,5 @@ __all__ = [
     "watchlist_router",
     "auto_trading_router",
     "outcomes_router",
+    "auth_router",
 ]
