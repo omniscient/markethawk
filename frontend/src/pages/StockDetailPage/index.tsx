@@ -262,39 +262,24 @@ const StockDetailPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <ChartPanel
-            symbol={symbol}
-            historicalData={historicalData}
-            loadingHistorical={loadingHistorical}
-            fetchingHistorical={fetchingHistorical}
-            liveData={liveData}
-            events={events}
+            symbol={symbol} historicalData={historicalData} liveData={liveData} events={events}
+            loadingHistorical={loadingHistorical} fetchingHistorical={fetchingHistorical}
             highlightDate={highlightDate}
-            period={period}
-            onPeriodChange={onPeriodChange}
-            timespan={timespan}
-            onTimespanChange={onTimespanChange}
-            wsResolution={wsResolution}
-            onWsResolution={setWsResolution}
-            showST={showST}
-            onShowST={setShowST}
-            catchingUp={catchingUp}
-            catchUpPending={catchUpMutation.isPending}
+            period={period} onPeriodChange={onPeriodChange}
+            timespan={timespan} onTimespanChange={onTimespanChange}
+            wsResolution={wsResolution} onWsResolution={setWsResolution}
+            showST={showST} onShowST={setShowST}
+            catchingUp={catchingUp} catchUpPending={catchUpMutation.isPending}
             onCatchUp={() => catchUpMutation.mutate(symbol)}
             details={details}
           />
           <ScannerHistoryPanel
-            symbol={symbol}
-            events={events}
-            clearConfirmOpen={clearConfirmOpen}
-            onClearConfirmOpen={setClearConfirmOpen}
-            onClearHistory={() => clearEventsMutation.mutate()}
-            clearHistoryPending={clearEventsMutation.isPending}
-            scanDialogOpen={scanDialogOpen}
-            onScanDialogOpen={setScanDialogOpen}
+            symbol={symbol} events={events}
+            clearConfirmOpen={clearConfirmOpen} onClearConfirmOpen={setClearConfirmOpen}
+            onClearHistory={() => clearEventsMutation.mutate()} clearHistoryPending={clearEventsMutation.isPending}
+            scanDialogOpen={scanDialogOpen} onScanDialogOpen={setScanDialogOpen}
             scanTask={{ status: scanTask.status, done: scanTask.done, total: scanTask.total, error: scanTask.error }}
-            scanDoneMsg={scanDoneMsg}
-            onScanSubmit={handleScanSubmit}
-            scanSubmitting={scanSubmitting}
+            scanDoneMsg={scanDoneMsg} onScanSubmit={handleScanSubmit} scanSubmitting={scanSubmitting}
             onHighlightDate={(date) => { setHighlightDate(date); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           />
         </div>

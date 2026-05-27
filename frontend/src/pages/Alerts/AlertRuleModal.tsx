@@ -10,26 +10,18 @@ import type { TradingStrategy } from '../../api/trading';
 
 const SCANNER_TYPES = [
   { id: 'pre_market_volume_spike', label: 'Pre-Market Volume Spike' },
-  { id: 'oversold_bounce', label: 'Oversold Bounce' },
-  { id: 'liquidity_hunt', label: 'Liquidity Hunt' },
-  { id: 'large_cap_breakout', label: 'Large Cap Breakout' },
-  { id: 'news_volume_spike', label: 'News Volume Spike' },
+  { id: 'oversold_bounce', label: 'Oversold Bounce' }, { id: 'liquidity_hunt', label: 'Liquidity Hunt' },
+  { id: 'large_cap_breakout', label: 'Large Cap Breakout' }, { id: 'news_volume_spike', label: 'News Volume Spike' },
 ];
 
 const SEVERITIES = [
-  { id: 'any', label: 'Any Severity' },
-  { id: 'high', label: 'High' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'low', label: 'Low' },
+  { id: 'any', label: 'Any Severity' }, { id: 'high', label: 'High' },
+  { id: 'medium', label: 'Medium' }, { id: 'low', label: 'Low' },
 ];
 
 const COOLDOWN_OPTIONS = [
-  { label: 'No Limit', value: 0 },
-  { label: '15 Minutes', value: 15 },
-  { label: '30 Minutes', value: 30 },
-  { label: '1 Hour', value: 60 },
-  { label: '4 Hours', value: 240 },
-  { label: 'Daily', value: 1440 },
+  { label: 'No Limit', value: 0 }, { label: '15 Minutes', value: 15 }, { label: '30 Minutes', value: 30 },
+  { label: '1 Hour', value: 60 }, { label: '4 Hours', value: 240 }, { label: 'Daily', value: 1440 },
 ];
 
 export interface AlertRuleModalProps {
@@ -50,10 +42,7 @@ export function AlertRuleModal({
 
   const toggleChannel = (channel: Channel) => {
     const current = formState.channels || [];
-    onFormState({
-      ...formState,
-      channels: current.includes(channel) ? current.filter(c => c !== channel) : [...current, channel],
-    });
+    onFormState({ ...formState, channels: current.includes(channel) ? current.filter(c => c !== channel) : [...current, channel] });
   };
 
   const toggleScannerType = (type: string) => {
