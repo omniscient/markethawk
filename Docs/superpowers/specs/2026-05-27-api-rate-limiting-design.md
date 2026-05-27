@@ -211,9 +211,36 @@ slowapi prefixes all keys with `LIMITS:` in Redis. Using db 1 keeps these keys f
 
 Writing rate limiting from scratch with Redis `INCR`/`EXPIRE` gives full control of the storage schema and error format, but requires ~200 lines of new code vs. ~50 lines of configuration with slowapi. Not worth it when slowapi already solves the problem.
 
-### Nginx/reverse proxy rate limiting
+### Gateway / reverse proxy (Nginx, Traefik, Caddy)
 
-Handle at the infrastructure layer with `nginx limit_req`. Keeps the concern out of the application entirely. However, the current Docker Compose stack has no Nginx service — adding one exclusively for rate limiting violates YAGNI and adds operational complexity. Nginx would also require duplicating the endpoint-tier config that is already expressible in Python.
+A reverse proxy in front of the entire stack can reject requests at the socket layer before Python processes them, which is meaningfully better under a true connection flood — the kernel drops packets before userland Python burns CPU parsing headers.
+
+**The user's concern is legitimate but applies to a different threat model.** Under a DDoS from hostile external clients, middleware is weaker because the Uvicorn event loop still accepts each TCP connection. However, every threat this issue names is self-inflicted:
+
+- Polygon quota exhaustion ← developer's automation loops
+- DB pool saturation ← same source
+- Celery queue flooding ← same source
+- Denial-of-service ← same source (no public API, no external users)
+
+For self-inflicted threats, a 429 from middleware is just as effective as a 429 from a proxy: the automation receives the error and should back off. No adversary means no bypass motivation.
+
+A gateway also has a **critical blind spot**: it only protects the HTTP API surface. Celery tasks fire Polygon calls that bypass any proxy entirely — throttling scan submissions at the API is the only meaningful control point for quota exhaustion.
+
+**Comparison:**
+
+| Factor | SlowAPI middleware | Gateway (Nginx/Traefik) |
+|--------|-------------------|------------------------|
+| Protects Polygon quota | ✓ | ✓ |
+| Protects DB pool | ✓ | ✓ |
+| Sheds load before Python | ✗ | ✓ |
+| Per-endpoint granularity | ✓ (decorator) | Limited (config) |
+| Throttles Celery-indirect calls | ✓ (via API surface) | ✗ (bypasses proxy) |
+| Current infra cost | Zero (no new service) | +1 Compose service, proxy config |
+| Local iteration overhead | None | Compose restart on every change |
+
+**Decision:** SlowAPI middleware for this deployment. The load-shedding advantage of a gateway is not material when all clients are internal and the rate limits are coarse (5/min on expensive endpoints).
+
+**Future path:** If MarketHawk ever becomes multi-tenant or internet-facing, add a reverse proxy in front for network-layer rejection and retain the middleware for application-logic granularity (per-route, per-user, Celery-aware). The two layers are complementary, not mutually exclusive.
 
 ---
 
