@@ -211,7 +211,7 @@ slowapi prefixes all keys with `LIMITS:` in Redis. Using db 1 keeps these keys f
 
 Writing rate limiting from scratch with Redis `INCR`/`EXPIRE` gives full control of the storage schema and error format, but requires ~200 lines of new code vs. ~50 lines of configuration with slowapi. Not worth it when slowapi already solves the problem.
 
-### Gateway / reverse proxy (Nginx, Traefik, Caddy)
+### Gateway / reverse proxy (Nginx, Traefik, Caddy) — see [ADR 0002](../../adr/0002-slowapi-middleware-over-gateway-for-rate-limiting.md)
 
 A reverse proxy in front of the entire stack can reject requests at the socket layer before Python processes them, which is meaningfully better under a true connection flood — the kernel drops packets before userland Python burns CPU parsing headers.
 
