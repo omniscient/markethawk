@@ -109,6 +109,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 
 | File | Endpoints |
 |------|-----------|
+| `auth.py` | `GET /api/auth/status` (bootstrap check), `POST /api/auth/register` (first-user only), `POST /api/auth/login` (sets HttpOnly JWT cookies), `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me` |
 | `scanner.py` | `/api/scanner/run`, `/api/scanner/results` (eager-loads reviews, default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/scanner/history`, `/api/scanner/signal-quality-distribution`, `POST /api/scanner/events/{uuid}/review` (submit verdict), `GET /api/scanner/events/reviews?scanner_type=` (list with `liquidity_hunt` alias), `GET /api/scanner/reviews/stats` (coverage, acceptance rate, by-type breakdown) |
 | `universe.py` | `/api/universe/*` — CRUD for stock universes and memberships |
 | `stocks.py` | `/api/stocks/*` — historical data, ticker search, stock details |
@@ -150,6 +151,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `SignalReview` | `signal_reviews` | User-submitted verdict (confirmed/rejected/enhanced/uncertain) on a `ScannerEvent`; FK → `scanner_events.id` CASCADE; supports `reject_reason` and `enhance_suggestion` JSONB. Written by `/validate-scanner` skill and frontend ReviewControls. Latest review exposed via `ScannerEvent.latest_review` @property. |
 | `MonitoredAccount` | `monitored_accounts` | X (Twitter) accounts tracked by the tweet-monitor service. Stores `handle`, `platform`, `poll_interval_seconds`, `last_tweet_id` for dedup, and per-account `classification_config` JSONB for keyword overrides. |
 | `TweetSignal` | `tweet_signals` | One row per scraped tweet. Records `classification` (CALLOUT/CELEBRATION/UPDATE/RETWEET/UNKNOWN), `confidence` score, extracted `tickers`/`price_levels` JSONB, `direction`, and `promoted` flag. FK to `scanner_events` when promoted. |
+| `User` | `users` | Operator account. Fields: `id` (UUID PK), `username` (unique), `password_hash` (bcrypt), `created_at`, `is_active`. First user created via bootstrap endpoint; additional users blocked at the application layer. |
 
 ## Frontend Architecture
 
@@ -175,6 +177,7 @@ Each page is a co-located directory (`pages/PageName/index.tsx` + panel files). 
 | `Alerts` | `/alerts` | `Alerts/` (index, AlertRulesPanel, AlertRuleModal, AlertLogsPanel, ChannelConfigPanel) | Alert configuration and delivery history |
 | `StockDetailPage` | `/stock/:ticker` | `StockDetailPage/` (index, ChartPanel, MetadataPanel, ScannerHistoryPanel) | Per-ticker chart, metrics, and news. Supports `?date=YYYY-MM-DD` |
 | `AutoTrading` | `/trading` | `AutoTrading/` (index, StrategyPanel, OrdersPanel, AccountPanel, ConfigPanel, components) | Strategy management, order approval, IBKR account |
+| `Login` | `/login` | `Login/index.tsx` | Bootstrap-aware login and first-user registration. On first launch shows "Create account" form; on subsequent launches shows login form. Redirects to `/` on success. |
 | `Settings` | `/settings` | `Settings.tsx` | System configuration |
 
 ### Charting Libraries
