@@ -23,8 +23,11 @@ from app.schemas.scanner import (
 )
 from app.schemas.event import ScannerEventResponse, ScannerEventSummary
 from app.schemas.stock import MonitoredStockResponse
+from app.schemas.auto_trade import TradingStrategyResponse, AutoTradeOrderResponse
 
 __all__ = [
+    "TradingStrategyResponse",
+    "AutoTradeOrderResponse",
     "StockUniverseCreate",
     "StockUniverseUpdate",
     "StockUniverseResponse",

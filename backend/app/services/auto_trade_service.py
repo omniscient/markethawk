@@ -531,3 +531,181 @@ class AutoTradeExecutor:
 
 # Module-level singleton for import convenience
 auto_trade_executor = AutoTradeExecutor()
+
+
+# ── Service functions extracted from routers/auto_trading.py ─────────────────
+
+def approve_order(
+    order: "AutoTradeOrder",
+    strategy: "TradingStrategy",
+    db: Session,
+) -> "AutoTradeOrder":
+    """
+    Approve a pending_approval order.
+
+    Paper mode: immediately marks submitted.
+    Live mode: queues the order for IBKR submission via Celery.
+    """
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
+
+    if strategy.paper_mode:
+        order.status = "submitted"
+        order.broker_order_id = f"PAPER-{order.id}"
+        order.broker_stop_id = f"PAPER-STOP-{order.id}"
+        order.broker_target_id = f"PAPER-TGT-{order.id}"
+        db.commit()
+        _logger.info(f"Approved paper order id={order.id}")
+    else:
+        from app.core.celery_app import celery_app as _celery
+        order.status = "pending"
+        db.commit()
+        _celery.send_task(
+            "app.tasks.submit_approved_order",
+            kwargs={"order_id": order.id},
+        )
+        _logger.info(f"Approved live order id={order.id}, queued for IBKR submission")
+
+    db.refresh(order)
+    return order
+
+
+def cancel_order(
+    order: "AutoTradeOrder",
+    db: Session,
+) -> "AutoTradeOrder":
+    """
+    Cancel an active order.
+
+    Paper orders: immediately marks cancelled.
+    Live orders: sends cancel to IBKR then marks cancelled.
+    Raises RuntimeError if IBKR cancel fails.
+    """
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
+
+    if not order.is_paper and order.broker_order_id and order.status in ("submitted", "open"):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            from app.providers.ibkr_orders import IBKROrderManager
+            manager = IBKROrderManager()
+            loop.run_until_complete(
+                manager.cancel_bracket(
+                    parent_order_id=int(order.broker_order_id),
+                    stop_order_id=int(order.broker_stop_id or 0),
+                    target_order_id=int(order.broker_target_id or 0),
+                )
+            )
+        except Exception as exc:
+            _logger.error(f"IBKR cancel failed for order {order.id}: {exc}")
+            raise RuntimeError(f"IBKR cancel failed: {exc}") from exc
+        finally:
+            loop.close()
+
+    from datetime import datetime, timezone
+    order.status = "cancelled"
+    order.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+    db.refresh(order)
+    _logger.info(f"Cancelled order id={order.id}")
+    return order
+
+
+def get_account() -> dict:
+    """
+    Fetch live account summary from IBKR.
+
+    Returns a dict with net_liquidation, available_funds, buying_power,
+    currency, connected, and open_broker_orders.
+    """
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
+
+    try:
+        from app.providers.ibkr_orders import IBKROrderManager
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            manager = IBKROrderManager()
+            account, open_broker_orders = loop.run_until_complete(
+                manager.get_account_and_orders()
+            )
+        finally:
+            loop.close()
+
+        return {
+            "net_liquidation": account.net_liquidation,
+            "available_funds": account.available_funds,
+            "buying_power": account.buying_power,
+            "currency": account.currency,
+            "connected": True,
+            "open_broker_orders": [
+                {
+                    "order_id": o.order_id,
+                    "symbol": o.symbol,
+                    "action": o.action,
+                    "order_type": o.order_type,
+                    "quantity": o.total_qty,
+                    "status": o.status,
+                    "filled": o.filled,
+                    "avg_fill_price": o.avg_fill_price,
+                }
+                for o in open_broker_orders
+            ],
+        }
+    except Exception as exc:
+        _logger.warning(f"get_account: IBKR unavailable: {exc}")
+        return {
+            "net_liquidation": None,
+            "available_funds": None,
+            "buying_power": None,
+            "currency": "USD",
+            "connected": False,
+            "error": str(exc),
+            "open_broker_orders": [],
+        }
+
+
+def get_stats(db: Session, days: int = 30) -> dict:
+    """Return auto-trading statistics for the last N days."""
+    from datetime import date as date_type, timedelta
+    from app.models.trade import Trade
+
+    since = date_type.today() - timedelta(days=days)
+    orders = (
+        db.query(AutoTradeOrder)
+        .filter(AutoTradeOrder.event_date >= since)
+        .all()
+    )
+
+    total = len(orders)
+    by_status: dict = {}
+    for o in orders:
+        by_status[o.status] = by_status.get(o.status, 0) + 1
+
+    closed = [o for o in orders if o.status == "closed"]
+    wins = [
+        o for o in closed
+        if o.exit_price and o.fill_price and (
+            (o.side == "long" and float(o.exit_price) > float(o.fill_price)) or
+            (o.side == "short" and float(o.exit_price) < float(o.fill_price))
+        )
+    ]
+
+    trade_ids = [o.trade_id for o in closed if o.trade_id]
+    total_pnl = 0.0
+    if trade_ids:
+        trades = db.query(Trade).filter(Trade.id.in_(trade_ids)).all()
+        total_pnl = sum(float(t.gross_pnl or 0) for t in trades)
+
+    return {
+        "period_days": days,
+        "total_orders": total,
+        "by_status": by_status,
+        "closed_count": len(closed),
+        "win_count": len(wins),
+        "win_rate": round(len(wins) / len(closed) * 100, 1) if closed else None,
+        "total_pnl": round(total_pnl, 2),
+        "avg_pnl_per_trade": round(total_pnl / len(closed), 2) if closed else None,
+    }
