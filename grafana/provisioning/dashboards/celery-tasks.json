@@ -1,0 +1,73 @@
+{
+  "title": "Celery Tasks",
+  "uid": "markethawk-celery",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-3h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Task Success Rate (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "sum(rate(celery_tasks_total{status=\"success\"}[5m])) by (task_name) * 60",
+          "legendFormat": "{{task_name}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Task Failure Rate (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "sum(rate(celery_tasks_total{status=\"failure\"}[5m])) by (task_name) * 60",
+          "legendFormat": "{{task_name}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Task Duration P95 (s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "histogram_quantile(0.95, sum(rate(celery_task_duration_seconds_bucket[5m])) by (le, task_name))",
+          "legendFormat": "p95 {{task_name}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Task Failure Ratio",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "sum(rate(celery_tasks_total{status=\"failure\"}[5m])) by (task_name) / sum(rate(celery_tasks_total[5m])) by (task_name)",
+          "legendFormat": "failure ratio {{task_name}}"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "pluginId": "prometheus",
+        "hide": 0,
+        "label": "Datasource"
+      }
+    ]
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "title": "Scanner Performance",
+  "uid": "markethawk-scanner",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scanner Events (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "sum(rate(scanner_events_total[5m])) by (scanner_type) * 60",
+          "legendFormat": "{{scanner_type}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Total Scanner Events (24h)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "sum(increase(scanner_events_total[24h])) by (scanner_type)",
+          "legendFormat": "{{scanner_type}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Scan Duration — P50/P95/P99 (s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "histogram_quantile(0.50, sum(rate(scan_duration_seconds_bucket[5m])) by (le, scanner_type))",
+          "legendFormat": "p50 {{scanner_type}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "histogram_quantile(0.95, sum(rate(scan_duration_seconds_bucket[5m])) by (le, scanner_type))",
+          "legendFormat": "p95 {{scanner_type}}"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "histogram_quantile(0.99, sum(rate(scan_duration_seconds_bucket[5m])) by (le, scanner_type))",
+          "legendFormat": "p99 {{scanner_type}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Polygon API Calls (rate/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "sum(rate(polygon_api_calls_total[1m])) by (endpoint) * 60",
+          "legendFormat": "{{endpoint}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "IBKR Connection Status",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "red", "value": null },
+            { "color": "green", "value": 1 }
+          ]
+        },
+        "mappings": [
+          { "type": "value", "options": { "0": { "text": "Disconnected" }, "1": { "text": "Connected" } } }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "ibkr_connection_status",
+          "legendFormat": "IBKR"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "pluginId": "prometheus",
+        "hide": 0,
+        "label": "Datasource"
+      }
+    ]
+  }
+}

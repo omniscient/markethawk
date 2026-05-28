@@ -335,3 +335,17 @@ def unsubscribe_push(payload: Dict[str, Any], db: Session = Depends(get_db)) -> 
         db.commit()
         return {"status": "unsubscribed"}
     return {"status": "not_found"}
+
+
+@router.post("/infrastructure", status_code=200)
+def receive_infrastructure_alert(payload: Dict[str, Any]) -> Dict[str, str]:
+    """Receive Grafana alerting webhook payloads and log them."""
+    title = payload.get("title") or payload.get("message") or "unknown"
+    state = payload.get("state") or payload.get("status") or "unknown"
+    logger.warning(
+        "Grafana infrastructure alert received: title=%s state=%s payload=%s",
+        title,
+        state,
+        json.dumps(payload),
+    )
+    return {"status": "received"}

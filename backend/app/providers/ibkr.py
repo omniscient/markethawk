@@ -20,6 +20,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from app.core.config import settings
 from app.exceptions import ProviderError
 from app.providers.base import BaseDataProvider
+from app.core.metrics import ibkr_connection_status
 
 logger = logging.getLogger(__name__)
 
@@ -410,6 +411,7 @@ class IBKRDataProvider(BaseDataProvider):
                     )
 
                 self._connected = True
+                ibkr_connection_status.set(1)
                 logger.info(
                     f"IBKRDataProvider: Connected to IB Gateway at "
                     f"{settings.IBKR_HOST}:{settings.IBKR_PORT} "
@@ -422,6 +424,7 @@ class IBKRDataProvider(BaseDataProvider):
             except Exception as e:
                 self._ib = None
                 self._connected = False
+                ibkr_connection_status.set(0)
                 delay = min(5 * (2 ** attempt), 60)   # 5 10 20 40 60 60 …
                 if attempt < max_retries - 1:
                     logger.warning(
@@ -444,6 +447,7 @@ class IBKRDataProvider(BaseDataProvider):
             logger.info("IBKRDataProvider: Disconnected from TWS.")
         self._ib = None
         self._connected = False
+        ibkr_connection_status.set(0)
 
     async def _get_connection(self) -> Optional["IB"]:
         """Return a live IB connection, connecting if necessary."""

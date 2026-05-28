@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time as _time
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
@@ -28,6 +29,7 @@ from app.models.stock_split import StockSplit
 from app.services.catalyst_parser import CatalystParser
 from app.services.alert_service import save_event as _save_event
 from app.utils.session import get_market_today
+from app.core.metrics import scanner_events_total, scan_duration_seconds
 
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
@@ -440,6 +442,7 @@ async def run_liquidity_hunt_scan(
     (no_data / no_prior_close / no_baseline / evaluated / fired_pre / fired_post /
     errors) plus the resolved start/end dates and ticker count.
     """
+    _start = _time.monotonic()
     # The pre/post variants need a *completed* regular session as a baseline,
     # so the no-args default rolls back to the previous trading day. This makes
     # the "Run Scanner" button always produce something pre-open instead of
@@ -542,6 +545,7 @@ async def run_liquidity_hunt_scan(
                     )
                     results.append(event_dict)
                     counts["fired_pre"] += 1
+                    scanner_events_total.labels(scanner_type="liquidity_hunt_pre").inc()
 
                 # Post-market variant (skip if no event_date regular close)
                 if event_date_regular_close is not None:
@@ -579,6 +583,7 @@ async def run_liquidity_hunt_scan(
                         )
                         results.append(event_dict)
                         counts["fired_post"] += 1
+                        scanner_events_total.labels(scanner_type="liquidity_hunt_post").inc()
 
             except Exception:
                 counts["errors"] += 1
@@ -608,6 +613,7 @@ async def run_liquidity_hunt_scan(
             "errors": counts["errors"],
         })
 
+    scan_duration_seconds.labels(scanner_type="liquidity_hunt").observe(_time.monotonic() - _start)
     return results
 
 
