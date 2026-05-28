@@ -4,6 +4,7 @@ import {
   ColorType,
   IChartApi,
   ISeriesApi,
+  ISeriesMarkersPluginApi,
   CandlestickData,
   LineData,
   AreaData,
@@ -103,7 +104,7 @@ const StockChart: React.FC<StockChartProps> = ({
   const stLine1SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const stLine2SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const stCloudSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const markersPluginRef = useRef<ReturnType<typeof createSeriesMarkers> | null>(null);
+  const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const prevDataLengthRef = useRef<number>(0);
   const currentBarRef = useRef<{
     time: Time;

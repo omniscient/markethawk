@@ -9,6 +9,11 @@ import {
   Target
 } from 'lucide-react';
 
+// Per spec Req 7: library cast, does not count against @ts-expect-error budget.
+// strictFunctionTypes: (value: number, name: string) not assignable to Formatter<ValueType, NameType>
+// because ValueType includes string and array; runtime behavior is correct.
+type TooltipFormatterFn = NonNullable<React.ComponentProps<typeof Tooltip>['formatter']>;
+
 // Components
 import Card from '../components/ui/Card';
 import MetricCard from '../components/ui/MetricCard';
@@ -378,11 +383,11 @@ const EdgeExplorer: React.FC = () => {
                     />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }}
-                      formatter={(value: number, name: string) => {
+                      formatter={((value: number, name: string) => {
                         if (name === 'avg_eod_pct') return [`${value?.toFixed(2)}%`, 'Avg EOD %'];
                         if (name === 'follow_through_rate') return [`${(value * 100).toFixed(1)}%`, 'Follow-through'];
                         return [value, name];
-                      }}
+                      }) as unknown as TooltipFormatterFn}
                     />
                     <Legend />
                     <Bar yAxisId="left" dataKey="avg_eod_pct" fill="#3B82F6" name="avg_eod_pct" radius={[2, 2, 0, 0]} />

@@ -9,6 +9,11 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+
+// Per spec Req 7: library cast, does not count against @ts-expect-error budget.
+// strictFunctionTypes: (value: number) not assignable to (value: ValueType | undefined) because
+// ValueType includes string and array; runtime behavior is correct — this chart only passes numbers.
+type TooltipFormatterFn = NonNullable<React.ComponentProps<typeof Tooltip>['formatter']>;
 import { DistributionPoint } from '../../api/outcomes';
 
 interface DistributionChartProps {
@@ -100,7 +105,7 @@ const DistributionChart: React.FC<DistributionChartProps> = ({ data, isLoading }
               }}
               itemStyle={{ color: '#F9FAFB', fontSize: '12px' }}
               labelStyle={{ color: '#9CA3AF', fontSize: '10px', fontWeight: 'bold' }}
-              formatter={(value: number) => [`${value} events`, 'Count']}
+              formatter={((value: number) => [`${value} events`, 'Count']) as unknown as TooltipFormatterFn}
             />
             <Bar dataKey="count" radius={[4, 4, 0, 0]}>
               {bins.map((bin, i) => (

@@ -18,9 +18,9 @@ export interface ScannerEvent {
 
   signal_quality_score?: number | null;
 
-  indicators: Record<string, any>;
-  criteria_met: Record<string, any>;
-  metadata: Record<string, any>;
+  indicators: Record<string, unknown>;
+  criteria_met: Record<string, unknown>;
+  metadata: Record<string, unknown>;
   
   created_at: string;
   updated_at: string;
@@ -64,8 +64,8 @@ export interface ScannerConfig {
   name: string;
   description: string;
   scanner_type: string;
-  parameters: Record<string, any>;
-  criteria: Record<string, any>[];
+  parameters: Record<string, unknown>;
+  criteria: Record<string, unknown>[];
   is_active: boolean;
   run_frequency: string;
   last_run: string | null;
@@ -77,7 +77,7 @@ export interface StockUniverse {
   uuid: string;
   name: string;
   description: string;
-  criteria: Record<string, any>;
+  criteria: Record<string, unknown>;
   created_at: string;
   is_active: boolean;
   ticker_count?: number;
@@ -243,7 +243,7 @@ export interface ScannerRunStatus {
     total_days?: number;
     tickers?: number;
     events_detected?: number;
-    [k: string]: any;
+    [k: string]: unknown;
   } | null;
 }
 
@@ -393,7 +393,7 @@ export const refreshUniverseStats = async (id: number): Promise<StockUniverse> =
 export const createStockUniverse = async (universe: {
   name: string;
   description?: string;
-  criteria: Record<string, any>;
+  criteria: Record<string, unknown>;
 }): Promise<StockUniverse> => {
   const response = await apiClient.post('/universe/create', universe);
   return response.data;
@@ -408,7 +408,7 @@ export const updateStockUniverse = async (
   universe: {
     name?: string;
     description?: string;
-    criteria?: Record<string, any>;
+    criteria?: Record<string, unknown>;
     is_active?: boolean;
   },
 ): Promise<StockUniverse> => {
@@ -416,22 +416,28 @@ export const updateStockUniverse = async (
   return response.data;
 };
 
-export const syncFundamentals = async (delay: number = 15.0): Promise<any> => {
+export interface TaskEnqueueResponse {
+  status: string;
+  message?: string;
+  task_id?: string;
+}
+
+export const syncFundamentals = async (delay: number = 15.0): Promise<TaskEnqueueResponse> => {
   const response = await apiClient.post('/universe/sync/fundamentals', null, { params: { delay } });
   return response.data;
 };
 
-export const syncMetrics = async (): Promise<any> => {
+export const syncMetrics = async (): Promise<TaskEnqueueResponse> => {
   const response = await apiClient.post('/universe/sync/metrics');
   return response.data;
 };
 
-export const syncTickerDetails = async (delay: number = 15.0): Promise<any> => {
+export const syncTickerDetails = async (delay: number = 15.0): Promise<TaskEnqueueResponse> => {
   const response = await apiClient.post('/universe/sync/details', null, { params: { delay } });
   return response.data;
 };
 
-export const stopSync = async (): Promise<any> => {
+export const stopSync = async (): Promise<TaskEnqueueResponse> => {
   const response = await apiClient.post('/universe/sync/stop');
   return response.data;
 };
