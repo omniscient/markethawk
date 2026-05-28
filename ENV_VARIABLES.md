@@ -94,6 +94,15 @@ Set in the `frontend` service's environment block in `docker-compose.yml`, or in
 
 ---
 
+## Monitoring
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `GRAFANA_ADMIN_PASSWORD` | `admin` | Password for the Grafana admin user (UI at http://localhost:3001) |
+| `PROMETHEUS_MULTIPROC_DIR` | `/tmp/prometheus_multiproc` | Shared tmpfs directory for prometheus-client multiprocess mode; set on both `backend` and `celery-worker` |
+
+---
+
 ## Verification
 
 ```bash

@@ -10,10 +10,9 @@ from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy.orm import Session
-
 from app.models.news_article import NewsArticle
 from app.providers import DataProviderFactory
+from sqlalchemy.orm import Session
 
 
 def _make_canned_bars(ticker: str, count: int = 5) -> list[dict]:

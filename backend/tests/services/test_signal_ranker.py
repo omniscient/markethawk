@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-
 from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
 
 _DEFAULT_WEIGHTS = {

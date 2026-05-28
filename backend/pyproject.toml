@@ -35,6 +35,6 @@ ignore = [
 "**/__init__.py" = ["F401"]
 # Tests import app modules after sys.path manipulation (E402); fixtures are redefined per-test
 # (F811 is intentional pytest pattern); unused vars in tests are intermediate assertions (F841)
-"tests/**/*.py" = ["E402", "F811", "F841"]
+"**/tests/**/*.py" = ["E402", "F811", "F841"]
 # Scripts use star imports for schema reflection and import after path setup
-"scripts/**/*.py" = ["E402", "F403", "W291", "W293"]
+"**/scripts/**/*.py" = ["E402", "F403", "W291", "W293"]

@@ -1,5 +1,8 @@
 """Tests for API rate limiting (SlowAPI, issue #87)."""
 
+from app.core.config import settings
+from app.core.rate_limits import GLOBAL_LIMIT, SCANNER_LIMIT, TRADING_LIMIT, limiter
+from app.main import app as main_app
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
@@ -7,10 +10,6 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIASGIMiddleware
 from slowapi.util import get_remote_address
-
-from app.core.config import settings
-from app.core.rate_limits import GLOBAL_LIMIT, SCANNER_LIMIT, TRADING_LIMIT, limiter
-from app.main import app as main_app
 
 # ── Task 1: constants and limiter instance ────────────────────────────────────
 

@@ -2,6 +2,7 @@
 Pydantic schemas package.
 """
 
+from app.schemas.auto_trade import AutoTradeOrderResponse, TradingStrategyResponse
 from app.schemas.event import ScannerEventResponse, ScannerEventSummary
 from app.schemas.scanner import (
     ClearEventsResponse,
@@ -25,6 +26,8 @@ from app.schemas.universe import (
 )
 
 __all__ = [
+    "TradingStrategyResponse",
+    "AutoTradeOrderResponse",
     "StockUniverseCreate",
     "StockUniverseUpdate",
     "StockUniverseResponse",

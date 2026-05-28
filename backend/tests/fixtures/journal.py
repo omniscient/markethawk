@@ -6,9 +6,8 @@ Each function inserts rows and flushes; the caller's transaction provides rollba
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy.orm import Session
-
 from app.models.trade import JournalEntry, Tag, Trade
+from sqlalchemy.orm import Session
 
 
 def seed_trades(db: Session) -> list[Trade]:

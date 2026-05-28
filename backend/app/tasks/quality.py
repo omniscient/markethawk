@@ -1,10 +1,12 @@
 import logging
+import time as _time
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
+from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,8 @@ def analyze_universe_quality(self, universe_id: int):
     from app.models.universe_quality_report import UniverseQualityReport
     from app.services.data_quality import DataQualityService
 
+    _task_name = "analyze_universe_quality"
+    _start = _time.monotonic()
     db: Session = SessionLocal()
     try:
         logger.info(f"🔍 Starting quality analysis for universe {universe_id}")
@@ -49,9 +53,11 @@ def analyze_universe_quality(self, universe_id: int):
             f"✅ Quality analysis complete for universe {universe_id}: "
             f"grade={result['overall_grade']} score={result['overall_score']}"
         )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
 
     except Exception as e:
         logger.error(f"❌ Quality analysis failed for universe {universe_id}: {e}")
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         try:
             report = (
                 db.query(UniverseQualityReport)
@@ -67,6 +73,9 @@ def analyze_universe_quality(self, universe_id: int):
         db.rollback()
         raise
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 

@@ -5,11 +5,11 @@ Runs against a real Postgres DB (via testcontainers).
 
 from datetime import timedelta
 
+from app.main import app
+from app.utils.session import get_market_today
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.main import app
-from app.utils.session import get_market_today
 from tests.fixtures.core import (
     seed_monitored_stocks,
     seed_scanner_configs,

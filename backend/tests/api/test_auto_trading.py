@@ -6,12 +6,11 @@ DI override is handled by tests/api/conftest.py autouse fixture.
 from datetime import date
 from decimal import Decimal
 
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from app.main import app
 from app.models.auto_trade_order import AutoTradeOrder
 from app.models.trading_strategy import TradingStrategy
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 client = TestClient(app)
 

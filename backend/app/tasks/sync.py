@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time as _time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 from app.models.monitored_stock import MonitoredStock
 from app.models.news_article import NewsArticle
 from app.models.news_preference import NewsPreference
@@ -28,6 +30,8 @@ def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
     Celery task to sync tickers in batches using strict rate limiting (recursive chaining).
     Each execution processes one page and schedules the next page 15 seconds later.
     """
+    _task_name = "sync_tickers_batch"
+    _start = _time.monotonic()
     db: Session = SessionLocal()
     try:
         # 1. Prepare URL
@@ -113,12 +117,17 @@ def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
             )
         else:
             logger.info("🎉 Sync Complete! No more pages.")
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
 
     except Exception as e:
         logger.error(f"❌ Error in sync_tickers_batch: {str(e)}")
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         db.rollback()
         raise e
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 

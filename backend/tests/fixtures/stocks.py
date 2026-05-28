@@ -5,9 +5,8 @@ Each function inserts rows and flushes; the caller's transaction provides rollba
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy.orm import Session
-
 from app.models.stock_aggregate import StockAggregate
+from sqlalchemy.orm import Session
 
 
 def seed_stock_aggregates(

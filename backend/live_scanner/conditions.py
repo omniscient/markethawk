@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import List
 
 from app.utils.session import session_total_minutes
+
 from live_scanner.bar_aggregator import MinuteBar
 
 # ── Thresholds ─────────────────────────────────────────────────────────────

@@ -7,11 +7,10 @@ Note: router calls db.commit() for write operations. Tests use unique symbols
 
 import uuid
 
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from app.main import app
 from app.models.active_watchlist import WATCHLIST_SOFT_LIMIT, ActiveWatchlist
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 client = TestClient(app)
 

@@ -6,7 +6,6 @@ no DB or external calls required.
 import numpy as np
 import pandas as pd
 import pytest
-
 from app.services.chart_indicators import ChartIndicatorsService
 
 

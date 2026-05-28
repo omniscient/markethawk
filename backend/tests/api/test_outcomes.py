@@ -4,10 +4,10 @@ Runs against a real Postgres DB (via testcontainers).
 """
 
 import pytest
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.main import app
 from tests.fixtures.outcomes import seed_outcomes
 
 client = TestClient(app)

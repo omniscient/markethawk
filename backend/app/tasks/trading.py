@@ -1,11 +1,13 @@
 import asyncio
 import logging
+import time as _time
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
+from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,8 @@ def execute_auto_trade(self, rule_id: int, scanner_event_id: int):
     from app.models.scanner_event import ScannerEvent
     from app.services.auto_trade_service import auto_trade_executor
 
+    _task_name = "execute_auto_trade"
+    _start = _time.monotonic()
     db: Session = SessionLocal()
     try:
         rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
@@ -53,14 +57,19 @@ def execute_auto_trade(self, rule_id: int, scanner_event_id: int):
                 f"execute_auto_trade: no order created for rule={rule_id} "
                 f"event={scanner_event_id}"
             )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
 
     except Exception as exc:
         logger.error(
             f"❌ execute_auto_trade failed rule={rule_id} event={scanner_event_id}: {exc}"
         )
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         db.rollback()
         raise self.retry(exc=exc, countdown=15)
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 
@@ -76,6 +85,8 @@ def submit_approved_order(self, order_id: int):
     from app.models.auto_trade_order import AutoTradeOrder
     from app.services.auto_trade_service import auto_trade_executor
 
+    _task_name = "submit_approved_order"
+    _start = _time.monotonic()
     db: Session = SessionLocal()
     try:
         order = db.query(AutoTradeOrder).filter(AutoTradeOrder.id == order_id).first()
@@ -93,11 +104,17 @@ def submit_approved_order(self, order_id: int):
         logger.info(
             f"✅ submit_approved_order: order {order_id} submitted, status={order.status}"
         )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
+
     except Exception as exc:
         logger.error(f"❌ submit_approved_order failed order={order_id}: {exc}")
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         db.rollback()
         raise self.retry(exc=exc, countdown=15)
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 
@@ -116,6 +133,8 @@ def poll_auto_trade_fills(self):
     """
     from app.models.auto_trade_order import AutoTradeOrder
 
+    _task_name = "poll_auto_trade_fills"
+    _start = _time.monotonic()
     db: Session = SessionLocal()
     try:
         pending_orders = (
@@ -124,6 +143,7 @@ def poll_auto_trade_fills(self):
             .all()
         )
         if not pending_orders:
+            celery_tasks_total.labels(task_name=_task_name, status="success").inc()
             return
 
         logger.info(
@@ -147,10 +167,16 @@ def poll_auto_trade_fills(self):
         if live_orders:
             _poll_live_orders(live_orders, db, now)
 
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
+
     except Exception as exc:
         logger.error(f"❌ poll_auto_trade_fills error: {exc}")
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         db.rollback()
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 

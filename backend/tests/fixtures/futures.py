@@ -5,11 +5,10 @@ Each function inserts rows and flushes; the caller's transaction provides rollba
 
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy.orm import Session
-
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.futures_contract import FuturesContract
 from app.models.futures_rollover import FuturesRollover
+from sqlalchemy.orm import Session
 
 
 def seed_futures_contracts(

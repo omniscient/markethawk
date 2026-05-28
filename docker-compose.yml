@@ -97,6 +97,7 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
     ports:
       - "8000:8000"
     depends_on:
@@ -108,6 +109,7 @@ services:
         condition: service_started
     volumes:
       - ./backend:/app:ro
+      - prometheus_multiproc:/tmp/prometheus_multiproc
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -158,6 +160,7 @@ services:
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
     depends_on:
       postgres:
         condition: service_healthy
@@ -167,6 +170,7 @@ services:
         condition: service_started
     volumes:
       - ./backend:/app:ro
+      - prometheus_multiproc:/tmp/prometheus_multiproc
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -281,6 +285,43 @@ services:
     networks:
       - stockscanner-network
 
+  # Prometheus — metrics scraper
+  prometheus:
+    build:
+      context: ./monitoring/prometheus
+      dockerfile: Dockerfile
+    container_name: stockscanner-prometheus
+    volumes:
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    ports:
+      - "9090:9090"
+    networks:
+      - stockscanner-network
+    restart: unless-stopped
+
+  # Grafana — metrics visualization
+  grafana:
+    build:
+      context: ./grafana
+      dockerfile: Dockerfile
+    container_name: stockscanner-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - stockscanner-network
+    restart: unless-stopped
+
   # Dark Factory — autonomous development agent (run on demand)
   dark-factory:
     build:
@@ -391,6 +432,14 @@ volumes:
     external: true
     name: markethawk_ib_gateway_settings
   timesfm_cache:
+  prometheus_multiproc:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=256m
+  prometheus_data:
+  grafana_data:
 
 
 networks:

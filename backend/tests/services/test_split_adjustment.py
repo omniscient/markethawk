@@ -6,7 +6,6 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
-
 from app.services.split_adjustment import SplitAdjustmentService
 
 

@@ -6,6 +6,7 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.config import settings
+from app.core.metrics import active_websocket_connections
 from app.core.rate_limits import limiter
 from app.services.websocket_manager import websocket_manager
 
@@ -27,6 +28,7 @@ async def stock_live_websocket(websocket: WebSocket, ticker: str, resolution: st
         resolution = "minute"
 
     await websocket.accept()
+    active_websocket_connections.inc()
 
     # Ensure backend is connected to Polygon and subscribed to this ticker
     websocket_manager.subscribe(ticker)
@@ -57,6 +59,7 @@ async def stock_live_websocket(websocket: WebSocket, ticker: str, resolution: st
     except Exception as e:
         logger.error(f"WebSocket error for {ticker}: {e}")
     finally:
+        active_websocket_connections.dec()
         await pubsub.unsubscribe(channel)
         await redis_client.close()
         # Optionally tell manager to check if anyone else is watching this ticker
@@ -75,6 +78,7 @@ async def watchlist_live_websocket(websocket: WebSocket):
       - alert              (from live_scanner via 'watchlist:alerts' channel)
     """
     await websocket.accept()
+    active_websocket_connections.inc()
 
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     pubsub = redis_client.pubsub()
@@ -95,6 +99,7 @@ async def watchlist_live_websocket(websocket: WebSocket):
     except Exception as e:
         logger.error(f"Watchlist WebSocket error: {e}")
     finally:
+        active_websocket_connections.dec()
         await pubsub.unsubscribe("watchlist:live_data", "watchlist:alerts")
         await redis_client.close()
 
@@ -107,6 +112,7 @@ async def scan_task_websocket(websocket: WebSocket, task_id: str):
     Subscribes to Redis channel scan_task:{task_id} and forwards messages to the client.
     """
     await websocket.accept()
+    active_websocket_connections.inc()
 
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
     pubsub = redis_client.pubsub()
@@ -135,5 +141,6 @@ async def scan_task_websocket(websocket: WebSocket, task_id: str):
     except Exception as e:
         logger.error(f"Scan task WebSocket error for {task_id}: {e}")
     finally:
+        active_websocket_connections.dec()
         await pubsub.unsubscribe(channel)
         await redis_client.aclose()

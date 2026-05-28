@@ -8,7 +8,6 @@ exercise the graceful-fallback and pure-math paths only.
 from unittest.mock import MagicMock
 
 import numpy as np
-
 from app.services import timeseries_forecast as tf_module
 from app.services.timeseries_forecast import compute_anomaly_score, get_volume_forecast
 

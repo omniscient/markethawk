@@ -4,6 +4,7 @@ Scanner Service - Pre-market volume scanning logic.
 
 import asyncio
 import logging
+import time as _time
 from datetime import date, datetime, time, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -12,6 +13,7 @@ import pandas as pd
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
+from app.core.metrics import scan_duration_seconds, scanner_events_total
 from app.exceptions import DataFetchError, ProviderError, ScanError
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.monitored_stock import MonitoredStock
@@ -458,6 +460,7 @@ class ScannerService:
         scanner_run: Optional["ScannerRun"] = None,
     ) -> List[Dict[str, Any]]:
         """Run extended hours volume spike scanner using DB aggregates."""
+        _start = _time.monotonic()
         if event_date is None:
             event_date = get_market_today()
 
@@ -761,6 +764,9 @@ class ScannerService:
                         ranker_config=ranker_config,
                     )
                     results.append(event_dict)
+                    scanner_events_total.labels(
+                        scanner_type="pre_market_volume_spike"
+                    ).inc()
             except (ScanError, DataFetchError, ProviderError) as e:
                 logging.error(
                     "pre_market_scan: domain error for %s: %s",
@@ -782,6 +788,9 @@ class ScannerService:
             db.add(scanner_run)
 
         db.commit()
+        scan_duration_seconds.labels(scanner_type="pre_market_volume_spike").observe(
+            _time.monotonic() - _start
+        )
         return results
 
     @staticmethod
@@ -792,6 +801,7 @@ class ScannerService:
         scanner_run: Optional["ScannerRun"] = None,
     ) -> List[Dict[str, Any]]:
         """Run the Oversold Bounce (Dual RSI) scan using DB daily aggregates."""
+        _start = _time.monotonic()
         if event_date is None:
             event_date = get_market_today()
 
@@ -957,6 +967,7 @@ class ScannerService:
                         ranker_config=ranker_config,
                     )
                     results.append(event_dict)
+                    scanner_events_total.labels(scanner_type="oversold_bounce").inc()
             except (ScanError, DataFetchError, ProviderError) as e:
                 logging.error(
                     "oversold_bounce_scan: domain error for %s: %s",
@@ -978,6 +989,9 @@ class ScannerService:
             db.add(scanner_run)
 
         db.commit()
+        scan_duration_seconds.labels(scanner_type="oversold_bounce").observe(
+            _time.monotonic() - _start
+        )
         return results
 
     @staticmethod

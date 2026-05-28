@@ -1,0 +1,114 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: markethawk-infrastructure
+    folder: MarketHawk
+    interval: 1m
+    rules:
+      - uid: ibkr-disconnected
+        title: IBKR Disconnected
+        condition: C
+        for: 2m
+        annotations:
+          summary: IBKR Gateway has been disconnected for more than 2 minutes
+        labels:
+          severity: critical
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: ibkr_connection_status
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B < 1
+
+      - uid: high-celery-failure-rate
+        title: High Celery Task Failure Rate
+        condition: C
+        for: 5m
+        annotations:
+          summary: Celery task failure rate exceeds 10% over the last 5 minutes
+        labels:
+          severity: warning
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >
+                sum(rate(celery_tasks_total{status="failure"}[5m]))
+                /
+                sum(rate(celery_tasks_total[5m]))
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B > 0.1
+
+      - uid: db-pool-overflow
+        title: DB Pool Overflow
+        condition: C
+        for: 5m
+        annotations:
+          summary: SQLAlchemy connection pool overflow is non-zero for more than 5 minutes
+        labels:
+          severity: warning
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: db_pool_overflow
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B > 0
+
+      - uid: high-api-error-rate
+        title: High API Error Rate
+        condition: C
+        for: 5m
+        annotations:
+          summary: HTTP 5xx error rate exceeds 5 errors/min
+        labels:
+          severity: warning
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(rate(http_requests_total{status_code=~"5.."}[1m])) * 60
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B > 5

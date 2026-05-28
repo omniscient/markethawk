@@ -5,10 +5,9 @@ Each function inserts rows and flushes; the caller's transaction provides rollba
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy.orm import Session
-
 from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
+from sqlalchemy.orm import Session
 
 
 def seed_alert_rules(db: Session) -> list[AlertRule]:

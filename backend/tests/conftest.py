@@ -13,13 +13,12 @@ from contextlib import contextmanager
 from typing import Generator
 
 import pytest
+from app.core.database import Base
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from testcontainers.postgres import PostgresContainer
-
-from app.core.database import Base
-from app.main import app
 
 _conftest_logger = _logging.getLogger(__name__)
 

@@ -3,7 +3,6 @@ from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.models.stock_aggregate import StockAggregate
 from app.models.system_config import SystemConfig
 from app.services.scanner import ScannerService

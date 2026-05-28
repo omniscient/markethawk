@@ -53,9 +53,12 @@ npm run lint      # ESLint
 | Frontend    | http://localhost:3333         |
 | Backend API | http://localhost:8000         |
 | API Docs    | http://localhost:8000/docs    |
+| Metrics     | http://localhost:8000/metrics |
 | pgAdmin     | http://localhost:5050         |
 | Flower      | http://localhost:5555         |
 | Seq Logs    | http://localhost:5380         |
+| Prometheus  | http://localhost:9090         |
+| Grafana     | http://localhost:3001         |
 
 ## Architecture
 

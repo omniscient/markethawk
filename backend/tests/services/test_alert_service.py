@@ -4,12 +4,11 @@ Tests for AlertRuleService — rule matching, cooldown logic, and delivery dispa
 
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy.orm import Session
-
 from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.scanner_event import ScannerEvent
 from app.services.alert_service import AlertRuleService
+from sqlalchemy.orm import Session
 
 # ── helpers ────────────────────────────────────────────────────────────────
 

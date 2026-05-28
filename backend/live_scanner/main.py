@@ -17,6 +17,7 @@ from typing import Dict
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.active_watchlist import ActiveWatchlist
+
 from live_scanner.bar_aggregator import BarAggregator
 from live_scanner.conditions import check_conditions
 from live_scanner.ibkr_adapter import create_adapter

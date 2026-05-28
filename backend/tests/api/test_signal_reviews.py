@@ -4,12 +4,12 @@ Integration tests for signal review endpoints under /api/scanner/.
 
 import uuid as uuid_lib
 
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from app.main import app
 from app.models.scanner_event import ScannerEvent
 from app.models.signal_review import SignalReview
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
 from tests.fixtures.scanner import seed_scanner_events
 
 client = TestClient(app)

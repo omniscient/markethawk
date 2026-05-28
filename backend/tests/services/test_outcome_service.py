@@ -6,12 +6,11 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import pytest
-from sqlalchemy.orm import Session
-
 from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
 from app.models.stock_aggregate import StockAggregate
 from app.services.outcome_service import OutcomeService
+from sqlalchemy.orm import Session
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
