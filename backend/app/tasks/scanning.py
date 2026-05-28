@@ -2,12 +2,14 @@ import logging
 import asyncio
 import redis
 import json
+import time as _time
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.config import settings
+from app.core.metrics import celery_tasks_total, celery_task_duration_seconds
 from app.models.monitored_stock import MonitoredStock
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,8 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
     from app.models.scanner_event import ScannerEvent
     from app.services.alert_service import AlertRuleService, NotificationDispatcher
 
+    _task_name = "evaluate_scanner_alerts"
+    _start = _time.monotonic()
     db: Session = SessionLocal()
     try:
         event = db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
@@ -60,11 +64,16 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
                     f"strategy={rule.trading_strategy_id} ticker={event.ticker}"
                 )
 
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
     except Exception as e:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         logger.error(f"❌ evaluate_scanner_alerts failed for event {scanner_event_id}: {e}")
         db.rollback()
         raise self.retry(exc=e, countdown=30)
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 
@@ -84,6 +93,8 @@ def run_range_scan(
     from app.exceptions import DataFetchError, ProviderError
     from app.services.stock_data import StockDataService
 
+    _task_name = "run_range_scan"
+    _start = _time.monotonic()
     task_id = run_range_scan.request.id
     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
     channel = f"scan_task:{task_id}"
@@ -160,14 +171,19 @@ def run_range_scan(
             "events_detected": events_detected,
         }))
         logger.info(f"run_range_scan {task_id}: completed, {events_detected} events")
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
 
     except Exception as e:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         logger.error(f"run_range_scan {task_id} failed: {e}")
         r.publish(channel, json.dumps({
             "status": "failed",
             "error": str(e),
         }))
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         r.delete(f"scan:{ticker}:range")
         db.close()
 
@@ -182,6 +198,8 @@ def run_liquidity_hunt_scheduled(self):
     from app.services.liquidity_hunt import run_liquidity_hunt_scan
     from app.models.scanner_config import ScannerConfig
 
+    _task_name = "run_liquidity_hunt_scheduled"
+    _start = _time.monotonic()
     db: Session = SessionLocal()
     try:
         event_date = get_market_today()
@@ -217,10 +235,15 @@ def run_liquidity_hunt_scheduled(self):
                 "liquidity_hunt scheduled scan for universe %s on %s: %d events",
                 universe_id, event_date, len(results),
             )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
     except Exception as exc:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         logger.exception("run_liquidity_hunt_scheduled failed: %s", exc)
         raise self.retry(exc=exc)
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 
@@ -254,6 +277,8 @@ def run_universe_scan(
     import app.services.liquidity_hunt  # noqa: F401
     import app.services.scan_orchestrator as _orchestrator
 
+    _task_name = "run_universe_scan"
+    _perf_start = _time.monotonic()
     task_id = self.request.id
     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
     channel = f"scan_task:{task_id}"
@@ -410,8 +435,10 @@ def run_universe_scan(
             "run_universe_scan %s completed: type=%s universe=%s days=%d events=%d",
             scan_id, scanner_type, universe_id, len(trading_days), events_total,
         )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
 
     except Exception as exc:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         logger.exception("run_universe_scan %s failed", scan_id)
         try:
             run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_id).first()
@@ -426,6 +453,9 @@ def run_universe_scan(
             db.rollback()
         _publish({"type": "failed", "error": str(exc)})
     finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _perf_start
+        )
         try:
             r.delete(state_key)
             r.delete(cancel_key)
