@@ -1,3 +1,4 @@
+import React from 'react';
 import { format } from 'date-fns';
 import { Play, X, Settings, Download, Clock, Zap } from 'lucide-react';
 import Card from '../../components/ui/Card';

@@ -63,15 +63,14 @@ export const loadPersistedSelection = (): PersistedSelection => {
 };
 
 export function useScannerState() {
-  const persisted = useRef<PersistedSelection>(loadPersistedSelection()).current;
-
   const [isScanning, setIsScanning] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<string>(
-    persisted.scanner_type || 'pre_market_volume_spike',
+    () => loadPersistedSelection().scanner_type || 'pre_market_volume_spike',
   );
-  const [selectedUniverse, setSelectedUniverse] = useState<number | null>(
-    typeof persisted.universe_id === 'number' ? persisted.universe_id : null,
-  );
+  const [selectedUniverse, setSelectedUniverse] = useState<number | null>(() => {
+    const p = loadPersistedSelection();
+    return typeof p.universe_id === 'number' ? p.universe_id : null;
+  });
   const [scanStartDate, setScanStartDate] = useState<string>(lastCompletedWeekday());
   const [scanEndDate, setScanEndDate] = useState<string>(lastCompletedWeekday());
   const [scanResults, setScanResults] = useState<any>(null);

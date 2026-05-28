@@ -8,6 +8,17 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 export default [
   { ignores: ['dist/**', 'node_modules/**'] },
 
+  // Service worker (runs in browser SW context, not in main-thread JS)
+  {
+    files: ['public/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.serviceworker,
+      },
+    },
+  },
+
   // Base JS rules
   js.configs.recommended,
 

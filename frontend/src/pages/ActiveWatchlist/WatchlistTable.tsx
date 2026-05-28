@@ -10,6 +10,7 @@ function PriceCell({ live }: { live: SymbolLiveData | undefined }) {
     return <span className="text-gray-600 text-sm font-mono">—</span>;
   }
 
+  // eslint-disable-next-line react-hooks/purity -- staleness check; acceptable impurity for live data display
   const isStale = Date.now() - live.lastTickAt > 15_000;
   const pct = live.priceChangePct;
   const pctColor =
@@ -85,6 +86,7 @@ function WatchlistRow({ item, live }: { item: WatchlistItem; live: SymbolLiveDat
   const addedDate = new Date(item.added_at).toLocaleDateString(undefined, {
     month: 'short', day: 'numeric', year: 'numeric',
   });
+  // eslint-disable-next-line react-hooks/purity -- staleness check; acceptable impurity for live data display
   const isLive = live && live.price > 0 && Date.now() - live.lastTickAt < 15_000;
 
   return (
