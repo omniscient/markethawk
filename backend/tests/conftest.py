@@ -1,4 +1,9 @@
 import os
+# Must be set before any app import so SlowAPI limiter builds as a no-op.
+# Redis (db 1) is not available in the test environment; without this the
+# SlowAPIASGIMiddleware raises ConnectionError on every request.
+os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
+
 import pytest
 import logging as _logging
 from typing import Generator
