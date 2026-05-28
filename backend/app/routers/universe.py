@@ -5,7 +5,8 @@ Universe router - CRUD operations for stock universes.
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from app.core.rate_limits import limiter, SCANNER_LIMIT
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -180,7 +181,9 @@ def refresh_universe_stats(
 
 
 @router.post("/sync/fundamentals")
+@limiter.limit(SCANNER_LIMIT)
 def sync_fundamental_data(
+    request: Request,
     background_tasks: BackgroundTasks,
     delay: float = 15.0,
     db: Session = Depends(get_db),
@@ -192,7 +195,9 @@ def sync_fundamental_data(
 
 
 @router.post("/sync/details")
+@limiter.limit(SCANNER_LIMIT)
 def sync_ticker_details(
+    request: Request,
     background_tasks: BackgroundTasks,
     delay: float = 15.0,
     resync: bool = False,
@@ -224,7 +229,9 @@ def stop_sync(
 
 
 @router.post("/sync/metrics")
+@limiter.limit(SCANNER_LIMIT)
 def sync_daily_metrics(
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
@@ -292,7 +299,9 @@ def get_universe_stocks(
 
 
 @router.post("/{universe_id}/sync-aggregates")
+@limiter.limit(SCANNER_LIMIT)
 def sync_universe_aggregates(
+    request: Request,
     universe_id: int,
     from_date: str,
     to_date: str,
@@ -310,7 +319,9 @@ def sync_universe_aggregates(
 
 
 @router.post("/{universe_id}/analyze-quality")
+@limiter.limit(SCANNER_LIMIT)
 def trigger_quality_analysis(
+    request: Request,
     universe_id: int,
     db: Session = Depends(get_db),
 ):
@@ -383,13 +394,15 @@ def get_quality_report(
 
 
 @router.post("/{universe_id}/normalize")
+@limiter.limit(SCANNER_LIMIT)
 def trigger_normalization(
+    request: Request,
     universe_id: int,
-    request: Optional[NormalizeRequest] = None,
+    body: Optional[NormalizeRequest] = None,
     db: Session = Depends(get_db),
 ):
     """Start (or resume) a normalization run. Poll GET .../quality-report for status."""
-    target_tickers = request.target_tickers if request else None
+    target_tickers = body.target_tickers if body else None
     try:
         return universe_orchestrator.queue_normalization(universe_id, target_tickers, db)
     except UniverseNotFoundError:
