@@ -1,27 +1,46 @@
 import React, { useEffect, useRef } from 'react';
-import { 
-  createChart, 
-  ColorType, 
-  IChartApi, 
-  ISeriesApi, 
-  CandlestickData, 
-  LineData, 
+import {
+  createChart,
+  ColorType,
+  IChartApi,
+  ISeriesApi,
+  CandlestickData,
+  LineData,
   AreaData,
   Time,
   CandlestickSeries,
   AreaSeries,
   LineSeries,
   HistogramSeries,
-  createSeriesMarkers
+  createSeriesMarkers,
+  SeriesMarker,
 } from 'lightweight-charts';
-import { calculateDoubleSuperTrend } from '../../utils/indicators';
+import { calculateDoubleSuperTrend, OHLCVInput } from '../../utils/indicators';
+import { ScannerEvent } from '../../api/scanner';
+
+export interface StockBarRow {
+  Date?: string;
+  Open?: number;
+  High?: number;
+  Low?: number;
+  Close?: number;
+  Volume?: number | null;
+  vwap?: number | null;
+  vwap_intraday?: number | null;
+  marker_type?: string | null;
+  contract_month?: string | null;
+  transactions?: number | null;
+  // Used in line/area mode for relative volume charts
+  event_date?: string;
+  relative_volume?: number;
+}
 
 interface StockChartProps {
-  data: any[];
+  data: StockBarRow[];
   type: 'candlestick' | 'area' | 'line';
   timespan?: string;
   height?: number;
-  events?: any[];
+  events?: ScannerEvent[];
   highlightDate?: string;
   symbol?: string; // Ticker symbol for live data filtering
   liveData?: {
@@ -76,13 +95,15 @@ const StockChart: React.FC<StockChartProps> = ({
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  // lightweight-charts has no base series interface; ISeriesApi<SeriesType> makes setData
+  // unsatisfiable at call sites — keep ISeriesApi<any> per spec Req 7 (library limitation).
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const vwapSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const stLine1SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const stLine2SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const stCloudSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const markersPluginRef = useRef<any | null>(null);
+  const markersPluginRef = useRef<ReturnType<typeof createSeriesMarkers> | null>(null);
   const prevDataLengthRef = useRef<number>(0);
   const currentBarRef = useRef<{
     time: Time;
@@ -268,7 +289,7 @@ const StockChart: React.FC<StockChartProps> = ({
       const seenTimes = new Set<number | string>();
 
       for (const d of data) {
-        if (!d.Date || d.Open == null) continue;
+        if (!d.Date || d.Open == null || d.High == null || d.Low == null || d.Close == null) continue;
 
         let timeValue: Time;
         if (timespan === 'day') {
@@ -318,8 +339,8 @@ const StockChart: React.FC<StockChartProps> = ({
 
         const stData = calculateDoubleSuperTrend(stInputData, 3, 12);
         
-        const line1Data = stData.map(d => ({ time: d.time, value: d.tsl1 }));
-        const line2Data = stData.map(d => ({ time: d.time, value: d.tsl2 }));
+        const line1Data = stData.map(d => ({ time: d.time as Time, value: d.tsl1 }));
+        const line2Data = stData.map(d => ({ time: d.time as Time, value: d.tsl2 }));
         const cloudData = stData.map(d => ({
           time: d.time,
           open: d.tsl1,
@@ -345,7 +366,7 @@ const StockChart: React.FC<StockChartProps> = ({
       }
 
       // Markers — events + inline indicators
-      let allMarkers: any[] = [];
+      let allMarkers: SeriesMarker<Time>[] = [];
 
       if (events && events.length > 0) {
         for (const e of events) {
@@ -393,7 +414,7 @@ const StockChart: React.FC<StockChartProps> = ({
               ? a.time - b.time
               : String(a.time).localeCompare(String(b.time))
           );
-          const validMarkers = allMarkers.filter(m => seenTimes.has(m.time as any));
+          const validMarkers = allMarkers.filter(m => seenTimes.has(m.time as number | string));
           markersPluginRef.current.setMarkers(validMarkers);
         } else {
           markersPluginRef.current.setMarkers([]);
@@ -406,13 +427,14 @@ const StockChart: React.FC<StockChartProps> = ({
       const formattedData: (LineData | AreaData)[] = data
         .filter(d => d[xKey] && d[yKey] != null)
         .map(d => {
-          const timeValue = String(d[xKey]).includes('T') || String(d[xKey]).includes(':') 
-            ? toLocalTime(new Date(d[xKey]).getTime() / 1000) as Time
-            : d[xKey].split('T')[0] as Time;
-          
+          const rawTime = d[xKey] as string;
+          const timeValue = rawTime.includes('T') || rawTime.includes(':')
+            ? toLocalTime(new Date(rawTime).getTime() / 1000) as Time
+            : rawTime.split('T')[0] as Time;
+
           return {
             time: timeValue,
-            value: d[yKey],
+            value: d[yKey] as number,
           };
         })
         .sort((a, b) => {
@@ -538,8 +560,8 @@ const StockChart: React.FC<StockChartProps> = ({
       // For intraday or other numeric time scales
       const targetTime = toLocalTime(new Date(highlightDate).getTime() / 1000) as Time;
       
-      const dataFreqSeconds = data.length > 1 
-        ? (new Date(data[1].Date || data[1].event_date).getTime() - new Date(data[0].Date || data[0].event_date).getTime()) / 1000
+      const dataFreqSeconds = data.length > 1
+        ? (new Date((data[1].Date || data[1].event_date) as string).getTime() - new Date((data[0].Date || data[0].event_date) as string).getTime()) / 1000
         : 86400; // default 1 day
 
       const bufferBars = 30;

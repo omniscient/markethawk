@@ -600,6 +600,20 @@ export const syncUniverseAggregates = async (
 
 // ---- Stocks --------------------------------------------------------------- //
 
+export interface OHLCVRow {
+  Date: string;
+  Open: number;
+  High: number;
+  Low: number;
+  Close: number;
+  Volume?: number;
+  vwap?: number;
+  vwap_intraday?: number;
+  marker_type?: string;
+  contract_month?: string;
+  transactions?: number;
+}
+
 export const fetchHistoricalData = async (
   ticker: string,
   period: string = '30d',
@@ -611,7 +625,7 @@ export const fetchHistoricalData = async (
   timespan: string;
   multiplier: number;
   data_points: number;
-  data: any[];
+  data: OHLCVRow[];
   format?: 'row' | 'columnar';
 }> => {
   const response = await apiClient.get(`/stocks/historical/${ticker}`, {
@@ -634,7 +648,7 @@ export const fetchHistoricalData = async (
     const records = new Array(rowCount);
 
     for (let i = 0; i < rowCount; i++) {
-      const row: any = {};
+      const row: Record<string, string | number | null> = {};
       for (const key of keys) {
         const fullKey = mapping[key] || key;
         let value = data[key][i];
@@ -659,7 +673,7 @@ export const fetchHistoricalData = async (
     const records = new Array(rowCount);
     
     for (let i = 0; i < rowCount; i++) {
-       const row: any = {};
+       const row: Record<string, string | number | null> = {};
        for (const key of keys) {
          row[key] = data[key][i];
        }
