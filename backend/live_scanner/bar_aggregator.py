@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from app.utils.session import session_for_ts
+from app.utils.session import session_for_ts, session_total_minutes  # noqa: F401
 
 ET = ZoneInfo("America/New_York")
 

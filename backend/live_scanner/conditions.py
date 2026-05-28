@@ -5,7 +5,8 @@ Live scanner conditions — evaluated on each completed 1-minute bar.
 from dataclasses import dataclass
 from typing import List
 
-from live_scanner.bar_aggregator import MinuteBar, session_total_minutes
+from app.utils.session import session_total_minutes
+from live_scanner.bar_aggregator import MinuteBar
 
 # ── Thresholds ─────────────────────────────────────────────────────────────
 VOLUME_SPIKE_RATIO = 4.0  # projected full-session volume vs avg daily volume
