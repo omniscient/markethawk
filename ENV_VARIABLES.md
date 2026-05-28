@@ -103,6 +103,17 @@ Set in the `frontend` service's environment block in `docker-compose.yml`, or in
 
 ---
 
+## Distributed Tracing (OpenTelemetry)
+
+Set on `backend`, `celery-worker`, and `celery-beat` services. When `OTEL_EXPORTER_OTLP_ENDPOINT` is empty the OTel SDK defaults to its built-in no-op tracer — no spans are created and no configuration is required to disable tracing.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `""` (no-op) | OTLP gRPC endpoint for the trace collector. In Docker Compose this is `http://jaeger:4317`. Leave empty in environments without Jaeger. |
+| `OTEL_SERVICE_NAME` | `markethawk` | Service name shown in the Jaeger UI to distinguish API spans (`markethawk-backend`) from worker spans (`markethawk-worker`, `markethawk-beat`). |
+
+---
+
 ## Verification
 
 ```bash

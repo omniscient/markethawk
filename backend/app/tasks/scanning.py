@@ -24,9 +24,11 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
     For rules with auto_trade=True, queues execute_auto_trade as a follow-up task.
     Called automatically when a new ScannerEvent is created.
     """
+    from opentelemetry import trace as _otel_trace
     from app.models.scanner_event import ScannerEvent
     from app.services.alert_service import AlertRuleService, NotificationDispatcher
 
+    _tracer = _otel_trace.get_tracer(__name__)
     _task_name = "evaluate_scanner_alerts"
     _start = _time.monotonic()
     db: Session = SessionLocal()
@@ -40,7 +42,11 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
             )
             return
 
-        matching_rules = AlertRuleService.get_matching_rules(event, db)
+        with _tracer.start_as_current_span("alerts.evaluate") as _eval_span:
+            _eval_span.set_attribute("event_id", scanner_event_id)
+            matching_rules = AlertRuleService.get_matching_rules(event, db)
+            _eval_span.set_attribute("rules_matched", len(matching_rules))
+
         if not matching_rules:
             return
 
@@ -49,26 +55,29 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
             f"event={scanner_event_id} ticker={event.ticker} type={event.scanner_type}"
         )
 
-        for rule in matching_rules:
-            # Notification dispatch
-            try:
-                NotificationDispatcher.dispatch(rule, event, db)
-            except Exception as exc:
-                logger.error(f"❌ Dispatch failed for rule {rule.id}: {exc}")
+        with _tracer.start_as_current_span("alerts.dispatch") as _dispatch_span:
+            _dispatch_span.set_attribute("event_id", scanner_event_id)
+            _dispatch_span.set_attribute("rules_matched", len(matching_rules))
+            for rule in matching_rules:
+                # Notification dispatch
+                try:
+                    NotificationDispatcher.dispatch(rule, event, db)
+                except Exception as exc:
+                    logger.error(f"❌ Dispatch failed for rule {rule.id}: {exc}")
 
-            # Auto-trade: queue a separate task so notification failures
-            # never block order placement, and vice versa.
-            if rule.auto_trade and rule.trading_strategy_id:
-                from app.tasks.trading import execute_auto_trade
+                # Auto-trade: queue a separate task so notification failures
+                # never block order placement, and vice versa.
+                if rule.auto_trade and rule.trading_strategy_id:
+                    from app.tasks.trading import execute_auto_trade
 
-                execute_auto_trade.delay(
-                    rule_id=rule.id,
-                    scanner_event_id=scanner_event_id,
-                )
-                logger.info(
-                    f"🤖 Auto-trade queued for rule={rule.id} "
-                    f"strategy={rule.trading_strategy_id} ticker={event.ticker}"
-                )
+                    execute_auto_trade.delay(
+                        rule_id=rule.id,
+                        scanner_event_id=scanner_event_id,
+                    )
+                    logger.info(
+                        f"🤖 Auto-trade queued for rule={rule.id} "
+                        f"strategy={rule.trading_strategy_id} ticker={event.ticker}"
+                    )
 
         celery_tasks_total.labels(task_name=_task_name, status="success").inc()
     except Exception as e:
@@ -313,11 +322,21 @@ def run_universe_scan(
     from datetime import date as _date
     from datetime import timedelta as _td
 
+    from opentelemetry import context as _otel_context
+    from opentelemetry import trace as _otel_trace
+
     import app.services.liquidity_hunt  # noqa: F401
     import app.services.oversold_bounce_scan  # noqa: F401
     import app.services.pre_market_scan  # noqa: F401 — triggers self-registration
     import app.services.scan_orchestrator as _orchestrator
     from app.models.scanner_run import ScannerRun
+
+    _tracer = _otel_trace.get_tracer(__name__)
+    _root_span = _tracer.start_span("scanner.universe_scan")
+    _root_token = _otel_context.attach(_otel_trace.set_span_in_context(_root_span))
+    _root_span.set_attribute("scan_id", scan_id)
+    _root_span.set_attribute("universe_id", universe_id)
+    _root_span.set_attribute("scanner_type", scanner_type)
 
     _task_name = "run_universe_scan"
     _perf_start = _time.monotonic()
@@ -546,3 +565,5 @@ def run_universe_scan(
         except Exception:
             pass
         db.close()
+        _root_span.end()
+        _otel_context.detach(_root_token)

@@ -60,6 +60,7 @@ npm run lint      # ESLint
 | Seq GELF    | udp://localhost:12201         |
 | Prometheus  | http://localhost:9090         |
 | Grafana     | http://localhost:3001         |
+| Jaeger UI   | http://localhost:16686        |
 
 ## Architecture
 

@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # Set to an empty string or "disabled" to fall back to stdout-only logging.
     SEQ_URL: str = "http://seq:5341"
 
+    # Distributed Tracing (OpenTelemetry)
+    # OTEL_EXPORTER_OTLP_ENDPOINT: OTLP gRPC endpoint (e.g. http://jaeger:4317).
+    # Leave empty to use the OTel no-op tracer (zero overhead, no Jaeger required).
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = ""
+    # OTEL_SERVICE_NAME: identifies this process in Jaeger UI traces.
+    OTEL_SERVICE_NAME: str = "markethawk"
+
     # CORS — JSON array format in .env: CORS_ORIGINS=["http://localhost:3333","https://example.com"]
     CORS_ORIGINS: list[str] = ["http://localhost:3333"]
 

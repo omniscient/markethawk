@@ -251,6 +251,16 @@ class ScannerService:
 
         Returns a 3-tuple: (ticker_batch_data, market_context_dict, sector_etf_pct_dict)
         """
+        from opentelemetry import trace as _otel_trace
+        _tracer = _otel_trace.get_tracer(__name__)
+        with _tracer.start_as_current_span("scanner.batch_enrichment") as _span:
+            _span.set_attribute("ticker_count", len(tickers))
+            return ScannerService._get_batch_enrichment_data_impl(tickers, event_date, db)
+
+    @staticmethod
+    def _get_batch_enrichment_data_impl(
+        tickers: List[str], event_date: date, db: Session
+    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any], Dict[str, Optional[float]]]:
         day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
         day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
         day_end_utc = (
@@ -509,8 +519,17 @@ class ScannerService:
             ScannerService._get_batch_enrichment_data, tickers, event_date, db
         )
 
+        from opentelemetry import trace as _otel_trace, context as _otel_context
+        _tracer = _otel_trace.get_tracer(__name__)
+
         for ticker in tickers:
+            _ticker_span = _tracer.start_span("scanner.evaluate_ticker")
+            _ticker_token = _otel_context.attach(
+                _otel_trace.set_span_in_context(_ticker_span)
+            )
             try:
+                _ticker_span.set_attribute("ticker", ticker)
+                _ticker_span.set_attribute("scanner_type", "pre_market_volume_spike")
                 daily_bars = (
                     db.query(StockAggregate)
                     .filter(
@@ -782,6 +801,9 @@ class ScannerService:
                         "retryable": e.is_retryable,
                     }
                 )
+            finally:
+                _ticker_span.end()
+                _otel_context.detach(_ticker_token)
 
         if failed and scanner_run is not None:
             scanner_run.failed_tickers = failed

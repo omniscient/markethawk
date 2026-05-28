@@ -110,6 +110,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: markethawk-backend
     ports:
       - "8000:8000"
     depends_on:
@@ -178,6 +180,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: markethawk-worker
     depends_on:
       postgres:
         condition: service_healthy
@@ -246,6 +250,8 @@ services:
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       PYTHONDONTWRITEBYTECODE: "1"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_SERVICE_NAME: markethawk-beat
     depends_on:
       postgres:
         condition: service_healthy
@@ -486,6 +492,19 @@ services:
       resources:
         limits:
           memory: 1G
+
+  # Distributed Tracing — Jaeger all-in-one
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: markethawk-jaeger
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:16686:16686"   # Jaeger UI
+      - "4317:4317"                # OTLP gRPC receiver
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    networks:
+      - stockscanner-network
 
 volumes:
   postgres_data:
