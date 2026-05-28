@@ -16,7 +16,7 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     const isNetworkError = !error.response;
 
-    if (status === 401 && !error.config._retried && !error.config.url?.includes('/auth/refresh')) {
+    if (status === 401 && !error.config._retried && !error.config.url?.includes('/auth/')) {
       error.config._retried = true;
       try {
         await apiClient.post('/auth/refresh');
