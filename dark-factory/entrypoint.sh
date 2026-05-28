@@ -88,8 +88,10 @@ post_cost_report() {
   if [ -z "${ISSUE_NUM:-}" ]; then return; fi
 
   # Get this run's cost data as JSON
-  local RUN_JSON
-  RUN_JSON=$(archon workflow cost --last --json 2>/dev/null || true)
+  # Archon's pino logger writes to stdout; use --quiet to suppress, fall back to jq filtering
+  local RAW_OUTPUT RUN_JSON
+  RAW_OUTPUT=$(archon workflow cost --last --json --quiet 2>/dev/null || true)
+  RUN_JSON=$(echo "$RAW_OUTPUT" | jq -s 'map(select(.run_id?)) | .[0] // empty' 2>/dev/null || true)
   if [ -z "$RUN_JSON" ] || [ "$RUN_JSON" = "null" ]; then return; fi
 
   echo "Posting cost report to issue #${ISSUE_NUM}..."
