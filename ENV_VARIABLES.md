@@ -41,7 +41,7 @@ These must be set before starting the stack. The application will start without 
 | `POLYGON_DELAYED` | `true` | When `true`, treats Polygon data as potentially delayed. Set to `false` if your plan provides real-time data. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | JWT access token lifetime in minutes. Short values improve security; longer values reduce refresh frequency. |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime in days. Stored in Redis; deleting the Redis key revokes the session. |
-| `CORS_ORIGINS` | `http://localhost:3333` | Comma-separated list of allowed frontend origins. Wildcard `*` is intentionally rejected; list explicit origins instead. |
+| `CORS_ORIGINS` | `["http://localhost:3333"]` | JSON array of allowed frontend origins (e.g. `["http://localhost:3333","https://your-domain.com"]`). Wildcard `*` is intentionally rejected; list explicit origins instead. |
 | `DB_POOL_SIZE` | `20` | SQLAlchemy connection pool size per process. Increase if you add more Celery workers. |
 | `DB_POOL_MAX_OVERFLOW` | `10` | Extra connections allowed above `DB_POOL_SIZE` during bursts. |
 | `DB_POOL_PRE_PING` | `true` | When `true`, tests each connection before use to automatically recover after PostgreSQL restarts. |
