@@ -4,6 +4,7 @@ System-level information and status router.
 
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from app.core.rate_limits import limiter
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
@@ -213,6 +214,7 @@ def apply_split_adjustments(db: Session = Depends(get_db)):
 
 
 @router.websocket("/ws/tasks")
+@limiter.exempt
 async def system_tasks_websocket(websocket: WebSocket):
     """
     WebSocket endpoint that aggregates and pushes active system tasks 

@@ -69,6 +69,7 @@ def get_recent_news(
     return articles
 
 from fastapi import WebSocket, WebSocketDisconnect
+from app.core.rate_limits import limiter
 import asyncio
 import redis.asyncio as aioredis
 from app.core.config import settings
@@ -81,6 +82,7 @@ def trigger_news_refresh():
     return {"status": "ok", "task_id": str(result.id)}
 
 @router.websocket("/ws")
+@limiter.exempt
 async def news_websocket(websocket: WebSocket):
     await websocket.accept()
     # Connect to redis using async redis client

@@ -11,6 +11,7 @@ from typing import Optional
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from app.core.rate_limits import limiter
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/api/tweets", tags=["tweets"])
 
 
 @router.websocket("/feed")
+@limiter.exempt
 async def tweet_feed_websocket(websocket: WebSocket):
     """WebSocket: streams real-time tweet signals from Redis channel tweet_signals:all."""
     await websocket.accept()

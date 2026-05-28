@@ -1,4 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from app.core.rate_limits import limiter
 import asyncio
 import json
 import logging
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/live", tags=["live"])
 
 @router.websocket("/ws/{ticker}/{resolution}")
+@limiter.exempt
 async def stock_live_websocket(websocket: WebSocket, ticker: str, resolution: str):
     """
     WebSocket endpoint for live stock updates with specific resolution (minute/second).
@@ -57,6 +59,7 @@ async def stock_live_websocket(websocket: WebSocket, ticker: str, resolution: st
 
 
 @router.websocket("/ws/watchlist")
+@limiter.exempt
 async def watchlist_live_websocket(websocket: WebSocket):
     """
     WebSocket endpoint that streams live tick data and alerts for all
@@ -90,6 +93,7 @@ async def watchlist_live_websocket(websocket: WebSocket):
 
 
 @router.websocket("/ws/scan-task/{task_id}")
+@limiter.exempt
 async def scan_task_websocket(websocket: WebSocket, task_id: str):
     """
     WebSocket endpoint that streams Celery task progress for a range scan.
