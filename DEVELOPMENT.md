@@ -137,6 +137,33 @@ npm run lint       # ESLint check
 
 The frontend reads `VITE_API_TARGET` to locate the backend. When running manually it defaults to `http://localhost:8000`.
 
+## Code Quality (Pre-commit Hooks)
+
+[pre-commit](https://pre-commit.com/) enforces ruff lint, ruff format, and ESLint before every
+commit. It is a **host-side** tool — install it once per machine, not inside Docker.
+
+```bash
+pip install pre-commit   # one-time host install
+pre-commit install       # register hooks in .git/hooks/pre-commit (run once per clone)
+```
+
+After `pre-commit install`, every `git commit` automatically:
+1. Runs **ruff lint** on staged Python files in `backend/` — auto-fixes fixable violations and re-stages the file
+2. Runs **ruff format** on staged Python files in `backend/` — applies consistent formatting
+3. Runs **ESLint** (`npm run lint`) when any `.ts/.tsx/.js/.jsx` file is staged
+
+Note: the ESLint hook scans the entire `frontend/` tree, so Python-only commits will still
+trigger it. This is intentional — it catches lint regressions before they accumulate.
+
+If a hook modifies a file (ruff auto-fix), the commit is aborted so you can review the change.
+Re-run `git commit` to proceed.
+
+To run hooks manually against all files:
+
+```bash
+pre-commit run --all-files
+```
+
 ## Database Migrations
 
 Migrations are managed with Alembic. Migration files live in `backend/alembic/versions/`.
