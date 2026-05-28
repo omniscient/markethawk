@@ -35,6 +35,7 @@ These must be set before starting the stack. The application will start without 
 | `POSTGRES_DB` | `stockscanner` | PostgreSQL database name |
 | `POSTGRES_USER` | `postgres` | PostgreSQL superuser name |
 | `REDIS_URL` | `redis://redis:6379/0` | Redis connection string. Overriding is only needed for external Redis. |
+| `RATE_LIMITING_ENABLED` | `true` | When `false`, disables all API rate limiting (SlowAPI `enabled=False` — no-op at both middleware and decorator level). Useful during local development to avoid 429s while iterating on scanner endpoints. |
 | `ENVIRONMENT` | `production` | Set to `development` to include stack traces in API error responses. Defaults to `production` so unset envs never leak internals. |
 | `LOG_LEVEL` | `INFO` | Backend and Celery log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
 | `SEQ_URL` | `http://seq:5341` | Seq ingestion endpoint. Set to `disabled` or leave empty to fall back to stdout-only logging. |

@@ -58,6 +58,7 @@ A full pre-market scan proceeds as follows:
 | `database.py` | Async SQLAlchemy engine and session factory (`AsyncSession`). `get_db()` dependency. |
 | `celery_app.py` | Celery instance; beat schedule definitions (scan times, sync intervals). |
 | `error_tracking.py` | `ErrorTracker` protocol; `SeqErrorTracker` and `StdoutErrorTracker` implementations; MD5-based `ErrorId` generation. |
+| `rate_limits.py` | SlowAPI `limiter` instance + three tier constants: `GLOBAL_LIMIT` (100/min), `SCANNER_LIMIT` (5/min), `TRADING_LIMIT` (10/min). Lives in `core/` (not `main.py`) to break the circular import from routers importing `limiter`. Redis db 1 storage when `RATE_LIMITING_ENABLED=true`. |
 
 ### Exception Hierarchy (`app/exceptions.py`)
 
