@@ -51,3 +51,7 @@ pywebpush==2.0.0
 # Authentication
 python-jose[cryptography]==3.3.0
 bcrypt==5.0.0
+
+# Metrics
+prometheus-client==0.21.1
+prometheus-fastapi-instrumentator==7.1.0
