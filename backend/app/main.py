@@ -14,8 +14,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from slowapi.middleware import SlowAPIASGIMiddleware
+from slowapi.errors import RateLimitExceeded
 from jose import JWTError, jwt
 from app.core.config import settings, get_settings
+from app.core.rate_limits import limiter
 from app.core.database import engine, Base
 from app.core.error_tracking import ErrorTrackerFactory
 from app.exceptions import MarketHawkError
@@ -186,6 +189,21 @@ def create_app() -> FastAPI:
     
     # Gzip middleware for large payloads
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+    # Rate limiting — added last = outermost middleware (LIFO stacking = first to process
+    # inbound requests). When RATE_LIMITING_ENABLED=False, limiter.enabled=False means
+    # neither middleware nor @limiter.limit() decorators enforce any limits.
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIASGIMiddleware)
+
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+        retry_after = exc.limit.limit.get_expiry() if exc.limit else 60
+        return JSONResponse(
+            status_code=429,
+            headers={"Retry-After": str(retry_after)},
+            content={"message": "Rate limit exceeded", "error_id": None, "retry_after": retry_after},
+        )
 
     # Include routers
     app.include_router(auth_router)
