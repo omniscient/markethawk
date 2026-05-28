@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp, ExternalLink, X } from 'lucide-react';
 
 interface ServerErrorDetail {

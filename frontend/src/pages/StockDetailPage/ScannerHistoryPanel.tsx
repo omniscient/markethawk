@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Zap } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import RecentEvents from '../../components/RecentEvents';

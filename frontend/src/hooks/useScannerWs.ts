@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import type { MutableRefObject } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { createScanRunWebSocket } from '../api/scanner';
-import { ACTIVE_SCAN_LS_KEY, EMPTY_PROGRESS, type LiveProgress } from './useScannerState';
+import { ACTIVE_SCAN_LS_KEY, type LiveProgress } from './useScannerState';
 
 interface WsStateSlice {
   wsRef: MutableRefObject<WebSocket | null>;

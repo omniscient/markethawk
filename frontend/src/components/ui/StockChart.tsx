@@ -16,7 +16,7 @@ import {
   createSeriesMarkers,
   SeriesMarker,
 } from 'lightweight-charts';
-import { calculateDoubleSuperTrend, OHLCVInput } from '../../utils/indicators';
+import { calculateDoubleSuperTrend } from '../../utils/indicators';
 import { ScannerEvent } from '../../api/scanner';
 
 export interface StockBarRow {
@@ -397,7 +397,6 @@ const StockChart: React.FC<StockChartProps> = ({
           timeValue = toLocalTime(ts) as Time;
         }
         const isSwipe = d.marker_type === 'swipe';
-        const _isFlush = d.marker_type === 'flush';
         allMarkers.push({
           time: timeValue,
           position: isSwipe ? 'aboveBar' : 'belowBar' as const,

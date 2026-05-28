@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Globe, Newspaper } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import NewsFeed from '../../components/NewsFeed';
