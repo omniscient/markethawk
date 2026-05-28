@@ -147,6 +147,7 @@ git --version             # Git
 gh --version              # GitHub CLI — required for Archon issue/PR automation
 bun --version             # Bun runtime — required for Archon CLI
 claude --version          # Claude Code CLI
+pre-commit --version      # Pre-commit hook framework
 ```
 
 **Install anything missing:**
@@ -154,6 +155,7 @@ claude --version          # Claude Code CLI
 - GitHub CLI: `winget install GitHub.cli` (Windows) / `brew install gh` (macOS)
 - Bun: `irm bun.sh/install.ps1 | iex` (Windows) / `curl -fsSL https://bun.sh/install | bash` (macOS/Linux)
 - Claude Code: `npm install -g @anthropic-ai/claude-code`
+- pre-commit: `pip install pre-commit` (macOS/Linux/Windows)
 
 ### Step 1 — Authenticate GitHub CLI
 
@@ -168,6 +170,12 @@ gh auth status             # Confirm: "Logged in to github.com"
 cp .env.example .env       # Then fill in API keys — see ENV_VARIABLES.md
 docker-compose up -d       # Start all services
 docker-compose exec backend python -m alembic upgrade head  # Apply migrations
+```
+
+### Step 2.5 — Install pre-commit hooks
+
+```bash
+pre-commit install    # registers hooks in .git/hooks/pre-commit
 ```
 
 ### Step 3 — Verify Archon
