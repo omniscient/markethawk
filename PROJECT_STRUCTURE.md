@@ -44,8 +44,10 @@ MarketHawk/
 │   │   │   ├── signal_review.py        # SignalReview — user verdict (confirmed/rejected/enhanced/uncertain) on a ScannerEvent; latest_review @property exposed via ScannerEvent
 │   │   │   ├── monitored_account.py    # MonitoredAccount — X accounts tracked by tweet-monitor; handle, platform, poll_interval_seconds, last_tweet_id, classification_config JSONB
 │   │   │   ├── tweet_signal.py         # TweetSignal — one row per scraped tweet; classification, confidence, tickers/price_levels JSONB, promoted flag, FK → scanner_events
+│   │   │   ├── user.py                 # User — operator account; id (UUID PK), username (unique), password_hash (bcrypt), created_at, is_active
 │   │   │   └── __init__.py             # Re-exports all models (required for Alembic autogenerate)
 │   │   ├── routers/
+│   │   │   ├── auth.py                 # /api/auth/* — status, register (bootstrap), login (HttpOnly JWT cookies), logout, refresh, me
 │   │   │   ├── scanner.py              # /api/scanner/* — run, results (eager-loads reviews), history, signal-quality-distribution; review endpoints: POST /events/{uuid}/review, GET /events/reviews, GET /reviews/stats
 │   │   │   ├── universe.py             # /api/universe/* — CRUD for universes
 │   │   │   ├── stocks.py               # /api/stocks/* — historical data, ticker search

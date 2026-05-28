@@ -20,6 +20,7 @@ These must be set before starting the stack. The application will start without 
 | `POSTGRES_PASSWORD` | PostgreSQL superuser password | `change_me` |
 | `DATABASE_URL` | Full PostgreSQL connection string (must match `POSTGRES_*` vars) | `postgresql://postgres:change_me@postgres:5432/stockscanner` |
 | `SECRET_KEY` | JWT and session signing key. Generate with: `python -c "import secrets; print(secrets.token_hex(32))"` | `a3f8d2...` |
+| `JWT_SECRET_KEY` | Signing key for user access tokens. Fail-closed: empty value blocks all non-exempt endpoints. Generate same as `SECRET_KEY`. | `b9e1c4...` |
 | `PGADMIN_DEFAULT_EMAIL` | Login email for pgAdmin web UI | `admin@example.com` |
 | `PGADMIN_DEFAULT_PASSWORD` | Login password for pgAdmin web UI | `change_me` |
 | `SEQ_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Seq admin password. Generate with: `echo 'YourPassword' \| docker run --rm -i datalust/seq config hash` | `$2a$11$...` |
@@ -38,6 +39,9 @@ These must be set before starting the stack. The application will start without 
 | `LOG_LEVEL` | `INFO` | Backend and Celery log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
 | `SEQ_URL` | `http://seq:5341` | Seq ingestion endpoint. Set to `disabled` or leave empty to fall back to stdout-only logging. |
 | `POLYGON_DELAYED` | `true` | When `true`, treats Polygon data as potentially delayed. Set to `false` if your plan provides real-time data. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | JWT access token lifetime in minutes. Short values improve security; longer values reduce refresh frequency. |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime in days. Stored in Redis; deleting the Redis key revokes the session. |
+| `CORS_ORIGINS` | `http://localhost:3333` | Comma-separated list of allowed frontend origins. Wildcard `*` is intentionally rejected; list explicit origins instead. |
 | `DB_POOL_SIZE` | `20` | SQLAlchemy connection pool size per process. Increase if you add more Celery workers. |
 | `DB_POOL_MAX_OVERFLOW` | `10` | Extra connections allowed above `DB_POOL_SIZE` during bursts. |
 | `DB_POOL_PRE_PING` | `true` | When `true`, tests each connection before use to automatically recover after PostgreSQL restarts. |

@@ -34,6 +34,7 @@ from app.models.signal_cluster import SignalCluster
 from app.models.signal_review import SignalReview
 from app.models.monitored_account import MonitoredAccount
 from app.models.tweet_signal import TweetSignal
+from app.models.user import User
 
 __all__ = [
     "StockUniverse",
@@ -70,4 +71,5 @@ __all__ = [
     "SignalReview",
     "MonitoredAccount",
     "TweetSignal",
+    "User",
 ]

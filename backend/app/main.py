@@ -14,11 +14,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from app.core.config import settings
+from jose import JWTError, jwt
+from app.core.config import settings, get_settings
 from app.core.database import engine, Base
 from app.core.error_tracking import ErrorTrackerFactory
 from app.exceptions import MarketHawkError
-from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router, futures_router, alerts_router, watchlist_router, auto_trading_router, outcomes_router
+from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router, futures_router, alerts_router, watchlist_router, auto_trading_router, outcomes_router, auth_router
 from app.routers.tweets import router as tweets_router
 from app.core.celery_app import celery_app as celery
 from app.services.websocket_manager import websocket_manager
@@ -157,6 +158,23 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    EXEMPT_PREFIXES = ("/api/auth/", "/api/health", "/docs", "/redoc", "/openapi.json")
+
+    @app.middleware("http")
+    async def auth_middleware(request: Request, call_next):
+        path = request.url.path
+        if any(path.startswith(p) for p in EXEMPT_PREFIXES):
+            return await call_next(request)
+        token = request.cookies.get("access_token")
+        if not token:
+            return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+        _settings = get_settings()
+        try:
+            jwt.decode(token, _settings.JWT_SECRET_KEY, algorithms=[_settings.JWT_ALGORITHM])
+        except JWTError:
+            return JSONResponse(status_code=401, content={"detail": "Token expired or invalid"})
+        return await call_next(request)
+
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
@@ -170,6 +188,7 @@ def create_app() -> FastAPI:
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Include routers
+    app.include_router(auth_router)
     app.include_router(health_router)
     app.include_router(scanner_router)
     app.include_router(universe_router)

@@ -45,3 +45,7 @@ email-validator==2.3.0
 
 # Browser Push Notifications (VAPID Web Push)
 pywebpush==2.0.0
+
+# Authentication
+python-jose[cryptography]==3.3.0
+bcrypt==5.0.0
