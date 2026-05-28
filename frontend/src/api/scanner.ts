@@ -755,12 +755,16 @@ export const getSignalQualityDistribution = async (params: {
   return response.data;
 };
 
-export const handleApiError = (error: any): string => {
-  if (error.response) {
-    return error.response.data?.detail ?? error.response.statusText;
+export const handleApiError = (error: unknown): string => {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const e = error as { response: { data?: { detail?: string }; statusText: string } };
+    return e.response.data?.detail ?? e.response.statusText;
   }
-  if (error.request) {
+  if (error && typeof error === 'object' && 'request' in error) {
     return 'Unable to connect to server';
   }
-  return error.message ?? 'An unexpected error occurred';
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'An unexpected error occurred';
 };

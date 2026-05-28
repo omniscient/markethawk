@@ -58,6 +58,32 @@ export interface JournalEntry {
   updated_at: string;
 }
 
+export interface CreateTradeRequest {
+  symbol: string;
+  side?: string;
+  open_date?: string;
+  quantity?: number;
+  avg_entry_price?: number;
+  notes?: string;
+}
+
+export interface CreateJournalEntryRequest {
+  entry_date: string;
+  content: string;
+  sentiment?: string;
+}
+
+export interface CreateTagRequest {
+  name: string;
+  color?: string;
+}
+
+export interface ImportTradesResponse {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
 // ---- API calls ------------------------------------------------------------ //
 
 export const journalApi = {
@@ -73,12 +99,12 @@ export const journalApi = {
     return response.data;
   },
 
-  createTrade: async (trade: any): Promise<Trade> => {
+  createTrade: async (trade: CreateTradeRequest): Promise<Trade> => {
     const response = await apiClient.post<Trade>('/journal/trades', trade);
     return response.data;
   },
 
-  updateTrade: async (tradeId: number, data: any): Promise<Trade> => {
+  updateTrade: async (tradeId: number, data: Partial<CreateTradeRequest>): Promise<Trade> => {
     const response = await apiClient.patch<Trade>(`/journal/trades/${tradeId}`, data);
     return response.data;
   },
@@ -88,7 +114,7 @@ export const journalApi = {
     return response.data;
   },
 
-  importTrades: async (file: File, broker: string): Promise<any> => {
+  importTrades: async (file: File, broker: string): Promise<ImportTradesResponse> => {
     const formData = new FormData();
     formData.append('file', file);
     const response = await apiClient.post(`/journal/import`, formData, {
@@ -103,7 +129,7 @@ export const journalApi = {
     return response.data;
   },
 
-  createEntry: async (data: any): Promise<JournalEntry> => {
+  createEntry: async (data: CreateJournalEntryRequest): Promise<JournalEntry> => {
     const response = await apiClient.post<JournalEntry>('/journal/entries', data);
     return response.data;
   },
@@ -113,7 +139,7 @@ export const journalApi = {
     return response.data;
   },
 
-  createTag: async (data: any): Promise<Tag> => {
+  createTag: async (data: CreateTagRequest): Promise<Tag> => {
     const response = await apiClient.post<Tag>('/journal/tags', data);
     return response.data;
   },
