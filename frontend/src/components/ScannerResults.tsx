@@ -237,15 +237,15 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                       <span className="text-[10px] font-bold text-gray-500 uppercase border border-gray-700 px-1.5 py-0.5 rounded-md bg-gray-900/50">
                         {event.scanner_type.replace(/_/g, ' ')}
                       </span>
-                      {event.scanner_type === 'social_callout' && event.metadata?.tweet_url && (
+                      {event.scanner_type === 'social_callout' && Boolean(event.metadata?.tweet_url) && (
                         <a
-                          href={event.metadata?.tweet_url}
+                          href={event.metadata.tweet_url as string}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[10px] text-financial-blue hover:underline truncate max-w-[120px]"
-                          title={`@${event.metadata?.source_account ?? ''}`}
+                          title={`@${(event.metadata?.source_account as string) ?? ''}`}
                         >
-                          @{event.metadata?.source_account ?? 'unknown'}
+                          @{(event.metadata?.source_account as string) ?? 'unknown'}
                         </a>
                       )}
                     </div>
@@ -260,7 +260,7 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                       {getImportantIndicators(event).map(key => (
                         <div key={key} className="flex flex-col">
                           <span className="text-gray-500 uppercase tracking-tighter text-[8px]">{key.replace(/_/g, ' ')}</span>
-                          <span className={event.indicators[key] > 0 || key.includes('rsi') ? 'text-financial-light' : 'text-gray-400'}>
+                          <span className={(event.indicators[key] as number) > 0 || key.includes('rsi') ? 'text-financial-light' : 'text-gray-400'}>
                              {renderIndicator(key, event.indicators[key])}
                           </span>
                         </div>

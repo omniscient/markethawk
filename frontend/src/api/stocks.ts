@@ -29,6 +29,12 @@ export interface StockDetailConsolidated {
   split_adjustment_pending?: boolean;
 }
 
+export interface StockDataTaskResponse {
+  status: string;
+  message?: string;
+  task_id?: string;
+}
+
 // ---- API calls ------------------------------------------------------------ //
 
 export const fetchStockDetails = async (ticker: string): Promise<StockDetailConsolidated> => {
@@ -40,19 +46,19 @@ export const refreshStockData = async (
   ticker: string,
   timespan: string = 'day',
   period?: string,
-): Promise<any> => {
+): Promise<StockDataTaskResponse> => {
   const response = await apiClient.post(`/stocks/refresh/${ticker}`, null, {
     params: { timespan, period },
   });
-  
+
   if (response.data?.status === 'error') {
     throw new Error(response.data.message || 'Error refreshing stock data');
   }
-  
+
   return response.data;
 };
 
-export const syncMissingStockAggregates = async (ticker: string): Promise<any> => {
+export const syncMissingStockAggregates = async (ticker: string): Promise<StockDataTaskResponse> => {
   const response = await apiClient.post(`/stocks/${ticker}/sync-missing`);
   return response.data;
 };

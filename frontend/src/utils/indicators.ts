@@ -1,4 +1,19 @@
 
+export interface OHLCVInput {
+  High: number;
+  Low: number;
+  Open: number;
+  Close: number;
+  time: unknown;
+}
+
+export interface DoubleSuperTrendPoint {
+  time: unknown;
+  tsl1: number;
+  tsl2: number;
+  trend: number;
+}
+
 /**
  * Calculates the Double SuperTrend ATR indicator.
  * Translated from Pine Script:
@@ -9,13 +24,13 @@
  * Trend = close > TDown[1] ? 1: close< TUp[1]? -1: nz(Trend[1],1)
  */
 export function calculateDoubleSuperTrend(
-  data: any[],
+  data: OHLCVInput[],
   factor: number = 3,
   atrPeriod: number = 12
-) {
+): DoubleSuperTrendPoint[] {
   if (data.length < atrPeriod) return [];
 
-  const results = [];
+  const results: DoubleSuperTrendPoint[] = [];
   let prevATR = 0;
   let prevTUp = 0;
   let prevTDown = 0;

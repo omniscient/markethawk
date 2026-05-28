@@ -1,5 +1,4 @@
-import React from 'react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { Play, X, Settings, Download, Clock, Zap } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';

@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { formatDistanceToNow } from 'date-fns';
 import { Eye } from 'lucide-react';
 import Card from '../../components/ui/Card';

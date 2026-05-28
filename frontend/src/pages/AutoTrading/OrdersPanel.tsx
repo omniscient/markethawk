@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Activity, Loader2 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import { OrderRow } from './components';
@@ -17,7 +17,7 @@ export interface OrdersPanelProps {
 
 export function OrdersPanel({
   orders, loadingOrders, orderFilter, onOrderFilter,
-  strategies, onApprove, onReject, onCancel,
+  strategies: _strategies, onApprove, onReject, onCancel,
 }: OrdersPanelProps) {
   return (
     <div className="space-y-4">

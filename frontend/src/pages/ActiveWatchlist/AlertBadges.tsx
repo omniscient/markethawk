@@ -1,4 +1,4 @@
-import React from 'react';
+
 import type { LiveAlert } from '../../hooks/useWatchlistLive';
 
 export function AlertBadge({ alert }: { alert: LiveAlert | null }) {
