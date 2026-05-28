@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketHawk — Architecture &amp; Quality Report</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #283548;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #0ea5e9;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --orange: #f97316;
+    --purple: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Inter, system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+  h1 { font-size: 2rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.25rem; }
+  h2 {
+    font-size: 1.5rem; font-weight: 600; color: #f8fafc;
+    margin: 2.5rem 0 1rem; padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--accent);
+  }
+  h3 { font-size: 1.15rem; font-weight: 600; color: #f1f5f9; margin: 1.5rem 0 0.5rem; }
+  h4 { font-size: 1rem; font-weight: 600; color: var(--accent); margin: 1rem 0 0.4rem; }
+  p, li { color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .subtitle { color: var(--text-dim); font-size: 0.95rem; margin-bottom: 2rem; }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 9999px;
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+  .badge-orange { background: rgba(249,115,22,0.15); color: var(--orange); }
+  .badge-blue { background: rgba(14,165,233,0.15); color: var(--accent); }
+
+  /* Header banner */
+  .header-banner {
+    background: linear-gradient(135deg, #0c4a6e 0%, #1e293b 100%);
+    padding: 2.5rem 2rem;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border);
+  }
+  .header-banner .meta { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .header-banner .meta span { color: var(--text-dim); font-size: 0.85rem; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+
+  /* Score card */
+  .score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    text-align: center;
+  }
+  .score-big { font-size: 2.5rem; font-weight: 800; }
+  .score-label { font-size: 0.85rem; color: var(--text-dim); margin-top: 0.25rem; }
+  .score-5 { color: var(--green); }
+  .score-4 { color: #4ade80; }
+  .score-3 { color: var(--yellow); }
+  .score-2 { color: var(--orange); }
+  .score-1 { color: var(--red); }
+  .score-0 { color: #6b7280; }
+
+  /* Tables */
+  table {
+    width: 100%; border-collapse: collapse;
+    margin: 0.75rem 0 1.5rem;
+    font-size: 0.9rem;
+  }
+  th, td {
+    text-align: left; padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: var(--surface2);
+    color: #cbd5e1;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    position: sticky; top: 0;
+  }
+  tr:hover td { background: rgba(14,165,233,0.04); }
+  td code {
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.82rem;
+  }
+
+  /* TOC */
+  .toc { columns: 2; column-gap: 2rem; }
+  .toc li { break-inside: avoid; margin-bottom: 0.3rem; font-size: 0.9rem; }
+  .toc a { color: var(--accent); }
+
+  /* Meter bar */
+  .meter { height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin: 0.3rem 0; }
+  .meter-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+  .meter-green .meter-fill { background: var(--green); }
+  .meter-yellow .meter-fill { background: var(--yellow); }
+  .meter-orange .meter-fill { background: var(--orange); }
+  .meter-red .meter-fill { background: var(--red); }
+
+  /* Severity labels */
+  .sev-critical { color: var(--red); font-weight: 700; }
+  .sev-high { color: var(--orange); font-weight: 600; }
+  .sev-medium { color: var(--yellow); font-weight: 600; }
+  .sev-low { color: var(--green); }
+
+  /* Lists */
+  ul, ol { padding-left: 1.3rem; margin: 0.5rem 0; }
+  li { margin-bottom: 0.3rem; }
+
+  /* File path */
+  .fp { color: var(--purple); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .toc { columns: 1; }
+    .card-grid { grid-template-columns: 1fr; }
+    .header-banner .meta { flex-direction: column; gap: 0.5rem; }
+  }
+
+  /* Print */
+  @media print {
+    body { background: #fff; color: #111; }
+    .card, th { background: #f3f4f6; }
+    .header-banner { background: #e0f2fe; }
+    h2 { border-color: #0284c7; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ===== HEADER ===== -->
+<div class="header-banner">
+  <h1>MarketHawk &mdash; Architecture &amp; Quality Report</h1>
+  <div class="meta">
+    <span>Repository: <strong>omniscient/markethawk</strong></span>
+    <span>Branch: <strong>main</strong></span>
+    <span>Commits: <strong>398</strong></span>
+    <span>Generated: <strong>2026-05-26</strong></span>
+  </div>
+</div>
+
+<!-- ===== TABLE OF CONTENTS ===== -->
+<h2 id="toc">Table of Contents</h2>
+<ol class="toc">
+  <li><a href="#exec-summary">Executive Summary</a></li>
+  <li><a href="#tech-overview">Repository &amp; Technology Overview</a></li>
+  <li><a href="#arch-assessment">Architecture Assessment</a></li>
+  <li><a href="#maintain">Maintainability Assessment</a></li>
+  <li><a href="#test">Testability &amp; Code Coverage</a></li>
+  <li><a href="#reliability">Reliability &amp; Operational Readiness</a></li>
+  <li><a href="#security">Security &amp; Compliance Review</a></li>
+  <li><a href="#perf">Performance &amp; Scalability</a></li>
+  <li><a href="#api-data">API, Data &amp; Integration Quality</a></li>
+  <li><a href="#devx">Developer Experience</a></li>
+  <li><a href="#risk-register">Risk Register</a></li>
+  <li><a href="#adr-obs">Architecture Decision Observations</a></li>
+  <li><a href="#scorecard">Quality Scorecard</a></li>
+  <li><a href="#roadmap">Prioritized Improvement Roadmap</a></li>
+  <li><a href="#final">Final Recommendations</a></li>
+  <li><a href="#evidence">Evidence Index</a></li>
+  <li><a href="#limitations">Limitations</a></li>
+</ol>
+
+<!-- ================================================================== -->
+<!--  1. EXECUTIVE SUMMARY                                              -->
+<!-- ================================================================== -->
+<h2 id="exec-summary">1. Executive Summary</h2>
+
+<div class="card-grid">
+  <div class="score-card">
+    <div class="score-big score-3">62</div>
+    <div class="score-label">Overall Quality Score (0&ndash;100)</div>
+  </div>
+  <div class="score-card">
+    <div class="score-big score-3">3.2</div>
+    <div class="score-label">Architecture Quality (0&ndash;5)</div>
+  </div>
+  <div class="score-card">
+    <div class="score-big" style="color:var(--accent);">~45k</div>
+    <div class="score-label">Lines of Code (Python + TypeScript)</div>
+  </div>
+  <div class="score-card">
+    <div class="score-big" style="color:var(--purple);">13</div>
+    <div class="score-label">Docker Services</div>
+  </div>
+</div>
+
+<div class="card">
+<h3>Overall Health</h3>
+<p>MarketHawk is a <strong>feature-rich, actively developed</strong> full-stack stock scanning platform with two contributors (human + autonomous "Dark Factory" agent). The backend follows a clean layered architecture (routers &rarr; services &rarr; providers &rarr; models) with good separation of concerns. The frontend is a modern React 19 + TypeScript + React Query application with real-time WebSocket support, recently refactored to decompose 5 large page components into focused subdirectories with extracted hooks.</p>
+<p>The codebase is <strong>functional and well-organized for a solo/small-team project</strong>, but has significant gaps in security, testing, and operational readiness that would need to be addressed before any production or multi-user deployment.</p>
+</div>
+
+<h3>Top 5 Strengths</h3>
+<ol>
+  <li><strong>Clean layered architecture</strong> &mdash; Backend follows consistent router &rarr; service &rarr; provider &rarr; model layering with dependency injection throughout.</li>
+  <li><strong>Comprehensive domain model</strong> &mdash; 37 ORM models covering scanners, signals, outcomes, alerts, auto-trading, futures, and journaling; well-indexed with composite constraints.</li>
+  <li><strong>Provider abstraction</strong> &mdash; Protocol-based data provider interface (<code>base.py</code>) allows Polygon.io and IBKR to be swapped transparently; IBKR pacing guard is well-engineered.</li>
+  <li><strong>Autonomous development pipeline</strong> &mdash; Dark Factory + Archon workflows enable fire-and-forget feature development from GitHub issues to reviewed PRs (117 factory commits, 30% of total).</li>
+  <li><strong>Structured error tracking</strong> &mdash; Protocol-based <code>ErrorTrackerFactory</code> with Seq integration, unique error IDs, and frontend-to-Seq deep linking in the <code>GlobalErrorToast</code>.</li>
+</ol>
+
+<h3>Top 5 Risks</h3>
+<ol>
+  <li><span class="sev-critical">CRITICAL</span> <strong>No authentication/authorization</strong> &mdash; All 60+ API endpoints are publicly accessible, including auto-trade order submission, system config, and alert management.</li>
+  <li><span class="sev-critical">CRITICAL</span> <strong>CORS wildcard (<code>["*"]</code>)</strong> &mdash; Hardcoded in <code>config.py:49</code>; not configurable per environment. Combined with no auth, any origin can call any endpoint.</li>
+  <li><span class="sev-high">HIGH</span> <strong>Zero frontend test coverage</strong> &mdash; No test framework configured, no test files exist across 86 files. Recent decomposition makes the codebase more testable, but TypeScript strict mode remains disabled.</li>
+  <li><span class="sev-high">HIGH</span> <strong>No database connection pooling</strong> &mdash; <code>create_engine()</code> in <code>database.py</code> uses default pool settings; under load this risks connection exhaustion.</li>
+  <li><span class="sev-high">HIGH</span> <strong>Minimal CI/CD</strong> &mdash; Single GitHub Actions workflow covers only backend pytest; no frontend checks, no Docker build, no security scanning, no migration validation.</li>
+</ol>
+
+<h3>Top 5 Recommended Actions</h3>
+<ol>
+  <li>Add authentication middleware (JWT or API key) to all non-health endpoints &mdash; <em>Effort: M, blocks production use</em>.</li>
+  <li>Make CORS origins environment-configurable and default to restrictive list &mdash; <em>Effort: S</em>.</li>
+  <li>Configure SQLAlchemy connection pooling (<code>pool_size</code>, <code>max_overflow</code>, <code>pool_pre_ping</code>) &mdash; <em>Effort: S</em>.</li>
+  <li>Extend CI to include frontend <code>tsc --noEmit</code> + <code>vite build</code>, Alembic migration check, and dependency audit &mdash; <em>Effort: M</em>.</li>
+  <li>Install Vitest and add tests for the 6 extracted hooks; enable TypeScript strict mode incrementally &mdash; <em>Effort: L</em>.</li>
+</ol>
+</div>
+
+<!-- ================================================================== -->
+<!--  2. REPOSITORY & TECHNOLOGY OVERVIEW                               -->
+<!-- ================================================================== -->
+<h2 id="tech-overview">2. Repository &amp; Technology Overview</h2>
+
+<h3>Technology Stack</h3>
+<table>
+  <tr><th>Layer</th><th>Technology</th><th>Version</th></tr>
+  <tr><td>Backend Framework</td><td>FastAPI + Uvicorn</td><td>0.135.3 / 0.44.0</td></tr>
+  <tr><td>ORM</td><td>SQLAlchemy (sync)</td><td>2.0.49</td></tr>
+  <tr><td>Database</td><td>PostgreSQL</td><td>15 Alpine</td></tr>
+  <tr><td>Cache / Broker</td><td>Redis</td><td>7 Alpine</td></tr>
+  <tr><td>Task Queue</td><td>Celery + Beat</td><td>5.6.3</td></tr>
+  <tr><td>Frontend Framework</td><td>React</td><td>19.2.5</td></tr>
+  <tr><td>Frontend Build</td><td>Vite</td><td>8.0.8</td></tr>
+  <tr><td>State Management</td><td>React Query (TanStack)</td><td>5.90.12</td></tr>
+  <tr><td>Styling</td><td>Tailwind CSS</td><td>4.2.2</td></tr>
+  <tr><td>Charts</td><td>Lightweight Charts + Recharts</td><td>5.1.0 / 3.8.1</td></tr>
+  <tr><td>Market Data (Primary)</td><td>Polygon.io</td><td>1.16.3</td></tr>
+  <tr><td>Market Data (Live)</td><td>IBKR via ib_insync</td><td>0.9.86</td></tr>
+  <tr><td>ML/Analytics</td><td>LightGBM, scikit-learn, SHAP</td><td>4.6.0 / 1.6.1 / 0.47.2</td></tr>
+  <tr><td>Logging</td><td>Seq (structured)</td><td>latest</td></tr>
+  <tr><td>Container Orchestration</td><td>Docker Compose</td><td>v2</td></tr>
+  <tr><td>CI/CD</td><td>GitHub Actions</td><td>1 workflow</td></tr>
+  <tr><td>Language (Backend)</td><td>Python</td><td>3.12</td></tr>
+  <tr><td>Language (Frontend)</td><td>TypeScript</td><td>~5.x (strict: false)</td></tr>
+</table>
+
+<h3>Codebase Metrics</h3>
+<table>
+  <tr><th>Metric</th><th>Count</th></tr>
+  <tr><td>Python source files (excl. migrations)</td><td>209</td></tr>
+  <tr><td>Python lines of code</td><td>~29,500</td></tr>
+  <tr><td>TypeScript/TSX files</td><td>86</td></tr>
+  <tr><td>TypeScript lines of code</td><td>~15,100</td></tr>
+  <tr><td>Backend test files</td><td>72</td></tr>
+  <tr><td>Backend test lines</td><td>~8,300</td></tr>
+  <tr><td>Frontend test files</td><td>0</td></tr>
+  <tr><td>SQLAlchemy models</td><td>37</td></tr>
+  <tr><td>Alembic migrations</td><td>37</td></tr>
+  <tr><td>API routers</td><td>15</td></tr>
+  <tr><td>Service modules</td><td>28</td></tr>
+  <tr><td>Docker services</td><td>13 (+ 3 optional profiles)</td></tr>
+  <tr><td>Contributors</td><td>2 (Francois Germain: 244, Dark Factory: 117)</td></tr>
+</table>
+
+<h3>Repository Structure</h3>
+<table>
+  <tr><th>Path</th><th>Purpose</th></tr>
+  <tr><td><code>backend/app/core/</code></td><td>Config, DB session, Celery setup, error tracking</td></tr>
+  <tr><td><code>backend/app/models/</code></td><td>37 SQLAlchemy ORM models</td></tr>
+  <tr><td><code>backend/app/routers/</code></td><td>15 FastAPI route handlers</td></tr>
+  <tr><td><code>backend/app/schemas/</code></td><td>Pydantic request/response models</td></tr>
+  <tr><td><code>backend/app/services/</code></td><td>28 business logic modules</td></tr>
+  <tr><td><code>backend/app/providers/</code></td><td>External API integrations (Polygon, IBKR)</td></tr>
+  <tr><td><code>backend/app/tasks/</code></td><td>Celery background tasks (sync, scanning, trading, quality)</td></tr>
+  <tr><td><code>backend/tests/</code></td><td>API, service, provider, and live-scanner tests</td></tr>
+  <tr><td><code>frontend/src/api/</code></td><td>Axios HTTP client layer (11 modules)</td></tr>
+  <tr><td><code>frontend/src/pages/</code></td><td>13 routes across 31 files; 5 decomposed into subdirectories</td></tr>
+  <tr><td><code>frontend/src/components/</code></td><td>34 reusable UI components (incl. 7 scorecard, 7 modals)</td></tr>
+  <tr><td><code>frontend/src/hooks/</code></td><td>6 custom React hooks</td></tr>
+  <tr><td><code>dark-factory/</code></td><td>Autonomous development container</td></tr>
+  <tr><td><code>services/tweet-monitor/</code></td><td>Tweet monitoring microservice</td></tr>
+  <tr><td><code>Docs/</code></td><td>Design specs, plans, ADRs, schema docs</td></tr>
+</table>
+
+<h3>Architectural Pattern</h3>
+<p><strong>Layered monolith with service extraction in progress.</strong> The backend is a monolithic FastAPI application following a classic layered architecture. The live-scanner and tweet-monitor are extracted as separate Docker services, suggesting movement toward a service-oriented architecture. Celery handles async work. The frontend is a standard React SPA communicating via REST + WebSocket.</p>
+
+<!-- ================================================================== -->
+<!--  3. ARCHITECTURE ASSESSMENT                                        -->
+<!-- ================================================================== -->
+<h2 id="arch-assessment">3. Architecture Assessment</h2>
+
+<h3>3.1 Separation of Concerns</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Evidence:</strong> Clean four-layer separation: routers handle HTTP, services contain business logic, providers abstract external APIs, models define the domain. Each router depends on services via explicit function calls; services receive DB sessions via dependency injection.</p>
+  <p><strong>Finding:</strong> Some backend routers contain non-trivial business logic (e.g., <code>scanner.py:760 lines</code>, <code>system.py:480 lines</code>), blurring the router/service boundary. The <code>universe.py</code> router was recently refactored to delegate to <code>universe_orchestrator.py</code> (PR #82). On the frontend, a major decomposition refactored the 5 largest page components (AutoTrading 1,003&rarr;211 lines, Scanner 830&rarr;177, Alerts 812&rarr;154, StockDetail, ActiveWatchlist) into subdirectories with focused panel components and extracted hooks &mdash; a strong improvement in separation of concerns.</p>
+  <p><strong>Risk:</strong> As features grow, thick routers become harder to test and reuse.</p>
+  <p><strong>Recommendation:</strong> Continue extracting business logic from <code>scanner.py</code> router into dedicated service methods, following the universe refactoring pattern.</p>
+</div>
+
+<h3>3.2 Module Boundaries</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Evidence:</strong> The <code>providers/</code> package enforces a clear protocol via <code>base.py</code>. Services do not directly import ORM internals. Models are registered centrally in <code>models/__init__.py</code>. The recent task module split (PR #80) broke a god module into domain-focused files.</p>
+  <p><strong>Finding:</strong> Service-to-service imports are present (e.g., <code>scanner.py</code> imports from <code>catalyst_parser</code>, <code>signal_ranker</code>, <code>timeseries_forecast</code>). This is acceptable for a monolith but creates implicit coupling.</p>
+  <p><strong>Risk:</strong> Inter-service coupling could complicate future extraction.</p>
+</div>
+
+<h3>3.3 Dependency Direction</h3>
+<div class="card">
+  <strong>Score: 3/5</strong> <span class="badge badge-yellow">Acceptable</span>
+  <div class="meter meter-yellow"><div class="meter-fill" style="width:60%"></div></div>
+  <p><strong>Evidence:</strong> Generally flows inward: routers &rarr; services &rarr; models. Providers are consumed by services.</p>
+  <p><strong>Finding:</strong> <code>main.py</code> contains a scan orchestrator registry (lines 188-193) with lazy imports of service modules, creating a top-level coupling point. <code>celery_app.py</code> defines the beat schedule with task names as strings, creating an implicit contract.</p>
+  <p><strong>Risk:</strong> String-based task references can silently break if task modules are renamed.</p>
+</div>
+
+<h3>3.4 Coupling and Cohesion</h3>
+<div class="card">
+  <strong>Score: 3/5</strong> <span class="badge badge-yellow">Acceptable</span>
+  <div class="meter meter-yellow"><div class="meter-fill" style="width:60%"></div></div>
+  <p><strong>Evidence:</strong> Most services are cohesive (one domain per module). The <code>scanning.py</code> task file orchestrates alerts + auto-trading after each scan, coupling scan execution with downstream effects.</p>
+  <p><strong>Finding:</strong> The <code>alert_service.py</code> (401 lines) handles rule evaluation, four delivery channels, delivery logging, and cooldown tracking &mdash; high cohesion around alerting but could benefit from channel-specific extractors.</p>
+</div>
+
+<h3>3.5 API Design</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Evidence:</strong> Consistent REST conventions: <code>POST</code> for creation (201), <code>202</code> for async operations, <code>409</code> for concurrency conflicts. All endpoints use Pydantic schemas for request/response validation. WebSocket endpoints for real-time scan progress and live market data.</p>
+  <p><strong>Finding:</strong> The columnar-compact data format for historical bars (<code>stocks.py</code> router) is a thoughtful optimization, mapping column names to 1-2 character keys for bandwidth reduction.</p>
+  <p><strong>Risk:</strong> No API versioning. Breaking changes would affect all clients simultaneously.</p>
+</div>
+
+<h3>3.6 Data Access Patterns</h3>
+<div class="card">
+  <strong>Score: 3/5</strong> <span class="badge badge-yellow">Acceptable</span>
+  <div class="meter meter-yellow"><div class="meter-fill" style="width:60%"></div></div>
+  <p><strong>Evidence:</strong> SQLAlchemy ORM used consistently. Transactions managed via session scope in <code>get_db()</code> dependency. SAVEPOINT-based test isolation in <code>conftest.py</code> is well-engineered.</p>
+  <p><strong>Finding:</strong> No eager loading (<code>joinedload</code>) observed in router queries. The <code>ScannerEvent.latest_review</code> property computes O(n) over the reviews list instead of using a database query. JSONB columns (indicators, metadata, criteria) are used for flexible payloads but are harder to query and index.</p>
+  <p><strong>Risk:</strong> N+1 query patterns likely exist for endpoints that traverse relationships.</p>
+  <p><strong>Recommendation:</strong> Audit top-traffic endpoints with SQL logging enabled and add <code>joinedload</code>/<code>selectinload</code> where relationships are always needed.</p>
+</div>
+
+<h3>3.7 Error Handling Architecture</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Evidence:</strong> Custom <code>MarketHawkError</code> exception hierarchy with <code>is_retryable</code> flag. Global exception handler in <code>main.py</code> generates unique error IDs via MD5 hash of traceback. Stack traces hidden in production (<code>ENVIRONMENT != development</code>). Seq integration for centralized error collection.</p>
+  <p><strong>Finding:</strong> Domain-specific errors (<code>UniverseNotFoundError</code>, <code>UniverseValidationError</code>) added in recent refactoring, moving away from generic <code>HTTPException</code> in routers.</p>
+</div>
+
+<h3>3.8 Configuration Management</h3>
+<div class="card">
+  <strong>Score: 2/5</strong> <span class="badge badge-orange">Weak</span>
+  <div class="meter meter-orange"><div class="meter-fill" style="width:40%"></div></div>
+  <p><strong>Evidence:</strong> <code>config.py</code> uses raw <code>os.getenv()</code> calls instead of Pydantic <code>BaseSettings</code>. No type validation or coercion on environment variables. <code>IBKR_PORT</code> and <code>IBKR_CLIENT_ID</code> do bare <code>int()</code> conversion that would crash with a non-numeric value.</p>
+  <p><strong>Finding:</strong> The docstring says "pydantic-settings" but the class doesn't inherit from <code>BaseSettings</code>. CORS origins are hardcoded (<code>["*"]</code>) rather than environment-configurable. <code>ENVIRONMENT</code> defaults to "production" &mdash; a safe default.</p>
+  <p><strong>Risk:</strong> Invalid env vars cause unhandled <code>ValueError</code> on startup instead of clear validation errors.</p>
+  <p><strong>Recommendation:</strong> Migrate to <code>pydantic-settings.BaseSettings</code> for automatic env validation, type coercion, and <code>.env</code> file support.</p>
+</div>
+
+<h3>3.9 Observability Architecture</h3>
+<div class="card">
+  <strong>Score: 3/5</strong> <span class="badge badge-yellow">Acceptable</span>
+  <div class="meter meter-yellow"><div class="meter-fill" style="width:60%"></div></div>
+  <p><strong>Evidence:</strong> Seq for structured logging with error IDs. Flower for Celery monitoring. pgAdmin for database inspection. Frontend GlobalErrorToast includes Seq deep links.</p>
+  <p><strong>Finding:</strong> No metrics (Prometheus/StatsD), no distributed tracing, no APM. System health endpoint checks DB, Redis, and IBKR connectivity but doesn't expose metrics for scraping.</p>
+  <p><strong>Risk:</strong> Performance degradation and capacity issues would be invisible until they cause failures.</p>
+</div>
+
+<h3>3.10 Security Architecture</h3>
+<div class="card">
+  <strong>Score: 1/5</strong> <span class="badge badge-red">Poor</span>
+  <div class="meter meter-red"><div class="meter-fill" style="width:20%"></div></div>
+  <p><strong>Evidence:</strong> No authentication or authorization layer detected across any of the 15 routers and 60+ endpoints. CORS allows all origins. No rate limiting middleware. No CSRF protection.</p>
+  <p><strong>Finding:</strong> The IB Gateway runs with <code>READ_ONLY_API=yes</code> by default, which is a good safety measure. However, the auto-trading router (<code>auto_trading.py</code>) submits orders to IBKR with no auth gate. The <code>system/config</code> endpoint allows arbitrary system configuration updates.</p>
+  <p><strong>Risk:</strong> Any network-accessible client can submit trades, modify system configuration, and access all user data.</p>
+  <p><strong>Recommendation:</strong> This is the #1 priority. Add JWT or API key authentication before any network exposure.</p>
+</div>
+
+<h3>3.11 Deployment Architecture</h3>
+<div class="card">
+  <strong>Score: 3/5</strong> <span class="badge badge-yellow">Acceptable</span>
+  <div class="meter meter-yellow"><div class="meter-fill" style="width:60%"></div></div>
+  <p><strong>Evidence:</strong> Docker Compose defines 13 services with health checks, dependency ordering, and network segmentation. External volumes for data persistence. Read-only bind mounts for backend code. Optional profiles for forecast-worker, dark-factory, and backlog-scheduler.</p>
+  <p><strong>Finding:</strong> No memory/CPU limits on most services. Management tools (pgAdmin, Flower, Seq) exposed on all interfaces. No TLS termination. No production vs. development compose file separation.</p>
+  <p><strong>Risk:</strong> Resource-hungry services (ML forecasting, data sync) could starve critical services (API, database).</p>
+</div>
+
+<!-- ================================================================== -->
+<!--  4. MAINTAINABILITY ASSESSMENT                                     -->
+<!-- ================================================================== -->
+<h2 id="maintain">4. Maintainability Assessment</h2>
+
+<h3>Code Organization</h3>
+<div class="card">
+  <p><strong>Score: 4/5.</strong> Well-organized with clear package boundaries. Recent refactoring PRs (#80, #81, #82) show active architectural hygiene &mdash; the tasks.py god module was split, IBKR coupling was abstracted, and universe orchestration was extracted.</p>
+</div>
+
+<h3>Complexity Hotspots</h3>
+<table>
+  <tr><th>File</th><th>Lines</th><th>Concern</th></tr>
+  <tr><td><code>services/futures_data.py</code></td><td>1,039</td><td>Largest service; handles contracts, rollovers, and aggregation</td></tr>
+  <tr><td><code>routers/scanner.py</code></td><td>857</td><td>Thick router with business logic mixed into handlers</td></tr>
+  <tr><td><code>services/scanner.py</code></td><td>804</td><td>Core domain logic; complex but cohesive</td></tr>
+  <tr><td><code>providers/ibkr.py</code></td><td>679</td><td>Pacing guard + connection management + multi-asset support</td></tr>
+  <tr><td><code>services/liquidity_hunt.py</code></td><td>646</td><td>Scanner variant with unique algorithm</td></tr>
+  <tr><td><code>tasks/sync.py</code></td><td>621</td><td>Data synchronization tasks</td></tr>
+  <tr><td><code>components/QualityReportModal.tsx</code></td><td>753</td><td>Largest frontend component; data quality display</td></tr>
+  <tr><td><code>components/ui/StockChart.tsx</code></td><td>563</td><td>Lightweight Charts wrapper with indicators</td></tr>
+</table>
+
+<h3>Naming Clarity</h3>
+<div class="card">
+  <p><strong>Score: 4/5.</strong> Python follows PEP 8 (snake_case). React follows standard conventions (PascalCase components, camelCase variables). File naming is consistent: kebab-case for frontend, snake_case for backend. Model names are descriptive: <code>ScannerOutcomeSnapshot</code>, <code>UniverseQualityReport</code>, <code>AlertDeliveryLog</code>.</p>
+</div>
+
+<h3>Duplication</h3>
+<div class="card">
+  <p><strong>Score: 3/5.</strong> Environment variable blocks are duplicated across 5 docker-compose service definitions (backend, celery-worker, celery-beat, live-scanner). The <code>massive.py</code> and <code>ibkr.py</code> providers share some structural patterns that could be consolidated. Frontend API modules <code>alerts.ts</code> and <code>trading.ts</code> create their own Axios instances instead of using the centralized client.</p>
+</div>
+
+<h3>Framework Usage</h3>
+<div class="card">
+  <p><strong>Score: 4/5.</strong> FastAPI features are well-leveraged: dependency injection via <code>Depends()</code>, Pydantic validation, lifespan management, WebSocket support, GZip middleware. React Query is used idiomatically for server state with proper cache invalidation. The frontend refactoring extracted domain-specific hooks (<code>useScannerState</code>, <code>useScannerWs</code>, <code>useWatchlistLive</code>) that encapsulate WebSocket and localStorage logic &mdash; good React patterns. Celery Beat scheduling is clean.</p>
+  <p><strong>Gap:</strong> SQLAlchemy async capabilities are imported (<code>asyncpg</code> in requirements) but not used &mdash; the ORM is synchronous. The FastAPI app is sync despite the framework supporting async natively.</p>
+</div>
+
+<h3>Exemplary Files</h3>
+<table>
+  <tr><th>File</th><th>Why</th></tr>
+  <tr><td><code>core/error_tracking.py</code></td><td>Protocol-based design, factory pattern, async support, graceful fallback</td></tr>
+  <tr><td><code>providers/base.py</code></td><td>Clean interface definition with clear contract</td></tr>
+  <tr><td><code>tests/conftest.py</code></td><td>SAVEPOINT-based test isolation with testcontainers</td></tr>
+  <tr><td><code>providers/ibkr.py</code></td><td>Sophisticated pacing guard with sliding-window rate limiting</td></tr>
+  <tr><td><code>pages/Scanner/</code></td><td>Recently decomposed: 830-line monolith split into 5 focused files (index, ScanConfigPanel, LiveProgressPanel, ResultsPanel, ScanStatusCard) with extracted hooks (useScannerState, useScannerWs)</td></tr>
+</table>
+
+<h3>Problematic Files</h3>
+<table>
+  <tr><th>File</th><th>Why</th></tr>
+  <tr><td><code>core/config.py</code></td><td>Docstring says "pydantic-settings" but doesn't use it; raw os.getenv with no validation</td></tr>
+  <tr><td><code>core/database.py</code></td><td>No connection pool configuration; 32 lines total</td></tr>
+  <tr><td><code>routers/scanner.py</code></td><td>857 lines of mixed routing and business logic</td></tr>
+  <tr><td><code>frontend/src/api/alerts.ts</code>, <code>trading.ts</code></td><td>Create separate Axios instances, bypassing centralized error handling in <code>client.ts</code></td></tr>
+  <tr><td><code>frontend/src/pages/Journal.tsx</code></td><td>496 lines; not yet decomposed like Scanner/Alerts/AutoTrading pages</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<!--  5. TESTABILITY & COVERAGE                                         -->
+<!-- ================================================================== -->
+<h2 id="test">5. Testability &amp; Code Coverage</h2>
+
+<h3>Backend Testing</h3>
+<div class="card">
+  <p><strong>Framework:</strong> pytest 9.0.3 + pytest-cov + pytest-asyncio + testcontainers + fakeredis</p>
+  <p><strong>Coverage threshold:</strong> 60% (configured in <code>pyproject.toml</code>)</p>
+  <p><strong>Test organization:</strong></p>
+  <ul>
+    <li><code>tests/api/</code> &mdash; 18 router test files using <code>TestClient</code></li>
+    <li><code>tests/services/</code> &mdash; 17 service unit/integration tests</li>
+    <li><code>tests/providers/</code> &mdash; 3 provider tests</li>
+    <li><code>tests/live_scanner/</code> &mdash; 6 live scanner module tests</li>
+    <li><code>tests/tasks/</code> &mdash; 3 task tests</li>
+    <li><code>tests/fixtures/</code> &mdash; 9 fixture modules for DB seeding</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h4>Test Infrastructure Quality</h4>
+  <p><strong>Score: 4/5.</strong> The test infrastructure is well-designed:</p>
+  <ul>
+    <li><strong>Database isolation:</strong> SAVEPOINT-based transaction rollback ensures each test starts clean without expensive table drops.</li>
+    <li><strong>Dual DB modes:</strong> Supports testcontainers (local dev) and external <code>TEST_DATABASE_URL</code> (CI).</li>
+    <li><strong>Fixture modules:</strong> Dedicated seed data factories for each domain (scanner, alerts, futures, journal, etc.).</li>
+    <li><strong>Redis mocking:</strong> fakeredis for testing Celery and cache interactions.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h4>Coverage Exclusions</h4>
+  <p>The following are explicitly excluded from coverage measurement:</p>
+  <ul>
+    <li><code>app/main.py</code> &mdash; lifespan/startup code</li>
+    <li><code>app/tasks/*.py</code> &mdash; Celery tasks (require running broker)</li>
+    <li><code>app/services/futures_data.py</code> &mdash; requires live IBKR connection</li>
+    <li><code>app/migrations/*</code> &mdash; Alembic migrations</li>
+  </ul>
+  <p><strong>Risk:</strong> Excluding all Celery tasks (4 modules, ~1,800 lines) from coverage means a significant portion of business logic is untestable in CI.</p>
+</div>
+
+<h3>Frontend Testing</h3>
+<div class="card">
+  <p><strong>Score: 0/5</strong> <span class="badge badge-red">Not present</span></p>
+  <p>No test framework is configured (no vitest/jest in <code>package.json</code>). No test files exist anywhere in the frontend codebase. The recent page-decomposition refactoring (86 files, ~15,100 lines) makes the codebase more testable &mdash; smaller, focused components with extracted hooks are easier to unit-test &mdash; but no tests have been written yet.</p>
+  <p><strong>Recommendation:</strong> Install Vitest (Vite-native). The 6 custom hooks (<code>useScannerState</code>, <code>useScannerWs</code>, <code>useWatchlistLive</code>, etc.) are the highest-value test targets since they contain state logic independent of rendering.</p>
+</div>
+
+<h3>Test Quality Signals</h3>
+<table>
+  <tr><th>Signal</th><th>Status</th></tr>
+  <tr><td>Test isolation (no shared state)</td><td><span class="badge badge-green">Yes</span> SAVEPOINT rollback</td></tr>
+  <tr><td>Deterministic data (seeded fixtures)</td><td><span class="badge badge-green">Yes</span> Fixture modules</td></tr>
+  <tr><td>Real database in CI</td><td><span class="badge badge-green">Yes</span> PostgreSQL 15 in GitHub Actions</td></tr>
+  <tr><td>Contract/E2E tests</td><td><span class="badge badge-red">No</span></td></tr>
+  <tr><td>Frontend tests</td><td><span class="badge badge-red">No</span></td></tr>
+  <tr><td>Celery task tests</td><td><span class="badge badge-yellow">Partial</span> 3 files only</td></tr>
+  <tr><td>Performance/load tests</td><td><span class="badge badge-red">No</span></td></tr>
+</table>
+
+<!-- ================================================================== -->
+<!--  6. RELIABILITY & OPERATIONAL READINESS                            -->
+<!-- ================================================================== -->
+<h2 id="reliability">6. Reliability &amp; Operational Readiness</h2>
+
+<table>
+  <tr><th>Capability</th><th>Score</th><th>Evidence</th></tr>
+  <tr>
+    <td>Logging</td>
+    <td><span class="badge badge-green">4/5</span></td>
+    <td>Structured logging via Seq with error IDs. Debug-mode SQL logging with parameter substitution. Centralized <code>ErrorTrackerFactory</code>.</td>
+  </tr>
+  <tr>
+    <td>Health Checks</td>
+    <td><span class="badge badge-green">4/5</span></td>
+    <td>Docker healthchecks on all critical services (postgres, redis, ib-gateway, backend). <code>/api/health</code> endpoint. <code>/api/system/health</code> with component-level status. Frontend <code>SystemActivityMonitor</code> component.</td>
+  </tr>
+  <tr>
+    <td>Retry Behavior</td>
+    <td><span class="badge badge-yellow">3/5</span></td>
+    <td>Celery tasks have <code>max_retries=2-3</code> with countdown for rate limits (60s on 429). IBKR pacing guard prevents request flooding. No HTTP retry middleware on outbound calls.</td>
+  </tr>
+  <tr>
+    <td>Timeout Handling</td>
+    <td><span class="badge badge-orange">2/5</span></td>
+    <td>IBKR pacing guard has time-based controls. No explicit request timeouts on Polygon API calls. No global request timeout middleware.</td>
+  </tr>
+  <tr>
+    <td>Graceful Degradation</td>
+    <td><span class="badge badge-yellow">3/5</span></td>
+    <td>Provider <code>is_available()</code> check. <code>stock_data.py</code> returns empty DataFrames on provider failures. Scanner orchestrator catches individual ticker failures without aborting the run.</td>
+  </tr>
+  <tr>
+    <td>Startup/Shutdown</td>
+    <td><span class="badge badge-green">4/5</span></td>
+    <td>Lifespan handler resets orphaned quality reports, cleans Redis state. Engine disposed on shutdown. WebSocket manager started/stopped cleanly.</td>
+  </tr>
+  <tr>
+    <td>Database Migrations</td>
+    <td><span class="badge badge-yellow">3/5</span></td>
+    <td>37 Alembic migrations. Auto-generate from model changes. No migration testing in CI. No rollback documentation.</td>
+  </tr>
+  <tr>
+    <td>Metrics</td>
+    <td><span class="badge badge-red">0/5</span></td>
+    <td>No Prometheus, StatsD, or other metrics framework. No counters, histograms, or gauges.</td>
+  </tr>
+  <tr>
+    <td>Distributed Tracing</td>
+    <td><span class="badge badge-red">0/5</span></td>
+    <td>No OpenTelemetry, Jaeger, or Zipkin integration.</td>
+  </tr>
+  <tr>
+    <td>Circuit Breakers</td>
+    <td><span class="badge badge-red">0/5</span></td>
+    <td>No circuit breaker library. IBKR pacing guard serves a similar purpose but is rate-limiting, not circuit-breaking.</td>
+  </tr>
+  <tr>
+    <td>Backup/Recovery</td>
+    <td><span class="badge badge-orange">1/5</span></td>
+    <td>Manual pg_dump command in deployment guide. No automated backups, no retention policy, no backup verification.</td>
+  </tr>
+  <tr>
+    <td>Feature Flags</td>
+    <td><span class="badge badge-red">0/5</span></td>
+    <td>No feature flag system. Docker compose profiles serve as coarse-grained feature toggles.</td>
+  </tr>
+</table>
+
+<!-- ================================================================== -->
+<!--  7. SECURITY & COMPLIANCE                                          -->
+<!-- ================================================================== -->
+<h2 id="security">7. Security &amp; Compliance Review</h2>
+
+<table>
+  <tr><th>Area</th><th>Score</th><th>Finding</th><th>Evidence</th></tr>
+  <tr>
+    <td>Authentication</td>
+    <td><span class="sev-critical">0/5</span></td>
+    <td>No authentication mechanism. All endpoints publicly accessible.</td>
+    <td>No auth middleware in <code>main.py</code>. No JWT, API key, or session handling in any router.</td>
+  </tr>
+  <tr>
+    <td>Authorization</td>
+    <td><span class="sev-critical">0/5</span></td>
+    <td>No authorization boundaries. No role-based access control.</td>
+    <td>Auto-trading endpoints, system config, and alert management have no permission checks.</td>
+  </tr>
+  <tr>
+    <td>CORS</td>
+    <td><span class="sev-critical">1/5</span></td>
+    <td>Wildcard <code>["*"]</code> hardcoded, not configurable.</td>
+    <td><code>config.py:49</code>: <code>CORS_ORIGINS: list = ["*"]</code></td>
+  </tr>
+  <tr>
+    <td>Input Validation</td>
+    <td><span class="badge badge-green">4/5</span></td>
+    <td>Pydantic schemas validate all request bodies. SQLAlchemy ORM prevents SQL injection.</td>
+    <td>Schemas in <code>backend/app/schemas/</code>. One raw query in <code>system.py</code> uses parameterized queries correctly.</td>
+  </tr>
+  <tr>
+    <td>Secrets Management</td>
+    <td><span class="badge badge-yellow">3/5</span></td>
+    <td>Secrets in env vars (standard pattern). <code>.env</code> properly gitignored. Dummy defaults in <code>config.py</code>.</td>
+    <td><code>.gitignore</code> excludes <code>.env</code>, <code>.archon/.env</code>. Config defaults include dummy DB password.</td>
+  </tr>
+  <tr>
+    <td>Rate Limiting</td>
+    <td><span class="sev-high">0/5</span></td>
+    <td>No API rate limiting middleware.</td>
+    <td>No slowapi or equivalent in <code>main.py</code> or <code>requirements.txt</code>.</td>
+  </tr>
+  <tr>
+    <td>Dependency Vulnerabilities</td>
+    <td><span class="badge badge-yellow">3/5</span></td>
+    <td>Backend pins exact versions. Frontend uses caret ranges (<code>^</code>) allowing minor upgrades. No automated scanning.</td>
+    <td><code>requirements.txt</code> uses <code>==</code>. <code>package.json</code> uses <code>^</code>.</td>
+  </tr>
+  <tr>
+    <td>Transport Security</td>
+    <td><span class="badge badge-orange">2/5</span></td>
+    <td>No TLS termination. Deployment guide recommends reverse proxy but doesn't implement it.</td>
+    <td>Docker Compose exposes HTTP on all interfaces. <code>deployment-guide.md</code> has TLS section.</td>
+  </tr>
+  <tr>
+    <td>Docker Security</td>
+    <td><span class="badge badge-orange">2/5</span></td>
+    <td>Dark factory mounts Docker socket (privilege escalation risk). Containers run as root.</td>
+    <td><code>docker-compose.yml:293</code>: <code>/var/run/docker.sock:/var/run/docker.sock</code></td>
+  </tr>
+  <tr>
+    <td>Sensitive Data in Logs</td>
+    <td><span class="badge badge-yellow">3/5</span></td>
+    <td>Stack traces hidden in production. Debug SQL logging shows query parameters. API keys could appear in error traces.</td>
+    <td><code>main.py</code> error handler checks <code>ENVIRONMENT</code>. SQL logging in <code>main.py:98-151</code>.</td>
+  </tr>
+</table>
+
+<!-- ================================================================== -->
+<!--  8. PERFORMANCE & SCALABILITY                                      -->
+<!-- ================================================================== -->
+<h2 id="perf">8. Performance &amp; Scalability</h2>
+
+<h3>Performance Findings</h3>
+<div class="card">
+  <h4>Strengths</h4>
+  <ul>
+    <li><strong>Columnar data format</strong> &mdash; Historical bar data uses a compact column-oriented format with 1-2 char keys, reducing JSON payload by ~60%.</li>
+    <li><strong>GZip middleware</strong> &mdash; Compresses responses &gt;1KB.</li>
+    <li><strong>Celery offloading</strong> &mdash; Heavy scans, data sync, and ML analysis run as background tasks.</li>
+    <li><strong>IBKR pacing guard</strong> &mdash; Sliding-window rate limiter prevents API bans (55 req/10min, 2s minimum gap).</li>
+    <li><strong>Database indexes</strong> &mdash; Composite indexes on frequently queried columns (ticker+timestamp, ticker+event_date+scanner_type).</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h4>Bottlenecks &amp; Risks</h4>
+  <ul>
+    <li><strong>No connection pooling</strong> &mdash; <code>database.py</code> calls <code>create_engine()</code> with no <code>pool_size</code>/<code>max_overflow</code>. SQLAlchemy defaults to pool_size=5, which is low for concurrent API + Celery workers.</li>
+    <li><strong>Synchronous ORM</strong> &mdash; Despite having <code>asyncpg</code> in requirements, the app uses synchronous SQLAlchemy. Each request blocks a thread during DB access.</li>
+    <li><strong>Frontend polling</strong> &mdash; System status polled every 30s, alert stats every 30s, universe sync status every 5s, scan status every 5s during active scans. Multiple timers could strain the API under many tabs.</li>
+    <li><strong>Discovery service delays</strong> &mdash; 15-second hard-coded delays between batch Polygon requests. No dynamic backoff.</li>
+    <li><strong>No caching layer</strong> &mdash; Redis is used as a Celery broker but not for application-level caching (API response caching, query result caching).</li>
+    <li><strong>Forecast worker</strong> &mdash; Requires 36GB RAM for a 200M-parameter model. No horizontal scaling beyond single worker.</li>
+  </ul>
+</div>
+
+<h3>Scalability Model</h3>
+<div class="card">
+  <p><strong>Horizontal:</strong> Celery workers can be scaled by adding containers. The API server runs a single instance; scaling would require session-affinity for WebSocket connections. Database is a single PostgreSQL instance with no read replicas.</p>
+  <p><strong>Vertical:</strong> The forecast worker explicitly requires 32GB+ RAM. Other services have no memory limits configured.</p>
+  <p><strong>Verdict:</strong> Adequate for single-user/small-team workloads. Would need connection pooling, async ORM, and read replicas for multi-user production.</p>
+</div>
+
+<!-- ================================================================== -->
+<!--  9. API, DATA & INTEGRATION QUALITY                                -->
+<!-- ================================================================== -->
+<h2 id="api-data">9. API, Data &amp; Integration Quality</h2>
+
+<h3>API Consistency</h3>
+<div class="card">
+  <p><strong>Score: 4/5.</strong> Endpoints follow consistent naming (<code>/api/{domain}/{action}</code>). HTTP status codes are appropriate (201, 202, 409). All endpoints use Pydantic schemas. FastAPI auto-generates OpenAPI docs at <code>/docs</code>.</p>
+  <p><strong>Gap:</strong> No API versioning (<code>/api/v1/</code>). Error response format varies slightly between router-thrown HTTPExceptions and the global MarketHawkError handler.</p>
+</div>
+
+<h3>Data Model Clarity</h3>
+<div class="card">
+  <p><strong>Score: 4/5.</strong> 37 models with clear naming. Relationships defined via ForeignKey + relationship(). Composite unique constraints prevent duplicate scanner events. UUID fields provide external-safe identifiers alongside integer PKs.</p>
+  <p><strong>Gap:</strong> Timestamps stored as naive UTC (<code>datetime.now(timezone.utc).replace(tzinfo=None)</code>) &mdash; an intentional choice but could confuse future contributors. JSONB columns lack schema validation.</p>
+</div>
+
+<h3>External Integration Patterns</h3>
+<div class="card">
+  <p><strong>Polygon.io:</strong> Wrapped in <code>massive.py</code> with lazy initialization, auto-pagination, and timestamp conversion. Rate limits handled by the SDK. <strong>Well-integrated.</strong></p>
+  <p><strong>IBKR:</strong> Wrapped in <code>ibkr.py</code> + <code>ibkr_orders.py</code> with pacing guard, contract mapping, and duration chunking. Separate client IDs for API (10), trading (11), and live scanner (5). <strong>Well-integrated, sophisticated.</strong></p>
+  <p><strong>Seq:</strong> HTTP POST to ingestion endpoint with structured JSON payload. Graceful fallback to stdout. <strong>Clean integration.</strong></p>
+  <p><strong>Tweet Monitor:</strong> Separate microservice with its own Dockerfile, scraping X.com with auth cookies. Requires manual token rotation every 30 days. <strong>Fragile dependency on cookie-based auth.</strong></p>
+</div>
+
+<h3>Migration Approach</h3>
+<div class="card">
+  <p><strong>Score: 3/5.</strong> 37 Alembic migrations auto-generated from model changes. Migrations not tested in CI. No rollback documentation. No zero-downtime migration strategy for large tables.</p>
+</div>
+
+<!-- ================================================================== -->
+<!--  10. DEVELOPER EXPERIENCE                                          -->
+<!-- ================================================================== -->
+<h2 id="devx">10. Developer Experience</h2>
+
+<table>
+  <tr><th>Aspect</th><th>Score</th><th>Evidence</th></tr>
+  <tr>
+    <td>Local Setup</td>
+    <td><span class="badge badge-green">4/5</span></td>
+    <td>Docker Compose one-command startup. <code>.env.example</code> with 120 lines of documented variables. Prerequisites listed in CLAUDE.md.</td>
+  </tr>
+  <tr>
+    <td>README Quality</td>
+    <td><span class="badge badge-green">4/5</span></td>
+    <td>196-line README with feature list, quick start, and tech stack. Links to supporting docs.</td>
+  </tr>
+  <tr>
+    <td>Documentation</td>
+    <td><span class="badge badge-yellow">3/5</span></td>
+    <td>CLAUDE.md (excellent AI guide), PROJECT_STRUCTURE.md, CONTEXT.md, deployment-guide.md. DEVELOPMENT.md, ARCHITECTURE.md, ENV_VARIABLES.md, POLYGON_RATE_LIMITS.md are referenced but missing.</td>
+  </tr>
+  <tr>
+    <td>Build Simplicity</td>
+    <td><span class="badge badge-green">4/5</span></td>
+    <td><code>docker-compose up -d</code> starts everything. Hot-reload via watchfiles (backend) and Vite (frontend).</td>
+  </tr>
+  <tr>
+    <td>Linting/Formatting</td>
+    <td><span class="badge badge-orange">2/5</span></td>
+    <td>ESLint configured for frontend. No Python linter configured (ruff referenced in .gitignore but no config). No pre-commit hooks. No auto-formatter (black/ruff format).</td>
+  </tr>
+  <tr>
+    <td>Type Checking</td>
+    <td><span class="badge badge-orange">2/5</span></td>
+    <td>TypeScript with <code>strict: false</code>. No mypy for Python. <code>Record&lt;string, any&gt;</code> used for flexible schemas.</td>
+  </tr>
+  <tr>
+    <td>CI Feedback</td>
+    <td><span class="badge badge-orange">2/5</span></td>
+    <td>Single CI workflow (backend pytest only). No frontend checks, no build verification, no security scanning. Coverage artifact uploaded but not displayed in PRs.</td>
+  </tr>
+  <tr>
+    <td>Debugging Support</td>
+    <td><span class="badge badge-green">4/5</span></td>
+    <td>Seq with error ID deep links. Debug-mode SQL logging. Unique error IDs in API responses. pgAdmin for database inspection.</td>
+  </tr>
+  <tr>
+    <td>Onboarding Friction</td>
+    <td><span class="badge badge-yellow">3/5</span></td>
+    <td>Docker Compose makes infrastructure setup easy. Missing DEVELOPMENT.md creates gaps for non-Docker development. IBKR credentials needed for full functionality.</td>
+  </tr>
+</table>
+
+<!-- ================================================================== -->
+<!--  11. RISK REGISTER                                                 -->
+<!-- ================================================================== -->
+<h2 id="risk-register">11. Risk Register</h2>
+
+<table>
+  <tr>
+    <th>ID</th><th>Description</th><th>Category</th><th>Severity</th><th>Likelihood</th><th>Evidence</th><th>Impact</th><th>Mitigation</th><th>Priority</th>
+  </tr>
+  <tr>
+    <td>R01</td>
+    <td>No authentication on API endpoints including auto-trade submission</td>
+    <td>Security</td>
+    <td><span class="sev-critical">Critical</span></td>
+    <td>Certain (if exposed)</td>
+    <td>No auth middleware in <code>main.py</code>; all routers lack auth decorators</td>
+    <td>Unauthorized trade execution, data exfiltration, system takeover</td>
+    <td>Add JWT auth middleware; require API key for all non-health endpoints</td>
+    <td>P0</td>
+  </tr>
+  <tr>
+    <td>R02</td>
+    <td>CORS wildcard allows any origin to call API</td>
+    <td>Security</td>
+    <td><span class="sev-critical">Critical</span></td>
+    <td>Certain</td>
+    <td><code>config.py:49</code>: <code>CORS_ORIGINS = ["*"]</code></td>
+    <td>CSRF-like attacks from any website; amplifies R01</td>
+    <td>Make CORS origins environment-configurable; default to frontend URL only</td>
+    <td>P0</td>
+  </tr>
+  <tr>
+    <td>R03</td>
+    <td>No API rate limiting</td>
+    <td>Security</td>
+    <td><span class="sev-high">High</span></td>
+    <td>Likely</td>
+    <td>No slowapi or equivalent in dependencies or middleware</td>
+    <td>DoS, Polygon API quota exhaustion, database overload</td>
+    <td>Add slowapi with per-IP and per-endpoint limits</td>
+    <td>P1</td>
+  </tr>
+  <tr>
+    <td>R04</td>
+    <td>Database connection pool not configured</td>
+    <td>Reliability</td>
+    <td><span class="sev-high">High</span></td>
+    <td>Likely under load</td>
+    <td><code>database.py</code>: <code>create_engine()</code> with no pool args</td>
+    <td>Connection exhaustion under concurrent API + Celery load</td>
+    <td>Set <code>pool_size=20, max_overflow=10, pool_pre_ping=True</code></td>
+    <td>P1</td>
+  </tr>
+  <tr>
+    <td>R05</td>
+    <td>Zero frontend test coverage</td>
+    <td>Quality</td>
+    <td><span class="sev-high">High</span></td>
+    <td>Certain</td>
+    <td>No test files or test framework in frontend (86 files, ~15,100 lines)</td>
+    <td>UI regressions undetected. Recent decomposition into smaller components makes the codebase more testable but no tests written yet</td>
+    <td>Install Vitest; add tests for 6 custom hooks and critical components</td>
+    <td>P1</td>
+  </tr>
+  <tr>
+    <td>R06</td>
+    <td>Management services exposed on all network interfaces</td>
+    <td>Security</td>
+    <td><span class="sev-high">High</span></td>
+    <td>Certain if on LAN/internet</td>
+    <td>pgAdmin (:5050), Flower (:5555), Seq (:5380) bound to 0.0.0.0</td>
+    <td>Unauthorized database access, task queue manipulation</td>
+    <td>Bind to 127.0.0.1 as documented in deployment-guide.md</td>
+    <td>P1</td>
+  </tr>
+  <tr>
+    <td>R07</td>
+    <td>Docker socket mounted in dark factory container</td>
+    <td>Security</td>
+    <td><span class="sev-high">High</span></td>
+    <td>Possible</td>
+    <td><code>docker-compose.yml:293</code></td>
+    <td>Container escape; host-level privilege escalation</td>
+    <td>Use Docker-in-Docker or rootless Docker; restrict socket access</td>
+    <td>P2</td>
+  </tr>
+  <tr>
+    <td>R08</td>
+    <td>No automated database backups</td>
+    <td>Reliability</td>
+    <td><span class="sev-high">High</span></td>
+    <td>Certain impact when data loss occurs</td>
+    <td><code>deployment-guide.md</code> shows manual pg_dump only</td>
+    <td>Unrecoverable data loss</td>
+    <td>Implement automated pg_dump cron with retention and verification</td>
+    <td>P1</td>
+  </tr>
+  <tr>
+    <td>R09</td>
+    <td>Config class uses raw os.getenv without validation</td>
+    <td>Reliability</td>
+    <td><span class="sev-medium">Medium</span></td>
+    <td>Possible</td>
+    <td><code>config.py</code> does <code>int(os.getenv(...))</code> with no error handling</td>
+    <td>Crash on startup with unhelpful error if env var is malformed</td>
+    <td>Migrate to pydantic-settings BaseSettings</td>
+    <td>P2</td>
+  </tr>
+  <tr>
+    <td>R10</td>
+    <td>Tweet monitor relies on cookie-based X.com auth with 30-day rotation</td>
+    <td>Reliability</td>
+    <td><span class="sev-medium">Medium</span></td>
+    <td>Certain (every 30 days)</td>
+    <td><code>docker-compose.yml</code>: X_AUTH_TOKEN, X_CSRF_TOKEN env vars</td>
+    <td>Silent failure of tweet signal pipeline when cookies expire</td>
+    <td>Add expiration monitoring/alerting; consider official X API</td>
+    <td>P2</td>
+  </tr>
+  <tr>
+    <td>R11</td>
+    <td>No resource limits on most Docker services</td>
+    <td>Reliability</td>
+    <td><span class="sev-medium">Medium</span></td>
+    <td>Possible</td>
+    <td>Only forecast-worker and tweet-monitor have memory limits</td>
+    <td>Resource starvation of critical services</td>
+    <td>Add memory and CPU limits to all services</td>
+    <td>P2</td>
+  </tr>
+  <tr>
+    <td>R12</td>
+    <td>Celery tasks excluded from coverage measurement</td>
+    <td>Quality</td>
+    <td><span class="sev-medium">Medium</span></td>
+    <td>Certain</td>
+    <td><code>pyproject.toml</code> omits <code>app/tasks/*.py</code></td>
+    <td>~1,800 lines of business logic untested</td>
+    <td>Create unit tests for task logic; separate testable logic from broker calls</td>
+    <td>P2</td>
+  </tr>
+  <tr>
+    <td>R13</td>
+    <td>Missing referenced documentation files</td>
+    <td>Developer Experience</td>
+    <td><span class="sev-low">Low</span></td>
+    <td>Certain</td>
+    <td>DEVELOPMENT.md, ARCHITECTURE.md, ENV_VARIABLES.md, POLYGON_RATE_LIMITS.md referenced but do not exist</td>
+    <td>Broken documentation links; onboarding friction</td>
+    <td>Create the referenced files or update references</td>
+    <td>P3</td>
+  </tr>
+  <tr>
+    <td>R14</td>
+    <td>TypeScript strict mode disabled; 76 explicit <code>any</code> usages across 27 files</td>
+    <td>Quality</td>
+    <td><span class="sev-medium">Medium</span></td>
+    <td>Certain</td>
+    <td><code>tsconfig.json:20</code>: <code>"strict": false</code>; 76 <code>: any</code> occurrences</td>
+    <td>Type errors slip through; implicit any hides bugs</td>
+    <td>Incrementally enable strict mode flags; replace <code>any</code> with domain types</td>
+    <td>P2</td>
+  </tr>
+</table>
+
+<!-- ================================================================== -->
+<!--  12. ARCHITECTURE DECISION OBSERVATIONS                            -->
+<!-- ================================================================== -->
+<h2 id="adr-obs">12. Architecture Decision Observations</h2>
+
+<h3>Intentional Decisions</h3>
+<table>
+  <tr><th>Decision</th><th>Evidence</th><th>Quality</th></tr>
+  <tr>
+    <td>Polygon.io as primary data provider</td>
+    <td>Single ADR exists: <code>Docs/adr/0001-polygon-for-historical-market-data.md</code></td>
+    <td><span class="badge badge-green">Documented</span></td>
+  </tr>
+  <tr>
+    <td>Provider protocol pattern for data sources</td>
+    <td><code>providers/base.py</code> defines clear protocol</td>
+    <td><span class="badge badge-green">Well-executed</span></td>
+  </tr>
+  <tr>
+    <td>Dedicated IBKR client IDs per service</td>
+    <td>Backend=10, Trading=11, Live Scanner=5 (docker-compose + config)</td>
+    <td><span class="badge badge-green">Well-executed</span></td>
+  </tr>
+  <tr>
+    <td>Live scanner as separate service</td>
+    <td>Dedicated container, own client ID, Redis pub/sub for data broadcast</td>
+    <td><span class="badge badge-green">Well-executed</span></td>
+  </tr>
+  <tr>
+    <td>Celery Beat for scheduled tasks</td>
+    <td><code>celery_app.py</code> defines 6 beat schedules</td>
+    <td><span class="badge badge-green">Appropriate</span></td>
+  </tr>
+  <tr>
+    <td>JSONB for flexible event metadata</td>
+    <td>indicators, criteria_met, metadata_ columns on ScannerEvent</td>
+    <td><span class="badge badge-yellow">Tradeoff</span> &mdash; flexibility vs. queryability</td>
+  </tr>
+  <tr>
+    <td>IB Gateway READ_ONLY default</td>
+    <td><code>docker-compose.yml:57</code>: <code>READ_ONLY_API: ${IB_READ_ONLY:-yes}</code></td>
+    <td><span class="badge badge-green">Safety-first</span></td>
+  </tr>
+</table>
+
+<h3>Accidental Decisions</h3>
+<table>
+  <tr><th>Decision</th><th>Evidence</th><th>Concern</th></tr>
+  <tr>
+    <td>No authentication at all</td>
+    <td>60+ endpoints with no auth</td>
+    <td>Likely started as local-only tool; never added as scope grew to include auto-trading</td>
+  </tr>
+  <tr>
+    <td>Synchronous ORM despite having asyncpg</td>
+    <td><code>requirements.txt</code> has asyncpg; <code>database.py</code> uses sync <code>create_engine</code></td>
+    <td>Async support was likely planned but never migrated</td>
+  </tr>
+  <tr>
+    <td>CORS wildcard</td>
+    <td>Hardcoded in config class</td>
+    <td>Development convenience that was never restricted</td>
+  </tr>
+  <tr>
+    <td>Some API modules bypass centralized error handling</td>
+    <td><code>alerts.ts</code>, <code>trading.ts</code> create separate Axios instances</td>
+    <td>These modules were likely added later without following the established pattern</td>
+  </tr>
+</table>
+
+<h3>Suggested ADRs</h3>
+<ol>
+  <li><strong>ADR-002: Authentication and Authorization Strategy</strong> &mdash; Document the chosen auth approach and its scope</li>
+  <li><strong>ADR-003: Synchronous vs. Async ORM</strong> &mdash; Document the decision and migration plan</li>
+  <li><strong>ADR-004: JSONB vs. Normalized Columns for Event Metadata</strong> &mdash; Document the query performance tradeoff</li>
+  <li><strong>ADR-005: Celery + Redis vs. Alternatives for Background Tasks</strong> &mdash; Document why not FastAPI background tasks or Airflow</li>
+  <li><strong>ADR-006: Live Scanner Service Extraction</strong> &mdash; Document the isolation rationale and communication pattern</li>
+  <li><strong>ADR-007: Dark Factory Autonomous Development</strong> &mdash; Document the trust model, safety boundaries, and Docker socket risk acceptance</li>
+  <li><strong>ADR-008: Naive UTC Timestamps</strong> &mdash; Document the decision to strip tzinfo and its implications</li>
+</ol>
+
+<!-- ================================================================== -->
+<!--  13. QUALITY SCORECARD                                             -->
+<!-- ================================================================== -->
+<h2 id="scorecard">13. Quality Scorecard</h2>
+
+<table>
+  <tr><th>Dimension</th><th>Score</th><th style="width:50%">Justification</th></tr>
+  <tr>
+    <td>Architecture Clarity</td>
+    <td><span class="score-big score-4" style="font-size:1.3rem">4</span></td>
+    <td>Clear layered architecture with explicit module boundaries. Router &rarr; service &rarr; provider &rarr; model flow is consistent.</td>
+  </tr>
+  <tr>
+    <td>Modularity</td>
+    <td><span class="score-big score-4" style="font-size:1.3rem">4</span></td>
+    <td>28 service modules, protocol-based providers, recent refactoring to split god modules. Active improvement visible in commit history.</td>
+  </tr>
+  <tr>
+    <td>Separation of Concerns</td>
+    <td><span class="score-big score-3" style="font-size:1.3rem">3</span></td>
+    <td>Generally good but some backend routers (scanner.py, system.py) contain significant business logic. Frontend recently improved &mdash; 5 large pages decomposed into subdirectories with extracted panels and hooks, though some pages (Journal 496 lines, Universes 471 lines) still mix concerns.</td>
+  </tr>
+  <tr>
+    <td>Maintainability</td>
+    <td><span class="score-big score-4" style="font-size:1.3rem">4</span></td>
+    <td>Consistent naming, clear file organization, good use of framework conventions. Recent frontend refactoring decomposed 5 monolithic pages (80% line reduction each) into focused sub-components with extracted hooks. Active refactoring history shows maintainability is valued.</td>
+  </tr>
+  <tr>
+    <td>Testability</td>
+    <td><span class="score-big score-3" style="font-size:1.3rem">3</span></td>
+    <td>Backend has solid test infrastructure (SAVEPOINT isolation, testcontainers, fixtures). Frontend has zero tests. Celery tasks excluded from coverage.</td>
+  </tr>
+  <tr>
+    <td>Code Coverage Maturity</td>
+    <td><span class="score-big score-2" style="font-size:1.3rem">2</span></td>
+    <td>Backend 60% threshold is low for financial software. Frontend 0%. Significant exclusions (tasks, futures). No mutation testing.</td>
+  </tr>
+  <tr>
+    <td>Reliability</td>
+    <td><span class="score-big score-3" style="font-size:1.3rem">3</span></td>
+    <td>Good error handling, graceful degradation for providers, orphan cleanup on startup. Missing: circuit breakers, timeouts, backpressure.</td>
+  </tr>
+  <tr>
+    <td>Security Posture</td>
+    <td><span class="score-big score-1" style="font-size:1.3rem">1</span></td>
+    <td>No authentication, CORS wildcard, no rate limiting, Docker socket exposure. Input validation via Pydantic is the sole bright spot.</td>
+  </tr>
+  <tr>
+    <td>Observability</td>
+    <td><span class="score-big score-3" style="font-size:1.3rem">3</span></td>
+    <td>Seq structured logging with error IDs, Flower for task monitoring, health endpoints. No metrics, no tracing, no alerting rules.</td>
+  </tr>
+  <tr>
+    <td>Performance Readiness</td>
+    <td><span class="score-big score-2" style="font-size:1.3rem">2</span></td>
+    <td>Columnar format and GZip are good. No connection pooling config, sync ORM, no caching layer, no performance benchmarks.</td>
+  </tr>
+  <tr>
+    <td>Scalability Readiness</td>
+    <td><span class="score-big score-2" style="font-size:1.3rem">2</span></td>
+    <td>Celery workers can scale horizontally. Single API instance, single DB, no read replicas, WebSocket sessions not scalable.</td>
+  </tr>
+  <tr>
+    <td>Deployment Readiness</td>
+    <td><span class="score-big score-3" style="font-size:1.3rem">3</span></td>
+    <td>Docker Compose with healthchecks and dependency ordering. No resource limits, no TLS, no prod/dev separation, no container registry.</td>
+  </tr>
+  <tr>
+    <td>Developer Experience</td>
+    <td><span class="score-big score-4" style="font-size:1.3rem">4</span></td>
+    <td>One-command setup, hot-reload, comprehensive CLAUDE.md, Seq for debugging. Missing linting config and pre-commit hooks.</td>
+  </tr>
+  <tr>
+    <td>Documentation</td>
+    <td><span class="score-big score-3" style="font-size:1.3rem">3</span></td>
+    <td>Strong AI development guide, domain glossary, project structure. Four referenced docs are missing. Only 1 ADR exists.</td>
+  </tr>
+  <tr>
+    <td>Dependency Hygiene</td>
+    <td><span class="score-big score-3" style="font-size:1.3rem">3</span></td>
+    <td>Backend pins exact versions. Frontend uses caret ranges. No dependency scanning or update automation. 48 Python deps, reasonable for scope.</td>
+  </tr>
+  <tr>
+    <td>Operational Readiness</td>
+    <td><span class="score-big score-2" style="font-size:1.3rem">2</span></td>
+    <td>No automated backups, no runbooks, no alerting, no incident response documentation. Deployment guide is a checklist, not a procedure.</td>
+  </tr>
+</table>
+
+<div class="card" style="text-align:center; margin-top:1.5rem;">
+  <div style="font-size:0.9rem; color:var(--text-dim);">Weighted Average Score</div>
+  <div class="score-big score-3" style="font-size:3rem;">2.8 / 5</div>
+  <div style="font-size:0.85rem; color:var(--text-dim);">Acceptable with significant gaps in security and operational maturity</div>
+</div>
+
+<!-- ================================================================== -->
+<!--  14. PRIORITIZED IMPROVEMENT ROADMAP                               -->
+<!-- ================================================================== -->
+<h2 id="roadmap">14. Prioritized Improvement Roadmap</h2>
+
+<h3>Immediate (0&ndash;2 weeks)</h3>
+<table>
+  <tr><th>Action</th><th>Benefit</th><th>Effort</th><th>Risk Reduced</th><th>Owner</th><th>Dependencies</th></tr>
+  <tr>
+    <td>Add JWT/API key authentication to all non-health endpoints</td>
+    <td>Blocks unauthorized access including trade execution</td>
+    <td>M</td>
+    <td>R01, R02</td>
+    <td>Developer</td>
+    <td>None</td>
+  </tr>
+  <tr>
+    <td>Make CORS origins environment-configurable</td>
+    <td>Prevents cross-origin attacks</td>
+    <td>S</td>
+    <td>R02</td>
+    <td>Developer</td>
+    <td>None</td>
+  </tr>
+  <tr>
+    <td>Configure SQLAlchemy connection pooling</td>
+    <td>Prevents connection exhaustion under load</td>
+    <td>S</td>
+    <td>R04</td>
+    <td>Developer</td>
+    <td>None</td>
+  </tr>
+  <tr>
+    <td>Bind management ports to 127.0.0.1</td>
+    <td>Prevents unauthorized access to pgAdmin, Flower, Seq</td>
+    <td>S</td>
+    <td>R06</td>
+    <td>Developer</td>
+    <td>None</td>
+  </tr>
+  <tr>
+    <td>Add API rate limiting (slowapi)</td>
+    <td>Prevents DoS and API quota exhaustion</td>
+    <td>S</td>
+    <td>R03</td>
+    <td>Developer</td>
+    <td>None</td>
+  </tr>
+</table>
+
+<h3>Short-term (1&ndash;2 months)</h3>
+<table>
+  <tr><th>Action</th><th>Benefit</th><th>Effort</th><th>Risk Reduced</th><th>Owner</th><th>Dependencies</th></tr>
+  <tr>
+    <td>Extend CI: frontend tsc + build, migration check, dependency audit</td>
+    <td>Catches frontend regressions and security issues in PRs</td>
+    <td>M</td>
+    <td>R05, R13</td>
+    <td>Developer</td>
+    <td>None</td>
+  </tr>
+  <tr>
+    <td>Install Vitest and add frontend tests for critical paths</td>
+    <td>Reduces UI regression risk</td>
+    <td>L</td>
+    <td>R05</td>
+    <td>Developer</td>
+    <td>Vitest setup</td>
+  </tr>
+  <tr>
+    <td>Implement automated database backups with cron</td>
+    <td>Prevents unrecoverable data loss</td>
+    <td>M</td>
+    <td>R08</td>
+    <td>SRE / Developer</td>
+    <td>Backup storage location</td>
+  </tr>
+  <tr>
+    <td>Migrate config.py to pydantic-settings BaseSettings</td>
+    <td>Validated configuration, clear error messages on startup</td>
+    <td>M</td>
+    <td>R09</td>
+    <td>Developer</td>
+    <td>pydantic-settings package</td>
+  </tr>
+  <tr>
+    <td>Enable TypeScript strict mode incrementally</td>
+    <td>Catches type-level bugs, improves code quality</td>
+    <td>M</td>
+    <td>R14</td>
+    <td>Developer</td>
+    <td>None</td>
+  </tr>
+  <tr>
+    <td>Add resource limits (memory/CPU) to all Docker services</td>
+    <td>Prevents resource starvation</td>
+    <td>S</td>
+    <td>R11</td>
+    <td>Developer</td>
+    <td>Baseline profiling</td>
+  </tr>
+  <tr>
+    <td>Create missing documentation (DEVELOPMENT.md, ARCHITECTURE.md, ENV_VARIABLES.md)</td>
+    <td>Reduces onboarding friction, fixes broken links</td>
+    <td>M</td>
+    <td>R13</td>
+    <td>Developer</td>
+    <td>None</td>
+  </tr>
+</table>
+
+<h3>Medium-term (3&ndash;6 months)</h3>
+<table>
+  <tr><th>Action</th><th>Benefit</th><th>Effort</th><th>Risk Reduced</th><th>Owner</th><th>Dependencies</th></tr>
+  <tr>
+    <td>Add Prometheus metrics and Grafana dashboards</td>
+    <td>Visibility into performance, capacity planning</td>
+    <td>L</td>
+    <td>Performance, reliability</td>
+    <td>SRE / Developer</td>
+    <td>Prometheus, Grafana Docker services</td>
+  </tr>
+  <tr>
+    <td>Extract business logic from thick routers into services</td>
+    <td>Testability, reusability</td>
+    <td>M</td>
+    <td>Maintainability</td>
+    <td>Developer</td>
+    <td>Test coverage first</td>
+  </tr>
+  <tr>
+    <td>Add pre-commit hooks (ruff lint, ruff format, eslint)</td>
+    <td>Consistent code quality before commits</td>
+    <td>S</td>
+    <td>Quality</td>
+    <td>Developer</td>
+    <td>Ruff config</td>
+  </tr>
+  <tr>
+    <td>Implement Redis application caching for hot endpoints</td>
+    <td>Reduced database load, faster responses</td>
+    <td>M</td>
+    <td>Performance</td>
+    <td>Developer</td>
+    <td>Cache invalidation strategy</td>
+  </tr>
+  <tr>
+    <td>Write ADRs for key architectural decisions</td>
+    <td>Knowledge preservation, onboarding</td>
+    <td>M</td>
+    <td>Documentation</td>
+    <td>Architect</td>
+    <td>None</td>
+  </tr>
+  <tr>
+    <td>Add eager loading (joinedload) to N+1 query hotspots</td>
+    <td>Reduced database round-trips</td>
+    <td>M</td>
+    <td>Performance</td>
+    <td>Developer</td>
+    <td>SQL logging audit</td>
+  </tr>
+</table>
+
+<h3>Strategic (6+ months)</h3>
+<table>
+  <tr><th>Action</th><th>Benefit</th><th>Effort</th><th>Risk Reduced</th><th>Owner</th><th>Dependencies</th></tr>
+  <tr>
+    <td>Migrate to async SQLAlchemy</td>
+    <td>Non-blocking DB access, better FastAPI utilization</td>
+    <td>XL</td>
+    <td>Performance, scalability</td>
+    <td>Developer</td>
+    <td>asyncpg already installed; requires session factory rewrite</td>
+  </tr>
+  <tr>
+    <td>Add frontend code splitting and lazy loading</td>
+    <td>Faster initial load, better user experience</td>
+    <td>M</td>
+    <td>Performance</td>
+    <td>Developer</td>
+    <td>React.lazy, Suspense boundaries</td>
+  </tr>
+  <tr>
+    <td>Implement distributed tracing (OpenTelemetry)</td>
+    <td>Cross-service request flow visibility</td>
+    <td>L</td>
+    <td>Debuggability</td>
+    <td>SRE</td>
+    <td>Tracing backend (Jaeger/Zipkin)</td>
+  </tr>
+  <tr>
+    <td>Evaluate container registry and CI/CD pipeline automation</td>
+    <td>Reproducible deployments, rollback capability</td>
+    <td>L</td>
+    <td>Deployment</td>
+    <td>SRE / Architect</td>
+    <td>Docker Hub or GHCR account</td>
+  </tr>
+  <tr>
+    <td>Add API versioning</td>
+    <td>Backward compatibility for external consumers</td>
+    <td>L</td>
+    <td>Integration stability</td>
+    <td>Architect</td>
+    <td>API strategy decision</td>
+  </tr>
+</table>
+
+<!-- ================================================================== -->
+<!--  15. FINAL RECOMMENDATIONS                                        -->
+<!-- ================================================================== -->
+<h2 id="final">15. Final Recommendations</h2>
+
+<div class="card">
+  <h4>Most Important Architectural Decision to Make Next</h4>
+  <p><strong>Authentication strategy.</strong> Every other improvement is secondary while 60+ endpoints &mdash; including trade execution and system configuration &mdash; are accessible without any credentials. Choose between JWT tokens (standard for SPAs), API keys (simpler, adequate for single-user), or OAuth2 (if multi-user is planned). This decision shapes middleware, frontend auth flow, and Celery task authentication.</p>
+</div>
+
+<div class="card">
+  <h4>Most Important Engineering Practice to Improve Next</h4>
+  <p><strong>CI/CD pipeline expansion.</strong> The current single-workflow CI (backend pytest only) is inadequate for a 45,000-line, 13-service codebase. Adding frontend type checking + build, migration validation, and dependency scanning would catch the majority of regressions before merge. This is a force multiplier &mdash; especially with 30% of commits coming from the autonomous Dark Factory agent.</p>
+</div>
+
+<div class="card">
+  <h4>Most Important Testing Gap to Close Next</h4>
+  <p><strong>Frontend test coverage.</strong> 15,100 lines of TypeScript across 86 files with zero tests is the single largest quality risk. The recent page-decomposition refactoring (Scanner, Alerts, AutoTrading, StockDetail, and ActiveWatchlist split into focused sub-components) has made the codebase significantly more testable &mdash; the 6 custom hooks (<code>useScannerState</code>, <code>useScannerWs</code>, <code>useWatchlistLive</code>, <code>useLiveStockData</code>, <code>useScanTask</code>, <code>useScorecard</code>) contain state and WebSocket logic that can be unit-tested independently of rendering. Start with Vitest + React Testing Library for hooks and the GlobalErrorToast.</p>
+</div>
+
+<div class="card">
+  <h4>Most Important Operational Risk to Reduce Next</h4>
+  <p><strong>Automated database backups.</strong> All scanner events, trade journals, signal reviews, alert rules, and system configuration live in a single PostgreSQL instance with no automated backup. A volume corruption or accidental <code>docker volume rm</code> would cause total data loss. A simple cron + pg_dump with retention policy costs hours to implement and eliminates an existential risk.</p>
+</div>
+
+<div class="card">
+  <h4>Conclusion</h4>
+  <p>MarketHawk is a well-architected application for its stage of development &mdash; a solo/small-team tool with impressive breadth (5 scanner types, auto-trading, ML signal ranking, futures, alerting, journaling). The codebase is clean, consistently organized, and actively improved through both human and AI-driven development.</p>
+  <p>The primary concern is that the system has grown beyond its original "local tool" scope (particularly with auto-trading and multi-channel alerts) without a corresponding investment in security, operational readiness, and testing rigor. The gap between feature ambition and infrastructure maturity is the central risk.</p>
+  <p>Addressing the top 5 immediate actions &mdash; authentication, CORS, connection pooling, port binding, and rate limiting &mdash; would significantly reduce risk within 2 weeks of focused effort. The longer-term improvements (CI expansion, frontend testing, metrics, async migration) represent a path toward production-grade maturity.</p>
+</div>
+
+<!-- ================================================================== -->
+<!--  EVIDENCE INDEX                                                    -->
+<!-- ================================================================== -->
+<h2 id="evidence">Evidence Index</h2>
+
+<h3>Key Files Reviewed</h3>
+<table>
+  <tr><th>File / Directory</th><th>Purpose</th></tr>
+  <tr><td><code>backend/app/main.py</code></td><td>Application entry point, middleware, error handlers</td></tr>
+  <tr><td><code>backend/app/core/config.py</code></td><td>Configuration and environment variable loading</td></tr>
+  <tr><td><code>backend/app/core/database.py</code></td><td>SQLAlchemy engine and session factory</td></tr>
+  <tr><td><code>backend/app/core/celery_app.py</code></td><td>Celery configuration and beat schedule</td></tr>
+  <tr><td><code>backend/app/core/error_tracking.py</code></td><td>Seq integration and error tracking</td></tr>
+  <tr><td><code>backend/app/models/__init__.py</code></td><td>Model registry (37 models)</td></tr>
+  <tr><td><code>backend/app/routers/*.py</code></td><td>15 API router modules</td></tr>
+  <tr><td><code>backend/app/services/*.py</code></td><td>28 service modules</td></tr>
+  <tr><td><code>backend/app/providers/*.py</code></td><td>Data provider implementations (Polygon, IBKR)</td></tr>
+  <tr><td><code>backend/app/tasks/*.py</code></td><td>Celery task modules (sync, scanning, trading, quality)</td></tr>
+  <tr><td><code>backend/app/schemas/*.py</code></td><td>Pydantic request/response schemas</td></tr>
+  <tr><td><code>backend/tests/conftest.py</code></td><td>Test infrastructure (SAVEPOINT isolation, testcontainers)</td></tr>
+  <tr><td><code>backend/requirements.txt</code></td><td>Python dependencies (48 packages)</td></tr>
+  <tr><td><code>backend/pyproject.toml</code></td><td>Pytest and coverage configuration</td></tr>
+  <tr><td><code>frontend/src/App.tsx</code></td><td>React app entry, routing, providers</td></tr>
+  <tr><td><code>frontend/src/api/*.ts</code></td><td>11 API client modules</td></tr>
+  <tr><td><code>frontend/src/pages/</code></td><td>31 page files across 13 routes; 5 decomposed into subdirectories (Scanner/, Alerts/, AutoTrading/, StockDetailPage/, ActiveWatchlist/)</td></tr>
+  <tr><td><code>frontend/src/components/**/*.tsx</code></td><td>34 UI components (incl. 7 scorecard, 7 modals, 7 ui primitives)</td></tr>
+  <tr><td><code>frontend/src/hooks/*.ts</code></td><td>6 custom React hooks (useScannerState, useScannerWs, useWatchlistLive, useLiveStockData, useScanTask, useScorecard)</td></tr>
+  <tr><td><code>frontend/package.json</code></td><td>Frontend dependencies and scripts</td></tr>
+  <tr><td><code>frontend/tsconfig.json</code></td><td>TypeScript configuration</td></tr>
+  <tr><td><code>frontend/vite.config.ts</code></td><td>Vite build configuration</td></tr>
+  <tr><td><code>docker-compose.yml</code></td><td>13-service Docker Compose orchestration</td></tr>
+  <tr><td><code>.github/workflows/ci.yml</code></td><td>GitHub Actions CI workflow</td></tr>
+  <tr><td><code>deployment-guide.md</code></td><td>Production hardening checklist</td></tr>
+  <tr><td><code>.env.example</code></td><td>Environment variable template</td></tr>
+  <tr><td><code>.gitignore</code></td><td>Version control exclusions</td></tr>
+  <tr><td><code>CLAUDE.md</code></td><td>AI development guide</td></tr>
+  <tr><td><code>CONTEXT.md</code></td><td>Domain glossary</td></tr>
+  <tr><td><code>PROJECT_STRUCTURE.md</code></td><td>Annotated file tree</td></tr>
+  <tr><td><code>Docs/adr/0001-polygon-for-historical-market-data.md</code></td><td>Architecture decision record</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<!--  LIMITATIONS                                                       -->
+<!-- ================================================================== -->
+<h2 id="limitations">Limitations</h2>
+
+<div class="card">
+<ul>
+  <li><strong>No test execution:</strong> Backend tests were not executed during this audit. The 60% coverage threshold is taken from <code>pyproject.toml</code> configuration, not from an actual test run. Actual coverage may differ.</li>
+  <li><strong>No runtime analysis:</strong> Docker services were not started. Performance observations are based on code review, not profiling or load testing.</li>
+  <li><strong>No dependency vulnerability scan:</strong> Neither <code>pip audit</code> nor <code>npm audit</code> were executed. Security observations are based on code patterns and configuration review.</li>
+  <li><strong>Missing files:</strong> DEVELOPMENT.md, ARCHITECTURE.md, ENV_VARIABLES.md, and POLYGON_RATE_LIMITS.md are referenced in the codebase but do not exist. These may contain relevant context not captured in this review.</li>
+  <li><strong>Dark factory internals:</strong> The dark factory Dockerfile and entrypoint were reviewed, but the Archon workflow logic and Claude Code execution behavior are external to this repository.</li>
+  <li><strong>IBKR integration:</strong> The IBKR provider and orders manager were reviewed at the code level. Actual trading behavior and order execution could not be verified without a live IBKR connection.</li>
+  <li><strong>Frontend accessibility audit:</strong> Limited to code-level review of ARIA attributes and semantic HTML. No automated accessibility scanning (axe, pa11y) was performed.</li>
+  <li><strong>Database schema verification:</strong> Model relationships and indexes were verified from ORM code and migration files, not from a live database inspection.</li>
+</ul>
+</div>
+
+<div style="text-align:center; margin-top:3rem; padding:1.5rem; color:var(--text-dim); font-size:0.85rem;">
+  <p>Report generated on 2026-05-26 by Claude Opus 4.6</p>
+  <p>MarketHawk &mdash; Architecture &amp; Quality Report v1.0</p>
+</div>
+
+</div><!-- .container -->
+</body>
+</html>
