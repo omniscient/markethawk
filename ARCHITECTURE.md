@@ -31,6 +31,9 @@ All services run as Docker containers on the `stockscanner-network` bridge netwo
                          │                    ──> redis:6379        │
                          │  (Playwright Chromium, triggered by      │
                          │   celery-beat every 45s via HTTP POST)   │
+                         │                                          │
+                         │ prometheus:9090 ──scrape──> backend:8000/metrics
+                         │ grafana:3001 ──> prometheus:9090         │
                          └─────────────────────────────────────────┘
 ```
 
@@ -390,6 +393,38 @@ sequenceDiagram
     UI->>API: POST /universe/{id}/refresh-stats  (per completed universe)
     UI->>UI: Invalidate React Query cache → reload universe list
 ```
+
+## Metrics and Observability
+
+### Prometheus metrics (`backend/app/core/metrics.py`)
+
+All custom metrics are registered in `app/core/metrics.py` and exported at `GET /metrics` (excluded from OpenAPI). The backend and `celery-worker` share a tmpfs volume (`prometheus_multiproc`) for `prometheus-client` multiprocess mode so Celery worker metrics aggregate correctly.
+
+| Metric | Type | Labels | Source |
+|--------|------|--------|--------|
+| `http_requests_total` | Counter | `method`, `handler`, `status_code` | `main.py` middleware |
+| `http_request_duration_seconds` | Histogram | `method`, `handler` | `main.py` middleware |
+| `scanner_events_total` | Counter | `scanner_type` | `scanner.py`, `liquidity_hunt.py` |
+| `scan_duration_seconds` | Histogram | `scanner_type` | `scanner.py`, `liquidity_hunt.py` |
+| `polygon_api_calls_total` | Counter | `endpoint` | `providers/massive.py` |
+| `ibkr_connection_status` | Gauge | — | `providers/ibkr.py` |
+| `celery_tasks_total` | Counter | `task_name`, `status` | all task files |
+| `celery_task_duration_seconds` | Histogram | `task_name` | all task files |
+| `active_websocket_connections` | Gauge | — | `routers/live_data.py` |
+| `db_pool_size` | Gauge | — | `main.py` lifespan |
+| `db_pool_checked_out` | Gauge | — | `main.py` lifespan |
+| `db_pool_overflow` | Gauge | — | `main.py` lifespan |
+
+### Grafana dashboards (`grafana/provisioning/dashboards/`)
+
+Four pre-provisioned dashboards load automatically from the `grafana/provisioning/` directory:
+
+- **API Overview** — request rate, error rate, P95 latency, WebSocket connections, DB pool
+- **Scanner Performance** — events/min per scanner type, scan durations, Polygon API call rate, IBKR status
+- **Celery Tasks** — success/failure rates and P95 duration per task
+- **Infrastructure** — IBKR status, DB pool utilization, WebSocket count
+
+Alerting rules (`grafana/provisioning/alerting/rules.yaml`) fire when IBKR disconnects for >2 min, Celery failure rate exceeds 10%, DB pool overflows, or HTTP 5xx rate spikes. Alerts POST to `backend:8000/api/alerts/infrastructure`.
 
 ## Test Architecture
 

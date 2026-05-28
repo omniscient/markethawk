@@ -1,0 +1,11 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: markethawk-webhook
+    receivers:
+      - uid: markethawk-infra-webhook
+        type: webhook
+        settings:
+          url: http://backend:8000/api/alerts/infrastructure
+          httpMethod: POST

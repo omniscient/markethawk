@@ -1,0 +1,158 @@
+{
+  "title": "Infrastructure",
+  "uid": "markethawk-infra",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "IBKR Connection Status",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "red", "value": null },
+            { "color": "green", "value": 1 }
+          ]
+        },
+        "mappings": [
+          { "type": "value", "options": { "0": { "text": "Disconnected" }, "1": { "text": "Connected" } } }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "ibkr_connection_status",
+          "legendFormat": "IBKR"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Active WebSocket Connections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "active_websocket_connections",
+          "legendFormat": "WebSocket connections"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "DB Pool — Checked Out",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "db_pool_checked_out",
+          "legendFormat": "checked out"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "DB Pool — Overflow",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "options": {
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 1 },
+            { "color": "red", "value": 5 }
+          ]
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "db_pool_overflow",
+          "legendFormat": "overflow"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "DB Pool — Size",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "db_pool_size",
+          "legendFormat": "pool size"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "DB Pool Utilization Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "db_pool_checked_out",
+          "legendFormat": "checked out"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "db_pool_overflow",
+          "legendFormat": "overflow"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "db_pool_size",
+          "legendFormat": "pool size"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Polygon API Call Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "sum(rate(polygon_api_calls_total[1m])) by (endpoint) * 60",
+          "legendFormat": "{{endpoint}}/min"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "WebSocket Connections Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "active_websocket_connections",
+          "legendFormat": "active connections"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "pluginId": "prometheus",
+        "hide": 0,
+        "label": "Datasource"
+      }
+    ]
+  }
+}

@@ -190,6 +190,23 @@ MarketHawk/
 │       │   ├── SKILL.md
 │       │   └── scripts/query_api.py    # CLI for ad-hoc Polygon API calls
 │       └── bash/SKILL.md               # Shell patterns for this environment
+├── monitoring/
+│   └── prometheus/
+│       └── prometheus.yml              # Prometheus scrape config (targets backend:8000/metrics every 15s)
+├── grafana/
+│   └── provisioning/
+│       ├── datasources/
+│       │   └── prometheus.yaml         # Auto-provision Prometheus datasource
+│       ├── dashboards/
+│       │   ├── dashboards.yaml         # Dashboard provider config (loads JSON files from this dir)
+│       │   ├── api-overview.json       # HTTP request rate, latency, DB pool, WebSocket connections
+│       │   ├── scanner-performance.json # Scanner events/duration, Polygon calls, IBKR status
+│       │   ├── celery-tasks.json       # Celery success/failure rates, P95 durations
+│       │   └── infrastructure.json     # IBKR status, DB pool, WebSocket, Polygon calls
+│       └── alerting/
+│           ├── contact-points.yaml     # Webhook receiver → backend /api/alerts/infrastructure
+│           ├── notification-policies.yaml # Default routing policy
+│           └── rules.yaml              # Alert rules: IBKR disconnect, high failure rate, DB overflow
 ├── database-schema.sql                 # Legacy SQL reference schema — do not use directly; use Alembic
 ├── docker-compose.yml                  # Full stack orchestration (all services)
 ├── .env.example                        # Environment variable template — copy to .env

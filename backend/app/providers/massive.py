@@ -15,6 +15,7 @@ from polygon import RESTClient
 from app.core.config import settings
 from app.exceptions import ProviderError
 from app.providers.base import BaseDataProvider
+from app.core.metrics import polygon_api_calls_total
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,7 @@ class MassiveDataProvider(BaseDataProvider):
             current_from: Any = from_date  # str on first call, int (ms) on subsequent calls
 
             while True:
+                polygon_api_calls_total.labels(endpoint="aggs").inc()
                 page = self._client.get_aggs(
                     ticker=symbol.upper(),
                     multiplier=multiplier,
@@ -150,6 +152,7 @@ class MassiveDataProvider(BaseDataProvider):
             return {}
 
         try:
+            polygon_api_calls_total.labels(endpoint="ticker_details").inc()
             details = self._client.get_ticker_details(symbol.upper())
             if not details:
                 return {}
@@ -176,6 +179,7 @@ class MassiveDataProvider(BaseDataProvider):
         if not self._client:
             return []
         try:
+            polygon_api_calls_total.labels(endpoint="snapshot_all").inc()
             raw = self._client.get_snapshot_all(market_type="stocks") or []
         except Exception as e:
             logger.error(f"MassiveDataProvider: Error fetching snapshots: {e}")
@@ -231,6 +235,7 @@ class MassiveDataProvider(BaseDataProvider):
         if not self._client:
             return []
         try:
+            polygon_api_calls_total.labels(endpoint="snapshot_all").inc()
             return self._client.get_snapshot_all(market_type=market_type) or []
         except Exception as e:
             logger.error(f"MassiveDataProvider: Error fetching snapshot: {e}")
@@ -240,6 +245,7 @@ class MassiveDataProvider(BaseDataProvider):
         if not self._client:
             return None
         try:
+            polygon_api_calls_total.labels(endpoint="snapshot_ticker").inc()
             snap = self._client.get_snapshot_ticker("stocks", symbol)
             if snap and snap.last_trade and snap.last_trade.price is not None:
                 return float(snap.last_trade.price)
