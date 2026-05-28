@@ -81,9 +81,122 @@ if [ -n "$ISSUE_NUM" ] && [ "$INTENT" != "close" ] && [ "$INTENT" != "refine" ] 
   set_board_status "$STATUS_IN_PROGRESS" || echo "WARNING: Could not update project board"
 fi
 
+# --- Helper: post or update cost report on issue ---
+COST_MARKER="<!-- dark-factory-cost-report -->"
+
+post_cost_report() {
+  if [ -z "${ISSUE_NUM:-}" ]; then return; fi
+
+  # Get this run's cost data as JSON
+  local RUN_JSON
+  RUN_JSON=$(archon workflow cost --last --json 2>/dev/null || true)
+  if [ -z "$RUN_JSON" ] || [ "$RUN_JSON" = "null" ]; then return; fi
+
+  echo "Posting cost report to issue #${ISSUE_NUM}..."
+
+  # Find existing cost report comment by marker
+  local COMMENT_ID
+  COMMENT_ID=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments" \
+    --jq "[.[] | select(.body | contains(\"$COST_MARKER\"))] | last | .id // empty" 2>/dev/null || true)
+
+  # Build the new run's markdown table rows
+  local RUN_ROWS TOTAL_COST TOTAL_IN TOTAL_OUT RUN_STATUS TIMESTAMP
+  TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+  RUN_STATUS=$(echo "$RUN_JSON" | jq -r '.status // "unknown"')
+  TOTAL_COST=$(echo "$RUN_JSON" | jq -r '.totals.cost_usd // 0')
+  TOTAL_IN=$(echo "$RUN_JSON" | jq -r '.totals.input_tokens // 0')
+  TOTAL_OUT=$(echo "$RUN_JSON" | jq -r '.totals.output_tokens // 0')
+
+  # jq helper functions for human-readable formatting
+  RUN_ROWS=$(echo "$RUN_JSON" | jq -r '
+    def fmt_tokens: if . >= 1000000 then "\(. / 1000000 * 10 | round / 10)M"
+                    elif . >= 1000 then "\(. / 1000 * 10 | round / 10)K"
+                    else "\(.)" end;
+    def fmt_dur: if . < 1000 then "\(.)ms"
+                 elif . < 60000 then "\(. / 100 | round / 10)s"
+                 else "\(. / 60000 | floor)m \((. % 60000 / 1000) | round)s" end;
+    def fmt_cost: "$\(. * 10000 | round / 10000)";
+    def fmt_model: ((.modelUsage // {}) | keys[0] // "") |
+                   gsub("^claude-"; "") | gsub("-2025.*$"; "");
+    .nodes[] |
+    "| \(.nodeId) | \(fmt_model) | \(.inputTokens | fmt_tokens) | \(.outputTokens | fmt_tokens) | \(.costUsd | fmt_cost) | \(.durationMs | fmt_dur) |"
+  ' 2>/dev/null || true)
+
+  if [ -z "$RUN_ROWS" ]; then return; fi
+
+  # If there's an existing comment, extract prior run sections and cumulative totals
+  local PRIOR_RUNS="" PREV_COST="0" PREV_IN="0" PREV_OUT="0"
+  if [ -n "$COMMENT_ID" ]; then
+    local EXISTING_BODY
+    EXISTING_BODY=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments/${COMMENT_ID}" \
+      --jq '.body' 2>/dev/null || true)
+    PRIOR_RUNS=$(echo "$EXISTING_BODY" | sed -n '/^### Run /,/^---$/p' | head -n -1 || true)
+    # Extract previous grand total from hidden data marker
+    PREV_COST=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=\K[0-9.]+' || echo "0")
+    PREV_IN=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=[0-9.]+ in=\K[0-9]+' || echo "0")
+    PREV_OUT=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=[0-9.]+ in=[0-9]+ out=\K[0-9]+' || echo "0")
+  fi
+
+  # Calculate cumulative totals
+  local CUM_COST CUM_IN CUM_OUT
+  CUM_COST=$(echo "$PREV_COST + $TOTAL_COST" | bc)
+  CUM_IN=$(( PREV_IN + TOTAL_IN ))
+  CUM_OUT=$(( PREV_OUT + TOTAL_OUT ))
+  local RUN_COUNT
+  RUN_COUNT=$(echo "$PRIOR_RUNS" | grep -c '^### Run ' || echo "0")
+  RUN_COUNT=$(( RUN_COUNT + 1 ))
+
+  # Format token counts for display
+  fmt_tokens() {
+    local n=$1
+    if [ "$n" -ge 1000000 ]; then
+      echo "$(echo "scale=1; $n / 1000000" | bc)M"
+    elif [ "$n" -ge 1000 ]; then
+      echo "$(echo "scale=1; $n / 1000" | bc)K"
+    else
+      echo "$n"
+    fi
+  }
+
+  # Build the full comment body
+  local BODY
+  BODY="${COST_MARKER}
+<!-- cumulative: cost=${CUM_COST} in=${CUM_IN} out=${CUM_OUT} -->
+## Dark Factory — Cost Report
+
+**${RUN_COUNT} run(s) — Total: \$${CUM_COST} ($(fmt_tokens "$CUM_IN") in / $(fmt_tokens "$CUM_OUT") out)**
+
+${PRIOR_RUNS}
+### Run: ${TIMESTAMP} (${INTENT:-fix}, ${RUN_STATUS})
+
+| Step | Model | In tokens | Out tokens | Cost | Duration |
+|------|-------|-----------|------------|------|----------|
+${RUN_ROWS}
+| **Subtotal** | | **$(fmt_tokens "$TOTAL_IN")** | **$(fmt_tokens "$TOTAL_OUT")** | **\$${TOTAL_COST}** | |
+
+---
+*Updated by MarketHawk Dark Factory*"
+
+  # Create or update the comment
+  local TMPFILE
+  TMPFILE=$(mktemp /tmp/cost-report-XXXXXX.md)
+  echo "$BODY" > "$TMPFILE"
+
+  if [ -n "$COMMENT_ID" ]; then
+    gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments/${COMMENT_ID}" \
+      --method PATCH -F "body=@${TMPFILE}" > /dev/null 2>&1 \
+      || echo "WARNING: Could not update cost report comment"
+  else
+    gh issue comment "$ISSUE_NUM" --body-file "$TMPFILE" 2>/dev/null \
+      || echo "WARNING: Could not post cost report"
+  fi
+  rm -f "$TMPFILE"
+}
+
 # --- Error handler: move ticket back to Ready and post comment ---
 on_failure() {
   local EXIT_CODE=$?
+  post_cost_report
   if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
     if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ]; then
       echo "Refinement pipeline failed (exit $EXIT_CODE) for issue #$ISSUE_NUM"
@@ -144,3 +257,6 @@ export IS_SANDBOX=1
 export ARCHON_SUPPRESS_NESTED_CLAUDE_WARNING=1
 echo "Starting dark factory: $ARGUMENTS"
 archon workflow run archon-dark-factory "$ARGUMENTS"
+
+# --- Post cost report to GitHub issue (success path) ---
+post_cost_report
