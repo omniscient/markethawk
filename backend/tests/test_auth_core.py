@@ -1,12 +1,20 @@
 import os
+
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests-only-32chars!")
 
 # Clear cached settings so the env var above is picked up
 from app.core.config import get_settings
+
 get_settings.cache_clear()
 
-from app.core.auth import hash_password, verify_password, create_access_token, create_refresh_token
 from jose import jwt
+
+from app.core.auth import (
+    create_access_token,
+    create_refresh_token,
+    hash_password,
+    verify_password,
+)
 
 
 def test_hash_and_verify():

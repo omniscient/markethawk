@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
@@ -8,7 +9,7 @@ from app.core.database import SessionLocal
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=0, name='app.tasks.analyze_universe_quality')
+@celery_app.task(bind=True, max_retries=0, name="app.tasks.analyze_universe_quality")
 def analyze_universe_quality(self, universe_id: int):
     """
     Run a full data-quality analysis for a universe and persist the result.
@@ -21,9 +22,11 @@ def analyze_universe_quality(self, universe_id: int):
         logger.info(f"🔍 Starting quality analysis for universe {universe_id}")
 
         # Mark as running
-        report = db.query(UniverseQualityReport).filter(
-            UniverseQualityReport.universe_id == universe_id
-        ).first()
+        report = (
+            db.query(UniverseQualityReport)
+            .filter(UniverseQualityReport.universe_id == universe_id)
+            .first()
+        )
         if not report:
             report = UniverseQualityReport(universe_id=universe_id)
             db.add(report)
@@ -50,9 +53,11 @@ def analyze_universe_quality(self, universe_id: int):
     except Exception as e:
         logger.error(f"❌ Quality analysis failed for universe {universe_id}: {e}")
         try:
-            report = db.query(UniverseQualityReport).filter(
-                UniverseQualityReport.universe_id == universe_id
-            ).first()
+            report = (
+                db.query(UniverseQualityReport)
+                .filter(UniverseQualityReport.universe_id == universe_id)
+                .first()
+            )
             if report:
                 report.status = "error"
                 report.error_message = str(e)
@@ -65,8 +70,10 @@ def analyze_universe_quality(self, universe_id: int):
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=0, name='app.tasks.normalize_universe_quality')
-def normalize_universe_quality(self, universe_id: int, resume: bool = False, target_tickers: list = None):
+@celery_app.task(bind=True, max_retries=0, name="app.tasks.normalize_universe_quality")
+def normalize_universe_quality(
+    self, universe_id: int, resume: bool = False, target_tickers: list = None
+):
     """
     Fix all data-quality issues for a universe so every ticker reaches an A grade.
 
@@ -86,14 +93,20 @@ def normalize_universe_quality(self, universe_id: int, resume: bool = False, tar
 
     db: Session = SessionLocal()
     try:
-        logger.info(f"🔧 Starting normalization for universe {universe_id} (resume={resume})")
+        logger.info(
+            f"🔧 Starting normalization for universe {universe_id} (resume={resume})"
+        )
 
-        report = db.query(UniverseQualityReport).filter(
-            UniverseQualityReport.universe_id == universe_id
-        ).first()
+        report = (
+            db.query(UniverseQualityReport)
+            .filter(UniverseQualityReport.universe_id == universe_id)
+            .first()
+        )
 
         if not report or not report.report_data:
-            logger.error(f"No quality report found for universe {universe_id}. Run analysis first.")
+            logger.error(
+                f"No quality report found for universe {universe_id}. Run analysis first."
+            )
             raise RuntimeError("Quality analysis must be run before normalization.")
 
         # Load checkpoint for resume, or start fresh
@@ -121,9 +134,11 @@ def normalize_universe_quality(self, universe_id: int, resume: bool = False, tar
         )
 
         # Save final state
-        report = db.query(UniverseQualityReport).filter(
-            UniverseQualityReport.universe_id == universe_id
-        ).first()
+        report = (
+            db.query(UniverseQualityReport)
+            .filter(UniverseQualityReport.universe_id == universe_id)
+            .first()
+        )
         report.normalization_status = "complete"
         report.normalization_data = final_data
         db.commit()
@@ -139,12 +154,16 @@ def normalize_universe_quality(self, universe_id: int, resume: bool = False, tar
     except Exception as e:
         logger.error(f"❌ Normalization failed for universe {universe_id}: {e}")
         try:
-            report = db.query(UniverseQualityReport).filter(
-                UniverseQualityReport.universe_id == universe_id
-            ).first()
+            report = (
+                db.query(UniverseQualityReport)
+                .filter(UniverseQualityReport.universe_id == universe_id)
+                .first()
+            )
             if report:
                 report.normalization_status = "error"
-                existing = dict(report.normalization_data) if report.normalization_data else {}
+                existing = (
+                    dict(report.normalization_data) if report.normalization_data else {}
+                )
                 existing["error"] = str(e)
                 report.normalization_data = existing
                 db.commit()
@@ -156,14 +175,15 @@ def normalize_universe_quality(self, universe_id: int, resume: bool = False, tar
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=1, name='app.tasks.analyze_signal_features')
+@celery_app.task(bind=True, max_retries=1, name="app.tasks.analyze_signal_features")
 def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
     import pandas as pd
+
     from app.models.scanner_event import ScannerEvent
+    from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
+    from app.models.scanner_outcome_summary import ScannerOutcomeSummary
     from app.models.signal_analysis_run import SignalAnalysisRun
     from app.models.signal_cluster import SignalCluster
-    from app.models.scanner_outcome_summary import ScannerOutcomeSummary
-    from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
     from app.services.statistical_discovery import StatisticalDiscoveryService
 
     db: Session = SessionLocal()
@@ -206,9 +226,14 @@ def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
         unique_event_ids = {r.event_id for r in rows}
         if len(unique_event_ids) < 500:
             run.status = "failed"
-            run.error_message = f"Insufficient data (n={len(unique_event_ids)} events, min=500)"
+            run.error_message = (
+                f"Insufficient data (n={len(unique_event_ids)} events, min=500)"
+            )
             db.commit()
-            logger.info("analyze_signal_features: insufficient data (%d events)", len(unique_event_ids))
+            logger.info(
+                "analyze_signal_features: insufficient data (%d events)",
+                len(unique_event_ids),
+            )
             return
 
         flat_rows = []
@@ -240,8 +265,7 @@ def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
         conditional_stats = svc.compute_conditional_stats(df, cluster_labels)
 
         feature_cols = [
-            c for c in df.columns
-            if c not in {"event_id", "interval_key", "pct_change"}
+            c for c in df.columns if c not in {"event_id", "interval_key", "pct_change"}
         ]
         global_mean = {feat: float(df[feat].mean()) for feat in feature_cols}
 
@@ -271,7 +295,9 @@ def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
         run.event_count = len(unique_event_ids)
         run.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
-        logger.info("analyze_signal_features: completed (events=%d)", len(unique_event_ids))
+        logger.info(
+            "analyze_signal_features: completed (events=%d)", len(unique_event_ids)
+        )
 
     except Exception as exc:
         logger.exception("analyze_signal_features failed: %s", exc)

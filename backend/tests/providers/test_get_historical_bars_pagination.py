@@ -1,5 +1,6 @@
 # backend/tests/providers/test_get_historical_bars_pagination.py
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
+
 from app.providers.massive import MassiveDataProvider
 
 
@@ -57,7 +58,7 @@ class TestGetHistoricalBarsPagination:
     def test_full_page_triggers_second_api_call(self):
         p = _make_provider()
         page1 = [_make_agg(1000 + i * _1MIN_MS) for i in range(PAGE_LIMIT)]  # full
-        page2 = [_make_agg(1000 + PAGE_LIMIT * _1MIN_MS)]                     # partial
+        page2 = [_make_agg(1000 + PAGE_LIMIT * _1MIN_MS)]  # partial
         result = self._call(p, [page1, page2])
         assert p._client.get_aggs.call_count == 2
 

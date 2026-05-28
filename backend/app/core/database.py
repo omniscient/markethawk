@@ -2,12 +2,12 @@
 Database configuration and session management.
 """
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from typing import Generator
 
-from app.core.config import settings
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
+from app.core.config import settings
 
 # Database engine
 engine = create_engine(

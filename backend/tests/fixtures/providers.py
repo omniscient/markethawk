@@ -4,17 +4,16 @@ Patches DataProviderFactory so no real Polygon calls are made during tests.
 Also provides news article seeding and a mock for the Polygon news HTTP call.
 """
 
-from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch
+import uuid as _uuid
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.orm import Session
 
-import uuid as _uuid
-
-from app.providers import DataProviderFactory
 from app.models.news_article import NewsArticle
+from app.providers import DataProviderFactory
 
 
 def _make_canned_bars(ticker: str, count: int = 5) -> list[dict]:
@@ -61,7 +60,9 @@ def mock_polygon_provider():
     mock.supported_asset_classes = ["stocks"]
     mock.is_available.return_value = (True, "Ready (mock)")
     mock.get_bars.side_effect = lambda symbol, **kwargs: _make_canned_bars(symbol)
-    mock.get_ticker_details.side_effect = lambda symbol: _make_canned_ticker_details(symbol)
+    mock.get_ticker_details.side_effect = lambda symbol: _make_canned_ticker_details(
+        symbol
+    )
     mock.get_snapshots.return_value = []
 
     original = DataProviderFactory._providers.get("massive")
@@ -90,7 +91,11 @@ def seed_news_articles(
     base_time = datetime.now(timezone.utc) - timedelta(hours=count)
     rows = []
     for i in range(count):
-        article_tickers = tickers if tickers is not None else [default_tickers[i % len(default_tickers)]]
+        article_tickers = (
+            tickers
+            if tickers is not None
+            else [default_tickers[i % len(default_tickers)]]
+        )
         row = NewsArticle(
             title=f"Test Article {i + 1}: Market Update",
             author="Test Author",
@@ -117,7 +122,9 @@ def _make_canned_polygon_news_response(tickers: list[str] | None = None) -> dict
             {
                 "title": "Canned News Article 1",
                 "author": "Polygon Test",
-                "published_utc": (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "published_utc": (now - timedelta(hours=2)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
                 "article_url": "https://polygon.test/news/canned-1",
                 "image_url": "https://polygon.test/images/canned-1.jpg",
                 "description": "Canned article 1 description.",
@@ -127,7 +134,9 @@ def _make_canned_polygon_news_response(tickers: list[str] | None = None) -> dict
             {
                 "title": "Canned News Article 2",
                 "author": "Polygon Test",
-                "published_utc": (now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "published_utc": (now - timedelta(hours=1)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
                 "article_url": "https://polygon.test/news/canned-2",
                 "image_url": None,
                 "description": "Canned article 2 description.",
@@ -168,7 +177,6 @@ def mock_news_provider():
     Patch httpx.Client.get so poll_massive_news never calls the real Polygon API.
     Yields the mock for optional assertion in tests.
     """
-    import json
     from unittest.mock import MagicMock
 
     fake_response = MagicMock()

@@ -17,11 +17,26 @@ from app.models import StockUniverse, StockUniverseTicker
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.stock_aggregate import StockAggregate
 
-
-STOCK_COLS = ["timestamp", "open", "high", "low", "close", "volume", "vwap", "transactions"]
+STOCK_COLS = [
+    "timestamp",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "vwap",
+    "transactions",
+]
 FUTURES_COLS = [
-    "timestamp", "open", "high", "low", "close",
-    "volume", "vwap", "transactions", "contract_month",
+    "timestamp",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "vwap",
+    "transactions",
+    "contract_month",
 ]
 
 
@@ -62,7 +77,8 @@ def export_aggregates(universe_id: int, request, db: Session) -> StreamingRespon
             filters.append(ts_col >= datetime.strptime(request.from_date, "%Y-%m-%d"))
         if request.to_date:
             filters.append(
-                ts_col < datetime.strptime(request.to_date, "%Y-%m-%d") + timedelta(days=1)
+                ts_col
+                < datetime.strptime(request.to_date, "%Y-%m-%d") + timedelta(days=1)
             )
         return filters
 
@@ -86,7 +102,9 @@ def export_aggregates(universe_id: int, request, db: Session) -> StreamingRespon
                 "close": float(row.close),
                 "volume": int(row.volume),
                 "vwap": float(row.vwap) if row.vwap is not None else "",
-                "transactions": row.transactions if row.transactions is not None else "",
+                "transactions": row.transactions
+                if row.transactions is not None
+                else "",
             }
 
     def _rows_for_futures(symbol):
@@ -109,7 +127,9 @@ def export_aggregates(universe_id: int, request, db: Session) -> StreamingRespon
                 "close": float(row.close),
                 "volume": int(row.volume),
                 "vwap": float(row.vwap) if row.vwap is not None else "",
-                "transactions": row.transactions if row.transactions is not None else "",
+                "transactions": row.transactions
+                if row.transactions is not None
+                else "",
                 "contract_month": row.contract_month,
             }
 

@@ -8,19 +8,18 @@ this file or any router that depends on it.
 
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
-from typing import Dict, Any, Optional
 
 import pandas as pd
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
 
-from app.models.stock_aggregate import StockAggregate
-from app.models.futures_aggregate import FuturesAggregate
-from app.models.monitored_stock import MonitoredStock
-from app.services.chart_indicators import ChartIndicatorsService
 from app.exceptions import DataFetchError, ProviderError
+from app.models.monitored_stock import MonitoredStock
+from app.models.stock_aggregate import StockAggregate
 from app.providers import DataProviderFactory
+from app.services.chart_indicators import ChartIndicatorsService
 
 
 class StockDataService:
@@ -104,6 +103,7 @@ class StockDataService:
 
             # Filter for extended hours
             from app.utils.session import classify_session
+
             extended_data = []
             for row in aggs:
                 is_pre, is_after = classify_session(row["timestamp"])
@@ -118,7 +118,9 @@ class StockDataService:
                 "pre_market_high": max(r["high"] for r in extended_data),
                 "pre_market_low": min(r["low"] for r in extended_data),
                 "pre_market_open": extended_data[0]["open"] if extended_data else None,
-                "pre_market_close": extended_data[-1]["close"] if extended_data else None,
+                "pre_market_close": extended_data[-1]["close"]
+                if extended_data
+                else None,
             }
 
         except Exception as e:
@@ -158,7 +160,7 @@ class StockDataService:
         ticker: str,
         period: str = "30d",
         timespan: str = "day",
-        multiplier: int = 1
+        multiplier: int = 1,
     ) -> pd.DataFrame:
         """Fetch historical data from the local database."""
         try:
@@ -177,11 +179,14 @@ class StockDataService:
                     days = int(period[:-1]) * 7
                 elif period.isdigit():
                     days = int(period)
-                start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+                start_date = datetime.now(timezone.utc).replace(
+                    tzinfo=None
+                ) - timedelta(days=days)
 
             # Use raw SQL to return lightweight tuples instead of full ORM objects.
             # For large datasets (e.g. 30D of 1M bars) this is 3-5x faster than .all().
             from sqlalchemy import text
+
             rows = db.execute(
                 text("""
                     SELECT timestamp, open, high, low, close, volume, vwap, transactions
@@ -192,14 +197,30 @@ class StockDataService:
                       AND timestamp >= :start_date
                     ORDER BY timestamp ASC
                 """),
-                {"ticker": ticker, "timespan": timespan,
-                 "multiplier": multiplier, "start_date": start_date},
+                {
+                    "ticker": ticker,
+                    "timespan": timespan,
+                    "multiplier": multiplier,
+                    "start_date": start_date,
+                },
             ).fetchall()
 
             if not rows:
                 return pd.DataFrame()
 
-            df = pd.DataFrame(rows, columns=["Date", "Open", "High", "Low", "Close", "Volume", "vwap", "transactions"])
+            df = pd.DataFrame(
+                rows,
+                columns=[
+                    "Date",
+                    "Open",
+                    "High",
+                    "Low",
+                    "Close",
+                    "Volume",
+                    "vwap",
+                    "transactions",
+                ],
+            )
             df.set_index("Date", inplace=True)
             return df
 
@@ -237,7 +258,9 @@ class StockDataService:
                     days = int(period[:-1]) * 7
                 elif period.isdigit():
                     days = int(period)
-                from_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+                from_date = (
+                    datetime.now(timezone.utc) - timedelta(days=days)
+                ).strftime("%Y-%m-%d")
 
             df = FuturesDataService.get_continuous_series(
                 symbol=symbol,
@@ -250,15 +273,17 @@ class StockDataService:
                 return pd.DataFrame()
 
             # Rename columns to match the format expected by the chart endpoint
-            df = df.rename(columns={
-                "timestamp": "Date",
-                "open": "Open",
-                "high": "High",
-                "low": "Low",
-                "close": "Close",
-                "volume": "Volume",
-                "vwap": "vwap",
-            })
+            df = df.rename(
+                columns={
+                    "timestamp": "Date",
+                    "open": "Open",
+                    "high": "High",
+                    "low": "Low",
+                    "close": "Close",
+                    "volume": "Volume",
+                    "vwap": "vwap",
+                }
+            )
             df.set_index("Date", inplace=True)
             return df
 
@@ -273,7 +298,7 @@ class StockDataService:
         timespan: str = "day",
         multiplier: int = 1,
         full_history: bool = False,
-        period: Optional[str] = None
+        period: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Refresh stock data from Polygon to DB incrementally.
@@ -291,23 +316,27 @@ class StockDataService:
                 )
 
             ticker = ticker.upper()
-            
+
             # 1. Determine from_date and target range
-            db_range = db.query(
-                func.max(StockAggregate.timestamp),
-                func.min(StockAggregate.timestamp)
-            ).filter(
-                StockAggregate.ticker == ticker,
-                StockAggregate.timespan == timespan,
-                StockAggregate.multiplier == multiplier
-            ).first()
-            
+            db_range = (
+                db.query(
+                    func.max(StockAggregate.timestamp),
+                    func.min(StockAggregate.timestamp),
+                )
+                .filter(
+                    StockAggregate.ticker == ticker,
+                    StockAggregate.timespan == timespan,
+                    StockAggregate.multiplier == multiplier,
+                )
+                .first()
+            )
+
             last_entry = db_range[0] if db_range else None
             first_entry = db_range[1] if db_range else None
-            
+
             # Use UTC-aware 'now' but strip tzinfo to match naive DB models if necessary
             now = datetime.now(timezone.utc).replace(tzinfo=None)
-            
+
             # Determine target start date for full history/first fetch
             if period:
                 days = 30
@@ -330,7 +359,7 @@ class StockDataService:
             if full_history or not last_entry:
                 from_date_dt = target_start
             elif first_entry and first_entry > target_start:
-                # We have some data, but not enough history. 
+                # We have some data, but not enough history.
                 # Fetch from target start to now (incremental check will handle duplicates)
                 from_date_dt = target_start
             else:
@@ -341,16 +370,22 @@ class StockDataService:
                     from_date_dt = last_entry + timedelta(minutes=1)
                 else:
                     from_date_dt = last_entry + timedelta(seconds=1)
-            
+
             from_date = from_date_dt.strftime("%Y-%m-%d")
             to_date = now.strftime("%Y-%m-%d")
-            
+
             if from_date_dt.date() > now.date() and timespan == "day":
-                return {"status": "success", "message": "Already up to date", "added": 0}
+                return {
+                    "status": "success",
+                    "message": "Already up to date",
+                    "added": 0,
+                }
 
             # 2. Fetch from Polygon
-            logging.info(f"🔄 Refreshing {ticker} {timespan} data from {from_date} to {to_date}")
-            
+            logging.info(
+                f"🔄 Refreshing {ticker} {timespan} data from {from_date} to {to_date}"
+            )
+
             # This is essentially what sync_stock_aggregates task does
             # We call the service method directly here for synchronous response
             aggs = StockDataService.get_aggregates(
@@ -362,66 +397,69 @@ class StockDataService:
                 limit=50000,
                 paginate=True,
             )
-            
+
             if not aggs:
                 return {"status": "success", "message": "No new data found", "added": 0}
-            
+
             # 3. Store in DB
             new_records = []
-            
+
             # Fetch existing timestamps in this range for deduplication
             # Making them naive for comparison
             existing_ts = set(
-                r[0] for r in db.query(StockAggregate.timestamp).filter(
+                r[0]
+                for r in db.query(StockAggregate.timestamp)
+                .filter(
                     StockAggregate.ticker == ticker,
                     StockAggregate.timespan == timespan,
                     StockAggregate.multiplier == multiplier,
-                    StockAggregate.timestamp >= from_date_dt
-                ).all()
+                    StockAggregate.timestamp >= from_date_dt,
+                )
+                .all()
             )
 
             from app.utils.session import classify_session
+
             for agg in aggs:
-                ts_utc = agg['timestamp']
+                ts_utc = agg["timestamp"]
                 ts_naive = ts_utc.replace(tzinfo=None)  # Store naive UTC in DB
 
                 if ts_naive in existing_ts:
                     continue
 
                 is_pre_market, is_after_market = classify_session(ts_utc)
-                
+
                 record = StockAggregate(
                     ticker=ticker,
                     timestamp=ts_naive,
                     multiplier=multiplier,
                     timespan=timespan,
-                    open=agg['open'],
-                    high=agg['high'],
-                    low=agg['low'],
-                    close=agg['close'],
-                    volume=agg['volume'],
-                    vwap=agg['vwap'],
-                    transactions=agg['transactions'],
+                    open=agg["open"],
+                    high=agg["high"],
+                    low=agg["low"],
+                    close=agg["close"],
+                    volume=agg["volume"],
+                    vwap=agg["vwap"],
+                    transactions=agg["transactions"],
                     is_pre_market=is_pre_market,
                     is_after_market=is_after_market,
-                    provider='polygon',
+                    provider="polygon",
                 )
                 new_records.append(record)
-                existing_ts.add(ts_naive) # Prevent duplicates within the same batch
-            
+                existing_ts.add(ts_naive)  # Prevent duplicates within the same batch
+
             if new_records:
                 db.bulk_save_objects(new_records)
                 db.commit()
                 logging.info(f"✅ Saved {len(new_records)} new aggregates for {ticker}")
-            
+
             return {
                 "status": "success",
                 "message": f"Refreshed {len(new_records)} records",
                 "added": len(new_records),
                 "from_date": from_date,
-                "to_date": to_date
+                "to_date": to_date,
             }
-
 
         except DataFetchError:
             db.rollback()
@@ -486,9 +524,7 @@ class StockDataService:
 
     @staticmethod
     def get_pre_market_movers(
-        db: Optional[Session] = None,
-        min_volume: int = 10000,
-        limit: int = 100
+        db: Optional[Session] = None, min_volume: int = 10000, limit: int = 100
     ) -> list[Dict[str, Any]]:
         """
         Fetch pre-market movers for all US stocks using Polygon Snapshot API.
@@ -512,15 +548,17 @@ class StockDataService:
                 if s["volume"] < min_volume:
                     continue
 
-                movers.append({
-                    "ticker": s["ticker"],
-                    "name": None,
-                    "price": s["price"],
-                    "change_percent": s["change_pct"],
-                    "change_value": s["change_value"],
-                    "volume": s["volume"],
-                    "prev_close": s["prev_close"],
-                })
+                movers.append(
+                    {
+                        "ticker": s["ticker"],
+                        "name": None,
+                        "price": s["price"],
+                        "change_percent": s["change_pct"],
+                        "change_value": s["change_value"],
+                        "volume": s["volume"],
+                        "prev_close": s["prev_close"],
+                    }
+                )
 
             # Sort by absolute change percent descending
             movers.sort(key=lambda x: abs(x["change_percent"]), reverse=True)
@@ -529,10 +567,15 @@ class StockDataService:
             # Enrich with DB data if available
             if db and top_movers:
                 from app.models.ticker_reference import TickerReference
+
                 ticker_list = [m["ticker"] for m in top_movers]
-                refs = db.query(TickerReference).filter(TickerReference.ticker.in_(ticker_list)).all()
+                refs = (
+                    db.query(TickerReference)
+                    .filter(TickerReference.ticker.in_(ticker_list))
+                    .all()
+                )
                 ref_map = {r.ticker: r for r in refs}
-                
+
                 for m in top_movers:
                     ref = ref_map.get(m["ticker"])
                     if ref:

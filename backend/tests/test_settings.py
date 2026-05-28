@@ -1,4 +1,5 @@
 import inspect
+
 import pytest
 from pydantic import ValidationError
 
@@ -6,6 +7,7 @@ from pydantic import ValidationError
 @pytest.fixture(autouse=True)
 def clear_settings_cache():
     from app.core.config import get_settings
+
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -15,17 +17,20 @@ class TestSettingsRequiredFields:
     def test_missing_database_url_raises(self, monkeypatch):
         monkeypatch.delenv("DATABASE_URL", raising=False)
         from app.core.config import Settings
+
         with pytest.raises(ValidationError):
             Settings(POLYGON_API_KEY="test-key")
 
     def test_missing_polygon_api_key_raises(self, monkeypatch):
         monkeypatch.delenv("POLYGON_API_KEY", raising=False)
         from app.core.config import Settings
+
         with pytest.raises(ValidationError):
             Settings(DATABASE_URL="postgresql://test:test@localhost/test")
 
     def test_valid_required_fields_succeeds(self):
         from app.core.config import Settings
+
         s = Settings(
             DATABASE_URL="postgresql://test:test@localhost/test",
             POLYGON_API_KEY="test-key",
@@ -37,6 +42,7 @@ class TestSettingsRequiredFields:
 class TestDatabaseUrlValidator:
     def test_non_postgresql_url_raises(self):
         from app.core.config import Settings
+
         with pytest.raises(ValidationError):
             Settings(
                 DATABASE_URL="mysql://test:test@localhost/test",
@@ -45,6 +51,7 @@ class TestDatabaseUrlValidator:
 
     def test_postgresql_asyncpg_scheme_accepted(self):
         from app.core.config import Settings
+
         s = Settings(
             DATABASE_URL="postgresql+asyncpg://test:test@localhost/test",
             POLYGON_API_KEY="test-key",
@@ -55,6 +62,7 @@ class TestDatabaseUrlValidator:
 class TestPortValidators:
     def test_ibkr_port_zero_raises(self):
         from app.core.config import Settings
+
         with pytest.raises(ValidationError):
             Settings(
                 DATABASE_URL="postgresql://test:test@localhost/test",
@@ -64,6 +72,7 @@ class TestPortValidators:
 
     def test_ibkr_port_too_high_raises(self):
         from app.core.config import Settings
+
         with pytest.raises(ValidationError):
             Settings(
                 DATABASE_URL="postgresql://test:test@localhost/test",
@@ -73,6 +82,7 @@ class TestPortValidators:
 
     def test_smtp_port_out_of_range_raises(self):
         from app.core.config import Settings
+
         with pytest.raises(ValidationError):
             Settings(
                 DATABASE_URL="postgresql://test:test@localhost/test",
@@ -82,6 +92,7 @@ class TestPortValidators:
 
     def test_valid_ports_accepted(self):
         from app.core.config import Settings
+
         s = Settings(
             DATABASE_URL="postgresql://test:test@localhost/test",
             POLYGON_API_KEY="test-key",
@@ -96,6 +107,7 @@ class TestCorsOrigins:
     def test_default_cors_origins(self, monkeypatch):
         monkeypatch.delenv("CORS_ORIGINS", raising=False)
         from app.core.config import Settings
+
         s = Settings(
             DATABASE_URL="postgresql://test:test@localhost/test",
             POLYGON_API_KEY="test-key",
@@ -108,6 +120,7 @@ class TestCorsOrigins:
             '["http://localhost:3333","http://localhost:3000"]',
         )
         from app.core.config import Settings
+
         s = Settings(
             DATABASE_URL="postgresql://test:test@localhost/test",
             POLYGON_API_KEY="test-key",
@@ -116,5 +129,6 @@ class TestCorsOrigins:
 
     def test_no_load_dotenv_call(self):
         from app.core import config
+
         source = inspect.getsource(config)
         assert "load_dotenv" not in source

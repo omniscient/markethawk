@@ -1,4 +1,5 @@
 import os
+
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 os.environ.setdefault("POLYGON_API_KEY", "test-key-for-unit-tests-only")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests-only-32chars!")
@@ -7,14 +8,17 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests-only-32c
 os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
 
 from app.core.config import get_settings
+
 get_settings.cache_clear()
 
-import pytest
-import fakeredis
 from unittest.mock import patch
+
+import fakeredis
+import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+
 from app.core.database import get_db
+from app.main import app
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +45,7 @@ def inject_auth_into_module_client(request):
     token signed with the test secret passes, regardless of subject UUID.
     """
     from app.core.auth import create_access_token
+
     module = request.module
     if hasattr(module, "client") and isinstance(module.client, TestClient):
         token = create_access_token("00000000-0000-0000-0000-000000000001")

@@ -25,7 +25,7 @@ Adding a new provider
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from app.providers.base import BaseDataProvider
 
@@ -79,10 +79,10 @@ class DataProviderFactory:
         """Return all registered providers along with their supported asset classes and availability."""
         return [
             {
-                "name": name, 
+                "name": name,
                 "classes": p.supported_asset_classes,
                 "available": p.is_available()[0],
-                "status_message": p.is_available()[1]
+                "status_message": p.is_available()[1],
             }
             for name, p in cls._providers.items()
         ]
@@ -99,8 +99,8 @@ class DataProviderFactory:
 # but is_available() returns False.
 # ---------------------------------------------------------------------------
 
+from app.providers.ibkr import IBKRDataProvider  # noqa: E402
 from app.providers.massive import MassiveDataProvider  # noqa: E402
-from app.providers.ibkr import IBKRDataProvider        # noqa: E402
 
 DataProviderFactory.register(MassiveDataProvider())
 DataProviderFactory.register(IBKRDataProvider())

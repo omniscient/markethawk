@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 import app.services.scan_orchestrator as orchestrator
-from app.services.scan_orchestrator import ScannerDescriptor, register, get_all, run
+from app.services.scan_orchestrator import ScannerDescriptor, get_all, register, run
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +33,9 @@ def test_get_all_includes_registered():
 def test_run_dispatches_to_registered_fn():
     expected = [{"ticker": "AAPL", "score": 90}]
     fn = AsyncMock(return_value=expected)
-    register(ScannerDescriptor(key="mock_scan", display_name="Mock", description="m", run=fn))
+    register(
+        ScannerDescriptor(key="mock_scan", display_name="Mock", description="m", run=fn)
+    )
     today = date(2026, 5, 23)
     result = asyncio.run(run("mock_scan", ["AAPL"], db=None, event_date=today))
     assert result == expected
@@ -61,6 +63,7 @@ def test_register_returns_descriptor():
 
 def test_pre_market_scanner_registered():
     import app.services.pre_market_scan  # noqa: F401
+
     assert "pre_market_volume_spike" in orchestrator._REGISTRY
     desc = orchestrator._REGISTRY["pre_market_volume_spike"]
     assert desc.display_name == "Pre-Market Volume Spike"
@@ -69,6 +72,7 @@ def test_pre_market_scanner_registered():
 
 def test_oversold_bounce_scanner_registered():
     import app.services.oversold_bounce_scan  # noqa: F401
+
     assert "oversold_bounce" in orchestrator._REGISTRY
     desc = orchestrator._REGISTRY["oversold_bounce"]
     assert desc.display_name == "Oversold Bounce"
@@ -77,5 +81,6 @@ def test_oversold_bounce_scanner_registered():
 
 def test_liquidity_hunt_variants_registered():
     import app.services.liquidity_hunt  # noqa: F401
+
     for key in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
         assert key in orchestrator._REGISTRY, f"Expected {key!r} in registry"

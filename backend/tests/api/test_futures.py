@@ -4,18 +4,18 @@ Runs against a real Postgres DB (via testcontainers).
 IBKR is never called — the mock_futures_provider fixture intercepts all provider calls.
 """
 
-import pytest
 from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from tests.fixtures.providers import mock_futures_provider  # noqa: F401
 from tests.fixtures.futures import (
-    seed_futures_contracts,
     seed_futures_aggregates,
+    seed_futures_contracts,
     seed_futures_rollover,
 )
+from tests.fixtures.providers import mock_futures_provider  # noqa: F401
 
 client = TestClient(app)
 

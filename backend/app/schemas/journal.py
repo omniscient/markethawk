@@ -1,19 +1,24 @@
-from pydantic import BaseModel, ConfigDict, Field
-from datetime import datetime, date
-from typing import List, Optional
+from datetime import date, datetime
 from decimal import Decimal
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict
+
 
 class TagBase(BaseModel):
     name: str
     color: Optional[str] = None
 
+
 class TagCreate(TagBase):
     pass
+
 
 class TagSchema(TagBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class ExecutionBase(BaseModel):
     timestamp: datetime
@@ -23,14 +28,17 @@ class ExecutionBase(BaseModel):
     commission: Optional[Decimal] = Decimal("0.0")
     external_id: Optional[str] = None
 
+
 class ExecutionCreate(ExecutionBase):
     pass
+
 
 class ExecutionSchema(ExecutionBase):
     id: int
     trade_id: int
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class TradeBase(BaseModel):
     symbol: str
@@ -47,13 +55,16 @@ class TradeBase(BaseModel):
     return_pct: Optional[Decimal] = None
     notes: Optional[str] = None
 
+
 class TradeCreate(TradeBase):
     pass
+
 
 class TradeUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     tag_ids: Optional[List[int]] = None
+
 
 class TradeSchema(TradeBase):
     id: int
@@ -64,13 +75,16 @@ class TradeSchema(TradeBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class JournalEntryBase(BaseModel):
     entry_date: date
     content: str
     sentiment: Optional[str] = None
 
+
 class JournalEntryCreate(JournalEntryBase):
     pass
+
 
 class JournalEntrySchema(JournalEntryBase):
     id: int
@@ -78,6 +92,7 @@ class JournalEntrySchema(JournalEntryBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class TradeStats(BaseModel):
     total_trades: int

@@ -1,8 +1,9 @@
 # backend/tests/tasks/test_paper_exit.py
 from decimal import Decimal
 from unittest.mock import ANY, MagicMock, patch
-from app.providers.massive import MassiveDataProvider
+
 import app.tasks.trading as tasks_module
+from app.providers.massive import MassiveDataProvider
 
 
 def _make_provider(client=None):
@@ -30,7 +31,9 @@ def _make_snapshot(last_trade_price=None, day_close=None):
 class TestGetSnapshotPrice:
     def test_returns_last_trade_price(self):
         client = MagicMock()
-        client.get_snapshot_ticker.return_value = _make_snapshot(last_trade_price=123.45)
+        client.get_snapshot_ticker.return_value = _make_snapshot(
+            last_trade_price=123.45
+        )
         p = _make_provider(client)
         assert p.get_snapshot_price("AAPL") == 123.45
 
@@ -90,8 +93,10 @@ class TestSimulatePaperExit:
         mock_provider = MagicMock()
         mock_provider.get_snapshot_price.return_value = snapshot_price
 
-        with patch("app.providers.DataProviderFactory") as mock_factory, \
-             patch("app.tasks.trading._record_exit_fill") as mock_exit:
+        with (
+            patch("app.providers.DataProviderFactory") as mock_factory,
+            patch("app.tasks.trading._record_exit_fill") as mock_exit,
+        ):
             mock_factory.get_or_none.return_value = mock_provider
             tasks_module._simulate_paper_exit(order, db, now)
             return mock_exit
@@ -135,8 +140,10 @@ class TestSimulatePaperExit:
         order = _make_order()
         db = MagicMock()
         now = MagicMock()
-        with patch("app.providers.DataProviderFactory") as mock_factory, \
-             patch("app.tasks.trading._record_exit_fill") as mock_exit:
+        with (
+            patch("app.providers.DataProviderFactory") as mock_factory,
+            patch("app.tasks.trading._record_exit_fill") as mock_exit,
+        ):
             mock_factory.get_or_none.return_value = None
             tasks_module._simulate_paper_exit(order, db, now)
             mock_exit.assert_not_called()

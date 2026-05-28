@@ -2,10 +2,12 @@
 ScannerRun SQLAlchemy model.
 """
 
-from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Date, Text, ForeignKey, Uuid as UUID
-from sqlalchemy.dialects.postgresql import JSONB
 import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Uuid as UUID
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import Base
 
@@ -27,7 +29,9 @@ class ScannerRun(Base):
     error_message = Column(Text, nullable=True)
     # Per-ticker failures from partial scan runs: [{ticker, error_type, message, retryable}, ...]
     failed_tickers = Column(JSONB, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
     scan_start_date = Column(Date, nullable=True)
     scan_end_date = Column(Date, nullable=True)
     celery_task_id = Column(String(64), nullable=True, index=True)

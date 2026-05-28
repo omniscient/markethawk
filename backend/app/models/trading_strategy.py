@@ -6,7 +6,8 @@ and R:R / sizing tweaks apply everywhere without touching alert configuration.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Numeric, Text
+
+from sqlalchemy import Boolean, Column, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
@@ -87,7 +88,9 @@ class TradingStrategy(Base):
 
     # ── Relationships ────────────────────────────────────────────────────
     alert_rules = relationship("AlertRule", back_populates="trading_strategy")
-    auto_trade_orders = relationship("AutoTradeOrder", back_populates="trading_strategy")
+    auto_trade_orders = relationship(
+        "AutoTradeOrder", back_populates="trading_strategy"
+    )
 
     created_at = Column(
         DateTime,

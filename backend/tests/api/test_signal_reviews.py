@@ -1,6 +1,7 @@
 """
 Integration tests for signal review endpoints under /api/scanner/.
 """
+
 import uuid as uuid_lib
 
 from fastapi.testclient import TestClient
@@ -21,9 +22,12 @@ def _get_first_event(db: Session) -> ScannerEvent:
 
 def test_create_confirmed_review(db: Session):
     event = _get_first_event(db)
-    response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
-        "verdict": "confirmed",
-    })
+    response = client.post(
+        f"/api/scanner/events/{event.uuid}/review",
+        json={
+            "verdict": "confirmed",
+        },
+    )
     assert response.status_code == 201
     data = response.json()
     assert data["verdict"] == "confirmed"
@@ -32,53 +36,71 @@ def test_create_confirmed_review(db: Session):
 
 def test_create_uncertain_review(db: Session):
     event = _get_first_event(db)
-    response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
-        "verdict": "uncertain",
-        "notes": "Need to check chart",
-    })
+    response = client.post(
+        f"/api/scanner/events/{event.uuid}/review",
+        json={
+            "verdict": "uncertain",
+            "notes": "Need to check chart",
+        },
+    )
     assert response.status_code == 201
     assert response.json()["verdict"] == "uncertain"
 
 
 def test_create_rejected_review_requires_reason(db: Session):
     event = _get_first_event(db)
-    response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
-        "verdict": "rejected",
-    })
+    response = client.post(
+        f"/api/scanner/events/{event.uuid}/review",
+        json={
+            "verdict": "rejected",
+        },
+    )
     assert response.status_code == 422
 
 
 def test_create_rejected_review_with_reason(db: Session):
     event = _get_first_event(db)
-    response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
-        "verdict": "rejected",
-        "reject_reason": "noise",
-        "notes": "Volume spike was a data artifact",
-    })
+    response = client.post(
+        f"/api/scanner/events/{event.uuid}/review",
+        json={
+            "verdict": "rejected",
+            "reject_reason": "noise",
+            "notes": "Volume spike was a data artifact",
+        },
+    )
     assert response.status_code == 201
     assert response.json()["reject_reason"] == "noise"
 
 
 def test_create_review_invalid_uuid(db: Session):
-    response = client.post("/api/scanner/events/not-a-uuid/review", json={
-        "verdict": "confirmed",
-    })
+    response = client.post(
+        "/api/scanner/events/not-a-uuid/review",
+        json={
+            "verdict": "confirmed",
+        },
+    )
     assert response.status_code == 400
 
 
 def test_create_review_nonexistent_event(db: Session):
     fake_uuid = str(uuid_lib.uuid4())
-    response = client.post(f"/api/scanner/events/{fake_uuid}/review", json={
-        "verdict": "confirmed",
-    })
+    response = client.post(
+        f"/api/scanner/events/{fake_uuid}/review",
+        json={
+            "verdict": "confirmed",
+        },
+    )
     assert response.status_code == 404
 
 
 def test_create_review_invalid_verdict(db: Session):
     event = _get_first_event(db)
-    response = client.post(f"/api/scanner/events/{event.uuid}/review", json={
-        "verdict": "maybe",
-    })
+    response = client.post(
+        f"/api/scanner/events/{event.uuid}/review",
+        json={
+            "verdict": "maybe",
+        },
+    )
     assert response.status_code == 422
 
 
@@ -88,7 +110,9 @@ def test_list_reviews_by_scanner_type(db: Session):
     db.add(review)
     db.flush()
 
-    response = client.get(f"/api/scanner/events/reviews?scanner_type={event.scanner_type}")
+    response = client.get(
+        f"/api/scanner/events/reviews?scanner_type={event.scanner_type}"
+    )
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
@@ -111,10 +135,16 @@ def test_list_reviews_liquidity_hunt_alias(db: Session):
 def test_list_reviews_filter_by_verdict(db: Session):
     event = _get_first_event(db)
     db.add(SignalReview(scanner_event_id=event.id, verdict="confirmed"))
-    db.add(SignalReview(scanner_event_id=event.id, verdict="rejected", reject_reason="noise"))
+    db.add(
+        SignalReview(
+            scanner_event_id=event.id, verdict="rejected", reject_reason="noise"
+        )
+    )
     db.flush()
 
-    response = client.get(f"/api/scanner/events/reviews?scanner_type={event.scanner_type}&verdict=confirmed")
+    response = client.get(
+        f"/api/scanner/events/reviews?scanner_type={event.scanner_type}&verdict=confirmed"
+    )
     assert response.status_code == 200
     data = response.json()
     assert all(r["verdict"] == "confirmed" for r in data)
@@ -128,7 +158,11 @@ def test_list_reviews_missing_scanner_type(db: Session):
 def test_review_stats(db: Session):
     events = seed_scanner_events(db)
     db.add(SignalReview(scanner_event_id=events[0].id, verdict="confirmed"))
-    db.add(SignalReview(scanner_event_id=events[1].id, verdict="rejected", reject_reason="noise"))
+    db.add(
+        SignalReview(
+            scanner_event_id=events[1].id, verdict="rejected", reject_reason="noise"
+        )
+    )
     db.add(SignalReview(scanner_event_id=events[2].id, verdict="uncertain"))
     db.flush()
 
@@ -149,11 +183,16 @@ def test_review_stats_with_scanner_type_filter(db: Session):
         db.add(SignalReview(scanner_event_id=e.id, verdict="confirmed"))
     db.flush()
 
-    response = client.get("/api/scanner/reviews/stats?scanner_type=pre_market_volume_spike")
+    response = client.get(
+        "/api/scanner/reviews/stats?scanner_type=pre_market_volume_spike"
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["reviewed_count"] > 0
-    assert all(row["scanner_type"] == "pre_market_volume_spike" for row in data["by_scanner_type"])
+    assert all(
+        row["scanner_type"] == "pre_market_volume_spike"
+        for row in data["by_scanner_type"]
+    )
 
 
 def test_scanner_results_include_latest_review(db: Session):

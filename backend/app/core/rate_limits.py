@@ -6,6 +6,7 @@ imports all routers, and routers need to import limiter.
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
 from app.core.config import settings
 
 GLOBAL_LIMIT = "100/minute"
@@ -18,7 +19,9 @@ def _build_limiter() -> Limiter:
     if not settings.RATE_LIMITING_ENABLED:
         # enabled=False is SlowAPI's purpose-built no-op — neither middleware nor
         # decorator auto_check will enforce limits.
-        return Limiter(key_func=get_remote_address, headers_enabled=False, enabled=False)
+        return Limiter(
+            key_func=get_remote_address, headers_enabled=False, enabled=False
+        )
     # rsplit('/', 1) safely strips the trailing /0 db segment.
     rate_redis_url = settings.REDIS_URL.rsplit("/", 1)[0] + "/1"
     return Limiter(

@@ -6,17 +6,17 @@ rollover schedules, and contract catalogs.
 """
 
 import logging
-
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
 from typing import Optional
+
 import pandas as pd
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.futures_contract import FuturesContract
 from app.models.futures_rollover import FuturesRollover
-from app.services.futures_data import FuturesDataService
 from app.providers import DataProviderFactory
+from app.services.futures_data import FuturesDataService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/futures", tags=["futures"])
@@ -48,14 +48,16 @@ def get_futures_history(
                 "symbol": symbol.upper(),
                 "timespan": timespan,
                 "data_points": 0,
-                "data": []
+                "data": [],
             }
 
         # Convert timestamp to ISO format for JSON response
-        df['timestamp'] = df['timestamp'].dt.tz_localize('UTC').dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+        df["timestamp"] = (
+            df["timestamp"].dt.tz_localize("UTC").dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        )
 
         # Convert numeric types
-        for col in ['open', 'high', 'low', 'close', 'vwap']:
+        for col in ["open", "high", "low", "close", "vwap"]:
             if col in df.columns:
                 df[col] = df[col].astype(float)
 
@@ -68,7 +70,7 @@ def get_futures_history(
             "symbol": symbol.upper(),
             "timespan": timespan,
             "data_points": len(data_dict),
-            "data": data_dict
+            "data": data_dict,
         }
 
     except Exception as e:
@@ -98,8 +100,12 @@ def get_futures_contracts(
                 "con_id": c.con_id,
                 "is_expired": c.is_expired,
                 "data_downloaded": c.data_downloaded,
-                "first_bar_date": c.first_bar_date.isoformat() if c.first_bar_date else None,
-                "last_bar_date": c.last_bar_date.isoformat() if c.last_bar_date else None,
+                "first_bar_date": c.first_bar_date.isoformat()
+                if c.first_bar_date
+                else None,
+                "last_bar_date": c.last_bar_date.isoformat()
+                if c.last_bar_date
+                else None,
             }
             for c in contracts
         ]

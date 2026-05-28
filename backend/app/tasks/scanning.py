@@ -1,19 +1,20 @@
-import logging
 import asyncio
-import redis
 import json
+import logging
 from datetime import datetime, timezone
+
+import redis
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
-from app.core.database import SessionLocal
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.models.monitored_stock import MonitoredStock
 
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=2, name='app.tasks.evaluate_scanner_alerts')
+@celery_app.task(bind=True, max_retries=2, name="app.tasks.evaluate_scanner_alerts")
 def evaluate_scanner_alerts(self, scanner_event_id: int):
     """
     Evaluate all active alert rules against a newly-saved ScannerEvent.
@@ -26,9 +27,13 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
 
     db: Session = SessionLocal()
     try:
-        event = db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
+        event = (
+            db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
+        )
         if not event:
-            logger.warning(f"evaluate_scanner_alerts: ScannerEvent id={scanner_event_id} not found.")
+            logger.warning(
+                f"evaluate_scanner_alerts: ScannerEvent id={scanner_event_id} not found."
+            )
             return
 
         matching_rules = AlertRuleService.get_matching_rules(event, db)
@@ -51,6 +56,7 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
             # never block order placement, and vice versa.
             if rule.auto_trade and rule.trading_strategy_id:
                 from app.tasks.trading import execute_auto_trade
+
                 execute_auto_trade.delay(
                     rule_id=rule.id,
                     scanner_event_id=scanner_event_id,
@@ -61,14 +67,16 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
                 )
 
     except Exception as e:
-        logger.error(f"❌ evaluate_scanner_alerts failed for event {scanner_event_id}: {e}")
+        logger.error(
+            f"❌ evaluate_scanner_alerts failed for event {scanner_event_id}: {e}"
+        )
         db.rollback()
         raise self.retry(exc=e, countdown=30)
     finally:
         db.close()
 
 
-@celery_app.task(name='app.tasks.run_range_scan')
+@celery_app.task(name="app.tasks.run_range_scan")
 def run_range_scan(
     ticker: str,
     scanner_types: list,
@@ -79,9 +87,10 @@ def run_range_scan(
     """Background task: run selected scanners over a date range for one ticker."""
     import asyncio
     from datetime import date, timedelta
-    from app.services.scanner import ScannerService
-    from app.services.liquidity_hunt import run_liquidity_hunt_scan_for_date as _lh_scan
+
     from app.exceptions import DataFetchError, ProviderError
+    from app.services.liquidity_hunt import run_liquidity_hunt_scan_for_date as _lh_scan
+    from app.services.scanner import ScannerService
     from app.services.stock_data import StockDataService
 
     task_id = run_range_scan.request.id
@@ -89,6 +98,7 @@ def run_range_scan(
     channel = f"scan_task:{task_id}"
 
     from datetime import datetime as _dt
+
     r.set(
         f"scan:{ticker}:range",
         json.dumps({"task_ids": [task_id], "started_at": _dt.utcnow().isoformat()}),
@@ -115,18 +125,22 @@ def run_range_scan(
             daily_period_days = (date.today() - (start - timedelta(days=90))).days
             try:
                 StockDataService.refresh_stock_data(
-                    db, ticker, timespan='day', period=f"{daily_period_days}d"
+                    db, ticker, timespan="day", period=f"{daily_period_days}d"
                 )
             except (DataFetchError, ProviderError) as exc:
-                logger.warning("refresh_stock_data (day) failed for %s: %s", ticker, exc)
+                logger.warning(
+                    "refresh_stock_data (day) failed for %s: %s", ticker, exc
+                )
             # Minute bars: cover just the requested range
             minute_period_days = (date.today() - start).days + 5
             try:
                 StockDataService.refresh_stock_data(
-                    db, ticker, timespan='minute', period=f"{minute_period_days}d"
+                    db, ticker, timespan="minute", period=f"{minute_period_days}d"
                 )
             except (DataFetchError, ProviderError) as exc:
-                logger.warning("refresh_stock_data (minute) failed for %s: %s", ticker, exc)
+                logger.warning(
+                    "refresh_stock_data (minute) failed for %s: %s", ticker, exc
+                )
 
         scanner_map = {
             "pre_market_volume_spike": ScannerService.run_pre_market_scan_for_date,
@@ -148,39 +162,56 @@ def run_range_scan(
             day_results = asyncio.run(_scan_day(day))
             events_detected += len(day_results)
             done += len(scanner_types)
-            r.publish(channel, json.dumps({
-                "status": "progress",
-                "day": day.isoformat(),
-                "done": done,
-                "total": total,
-            }))
+            r.publish(
+                channel,
+                json.dumps(
+                    {
+                        "status": "progress",
+                        "day": day.isoformat(),
+                        "done": done,
+                        "total": total,
+                    }
+                ),
+            )
 
-        r.publish(channel, json.dumps({
-            "status": "completed",
-            "events_detected": events_detected,
-        }))
+        r.publish(
+            channel,
+            json.dumps(
+                {
+                    "status": "completed",
+                    "events_detected": events_detected,
+                }
+            ),
+        )
         logger.info(f"run_range_scan {task_id}: completed, {events_detected} events")
 
     except Exception as e:
         logger.error(f"run_range_scan {task_id} failed: {e}")
-        r.publish(channel, json.dumps({
-            "status": "failed",
-            "error": str(e),
-        }))
+        r.publish(
+            channel,
+            json.dumps(
+                {
+                    "status": "failed",
+                    "error": str(e),
+                }
+            ),
+        )
     finally:
         r.delete(f"scan:{ticker}:range")
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=1, name='app.tasks.run_liquidity_hunt_scheduled')
+@celery_app.task(
+    bind=True, max_retries=1, name="app.tasks.run_liquidity_hunt_scheduled"
+)
 def run_liquidity_hunt_scheduled(self):
     """
     Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post
     for today's date over all active ScannerConfig universes of type 'liquidity_hunt'.
     """
-    from app.utils.session import get_market_today
-    from app.services.liquidity_hunt import run_liquidity_hunt_scan
     from app.models.scanner_config import ScannerConfig
+    from app.services.liquidity_hunt import run_liquidity_hunt_scan
+    from app.utils.session import get_market_today
 
     db: Session = SessionLocal()
     try:
@@ -197,25 +228,33 @@ def run_liquidity_hunt_scheduled(self):
         for cfg in configs:
             universe_id = cfg.parameters.get("universe_id")
             if not universe_id:
-                logger.warning("liquidity_hunt ScannerConfig %s has no universe_id", cfg.id)
+                logger.warning(
+                    "liquidity_hunt ScannerConfig %s has no universe_id", cfg.id
+                )
                 continue
 
             tickers = [
                 ms.ticker
-                for ms in db.query(MonitoredStock).filter(
+                for ms in db.query(MonitoredStock)
+                .filter(
                     MonitoredStock.universe_id == universe_id,
                     MonitoredStock.is_active.is_(True),
-                ).all()
+                )
+                .all()
             ]
             if not tickers:
                 continue
 
             results = asyncio.run(
-                run_liquidity_hunt_scan(tickers, db, start_date=event_date, end_date=event_date)
+                run_liquidity_hunt_scan(
+                    tickers, db, start_date=event_date, end_date=event_date
+                )
             )
             logger.info(
                 "liquidity_hunt scheduled scan for universe %s on %s: %d events",
-                universe_id, event_date, len(results),
+                universe_id,
+                event_date,
+                len(results),
             )
     except Exception as exc:
         logger.exception("run_liquidity_hunt_scheduled failed: %s", exc)
@@ -229,7 +268,8 @@ def run_liquidity_hunt_scheduled(self):
 # and publishes per-day progress to Redis.
 # ---------------------------------------------------------------------------
 
-@celery_app.task(bind=True, max_retries=0, name='app.tasks.run_universe_scan')
+
+@celery_app.task(bind=True, max_retries=0, name="app.tasks.run_universe_scan")
 def run_universe_scan(
     self,
     scan_id: str,
@@ -247,12 +287,14 @@ def run_universe_scan(
     deleted in ``finally``; the system tasks aggregator at /api/system/ws/tasks
     discovers active scans by scanning ``universe:*:scan:*``.
     """
-    from datetime import date as _date, timedelta as _td
-    from app.models.scanner_run import ScannerRun
-    import app.services.pre_market_scan  # noqa: F401 — triggers self-registration
-    import app.services.oversold_bounce_scan  # noqa: F401
+    from datetime import date as _date
+    from datetime import timedelta as _td
+
     import app.services.liquidity_hunt  # noqa: F401
+    import app.services.oversold_bounce_scan  # noqa: F401
+    import app.services.pre_market_scan  # noqa: F401 — triggers self-registration
     import app.services.scan_orchestrator as _orchestrator
+    from app.models.scanner_run import ScannerRun
 
     task_id = self.request.id
     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -279,10 +321,12 @@ def run_universe_scan(
 
         tickers = [
             ms.ticker
-            for ms in db.query(MonitoredStock).filter(
+            for ms in db.query(MonitoredStock)
+            .filter(
                 MonitoredStock.universe_id == universe_id,
                 MonitoredStock.is_active.is_(True),
-            ).all()
+            )
+            .all()
         ]
         if not tickers:
             run.status = "failed"
@@ -306,70 +350,96 @@ def run_universe_scan(
         db.commit()
 
         cum = {
-            "evaluated": 0, "no_data": 0, "no_prior_close": 0, "no_baseline": 0,
-            "errors": 0, "fired_pre": 0, "fired_post": 0,
+            "evaluated": 0,
+            "no_data": 0,
+            "no_prior_close": 0,
+            "no_baseline": 0,
+            "errors": 0,
+            "fired_pre": 0,
+            "fired_post": 0,
         }
         events_total = 0
 
         def _write_state(progress_extra: dict | None = None):
-            r.set(state_key, json.dumps({
-                "task_ids": [task_id],
-                "scan_id": scan_id,
-                "scanner_type": scanner_type,
-                "universe_id": universe_id,
-                "start_date": start.isoformat(),
-                "end_date": end.isoformat(),
-                "started_at": started_at.replace(tzinfo=timezone.utc).isoformat(),
-                "tickers": len(tickers),
-                "total_days": len(trading_days),
-                "events_detected": events_total,
-                **cum,
-                **(progress_extra or {}),
-            }), ex=14400)
+            r.set(
+                state_key,
+                json.dumps(
+                    {
+                        "task_ids": [task_id],
+                        "scan_id": scan_id,
+                        "scanner_type": scanner_type,
+                        "universe_id": universe_id,
+                        "start_date": start.isoformat(),
+                        "end_date": end.isoformat(),
+                        "started_at": started_at.replace(
+                            tzinfo=timezone.utc
+                        ).isoformat(),
+                        "tickers": len(tickers),
+                        "total_days": len(trading_days),
+                        "events_detected": events_total,
+                        **cum,
+                        **(progress_extra or {}),
+                    }
+                ),
+                ex=14400,
+            )
 
         _write_state({"day_index": 0})
-        _publish({
-            "type": "started",
-            "scan_id": scan_id,
-            "task_id": task_id,
-            "total_days": len(trading_days),
-            "total_tickers": len(tickers),
-            "estimated_pairs": len(tickers) * len(trading_days),
-            "scanner_type": scanner_type,
-            "start_date": start.isoformat(),
-            "end_date": end.isoformat(),
-        })
+        _publish(
+            {
+                "type": "started",
+                "scan_id": scan_id,
+                "task_id": task_id,
+                "total_days": len(trading_days),
+                "total_tickers": len(tickers),
+                "estimated_pairs": len(tickers) * len(trading_days),
+                "scanner_type": scanner_type,
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+            }
+        )
 
         for i, day in enumerate(trading_days, start=1):
             if _cancelled():
                 run.status = "cancelled"
                 run.events_detected = events_total
                 run.execution_time_ms = int(
-                    (datetime.now(timezone.utc).replace(tzinfo=None) - started_at).total_seconds() * 1000
+                    (
+                        datetime.now(timezone.utc).replace(tzinfo=None) - started_at
+                    ).total_seconds()
+                    * 1000
                 )
                 db.commit()
-                _publish({
-                    "type": "cancelled",
-                    "evaluated_so_far": cum["evaluated"],
-                    "events_detected_so_far": events_total,
-                })
+                _publish(
+                    {
+                        "type": "cancelled",
+                        "evaluated_so_far": cum["evaluated"],
+                        "events_detected_so_far": events_total,
+                    }
+                )
                 return
 
-            _publish({
-                "type": "day_started",
-                "date": day.isoformat(),
-                "day_index": i,
-                "total_days": len(trading_days),
-            })
+            _publish(
+                {
+                    "type": "day_started",
+                    "date": day.isoformat(),
+                    "day_index": i,
+                    "total_days": len(trading_days),
+                }
+            )
 
             try:
                 day_events = asyncio.run(
-                    _orchestrator.run(scanner_type, tickers, db=db, event_date=day, scanner_run=run)
+                    _orchestrator.run(
+                        scanner_type, tickers, db=db, event_date=day, scanner_run=run
+                    )
                 )
             except Exception as e:
                 cum["errors"] += 1
                 logger.exception("run_universe_scan: day %s failed", day)
-                _publish({"type": "day_error", "date": day.isoformat(), "error": str(e)})
+                _publish(
+                    {"type": "day_error", "date": day.isoformat(), "error": str(e)}
+                )
                 continue
 
             events_total += len(day_events)
@@ -378,37 +448,48 @@ def run_universe_scan(
             db.commit()
 
             _write_state({"day_index": i})
-            _publish({
-                "type": "day_completed",
-                "date": day.isoformat(),
-                "day_index": i,
-                "total_days": len(trading_days),
-                "events": len(day_events),
-                "events_detected": events_total,
-                **cum,
-            })
+            _publish(
+                {
+                    "type": "day_completed",
+                    "date": day.isoformat(),
+                    "day_index": i,
+                    "total_days": len(trading_days),
+                    "events": len(day_events),
+                    "events_detected": events_total,
+                    **cum,
+                }
+            )
 
         run.status = "completed"
         run.events_detected = events_total
         run.execution_time_ms = int(
-            (datetime.now(timezone.utc).replace(tzinfo=None) - started_at).total_seconds() * 1000
+            (
+                datetime.now(timezone.utc).replace(tzinfo=None) - started_at
+            ).total_seconds()
+            * 1000
         )
         db.commit()
-        _publish({
-            "type": "completed",
-            "events_detected": events_total,
-            "diagnostics": {
-                "tickers": len(tickers),
-                "days": len(trading_days),
-                "start_date": start.isoformat(),
-                "end_date": end.isoformat(),
-                **cum,
-            },
-            "execution_time_ms": run.execution_time_ms,
-        })
+        _publish(
+            {
+                "type": "completed",
+                "events_detected": events_total,
+                "diagnostics": {
+                    "tickers": len(tickers),
+                    "days": len(trading_days),
+                    "start_date": start.isoformat(),
+                    "end_date": end.isoformat(),
+                    **cum,
+                },
+                "execution_time_ms": run.execution_time_ms,
+            }
+        )
         logger.info(
             "run_universe_scan %s completed: type=%s universe=%s days=%d events=%d",
-            scan_id, scanner_type, universe_id, len(trading_days), events_total,
+            scan_id,
+            scanner_type,
+            universe_id,
+            len(trading_days),
+            events_total,
         )
 
     except Exception as exc:
@@ -419,7 +500,10 @@ def run_universe_scan(
                 run.status = "failed"
                 run.error_message = str(exc)
                 run.execution_time_ms = int(
-                    (datetime.now(timezone.utc).replace(tzinfo=None) - started_at).total_seconds() * 1000
+                    (
+                        datetime.now(timezone.utc).replace(tzinfo=None) - started_at
+                    ).total_seconds()
+                    * 1000
                 )
                 db.commit()
         except Exception:

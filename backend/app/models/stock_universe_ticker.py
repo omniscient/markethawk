@@ -3,7 +3,9 @@ StockUniverseTicker SQLAlchemy model.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Index
+
+from sqlalchemy import Column, DateTime, Index, Integer, String
+
 from app.core.database import Base
 
 
@@ -12,20 +14,20 @@ class StockUniverseTicker(Base):
     Represents a simple list of tickers associated with a universe.
     Used for persistent storage of universe constituents.
     """
-    
+
     __tablename__ = "stock_universe_tickers"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     universe_id = Column(Integer, index=True, nullable=False)
     ticker = Column(String(50), nullable=False)
     asset_class = Column(String(50), default="stocks", nullable=False)
     data_source = Column(String(50), default="massive", nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
 
     # Unique constraint or just index to prevent dupes?
     # Usually a universe shouldn't have the same ticker twice.
     # We can add a UniqueConstraint if needed, but for now simple structure.
     # Let's add an index on (universe_id, ticker)
-    __table_args__ = (
-        Index('ix_universe_ticker', 'universe_id', 'ticker'),
-    )
+    __table_args__ = (Index("ix_universe_ticker", "universe_id", "ticker"),)

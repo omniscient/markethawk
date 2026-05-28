@@ -3,8 +3,8 @@ ScannerOutcomeSummary SQLAlchemy model.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, Boolean, DateTime, Numeric, ForeignKey
-from sqlalchemy.schema import Index
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric
 
 from app.core.database import Base
 
@@ -15,7 +15,13 @@ class ScannerOutcomeSummary(Base):
     __tablename__ = "scanner_outcome_summaries"
 
     id = Column(Integer, primary_key=True, index=True)
-    scanner_event_id = Column(Integer, ForeignKey("scanner_events.id"), nullable=False, unique=True, index=True)
+    scanner_event_id = Column(
+        Integer,
+        ForeignKey("scanner_events.id"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
     reference_price = Column(Numeric, nullable=False)
     mfe_pct = Column(Numeric, nullable=True)
     mfe_time_minutes = Column(Integer, nullable=True)
@@ -29,6 +35,11 @@ class ScannerOutcomeSummary(Base):
     is_complete = Column(Boolean, default=False, index=True)
     completed_at = Column(DateTime, nullable=True)
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-                        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+    )

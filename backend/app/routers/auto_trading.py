@@ -24,27 +24,26 @@ Endpoints:
 
 import asyncio
 import logging
-from datetime import datetime, timezone, date as date_type, timedelta
-from decimal import Decimal
+from datetime import date as date_type
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from app.core.rate_limits import limiter, TRADING_LIMIT
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
-from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limits import TRADING_LIMIT, limiter
 from app.models.auto_trade_order import AutoTradeOrder
 from app.models.system_config import SystemConfig
-from app.models.trading_strategy import TradingStrategy
 from app.models.trade import Trade
+from app.models.trading_strategy import TradingStrategy
 
 router = APIRouter(prefix="/api/trading", tags=["auto-trading"])
 logger = logging.getLogger(__name__)
 
 
 # ── Serialisers ──────────────────────────────────────────────────────────────
+
 
 def _strategy_to_dict(s: TradingStrategy) -> Dict[str, Any]:
     return {
@@ -54,15 +53,25 @@ def _strategy_to_dict(s: TradingStrategy) -> Dict[str, Any]:
         "is_active": s.is_active,
         "paper_mode": s.paper_mode,
         "requires_approval": s.requires_approval,
-        "risk_per_trade_pct": float(s.risk_per_trade_pct) if s.risk_per_trade_pct is not None else None,
-        "max_position_usd": float(s.max_position_usd) if s.max_position_usd is not None else None,
+        "risk_per_trade_pct": float(s.risk_per_trade_pct)
+        if s.risk_per_trade_pct is not None
+        else None,
+        "max_position_usd": float(s.max_position_usd)
+        if s.max_position_usd is not None
+        else None,
         "max_trades_per_day": s.max_trades_per_day,
         "max_concurrent_positions": s.max_concurrent_positions,
         "entry_type": s.entry_type,
-        "limit_offset_pct": float(s.limit_offset_pct) if s.limit_offset_pct is not None else 0.0,
+        "limit_offset_pct": float(s.limit_offset_pct)
+        if s.limit_offset_pct is not None
+        else 0.0,
         "stop_pct": float(s.stop_pct) if s.stop_pct is not None else None,
-        "risk_reward_ratio": float(s.risk_reward_ratio) if s.risk_reward_ratio is not None else None,
-        "max_slippage_pct": float(s.max_slippage_pct) if s.max_slippage_pct is not None else None,
+        "risk_reward_ratio": float(s.risk_reward_ratio)
+        if s.risk_reward_ratio is not None
+        else None,
+        "max_slippage_pct": float(s.max_slippage_pct)
+        if s.max_slippage_pct is not None
+        else None,
         "allowed_sessions": s.allowed_sessions or ["regular"],
         "direction": s.direction,
         "created_at": s.created_at.isoformat() if s.created_at else None,
@@ -81,12 +90,22 @@ def _order_to_dict(o: AutoTradeOrder) -> Dict[str, Any]:
         "event_date": o.event_date.isoformat() if o.event_date else None,
         "status": o.status,
         "rejection_reason": o.rejection_reason,
-        "trigger_price": float(o.trigger_price) if o.trigger_price is not None else None,
-        "entry_price_target": float(o.entry_price_target) if o.entry_price_target is not None else None,
-        "calculated_stop": float(o.calculated_stop) if o.calculated_stop is not None else None,
-        "calculated_target": float(o.calculated_target) if o.calculated_target is not None else None,
+        "trigger_price": float(o.trigger_price)
+        if o.trigger_price is not None
+        else None,
+        "entry_price_target": float(o.entry_price_target)
+        if o.entry_price_target is not None
+        else None,
+        "calculated_stop": float(o.calculated_stop)
+        if o.calculated_stop is not None
+        else None,
+        "calculated_target": float(o.calculated_target)
+        if o.calculated_target is not None
+        else None,
         "quantity": o.quantity,
-        "risk_amount_usd": float(o.risk_amount_usd) if o.risk_amount_usd is not None else None,
+        "risk_amount_usd": float(o.risk_amount_usd)
+        if o.risk_amount_usd is not None
+        else None,
         "is_paper": o.is_paper,
         "broker_order_id": o.broker_order_id,
         "broker_stop_id": o.broker_stop_id,
@@ -105,11 +124,22 @@ def _order_to_dict(o: AutoTradeOrder) -> Dict[str, Any]:
 # ── Trading Strategies — CRUD ────────────────────────────────────────────────
 
 _STRATEGY_UPDATABLE = {
-    "name", "description", "is_active", "paper_mode", "requires_approval",
-    "risk_per_trade_pct", "max_position_usd", "max_trades_per_day",
-    "max_concurrent_positions", "entry_type", "limit_offset_pct",
-    "stop_pct", "risk_reward_ratio", "max_slippage_pct",
-    "allowed_sessions", "direction",
+    "name",
+    "description",
+    "is_active",
+    "paper_mode",
+    "requires_approval",
+    "risk_per_trade_pct",
+    "max_position_usd",
+    "max_trades_per_day",
+    "max_concurrent_positions",
+    "entry_type",
+    "limit_offset_pct",
+    "stop_pct",
+    "risk_reward_ratio",
+    "max_slippage_pct",
+    "allowed_sessions",
+    "direction",
 }
 
 
@@ -209,7 +239,9 @@ def delete_strategy(
         db.query(AutoTradeOrder)
         .filter(
             AutoTradeOrder.trading_strategy_id == strategy_id,
-            AutoTradeOrder.status.in_(["submitted", "open", "pending", "pending_approval"]),
+            AutoTradeOrder.status.in_(
+                ["submitted", "open", "pending", "pending_approval"]
+            ),
         )
         .count()
     )
@@ -226,6 +258,7 @@ def delete_strategy(
 
 
 # ── Auto-Trade Orders ────────────────────────────────────────────────────────
+
 
 @router.get("/orders")
 def list_orders(
@@ -249,13 +282,11 @@ def list_orders(
             d = date_type.fromisoformat(from_date)
             q = q.filter(AutoTradeOrder.event_date >= d)
         except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid from_date format. Use YYYY-MM-DD.")
+            raise HTTPException(
+                status_code=422, detail="Invalid from_date format. Use YYYY-MM-DD."
+            )
 
-    orders = (
-        q.order_by(AutoTradeOrder.created_at.desc())
-        .limit(min(limit, 500))
-        .all()
-    )
+    orders = q.order_by(AutoTradeOrder.created_at.desc()).limit(min(limit, 500)).all()
     return [_order_to_dict(o) for o in orders]
 
 
@@ -293,9 +324,11 @@ def approve_order(
         )
 
     # Fetch strategy to decide paper vs live
-    strategy = db.query(TradingStrategy).filter(
-        TradingStrategy.id == o.trading_strategy_id
-    ).first()
+    strategy = (
+        db.query(TradingStrategy)
+        .filter(TradingStrategy.id == o.trading_strategy_id)
+        .first()
+    )
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found.")
 
@@ -382,6 +415,7 @@ def cancel_order(
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             from app.providers.ibkr_orders import IBKROrderManager
+
             manager = IBKROrderManager()
             loop.run_until_complete(
                 manager.cancel_bracket(
@@ -406,6 +440,7 @@ def cancel_order(
 
 # ── Account Summary ──────────────────────────────────────────────────────────
 
+
 @router.get("/account")
 def get_account(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
@@ -416,6 +451,7 @@ def get_account(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
     try:
         from app.providers.ibkr_orders import IBKROrderManager
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -461,6 +497,7 @@ def get_account(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
 # ── Stats ────────────────────────────────────────────────────────────────────
 
+
 @router.get("/stats")
 def get_stats(
     days: int = 30,
@@ -472,11 +509,7 @@ def get_stats(
     Counts by status, total risk deployed, closed P&L, win rate.
     """
     since = date_type.today() - timedelta(days=days)
-    orders = (
-        db.query(AutoTradeOrder)
-        .filter(AutoTradeOrder.event_date >= since)
-        .all()
-    )
+    orders = db.query(AutoTradeOrder).filter(AutoTradeOrder.event_date >= since).all()
 
     total = len(orders)
     by_status: Dict[str, int] = {}
@@ -484,10 +517,16 @@ def get_stats(
         by_status[o.status] = by_status.get(o.status, 0) + 1
 
     closed = [o for o in orders if o.status == "closed"]
-    wins   = [o for o in closed if o.exit_price and o.fill_price and (
-        (o.side == "long"  and float(o.exit_price) > float(o.fill_price)) or
-        (o.side == "short" and float(o.exit_price) < float(o.fill_price))
-    )]
+    wins = [
+        o
+        for o in closed
+        if o.exit_price
+        and o.fill_price
+        and (
+            (o.side == "long" and float(o.exit_price) > float(o.fill_price))
+            or (o.side == "short" and float(o.exit_price) < float(o.fill_price))
+        )
+    ]
 
     # P&L from linked Trade records
     trade_ids = [o.trade_id for o in closed if o.trade_id]
@@ -510,11 +549,15 @@ def get_stats(
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
+
 @router.get("/config")
 def get_trading_config(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Return current auto-trading system config values."""
     keys = ["AUTO_TRADING_ENABLED", "PAPER_ACCOUNT_SIZE"]
-    result: Dict[str, Any] = {"AUTO_TRADING_ENABLED": False, "PAPER_ACCOUNT_SIZE": 100000}
+    result: Dict[str, Any] = {
+        "AUTO_TRADING_ENABLED": False,
+        "PAPER_ACCOUNT_SIZE": 100000,
+    }
     configs = db.query(SystemConfig).filter(SystemConfig.key.in_(keys)).all()
     for c in configs:
         if c.key == "AUTO_TRADING_ENABLED":

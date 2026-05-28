@@ -1,8 +1,8 @@
 from datetime import date, datetime
 from unittest.mock import MagicMock
 
-from app.services.catalyst_parser import CatalystParser
 from app.models.news_article import NewsArticle
+from app.services.catalyst_parser import CatalystParser
 
 
 def _make_article(ticker, title, published_utc):

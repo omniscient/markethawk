@@ -5,8 +5,10 @@ provides isolation and rollback.
 """
 
 from datetime import date
+
 from sqlalchemy.orm import Session
-from app.models import StockUniverse, StockUniverseTicker, ScannerConfig, MonitoredStock
+
+from app.models import MonitoredStock, ScannerConfig, StockUniverse, StockUniverseTicker
 
 
 def seed_universes(db: Session) -> list[StockUniverse]:

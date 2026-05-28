@@ -1,14 +1,17 @@
 """
 Tests for data_quality module pure helper functions — no DB required.
 """
+
 from datetime import date, timedelta
 
-import pytest
-
-from app.services.data_quality import _score_to_grade, _grade_color, _count_weekdays_between
-
+from app.services.data_quality import (
+    _count_weekdays_between,
+    _grade_color,
+    _score_to_grade,
+)
 
 # ── _score_to_grade ───────────────────────────────────────────────────────────
+
 
 def test_score_95_or_above_is_A():
     assert _score_to_grade(95.0) == "A"
@@ -37,6 +40,7 @@ def test_score_below_50_is_F():
 
 # ── _grade_color ─────────────────────────────────────────────────────────────
 
+
 def test_grade_A_is_green():
     assert _grade_color("A") == "green"
 
@@ -63,14 +67,15 @@ def test_unknown_grade_is_gray():
 
 # ── _count_weekdays_between ───────────────────────────────────────────────────
 
+
 def test_adjacent_days_no_weekday_between():
     d = date(2024, 1, 2)  # Tuesday
     assert _count_weekdays_between(d, d + timedelta(days=1)) == 0
 
 
 def test_monday_to_friday_has_3_weekdays_between():
-    monday = date(2024, 1, 1)   # Monday
-    friday = date(2024, 1, 5)   # Friday
+    monday = date(2024, 1, 1)  # Monday
+    friday = date(2024, 1, 5)  # Friday
     # weekdays strictly between Mon and Fri: Tue, Wed, Thu = 3
     assert _count_weekdays_between(monday, friday) == 3
 

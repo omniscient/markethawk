@@ -3,28 +3,41 @@ Stock Scanner Backend API
 FastAPI-based REST API for stock scanning and alert system
 """
 
-import logging
-import os
-import traceback
 import hashlib
-
+import logging
+import traceback
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from slowapi.middleware import SlowAPIASGIMiddleware
-from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 from jose import JWTError, jwt
-from app.core.config import settings, get_settings
-from app.core.rate_limits import limiter
-from app.core.database import engine, Base
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIASGIMiddleware
+
+from app.core.config import get_settings, settings
+from app.core.database import engine
 from app.core.error_tracking import ErrorTrackerFactory
+from app.core.rate_limits import limiter
 from app.exceptions import MarketHawkError
-from app.routers import health_router, scanner_router, universe_router, stocks_router, news_router, live_data_router, journal_router, system_router, futures_router, alerts_router, watchlist_router, auto_trading_router, outcomes_router, auth_router
+from app.routers import (
+    alerts_router,
+    auth_router,
+    auto_trading_router,
+    futures_router,
+    health_router,
+    journal_router,
+    live_data_router,
+    news_router,
+    outcomes_router,
+    scanner_router,
+    stocks_router,
+    system_router,
+    universe_router,
+    watchlist_router,
+)
 from app.routers.tweets import router as tweets_router
-from app.core.celery_app import celery_app as celery
 from app.services.websocket_manager import websocket_manager
 
 # Celery Configuration
@@ -35,17 +48,26 @@ from app.services.websocket_manager import websocket_manager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic for the FastAPI application."""
     # --- Startup ---
+    import redis.asyncio as aioredis
+
     from app.core.database import SessionLocal
     from app.models.universe_quality_report import UniverseQualityReport
-    import redis.asyncio as aioredis
 
     try:
         db = SessionLocal()
         try:
-            reports = db.query(UniverseQualityReport).filter(
-                (UniverseQualityReport.status.in_(["pending", "running"])) |
-                (UniverseQualityReport.normalization_status.in_(["pending", "running"]))
-            ).all()
+            reports = (
+                db.query(UniverseQualityReport)
+                .filter(
+                    (UniverseQualityReport.status.in_(["pending", "running"]))
+                    | (
+                        UniverseQualityReport.normalization_status.in_(
+                            ["pending", "running"]
+                        )
+                    )
+                )
+                .all()
+            )
             for report in reports:
                 if report.status in ["pending", "running"]:
                     report.status = "error"
@@ -54,7 +76,9 @@ async def lifespan(app: FastAPI):
                     report.normalization_status = "error"
             if reports:
                 db.commit()
-                logging.info(f"Reset {len(reports)} orphaned quality reports to error state.")
+                logging.info(
+                    f"Reset {len(reports)} orphaned quality reports to error state."
+                )
         except Exception as dbe:
             logging.error(f"Error resetting orphaned DB tasks: {dbe}")
         finally:
@@ -65,17 +89,21 @@ async def lifespan(app: FastAPI):
 
     try:
         r = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-        cursor = '0'
+        cursor = "0"
         keys_deleted = 0
         while True:
-            cursor, keys = await r.scan(cursor=cursor, match="universe:*:sync", count=100)
+            cursor, keys = await r.scan(
+                cursor=cursor, match="universe:*:sync", count=100
+            )
             if keys:
                 await r.delete(*keys)
                 keys_deleted += len(keys)
-            if cursor == 0 or cursor == '0' or str(cursor) == '0':
+            if cursor == 0 or cursor == "0" or str(cursor) == "0":
                 break
         if keys_deleted > 0:
-            logging.info(f"Cleared {keys_deleted} orphaned sync tracking keys from Redis.")
+            logging.info(
+                f"Cleared {keys_deleted} orphaned sync tracking keys from Redis."
+            )
         await r.close()
     except Exception as re:
         logging.error(f"Failed to clean up Redis sync keys on startup: {re}")
@@ -101,25 +129,30 @@ def create_app() -> FastAPI:
     # Centralized SQL Logging
     # Centralized SQL Logging
     if settings.LOG_LEVEL == "DEBUG":
-        from sqlalchemy import event
-        from sqlalchemy.engine import Engine
         import datetime
 
+        from sqlalchemy import event
+        from sqlalchemy.engine import Engine
+
         @event.listens_for(Engine, "before_cursor_execute")
-        def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-            conn.info.setdefault('query_start_time', []).append(datetime.datetime.now(datetime.timezone.utc))
-            
+        def before_cursor_execute(
+            conn, cursor, statement, parameters, context, executemany
+        ):
+            conn.info.setdefault("query_start_time", []).append(
+                datetime.datetime.now(datetime.timezone.utc)
+            )
+
             # Attempt to format the query for easier debugging (Copy/Paste to PGAdmin)
             # Note: This is a best-effort approximation for logging purposes.
             try:
                 if parameters and not executemany:
                     # Handle clear substitution for simple cases
                     formatted_sql = statement
-                    
+
                     if isinstance(parameters, dict):
-                         # Handle %(name)s style
-                         formatted_params = {}
-                         for key, p in parameters.items():
+                        # Handle %(name)s style
+                        formatted_params = {}
+                        for key, p in parameters.items():
                             if isinstance(p, str):
                                 formatted_params[key] = f"'{p}'"
                             elif isinstance(p, (datetime.date, datetime.datetime)):
@@ -128,8 +161,8 @@ def create_app() -> FastAPI:
                                 formatted_params[key] = "NULL"
                             else:
                                 formatted_params[key] = str(p)
-                         formatted_sql = statement % formatted_params
-                         
+                        formatted_sql = statement % formatted_params
+
                     elif isinstance(parameters, (list, tuple)):
                         # Handle %s style
                         formatted_params = []
@@ -143,14 +176,18 @@ def create_app() -> FastAPI:
                             else:
                                 formatted_params.append(str(p))
                         formatted_sql = statement % tuple(formatted_params)
-                    
+
                     logging.info(f"\n[DEBUG SQL]:\n{formatted_sql};\n")
                 else:
-                     # Fallback for executemany or no params
-                     logging.info(f"\n[DEBUG SQL RAW]:\n{statement} \nParams: {parameters}\n")
+                    # Fallback for executemany or no params
+                    logging.info(
+                        f"\n[DEBUG SQL RAW]:\n{statement} \nParams: {parameters}\n"
+                    )
             except Exception:
                 # If formatting fails, just log raw
-                logging.info(f"\n[DEBUG SQL RAW]:\n{statement} \nParams: {parameters}\n")
+                logging.info(
+                    f"\n[DEBUG SQL RAW]:\n{statement} \nParams: {parameters}\n"
+                )
 
         logging.info("Advanced SQL Logging enabled (Copy-Paste friendly)")
 
@@ -170,12 +207,18 @@ def create_app() -> FastAPI:
             return await call_next(request)
         token = request.cookies.get("access_token")
         if not token:
-            return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+            return JSONResponse(
+                status_code=401, content={"detail": "Not authenticated"}
+            )
         _settings = get_settings()
         try:
-            jwt.decode(token, _settings.JWT_SECRET_KEY, algorithms=[_settings.JWT_ALGORITHM])
+            jwt.decode(
+                token, _settings.JWT_SECRET_KEY, algorithms=[_settings.JWT_ALGORITHM]
+            )
         except JWTError:
-            return JSONResponse(status_code=401, content={"detail": "Token expired or invalid"})
+            return JSONResponse(
+                status_code=401, content={"detail": "Token expired or invalid"}
+            )
         return await call_next(request)
 
     # CORS middleware
@@ -186,7 +229,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # Gzip middleware for large payloads
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
@@ -202,7 +245,11 @@ def create_app() -> FastAPI:
         return JSONResponse(
             status_code=429,
             headers={"Retry-After": str(retry_after)},
-            content={"message": "Rate limit exceeded", "error_id": None, "retry_after": retry_after},
+            content={
+                "message": "Rate limit exceeded",
+                "error_id": None,
+                "retry_after": retry_after,
+            },
         )
 
     # Include routers
@@ -225,6 +272,7 @@ def create_app() -> FastAPI:
     # Populate scan_orchestrator registry — must be after router includes.
     # importlib avoids the local variable `app` shadowing the package name.
     import importlib
+
     importlib.import_module("app.services.pre_market_scan")
     importlib.import_module("app.services.oversold_bounce_scan")
     importlib.import_module("app.services.liquidity_hunt")
@@ -257,20 +305,22 @@ def create_app() -> FastAPI:
         # Fallback error ID just in case
         error_id = "ERR-UNKNOWN"
         tb_string = ""
-        
+
         try:
-            tb_string = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-            
+            tb_string = "".join(
+                traceback.format_exception(type(exc), exc, exc.__traceback__)
+            )
+
             # Hash traceback to generate deterministic Error ID
-            error_hash = hashlib.md5(tb_string.encode('utf-8')).hexdigest()[:8]
+            error_hash = hashlib.md5(tb_string.encode("utf-8")).hexdigest()[:8]
             error_id = f"ERR-{error_hash}"
-            
+
             # Send to Tracking System (Seq) - handled internally as background task
             tracker = ErrorTrackerFactory.get_tracker()
             tracker.log_error(error_id, exc, tb_string, str(request.url.path))
         except Exception as handler_exc:
             logging.error(f"Error in global_exception_handler: {handler_exc}")
-        
+
         # Production-safe by default: only expose detail when explicitly in dev/debug.
         if _expose_traces:
             return JSONResponse(
@@ -279,15 +329,12 @@ def create_app() -> FastAPI:
                     "message": "Internal Server Error",
                     "error_id": error_id,
                     "detail": str(exc),
-                    "stack_trace": tb_string
-                }
+                    "stack_trace": tb_string,
+                },
             )
         return JSONResponse(
             status_code=500,
-            content={
-                "message": "Internal Server Error",
-                "error_id": error_id
-            }
+            content={"message": "Internal Server Error", "error_id": error_id},
         )
 
     return app
@@ -299,4 +346,5 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

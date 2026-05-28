@@ -4,13 +4,14 @@ DI override is handled by tests/api/conftest.py autouse fixture.
 Note: router calls db.commit() for write operations. Tests use unique symbols
       via uuid to avoid unique-constraint conflicts across test runs.
 """
+
 import uuid
-import pytest
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from app.models.active_watchlist import ActiveWatchlist, WATCHLIST_SOFT_LIMIT
+from app.models.active_watchlist import WATCHLIST_SOFT_LIMIT, ActiveWatchlist
 
 client = TestClient(app)
 
@@ -21,10 +22,13 @@ def _sym(prefix="T"):
 
 
 def _post(symbol, security_type="STK"):
-    return client.post("/api/watchlist/", json={"symbol": symbol, "security_type": security_type})
+    return client.post(
+        "/api/watchlist/", json={"symbol": symbol, "security_type": security_type}
+    )
 
 
 # ── GET / ─────────────────────────────────────────────────────────────────
+
 
 def test_list_watchlist_returns_200(db: Session):
     response = client.get("/api/watchlist/")
@@ -41,6 +45,7 @@ def test_list_watchlist_contains_added_entry(db: Session):
 
 
 # ── POST / ────────────────────────────────────────────────────────────────
+
 
 def test_add_to_watchlist_returns_201(db: Session):
     sym = _sym("A")
@@ -76,6 +81,7 @@ def test_add_beyond_soft_limit_returns_422(db: Session):
 
 # ── PATCH /{symbol} ───────────────────────────────────────────────────────
 
+
 def test_update_watchlist_notes(db: Session):
     sym = _sym("U")
     _post(sym)
@@ -90,6 +96,7 @@ def test_update_watchlist_not_found_returns_404(db: Session):
 
 
 # ── DELETE /{symbol} ──────────────────────────────────────────────────────
+
 
 def test_delete_from_watchlist_returns_204(db: Session):
     sym = _sym("E")

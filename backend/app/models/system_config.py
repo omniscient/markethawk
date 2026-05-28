@@ -3,7 +3,8 @@ SystemConfig model — key/value store for system-wide settings.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime
+
+from sqlalchemy import Column, DateTime, String
 
 from app.core.database import Base
 

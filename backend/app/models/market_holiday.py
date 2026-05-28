@@ -23,7 +23,9 @@ class MarketHoliday(Base):
     id = Column(Integer, primary_key=True, index=True)
     exchange = Column(String(20), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
-    event_type = Column(String(20), nullable=False)   # full_close | early_close | late_open
+    event_type = Column(
+        String(20), nullable=False
+    )  # full_close | early_close | late_open
     description = Column(String(200), nullable=True)
 
     __table_args__ = (

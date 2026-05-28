@@ -12,29 +12,26 @@ from app.core.database import get_db
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
-from app.schemas.outcome import (
-    ScorecardResponse,
-    EventOutcomeResponse,
-    OutcomeSnapshotResponse,
-    OutcomeSummaryResponse,
-    ReadinessResponse,
-    BackfillRequest,
-    BackfillResponse,
-    SignalListResponse,
-)
 from app.models.signal_analysis_run import SignalAnalysisRun
 from app.models.signal_cluster import SignalCluster
 from app.schemas.analysis import (
     AnalysisTriggerResponse,
-    CorrelationResponse,
-    LatestAnalysisResponse,
-    ClusterSummary,
     ClusterReturnInterval,
+    ClusterSummary,
+    CorrelationResponse,
     FeatureWeight,
+    LatestAnalysisResponse,
 )
-from app.services.stats import StatsService
+from app.schemas.outcome import (
+    BackfillRequest,
+    BackfillResponse,
+    EventOutcomeResponse,
+    ReadinessResponse,
+    SignalListResponse,
+)
 from app.services.data_readiness import DataReadinessService
 from app.services.outcome_service import OutcomeService
+from app.services.stats import StatsService
 
 router = APIRouter(prefix="/api/outcomes", tags=["outcomes"])
 
@@ -105,8 +102,15 @@ def get_signals(
     db: Session = Depends(get_db),
 ):
     return StatsService.get_signals(
-        db, scanner_type, start_date, end_date, severity,
-        sort_by, sort_order, limit, offset,
+        db,
+        scanner_type,
+        start_date,
+        end_date,
+        severity,
+        sort_by,
+        sort_order,
+        limit,
+        offset,
     )
 
 
@@ -141,7 +145,9 @@ def get_readiness(
     db: Session = Depends(get_db),
 ):
     if not scanner_type:
-        raise HTTPException(status_code=400, detail="scanner_type query param is required")
+        raise HTTPException(
+            status_code=400, detail="scanner_type query param is required"
+        )
     report = DataReadinessService.check(db, ticker.upper(), scanner_type)
     return ReadinessResponse(
         ticker=report.ticker,
@@ -224,6 +230,7 @@ def trigger_signal_analysis(
     db: Session = Depends(get_db),
 ):
     from app.tasks import analyze_signal_features
+
     result = analyze_signal_features.delay(scanner_type=scanner_type, k=k)
     return AnalysisTriggerResponse(task_id=result.id)
 

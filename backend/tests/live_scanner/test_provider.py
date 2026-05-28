@@ -1,5 +1,3 @@
-import inspect
-import pytest
 from live_scanner.provider import LiveDataProvider
 
 

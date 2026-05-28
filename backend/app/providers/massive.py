@@ -8,7 +8,7 @@ kept functionally identical - it just now lives inside this class.
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from polygon import RESTClient
 
@@ -40,7 +40,9 @@ class MassiveDataProvider(BaseDataProvider):
                 logger.error(f"MassiveDataProvider: Failed to init Polygon client: {e}")
                 self._client = None
         else:
-            logger.warning("MassiveDataProvider: POLYGON_API_KEY not set — provider disabled.")
+            logger.warning(
+                "MassiveDataProvider: POLYGON_API_KEY not set — provider disabled."
+            )
 
     # ------------------------------------------------------------------ #
     #  BaseDataProvider interface                                          #
@@ -88,7 +90,9 @@ class MassiveDataProvider(BaseDataProvider):
 
         def _convert(agg) -> Dict[str, Any]:
             return {
-                "timestamp": datetime.fromtimestamp(agg.timestamp / 1000, tz=timezone.utc),
+                "timestamp": datetime.fromtimestamp(
+                    agg.timestamp / 1000, tz=timezone.utc
+                ),
                 "open": agg.open,
                 "high": agg.high,
                 "low": agg.low,
@@ -100,7 +104,9 @@ class MassiveDataProvider(BaseDataProvider):
 
         try:
             all_bars: List[Dict[str, Any]] = []
-            current_from: Any = from_date  # str on first call, int (ms) on subsequent calls
+            current_from: Any = (
+                from_date  # str on first call, int (ms) on subsequent calls
+            )
 
             while True:
                 page = self._client.get_aggs(
@@ -163,10 +169,14 @@ class MassiveDataProvider(BaseDataProvider):
             }
 
         except Exception as e:
-            logger.error(f"MassiveDataProvider: Error fetching details for {symbol}: {e}")
+            logger.error(
+                f"MassiveDataProvider: Error fetching details for {symbol}: {e}"
+            )
             return {}
 
-    def get_snapshots(self, symbols: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def get_snapshots(
+        self, symbols: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
         """
         Fetch market snapshots from Polygon and return normalized dicts.
 
@@ -207,14 +217,16 @@ class MassiveDataProvider(BaseDataProvider):
             if current_price == 0:
                 continue
 
-            results.append({
-                "ticker": s.ticker,
-                "price": float(current_price),
-                "change_pct": float(getattr(s, "todays_change_percent", 0) or 0),
-                "change_value": float(getattr(s, "todays_change", 0) or 0),
-                "volume": int(volume),
-                "prev_close": float(prev_close),
-            })
+            results.append(
+                {
+                    "ticker": s.ticker,
+                    "price": float(current_price),
+                    "change_pct": float(getattr(s, "todays_change_percent", 0) or 0),
+                    "change_value": float(getattr(s, "todays_change", 0) or 0),
+                    "volume": int(volume),
+                    "prev_close": float(prev_close),
+                }
+            )
 
         return results
 

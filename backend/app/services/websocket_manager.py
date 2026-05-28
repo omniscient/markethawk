@@ -2,20 +2,23 @@ import asyncio
 import json
 import logging
 import threading
-from typing import Set, Dict, Any, Optional
+from typing import Any, Dict, Optional, Set
+
 import redis.asyncio as aioredis
 from polygon import WebSocketClient
-from polygon.websocket.models import WebSocketMessage, Feed
+from polygon.websocket.models import Feed, WebSocketMessage
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
 
 class StockWebSocketManager:
     """
     Singleton manager for Polygon.io WebSocket connection.
     Proxies updates to Redis Pub/Sub for frontend consumption.
     """
+
     _instance = None
     _lock = threading.Lock()
 
@@ -29,7 +32,7 @@ class StockWebSocketManager:
     def __init__(self):
         if self._initialized:
             return
-        
+
         self.api_key = settings.POLYGON_API_KEY
         self.client: Optional[WebSocketClient] = None
         self.active_tickers: Set[str] = set()
@@ -40,7 +43,9 @@ class StockWebSocketManager:
 
     async def _get_redis(self):
         if self.redis_client is None:
-            self.redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+            self.redis_client = aioredis.from_url(
+                settings.REDIS_URL, decode_responses=True
+            )
         return self.redis_client
 
     def _handle_msg(self, msgs: list[WebSocketMessage]):
@@ -62,19 +67,20 @@ class StockWebSocketManager:
                     "l": msg.low,
                     "vw": getattr(msg, "vwap", None),
                     "s": msg.start_timestamp,
-                    "e": msg.end_timestamp
+                    "e": msg.end_timestamp,
                 }
-                
+
                 # Determine resolution string
                 res = "minute" if msg.event_type == "AM" else "second"
-                
+
                 # Use the loop to call async publish
                 asyncio.run_coroutine_threadsafe(
-                    self._publish_to_redis(ticker, res, payload), 
-                    self._loop
+                    self._publish_to_redis(ticker, res, payload), self._loop
                 )
 
-    async def _publish_to_redis(self, ticker: str, resolution: str, payload: Dict[str, Any]):
+    async def _publish_to_redis(
+        self, ticker: str, resolution: str, payload: Dict[str, Any]
+    ):
         try:
             redis = await self._get_redis()
             # Channel format supports specific resolution subscriptions
@@ -93,16 +99,18 @@ class StockWebSocketManager:
             return
 
         self._loop = asyncio.get_event_loop()
-        
+
         def run_client():
             try:
                 feed = Feed.Delayed if settings.POLYGON_DELAYED else Feed.RealTime
-                logger.info(f"Connecting to Polygon.io WebSocket ({'Delayed' if settings.POLYGON_DELAYED else 'Live'})...")
+                logger.info(
+                    f"Connecting to Polygon.io WebSocket ({'Delayed' if settings.POLYGON_DELAYED else 'Live'})..."
+                )
                 self.client = WebSocketClient(
                     api_key=self.api_key,
                     feed=feed,
                     # We'll subscribe dynamically, but start with nothing or a dummy
-                    subscriptions=["AM.*"] if self.active_tickers else []
+                    subscriptions=["AM.*"] if self.active_tickers else [],
                 )
                 self._connected = True
                 self.client.run(self._handle_msg)
@@ -128,6 +136,7 @@ class StockWebSocketManager:
         # Note: We might want a reference counter here if multiple clients watch the same ticker
         # For simplicity, we'll just keep it subscribed for now, or implement a basic TTL
         pass
+
 
 # Global instance
 websocket_manager = StockWebSocketManager()

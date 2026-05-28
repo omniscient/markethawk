@@ -19,7 +19,7 @@ from app.core.database import SessionLocal
 from app.models.active_watchlist import ActiveWatchlist
 from live_scanner.bar_aggregator import BarAggregator
 from live_scanner.conditions import check_conditions
-from live_scanner.ibkr_adapter import IBKRLiveAdapter, create_adapter
+from live_scanner.ibkr_adapter import create_adapter
 from live_scanner.provider import LiveDataProvider
 from live_scanner.publisher import LivePublisher
 
@@ -35,14 +35,15 @@ logger = logging.getLogger("live_scanner")
 # ── Constants ──────────────────────────────────────────────────────────────
 
 LIVE_SCANNER_CLIENT_ID = 5
-WATCHLIST_SYNC_INTERVAL = 30   # seconds between DB polls
+WATCHLIST_SYNC_INTERVAL = 30  # seconds between DB polls
 
 # Queue message tags
-TAG_BAR   = "bar"
+TAG_BAR = "bar"
 TAG_QUOTE = "quote"
 
 
 # ── DB helpers ─────────────────────────────────────────────────────────────
+
 
 def _db_get_watchlist():
     db = SessionLocal()
@@ -52,9 +53,8 @@ def _db_get_watchlist():
             {
                 "symbol": r.symbol,
                 "security_type": r.security_type or "STK",
-                "exchange": r.exchange or (
-                    "CME" if (r.security_type or "STK") == "FUT" else "SMART"
-                ),
+                "exchange": r.exchange
+                or ("CME" if (r.security_type or "STK") == "FUT" else "SMART"),
             }
             for r in rows
         ]
@@ -63,6 +63,7 @@ def _db_get_watchlist():
 
 
 # ── Subscription coordination ──────────────────────────────────────────────
+
 
 async def _subscribe(
     provider: LiveDataProvider,
@@ -86,8 +87,11 @@ async def _subscribe(
         queue.put_nowait((TAG_QUOTE, sym, quote))
 
     await provider.subscribe(
-        symbol, item["security_type"], item["exchange"],
-        on_bar=on_bar, on_quote=on_quote,
+        symbol,
+        item["security_type"],
+        item["exchange"],
+        on_bar=on_bar,
+        on_quote=on_quote,
     )
     logger.info(f"Real-time bars + market data active for {symbol}")
 
@@ -103,6 +107,7 @@ async def _unsubscribe(
 
 
 # ── Core loops ─────────────────────────────────────────────────────────────
+
 
 async def _sync_loop(
     provider: LiveDataProvider,
@@ -181,6 +186,7 @@ async def _process_loop(
 
 
 # ── Main entry point ───────────────────────────────────────────────────────
+
 
 async def run(provider: LiveDataProvider | None = None) -> None:
     publisher = LivePublisher(settings.REDIS_URL)

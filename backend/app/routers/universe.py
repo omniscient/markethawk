@@ -6,22 +6,22 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from app.core.rate_limits import limiter, SCANNER_LIMIT
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.rate_limits import SCANNER_LIMIT, limiter
 from app.exceptions import UniverseNotFoundError, UniverseValidationError
-from app.models import StockUniverse, MonitoredStock, StockUniverseTicker
+from app.models import MonitoredStock, StockUniverse, StockUniverseTicker
 from app.models.stock_aggregate import StockAggregate
 from app.schemas import (
-    StockUniverseCreate,
-    StockUniverseUpdate,
-    StockUniverseResponse,
     MonitoredStockResponse,
+    StockUniverseCreate,
+    StockUniverseResponse,
+    StockUniverseUpdate,
     UniverseSummary,
 )
-from app.services import universe_orchestrator, universe_export
+from app.services import universe_export, universe_orchestrator
 from app.services.discovery_service import DiscoveryService
 from app.services.universe_stats import UniverseStatsService
 
@@ -191,7 +191,10 @@ def sync_fundamental_data(
     """Trigger background sync of fundamental data from Polygon."""
     service = DiscoveryService(db)
     background_tasks.add_task(service.sync_fundamental_data, delay_seconds=delay)
-    return {"status": "accepted", "message": f"Fundamental sync started in background (delay={delay}s)"}
+    return {
+        "status": "accepted",
+        "message": f"Fundamental sync started in background (delay={delay}s)",
+    }
 
 
 @router.post("/sync/details")
@@ -206,7 +209,10 @@ def sync_ticker_details(
     """Trigger background sync of ticker details. delay: 15.0=Free, 0.2=Paid. resync: force re-crawl."""
     service = DiscoveryService(db)
     background_tasks.add_task(service.sync_ticker_details_crawler, delay, resync)
-    return {"status": "accepted", "message": f"Ticker details sync started in background (delay={delay}s, resync={resync})"}
+    return {
+        "status": "accepted",
+        "message": f"Ticker details sync started in background (delay={delay}s, resync={resync})",
+    }
 
 
 @router.post("/sync/stop")
@@ -214,9 +220,10 @@ def stop_sync(
     db: Session = Depends(get_db),
 ):
     """Stops any running sync process by setting a Stop Flag in Redis and purging the queue."""
+    import redis
+
     from app.core.celery_app import celery_app
     from app.core.config import settings
-    import redis
 
     try:
         r = redis.from_url(settings.REDIS_URL)
@@ -225,7 +232,10 @@ def stop_sync(
     except Exception as e:
         redis_status = f"Redis error: {e}"
     purged_count = celery_app.control.purge()
-    return {"status": "stopped", "message": f"Stop signal sent ({redis_status}). {purged_count} pending tasks removed."}
+    return {
+        "status": "stopped",
+        "message": f"Stop signal sent ({redis_status}). {purged_count} pending tasks removed.",
+    }
 
 
 @router.post("/sync/metrics")
@@ -238,7 +248,10 @@ def sync_daily_metrics(
     """Trigger background update of daily technical metrics."""
     service = DiscoveryService(db)
     background_tasks.add_task(service.update_daily_metrics_snapshot)
-    return {"status": "accepted", "message": "Daily metrics update started in background"}
+    return {
+        "status": "accepted",
+        "message": "Daily metrics update started in background",
+    }
 
 
 @router.post("/{universe_id}/refresh")
@@ -364,7 +377,11 @@ def delete_ticker_aggregates(
     ).delete(synchronize_session=False)
 
     db.commit()
-    return {"deleted_bars": deleted, "ticker": request.ticker, "removed_from_universe": True}
+    return {
+        "deleted_bars": deleted,
+        "ticker": request.ticker,
+        "removed_from_universe": True,
+    }
 
 
 @router.get("/{universe_id}/quality-report")
@@ -375,17 +392,25 @@ def get_quality_report(
     """Return the latest quality report for a universe (or null if none exists)."""
     from app.models.universe_quality_report import UniverseQualityReport
 
-    report = db.query(UniverseQualityReport).filter(UniverseQualityReport.universe_id == universe_id).first()
+    report = (
+        db.query(UniverseQualityReport)
+        .filter(UniverseQualityReport.universe_id == universe_id)
+        .first()
+    )
     if not report:
         return None
     return {
         "universe_id": universe_id,
         "status": report.status,
         "overall_grade": report.overall_grade,
-        "overall_score": float(report.overall_score) if report.overall_score is not None else None,
+        "overall_score": float(report.overall_score)
+        if report.overall_score is not None
+        else None,
         "ticker_count": report.ticker_count,
         "started_at": report.started_at.isoformat() if report.started_at else None,
-        "generated_at": report.generated_at.isoformat() if report.generated_at else None,
+        "generated_at": report.generated_at.isoformat()
+        if report.generated_at
+        else None,
         "report_data": report.report_data,
         "error_message": report.error_message,
         "normalization_status": report.normalization_status,
@@ -404,7 +429,9 @@ def trigger_normalization(
     """Start (or resume) a normalization run. Poll GET .../quality-report for status."""
     target_tickers = body.target_tickers if body else None
     try:
-        return universe_orchestrator.queue_normalization(universe_id, target_tickers, db)
+        return universe_orchestrator.queue_normalization(
+            universe_id, target_tickers, db
+        )
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
     except UniverseValidationError as e:

@@ -43,7 +43,8 @@ class OutcomeService:
         if reference_price is None:
             logger.warning(
                 "OutcomeService: no reference price for event %s (source=%s), skipping snapshots",
-                event.id, ref_source,
+                event.id,
+                ref_source,
             )
             return []
 
@@ -66,9 +67,11 @@ class OutcomeService:
         """Fill in a pending snapshot's price metrics from stock_aggregates."""
         from app.models.stock_aggregate import StockAggregate
 
-        event = db.query(ScannerEvent).filter(
-            ScannerEvent.id == snapshot.scanner_event_id
-        ).first()
+        event = (
+            db.query(ScannerEvent)
+            .filter(ScannerEvent.id == snapshot.scanner_event_id)
+            .first()
+        )
         if not event:
             snapshot.status = "failed"
             return
@@ -78,7 +81,8 @@ class OutcomeService:
             snapshot.status = "failed"
             return
 
-        from datetime import timedelta, time as _time
+        from datetime import time as _time
+        from datetime import timedelta
         from zoneinfo import ZoneInfo
 
         _ET = ZoneInfo("America/New_York")
@@ -123,7 +127,9 @@ class OutcomeService:
         total_volume = sum(int(b.volume) for b in bars)
 
         snapshot.snapshot_price = Decimal(str(round(last_close, 4)))
-        snapshot.pct_change = Decimal(str(round((last_close - ref_price) / ref_price * 100, 4)))
+        snapshot.pct_change = Decimal(
+            str(round((last_close - ref_price) / ref_price * 100, 4))
+        )
         snapshot.high_since_signal = Decimal(str(round(high, 4)))
         snapshot.low_since_signal = Decimal(str(round(low, 4)))
         snapshot.volume_since_signal = total_volume
@@ -131,9 +137,13 @@ class OutcomeService:
         snapshot.status = "captured"
 
     @staticmethod
-    def recompute_summary(db: Session, scanner_event_id: int) -> Optional[ScannerOutcomeSummary]:
+    def recompute_summary(
+        db: Session, scanner_event_id: int
+    ) -> Optional[ScannerOutcomeSummary]:
         """Upsert the outcome summary for an event from its captured snapshots."""
-        event = db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
+        event = (
+            db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
+        )
         if not event:
             return None
 
@@ -150,14 +160,24 @@ class OutcomeService:
         if ref_price <= 0:
             return None
 
-        highest = max(float(s.high_since_signal) for s in captured if s.high_since_signal is not None)
-        lowest = min(float(s.low_since_signal) for s in captured if s.low_since_signal is not None)
+        highest = max(
+            float(s.high_since_signal)
+            for s in captured
+            if s.high_since_signal is not None
+        )
+        lowest = min(
+            float(s.low_since_signal)
+            for s in captured
+            if s.low_since_signal is not None
+        )
         mfe_pct = round((highest - ref_price) / ref_price * 100, 4)
         mae_pct = round((lowest - ref_price) / ref_price * 100, 4)
         mfe_mae_ratio = round(abs(mfe_pct / mae_pct), 4) if mae_pct != 0 else None
 
         eod_snap = next((s for s in captured if s.interval_key == "eod"), None)
-        eod_pct = float(eod_snap.pct_change) if eod_snap and eod_snap.pct_change else None
+        eod_pct = (
+            float(eod_snap.pct_change) if eod_snap and eod_snap.pct_change else None
+        )
 
         config = (
             db.query(ScannerConfig)
@@ -173,7 +193,11 @@ class OutcomeService:
         if config and config.outcome_config:
             all_intervals = set(config.outcome_config.get("intervals", []))
         captured_intervals = {s.interval_key for s in captured}
-        is_complete = all_intervals.issubset(captured_intervals) if all_intervals else len(captured) > 0
+        is_complete = (
+            all_intervals.issubset(captured_intervals)
+            if all_intervals
+            else len(captured) > 0
+        )
 
         summary = (
             db.query(ScannerOutcomeSummary)
@@ -187,11 +211,15 @@ class OutcomeService:
         summary.reference_price = Decimal(str(ref_price))
         summary.mfe_pct = Decimal(str(mfe_pct))
         summary.mae_pct = Decimal(str(mae_pct))
-        summary.mfe_mae_ratio = Decimal(str(mfe_mae_ratio)) if mfe_mae_ratio is not None else None
+        summary.mfe_mae_ratio = (
+            Decimal(str(mfe_mae_ratio)) if mfe_mae_ratio is not None else None
+        )
         summary.eod_pct_change = Decimal(str(eod_pct)) if eod_pct is not None else None
         summary.follow_through = follow_through
         summary.is_complete = is_complete
-        summary.completed_at = datetime.now(timezone.utc).replace(tzinfo=None) if is_complete else None
+        summary.completed_at = (
+            datetime.now(timezone.utc).replace(tzinfo=None) if is_complete else None
+        )
 
         db.flush()
         return summary

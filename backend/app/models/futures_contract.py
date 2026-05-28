@@ -7,7 +7,8 @@ subsequent downloads don't need to re-query IBKR for the contract list.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Date, Index
+
+from sqlalchemy import Boolean, Column, Date, DateTime, Index, Integer, String
 
 from app.core.database import Base
 
@@ -17,23 +18,31 @@ class FuturesContract(Base):
 
     __tablename__ = "futures_contracts"
 
-    id             = Column(Integer, primary_key=True, index=True)
-    symbol         = Column(String(20), nullable=False, index=True)  # root, e.g. "ES"
-    exchange       = Column(String(20), nullable=False)              # e.g. "CME"
-    contract_month = Column(String(8),  nullable=False)              # YYYYMMDD
-    expiry_date    = Column(Date)                                    # Parsed from contract_month
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String(20), nullable=False, index=True)  # root, e.g. "ES"
+    exchange = Column(String(20), nullable=False)  # e.g. "CME"
+    contract_month = Column(String(8), nullable=False)  # YYYYMMDD
+    expiry_date = Column(Date)  # Parsed from contract_month
 
     # IBKR internal contract ID — allows direct requests without re-lookup
     con_id = Column(Integer)
 
-    is_expired     = Column(Boolean, default=False)
+    is_expired = Column(Boolean, default=False)
     data_downloaded = Column(Boolean, default=False)  # Has OHLCV data been fetched?
 
-    last_bar_date  = Column(DateTime)  # Most recent bar timestamp in DB for this contract
+    last_bar_date = Column(
+        DateTime
+    )  # Most recent bar timestamp in DB for this contract
     first_bar_date = Column(DateTime)  # Oldest bar timestamp in DB for this contract
 
-    created_at   = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    last_updated = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+    last_updated = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+    )
 
     __table_args__ = (
         # Primary lookup: symbol + contract month must be unique

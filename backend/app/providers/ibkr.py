@@ -14,8 +14,8 @@ import logging
 import os
 import time
 from collections import deque
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
 from app.exceptions import ProviderError
@@ -27,8 +27,9 @@ logger = logging.getLogger(__name__)
 # Lazy import guard — ib_insync is only needed when IBKR features are used.
 # ---------------------------------------------------------------------------
 try:
-    from ib_insync import IB, Future, ContFuture, Stock, util
+    from ib_insync import IB, ContFuture, Future, Stock, util  # noqa: F401
     from ib_insync.contract import ContractDetails
+
     IB_INSYNC_AVAILABLE = True
 except ImportError:
     IB_INSYNC_AVAILABLE = False
@@ -42,37 +43,37 @@ except ImportError:
 # Timespan mapping: our internal names → IBKR barSizeSetting strings
 # ---------------------------------------------------------------------------
 TIMESPAN_TO_IBKR = {
-    "second":  "1 secs",
+    "second": "1 secs",
     "5second": "5 secs",
-    "minute":  "1 min",
+    "minute": "1 min",
     "2minute": "2 mins",
     "5minute": "5 mins",
     "15minute": "15 mins",
     "30minute": "30 mins",
-    "hour":    "1 hour",
-    "2hour":   "2 hours",
-    "4hour":   "4 hours",
-    "day":     "1 day",
-    "week":    "1 week",
-    "month":   "1 month",
+    "hour": "1 hour",
+    "2hour": "2 hours",
+    "4hour": "4 hours",
+    "day": "1 day",
+    "week": "1 week",
+    "month": "1 month",
 }
 
 # How much history IBKR allows per request for each bar size
 # (used to chunk multi-year requests into valid IBKR durations)
 IBKR_MAX_DURATION = {
-    "1 secs":   "1800 S",
-    "5 secs":   "7200 S",
-    "1 min":    "1 D",
-    "2 mins":   "2 D",
-    "5 mins":   "1 W",
-    "15 mins":  "2 W",
-    "30 mins":  "1 M",
-    "1 hour":   "1 M",
-    "2 hours":  "1 M",
-    "4 hours":  "1 M",
-    "1 day":    "1 Y",
-    "1 week":   "5 Y",
-    "1 month":  "10 Y",
+    "1 secs": "1800 S",
+    "5 secs": "7200 S",
+    "1 min": "1 D",
+    "2 mins": "2 D",
+    "5 mins": "1 W",
+    "15 mins": "2 W",
+    "30 mins": "1 M",
+    "1 hour": "1 M",
+    "2 hours": "1 M",
+    "4 hours": "1 M",
+    "1 day": "1 Y",
+    "1 week": "5 Y",
+    "1 month": "10 Y",
 }
 
 
@@ -169,7 +170,9 @@ class IBKRDataProvider(BaseDataProvider):
         """IBKR serves futures only; stock bars are not supported — return empty."""
         return []
 
-    def get_snapshots(self, symbols: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def get_snapshots(
+        self, symbols: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
         """IBKR does not provide a snapshot feed; return empty."""
         return []
 
@@ -221,7 +224,9 @@ class IBKRDataProvider(BaseDataProvider):
                 timeout=30,
             )
         except Exception as e:
-            logger.error(f"IBKRDataProvider: get_futures_contracts failed for {symbol}: {e}")
+            logger.error(
+                f"IBKRDataProvider: get_futures_contracts failed for {symbol}: {e}"
+            )
             raise ProviderError(
                 f"get_futures_contracts failed for {symbol}: {e}",
                 provider="ibkr",
@@ -240,7 +245,9 @@ class IBKRDataProvider(BaseDataProvider):
             # Normalise to 8-digit format
             expiry_8 = expiry_str.ljust(8, "0")[:8]
             try:
-                expiry_dt = datetime.strptime(expiry_8, "%Y%m%d").replace(tzinfo=timezone.utc)
+                expiry_dt = datetime.strptime(expiry_8, "%Y%m%d").replace(
+                    tzinfo=timezone.utc
+                )
             except ValueError:
                 continue
 
@@ -422,7 +429,7 @@ class IBKRDataProvider(BaseDataProvider):
             except Exception as e:
                 self._ib = None
                 self._connected = False
-                delay = min(5 * (2 ** attempt), 60)   # 5 10 20 40 60 60 …
+                delay = min(5 * (2**attempt), 60)  # 5 10 20 40 60 60 …
                 if attempt < max_retries - 1:
                     logger.warning(
                         f"IBKRDataProvider: Connection attempt {attempt + 1}/{max_retries} "
@@ -525,14 +532,14 @@ class IBKRDataProvider(BaseDataProvider):
         _DURATION_STEP: Dict[str, timedelta] = {
             "1800 S": timedelta(minutes=30),
             "7200 S": timedelta(hours=2),
-            "1 D":    timedelta(days=1),
-            "2 D":    timedelta(days=2),
-            "1 W":    timedelta(weeks=1),
-            "2 W":    timedelta(weeks=2),
-            "1 M":    timedelta(days=30),
-            "1 Y":    timedelta(days=365),
-            "5 Y":    timedelta(days=365 * 5),
-            "10 Y":   timedelta(days=365 * 10),
+            "1 D": timedelta(days=1),
+            "2 D": timedelta(days=2),
+            "1 W": timedelta(weeks=1),
+            "2 W": timedelta(weeks=2),
+            "1 M": timedelta(days=30),
+            "1 Y": timedelta(days=365),
+            "5 Y": timedelta(days=365 * 5),
+            "10 Y": timedelta(days=365 * 10),
         }
         empty_step = _DURATION_STEP.get(max_duration, timedelta(days=1))
         # Allow this many consecutive empty chunks before giving up.
@@ -548,7 +555,9 @@ class IBKRDataProvider(BaseDataProvider):
             # Ensure we still have a live connection before each chunk
             ib = await self._get_connection()
             if not ib:
-                logger.error("IBKRDataProvider: lost connection during chunked download, aborting.")
+                logger.error(
+                    "IBKRDataProvider: lost connection during chunked download, aborting."
+                )
                 break
 
             chunk_num += 1
@@ -621,7 +630,9 @@ class IBKRDataProvider(BaseDataProvider):
                         "close": float(b.close),
                         "volume": int(b.volume),
                         "vwap": float(b.average) if hasattr(b, "average") else None,
-                        "transactions": int(b.barCount) if hasattr(b, "barCount") else None,
+                        "transactions": int(b.barCount)
+                        if hasattr(b, "barCount")
+                        else None,
                     }
                 )
 

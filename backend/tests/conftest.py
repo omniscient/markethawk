@@ -1,4 +1,5 @@
 import os
+
 # Must be set before any app import so SlowAPI limiter builds as a no-op.
 # Redis (db 1) is not available in the test environment; without this the
 # SlowAPIASGIMiddleware raises ConnectionError on every request.
@@ -7,16 +8,17 @@ os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 os.environ.setdefault("POLYGON_API_KEY", "test-key-for-unit-tests-only")
 
-import pytest
 import logging as _logging
-from typing import Generator
 from contextlib import contextmanager
+from typing import Generator
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from testcontainers.postgres import PostgresContainer
 
-from app.core.database import Base, get_db
+from app.core.database import Base
 from app.main import app
 
 _conftest_logger = _logging.getLogger(__name__)

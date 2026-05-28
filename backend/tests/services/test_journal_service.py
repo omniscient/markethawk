@@ -1,25 +1,34 @@
 """
 Tests for journal_service CRUD functions against the testcontainers DB.
 """
+
 from decimal import Decimal
+
 import pytest
 from sqlalchemy.orm import Session
 
+from app.schemas.journal import JournalEntryCreate, TagCreate, TradeCreate, TradeUpdate
 from app.services.journal_service import (
-    create_trade, get_trade, get_trades, update_trade,
-    create_journal_entry, get_journal_entries,
-    create_tag, get_tags, get_trade_stats,
+    create_journal_entry,
+    create_tag,
+    create_trade,
+    get_journal_entries,
+    get_tags,
+    get_trade,
+    get_trade_stats,
+    get_trades,
+    update_trade,
 )
-from app.schemas.journal import TradeCreate, TradeUpdate, JournalEntryCreate, TagCreate
-
 
 # ── helpers ──────────────────────────────────────────────────────────────
+
 
 def _trade(symbol="AAPL", status="open"):
     return TradeCreate(symbol=symbol, status=status)
 
 
 # ── create_trade / get_trade ─────────────────────────────────────────────
+
 
 def test_create_trade_returns_persisted_object(db: Session):
     trade = create_trade(db, _trade())
@@ -40,6 +49,7 @@ def test_get_trade_returns_none_for_missing_id(db: Session):
 
 
 # ── get_trades ───────────────────────────────────────────────────────────
+
 
 def test_get_trades_returns_all(db: Session):
     create_trade(db, _trade("AAPL"))
@@ -66,6 +76,7 @@ def test_get_trades_filters_by_status(db: Session):
 
 # ── update_trade ─────────────────────────────────────────────────────────
 
+
 def test_update_trade_status(db: Session):
     trade = create_trade(db, _trade())
     updated = update_trade(db, trade.id, TradeUpdate(status="closed"))
@@ -85,6 +96,7 @@ def test_update_trade_returns_none_for_missing(db: Session):
 
 # ── trade stats ───────────────────────────────────────────────────────────
 
+
 def test_trade_stats_empty_db(db: Session):
     stats = get_trade_stats(db)
     assert stats.total_trades == 0
@@ -93,6 +105,7 @@ def test_trade_stats_empty_db(db: Session):
 
 def test_trade_stats_win_rate(db: Session):
     from app.models.trade import Trade
+
     winner = Trade(symbol="AAPL", status="closed", net_pnl=Decimal("100"))
     loser = Trade(symbol="MSFT", status="closed", net_pnl=Decimal("-50"))
     db.add_all([winner, loser])
@@ -106,17 +119,23 @@ def test_trade_stats_win_rate(db: Session):
 
 # ── journal entries ────────────────────────────────────────────────────────
 
+
 def test_create_and_get_journal_entry(db: Session):
     from datetime import date
-    entry = create_journal_entry(db, JournalEntryCreate(
-        entry_date=date.today(), title="Test Entry", content="Notes here"
-    ))
+
+    entry = create_journal_entry(
+        db,
+        JournalEntryCreate(
+            entry_date=date.today(), title="Test Entry", content="Notes here"
+        ),
+    )
     entries = get_journal_entries(db)
     ids = [e.id for e in entries]
     assert entry.id in ids
 
 
 # ── tags ──────────────────────────────────────────────────────────────────
+
 
 def test_create_and_get_tag(db: Session):
     tag = create_tag(db, TagCreate(name="momentum"))

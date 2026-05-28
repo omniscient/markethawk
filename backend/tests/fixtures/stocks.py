@@ -3,7 +3,7 @@ Stocks seed helpers.
 Each function inserts rows and flushes; the caller's transaction provides rollback.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 

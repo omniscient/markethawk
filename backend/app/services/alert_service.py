@@ -12,7 +12,7 @@ import json
 import logging
 import smtplib
 import ssl
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Dict, List, Optional
@@ -21,8 +21,8 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.alert_rule import AlertRule
 from app.models.alert_delivery_log import AlertDeliveryLog
+from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
 
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────────────────────────────────────
 # Rule Evaluation
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class AlertRuleService:
     """Evaluates scanner events against stored alert rules."""
@@ -90,6 +91,7 @@ class AlertRuleService:
 # Notification Dispatcher
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class NotificationDispatcher:
     """Dispatches alert notifications across all enabled channels."""
 
@@ -129,12 +131,16 @@ class NotificationDispatcher:
                     if url:
                         NotificationDispatcher._send_webhook(
                             url=url,
-                            payload=NotificationDispatcher._build_webhook_payload(event, rule),
+                            payload=NotificationDispatcher._build_webhook_payload(
+                                event, rule
+                            ),
                         )
                     else:
                         raise ValueError("No webhook URL configured.")
                 else:
-                    logger.warning(f"Unknown alert channel '{channel}' on rule {rule.id}")
+                    logger.warning(
+                        f"Unknown alert channel '{channel}' on rule {rule.id}"
+                    )
                     continue
 
                 logger.info(
@@ -169,7 +175,7 @@ class NotificationDispatcher:
     def _send_browser_push(event: ScannerEvent, db: Session) -> None:
         """Send a native browser push notification to all stored subscriptions."""
         try:
-            from pywebpush import webpush, WebPushException
+            from pywebpush import WebPushException, webpush  # noqa: F401
         except ImportError:
             raise RuntimeError(
                 "pywebpush is not installed. "
@@ -265,7 +271,8 @@ class NotificationDispatcher:
         scanner_type_display = event.scanner_type.replace("_", " ").title()
         return {
             "title": f"MarketHawk: {event.ticker} — {scanner_type_display}",
-            "body": event.summary or f"{scanner_type_display} detected on {event.ticker}",
+            "body": event.summary
+            or f"{scanner_type_display} detected on {event.ticker}",
             "severity": event.severity,
             "ticker": event.ticker,
             "scanner_type": event.scanner_type,
@@ -330,9 +337,11 @@ class NotificationDispatcher:
 # Scanner Event Persistence
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def trigger_scanner_alert(event_id: int) -> None:
     """Enqueue alert evaluation for a newly persisted ScannerEvent."""
     from app.tasks import evaluate_scanner_alerts
+
     evaluate_scanner_alerts.delay(event_id)
 
 
@@ -350,7 +359,10 @@ def save_event(
     ranker_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Persist a ScannerEvent and enqueue alert evaluation for new events."""
-    from app.services.event_helpers import generate_event_summary, compute_event_severity
+    from app.services.event_helpers import (
+        compute_event_severity,
+        generate_event_summary,
+    )
     from app.services.signal_ranker import compute_signal_quality_score
 
     summary = generate_event_summary(scanner_type, indicators)
@@ -375,11 +387,15 @@ def save_event(
         "signal_quality_score": score,
     }
 
-    existing = db.query(ScannerEvent).filter(
-        ScannerEvent.ticker == ticker,
-        ScannerEvent.event_date == event_date,
-        ScannerEvent.scanner_type == scanner_type,
-    ).first()
+    existing = (
+        db.query(ScannerEvent)
+        .filter(
+            ScannerEvent.ticker == ticker,
+            ScannerEvent.event_date == event_date,
+            ScannerEvent.scanner_type == scanner_type,
+        )
+        .first()
+    )
 
     if existing:
         for key, value in event_dict.items():

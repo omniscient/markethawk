@@ -1,8 +1,10 @@
 """
 Tests for OutcomeService — snapshot creation, capture, and summary recompute.
 """
+
 from datetime import date, datetime, timezone
 from decimal import Decimal
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -11,8 +13,8 @@ from app.models.scanner_event import ScannerEvent
 from app.models.stock_aggregate import StockAggregate
 from app.services.outcome_service import OutcomeService
 
-
 # ── helpers ────────────────────────────────────────────────────────────────
+
 
 def _config(db, scanner_type="pre_market_volume_spike"):
     cfg = ScannerConfig(
@@ -48,6 +50,7 @@ def _event(db, scanner_type="pre_market_volume_spike", opening_price=10.0):
 
 # ── create_pending_snapshots ──────────────────────────────────────────────
 
+
 def test_create_pending_snapshots_returns_correct_count(db: Session):
     _config(db)
     event = _event(db)
@@ -79,15 +82,19 @@ def test_create_pending_snapshots_no_opening_price_returns_empty(db: Session):
 
 # ── capture_snapshot ──────────────────────────────────────────────────────
 
+
 def test_capture_snapshot_sets_status_captured(db: Session):
     from datetime import timedelta
     from zoneinfo import ZoneInfo
+
     _config(db)
     event = _event(db, opening_price=10.0)
     snapshots = OutcomeService.create_pending_snapshots(db, event)
 
     _ET = ZoneInfo("America/New_York")
-    open_et = datetime.combine(event.event_date, __import__("datetime").time(9, 30), tzinfo=_ET)
+    open_et = datetime.combine(
+        event.event_date, __import__("datetime").time(9, 30), tzinfo=_ET
+    )
     open_utc = open_et.astimezone(timezone.utc).replace(tzinfo=None)
 
     bar = StockAggregate(
@@ -120,6 +127,7 @@ def test_capture_snapshot_no_bars_sets_failed(db: Session):
 
 
 # ── recompute_summary ─────────────────────────────────────────────────────
+
 
 def test_recompute_summary_returns_none_without_captured_snapshots(db: Session):
     _config(db)

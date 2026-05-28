@@ -6,7 +6,8 @@ the API layer. There is no automatic expiry; entries persist until removed.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Text
+
+from sqlalchemy import Column, DateTime, Integer, String, Text
 
 from app.core.database import Base
 

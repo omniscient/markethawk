@@ -9,11 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.active_watchlist import ActiveWatchlist, WATCHLIST_SOFT_LIMIT
+from app.models.active_watchlist import WATCHLIST_SOFT_LIMIT, ActiveWatchlist
 from app.schemas.active_watchlist import (
     ActiveWatchlistAdd,
-    ActiveWatchlistUpdate,
     ActiveWatchlistItem,
+    ActiveWatchlistUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,9 +76,7 @@ def update_watchlist_entry(
 ):
     """Update the notes for a watchlist entry."""
     symbol = symbol.strip().upper()
-    entry = (
-        db.query(ActiveWatchlist).filter(ActiveWatchlist.symbol == symbol).first()
-    )
+    entry = db.query(ActiveWatchlist).filter(ActiveWatchlist.symbol == symbol).first()
     if not entry:
         raise HTTPException(status_code=404, detail=f"{symbol} not found in watchlist.")
 
@@ -92,9 +90,7 @@ def update_watchlist_entry(
 def remove_from_watchlist(symbol: str, db: Session = Depends(get_db)):
     """Remove a symbol from the active watchlist."""
     symbol = symbol.strip().upper()
-    entry = (
-        db.query(ActiveWatchlist).filter(ActiveWatchlist.symbol == symbol).first()
-    )
+    entry = db.query(ActiveWatchlist).filter(ActiveWatchlist.symbol == symbol).first()
     if not entry:
         raise HTTPException(status_code=404, detail=f"{symbol} not found in watchlist.")
 

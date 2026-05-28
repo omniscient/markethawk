@@ -2,7 +2,6 @@
 
 from typing import Awaitable, Callable, Protocol, runtime_checkable
 
-
 BarCallback = Callable[[str, object], Awaitable[None]]
 QuoteCallback = Callable[[str, dict], Awaitable[None]]
 

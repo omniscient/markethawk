@@ -1,8 +1,9 @@
-
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)
+
 
 def test_health_check():
     response = client.get("/api/health")
@@ -12,10 +13,12 @@ def test_health_check():
     assert "timestamp" in data
     assert "version" in data
 
+
 def test_health_is_exempt_from_auth():
     c = TestClient(app)
     response = c.get("/api/health")
     assert response.status_code == 200
+
 
 def test_protected_endpoint_returns_401_without_cookie():
     c = TestClient(app, raise_server_exceptions=False)

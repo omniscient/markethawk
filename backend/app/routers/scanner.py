@@ -2,47 +2,57 @@
 Scanner router - endpoints for running and viewing scanner results.
 """
 
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
-import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
-from app.core.rate_limits import limiter, SCANNER_LIMIT
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import cast
-from sqlalchemy.dialects.postgresql import JSONB
 import sqlalchemy as sa
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from sqlalchemy.orm import Session, joinedload
 
-from app.utils.session import get_market_today
 from app.core.database import get_db
-from app.models import MonitoredStock, ScannerEvent, ScannerConfig, ScannerRun
+from app.core.rate_limits import SCANNER_LIMIT, limiter
+from app.models import MonitoredStock, ScannerConfig, ScannerEvent, ScannerRun
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.signal_review import SignalReview
-from app.schemas.signal_review import SignalReviewRequest, SignalReviewResponse, SignalReviewStatsResponse
 from app.models.system_config import SystemConfig
 from app.schemas import (
+    ClearEventsResponse,
+    PreMarketMoversResponse,
+    ScannerConfigResponse,
+    ScannerEventResponse,
+    ScannerRangeRequest,
+    ScannerRunAsyncResponse,
     ScannerRunRequest,
     ScannerRunResponse,
-    ScannerRunAsyncResponse,
     ScannerRunStatusResponse,
-    ScannerEventResponse,
-    ScannerEventSummary,
     ScannerStatsResponse,
-    ScannerConfigResponse,
-    PreMarketMoversResponse,
-    PreMarketMover,
-    ScannerRangeRequest,
     ScannerStatusBlockResponse,
-    ClearEventsResponse,
+)
+from app.schemas.signal_review import (
+    SignalReviewRequest,
+    SignalReviewResponse,
+    SignalReviewStatsResponse,
 )
 from app.services import StockDataService
 from app.services.scanner import ScannerService
+from app.utils.session import get_market_today
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
+
 
 def _last_completed_weekday() -> "date":
     """Default scan date when none supplied — most recent completed weekday."""
     from datetime import timedelta as _td
+
     d = get_market_today() - _td(days=1)
     while d.weekday() >= 5:  # Saturday=5, Sunday=6
         d -= _td(days=1)
@@ -53,6 +63,7 @@ def _last_completed_weekday() -> "date":
 def list_scanner_types():
     """Return all registered scanner types for frontend scanner pickers."""
     from app.services.scan_orchestrator import get_all
+
     return [
         {
             "key": d.key,
@@ -167,7 +178,9 @@ def get_scan_status(scan_id: str, db: Session = Depends(get_db)):
     fields (status, events_detected, execution_time_ms) are authoritative.
     """
     import json
+
     import redis as _redis
+
     from app.core.config import settings as _settings
 
     try:
@@ -219,6 +232,7 @@ def cancel_scan(scan_id: str, db: Session = Depends(get_db)):
     'cancelled' message on its progress channel.
     """
     import redis as _redis
+
     from app.core.config import settings as _settings
 
     try:
@@ -230,7 +244,9 @@ def cancel_scan(scan_id: str, db: Session = Depends(get_db)):
     if run is None:
         raise HTTPException(status_code=404, detail="scan not found")
     if run.status not in ("queued", "running"):
-        raise HTTPException(status_code=409, detail=f"scan is {run.status}, not cancellable")
+        raise HTTPException(
+            status_code=409, detail=f"scan is {run.status}, not cancellable"
+        )
 
     r = _redis.Redis.from_url(_settings.REDIS_URL, decode_responses=True)
     r.set(f"scan_cancel:{scan_id}", "1", ex=3600)
@@ -247,7 +263,9 @@ async def scan_run_websocket(websocket: WebSocket, task_id: str):
     pub/sub messages for the same channel until the task completes/fails.
     """
     import json
+
     from redis import asyncio as aioredis
+
     from app.core.config import settings as _settings
 
     await websocket.accept()
@@ -258,7 +276,9 @@ async def scan_run_websocket(websocket: WebSocket, task_id: str):
         #    locate it by scanning for any key whose stored task_id matches).
         cursor = 0
         while True:
-            cursor, keys = await redis_client.scan(cursor=cursor, match="universe:*:scan:*", count=100)
+            cursor, keys = await redis_client.scan(
+                cursor=cursor, match="universe:*:scan:*", count=100
+            )
             for key in keys:
                 raw = await redis_client.get(key)
                 if not raw:
@@ -322,12 +342,9 @@ def get_scanner_history(
 ):
     """Get recent scanner runs."""
     runs = (
-        db.query(ScannerRun)
-        .order_by(ScannerRun.created_at.desc())
-        .limit(limit)
-        .all()
+        db.query(ScannerRun).order_by(ScannerRun.created_at.desc()).limit(limit).all()
     )
-    
+
     # Map to schema
     return [
         ScannerRunResponse(
@@ -338,7 +355,7 @@ def get_scanner_history(
             events_detected=run.events_detected,
             execution_time_ms=run.execution_time_ms,
             error_message=run.error_message,
-            created_at=run.created_at
+            created_at=run.created_at,
         )
         for run in runs
     ]
@@ -348,7 +365,7 @@ def get_scanner_history(
 def get_scanner_results(
     ticker: Optional[str] = None,
     scanner_type: Optional[str] = None,
-    event_type: Optional[str] = None, # Alias for backward compat
+    event_type: Optional[str] = None,  # Alias for backward compat
     universe_id: Optional[int] = None,
     sort_by: Optional[str] = "signal_quality_score",
     sort_order: Optional[str] = "desc",
@@ -369,17 +386,19 @@ def get_scanner_results(
     if stype:
         # 'liquidity_hunt' is the umbrella type — include all three variants
         if stype == "liquidity_hunt":
-            query = query.filter(ScannerEvent.scanner_type.in_([
-                "liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"
-            ]))
+            query = query.filter(
+                ScannerEvent.scanner_type.in_(
+                    ["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]
+                )
+            )
         else:
             query = query.filter(ScannerEvent.scanner_type == stype)
 
     if universe_id:
         query = query.join(
             MonitoredStock,
-            (ScannerEvent.ticker == MonitoredStock.ticker) &
-            (MonitoredStock.universe_id == universe_id)
+            (ScannerEvent.ticker == MonitoredStock.ticker)
+            & (MonitoredStock.universe_id == universe_id),
         )
 
     if start_date:
@@ -397,13 +416,13 @@ def get_scanner_results(
                 order_expr = sort_attr.asc().nulls_last()
             query = query.order_by(order_expr)
         else:
-            query = query.order_by(ScannerEvent.signal_quality_score.desc().nulls_last())
+            query = query.order_by(
+                ScannerEvent.signal_quality_score.desc().nulls_last()
+            )
     except Exception:
         query = query.order_by(ScannerEvent.created_at.desc())
 
-    results = (
-        query.limit(limit).offset(offset).all()
-    )
+    results = query.limit(limit).offset(offset).all()
 
     return results
 
@@ -420,12 +439,12 @@ def get_signal_quality_distribution(
     Deciles are bucketed as strings: '0.0-0.1', '0.1-0.2', ..., '0.9-1.0'.
     Only events with both a signal_quality_score and a completed ScannerOutcomeSummary are included.
     """
-    from sqlalchemy import func, case, cast as sa_cast
-    from sqlalchemy.types import Float as SAFloat
 
-    ranker_version = db.query(SystemConfig).filter(
-        SystemConfig.key == "signal_ranker_version"
-    ).first()
+    ranker_version = (
+        db.query(SystemConfig)
+        .filter(SystemConfig.key == "signal_ranker_version")
+        .first()
+    )
     version = ranker_version.value if ranker_version else "unknown"
 
     query = (
@@ -434,7 +453,10 @@ def get_signal_quality_distribution(
             ScannerOutcomeSummary.eod_pct_change,
             ScannerOutcomeSummary.follow_through,
         )
-        .join(ScannerOutcomeSummary, ScannerOutcomeSummary.scanner_event_id == ScannerEvent.id)
+        .join(
+            ScannerOutcomeSummary,
+            ScannerOutcomeSummary.scanner_event_id == ScannerEvent.id,
+        )
         .filter(ScannerEvent.signal_quality_score.isnot(None))
     )
     if scanner_type:
@@ -448,12 +470,18 @@ def get_signal_quality_distribution(
 
     # Bucket into deciles
     buckets: dict[str, dict] = {}
-    for label in [f"{i/10:.1f}-{(i+1)/10:.1f}" for i in range(10)]:
-        buckets[label] = {"count": 0, "eod_sum": 0.0, "ft_sum": 0, "eod_count": 0, "ft_count": 0}
+    for label in [f"{i / 10:.1f}-{(i + 1) / 10:.1f}" for i in range(10)]:
+        buckets[label] = {
+            "count": 0,
+            "eod_sum": 0.0,
+            "ft_sum": 0,
+            "eod_count": 0,
+            "ft_count": 0,
+        }
 
     for score, eod_pct, follow_through in rows:
         idx = min(int(float(score) * 10), 9)
-        label = f"{idx/10:.1f}-{(idx+1)/10:.1f}"
+        label = f"{idx / 10:.1f}-{(idx + 1) / 10:.1f}"
         b = buckets[label]
         b["count"] += 1
         if eod_pct is not None:
@@ -467,8 +495,12 @@ def get_signal_quality_distribution(
         {
             "decile": label,
             "count": b["count"],
-            "avg_eod_pct": round(b["eod_sum"] / b["eod_count"], 3) if b["eod_count"] > 0 else None,
-            "follow_through_rate": round(b["ft_sum"] / b["ft_count"], 3) if b["ft_count"] > 0 else None,
+            "avg_eod_pct": round(b["eod_sum"] / b["eod_count"], 3)
+            if b["eod_count"] > 0
+            else None,
+            "follow_through_rate": round(b["ft_sum"] / b["ft_count"], 3)
+            if b["ft_count"] > 0
+            else None,
         }
         for label, b in buckets.items()
     ]
@@ -481,8 +513,9 @@ def get_scanner_stats(
     db: Session = Depends(get_db),
 ):
     """Get scanner statistics for the dashboard."""
+    from datetime import datetime
+
     from sqlalchemy import func
-    from datetime import datetime, timedelta
 
     # Total events
     total_events = db.query(func.count(ScannerEvent.id)).scalar() or 0
@@ -508,11 +541,23 @@ def get_scanner_stats(
     # Average volume spike ratio (specifically for volume scanners)
     # We use cast for JSON access in Postgres
     avg_spike = (
-        db.query(func.avg(sa.cast(ScannerEvent.indicators['volume_spike_ratio'].astext, sa.Numeric)))
-        .filter(ScannerEvent.scanner_type.in_([
-            'pre_market_volume_spike', 'liquidity_hunt',
-            'liquidity_hunt_pre', 'liquidity_hunt_post',
-        ]))
+        db.query(
+            func.avg(
+                sa.cast(
+                    ScannerEvent.indicators["volume_spike_ratio"].astext, sa.Numeric
+                )
+            )
+        )
+        .filter(
+            ScannerEvent.scanner_type.in_(
+                [
+                    "pre_market_volume_spike",
+                    "liquidity_hunt",
+                    "liquidity_hunt_pre",
+                    "liquidity_hunt_post",
+                ]
+            )
+        )
         .scalar()
     )
     if avg_spike is None:
@@ -535,7 +580,10 @@ def get_edge_stats(
 ):
     """Get aggregated statistical edge data."""
     from app.services.stats import StatsService
-    return StatsService.get_edge_stats(db, ticker=ticker, period=period, scanner_type=scanner_type)
+
+    return StatsService.get_edge_stats(
+        db, ticker=ticker, period=period, scanner_type=scanner_type
+    )
 
 
 @router.get("/edge-distribution")
@@ -546,14 +594,21 @@ def get_edge_distribution(
 ):
     """Get distribution data for scatter plots."""
     from app.services.stats import StatsService
-    return StatsService.get_distribution_data(db, ticker=ticker, scanner_type=scanner_type)
+
+    return StatsService.get_distribution_data(
+        db, ticker=ticker, scanner_type=scanner_type
+    )
 
 
 def _compute_next_run(scanner_type: str) -> Optional[datetime]:
     """Return next scheduled fire time for scanner_type, or None if not scheduled."""
     from datetime import timedelta as _td
 
-    if scanner_type not in {"liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"}:
+    if scanner_type not in {
+        "liquidity_hunt",
+        "liquidity_hunt_pre",
+        "liquidity_hunt_post",
+    }:
         return None
 
     now = datetime.now(timezone.utc)
@@ -578,9 +633,9 @@ def get_scan_status_block(
     if universe_id is not None:
         base_q = base_q.filter(ScannerRun.universe_id == universe_id)
 
-    last_run_record: Optional[ScannerRun] = (
-        base_q.order_by(ScannerRun.created_at.desc()).first()
-    )
+    last_run_record: Optional[ScannerRun] = base_q.order_by(
+        ScannerRun.created_at.desc()
+    ).first()
 
     last_run_info = None
     if last_run_record is not None:
@@ -594,9 +649,7 @@ def get_scan_status_block(
             "duration_ms": last_run_record.execution_time_ms or 0,
         }
 
-    recent_20 = (
-        base_q.order_by(ScannerRun.created_at.desc()).limit(20).all()
-    )
+    recent_20 = base_q.order_by(ScannerRun.created_at.desc()).limit(20).all()
     success_rate: Optional[float] = None
     avg_events: Optional[float] = None
     if recent_20:
@@ -607,15 +660,15 @@ def get_scan_status_block(
                 sum(r.events_detected or 0 for r in completed) / len(completed), 1
             )
 
-    sparkline_rows = (
-        base_q.order_by(ScannerRun.created_at.desc()).limit(10).all()
-    )
+    sparkline_rows = base_q.order_by(ScannerRun.created_at.desc()).limit(10).all()
     sparkline = [
         {
             "created_at": (
                 r.created_at.replace(tzinfo=timezone.utc).isoformat()
                 if r.created_at and r.created_at.tzinfo is None
-                else r.created_at.isoformat() if r.created_at else None
+                else r.created_at.isoformat()
+                if r.created_at
+                else None
             ),
             "events_detected": r.events_detected or 0,
             "status": r.status,
@@ -663,22 +716,18 @@ def get_scanner_configs(
 
 @router.get("/movers/pre-market", response_model=PreMarketMoversResponse)
 def get_pre_market_movers(
-    min_volume: int = 10000,
-    limit: int = 100,
-    db: Session = Depends(get_db)
+    min_volume: int = 10000, limit: int = 100, db: Session = Depends(get_db)
 ):
     """Get top pre-market movers."""
     movers = StockDataService.get_pre_market_movers(
-        db=db,
-        min_volume=min_volume,
-        limit=limit
+        db=db, min_volume=min_volume, limit=limit
     )
 
     # Map to schema if necessary, but the dicts should match
     return {
         "status": "success",
         "movers": movers,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -691,6 +740,7 @@ def run_scanner_range(
 ):
     """Enqueue a date-range scan for a single ticker as a background Celery task."""
     from app.tasks import run_range_scan
+
     task = run_range_scan.delay(
         ticker=body.ticker.upper(),
         scanner_types=body.scanner_types,
@@ -717,7 +767,9 @@ def clear_scanner_events(
     return ClearEventsResponse(ticker=ticker, deleted_count=deleted)
 
 
-@router.post("/events/{event_uuid}/review", response_model=SignalReviewResponse, status_code=201)
+@router.post(
+    "/events/{event_uuid}/review", response_model=SignalReviewResponse, status_code=201
+)
 def create_event_review(
     event_uuid: str,
     payload: SignalReviewRequest,
@@ -755,12 +807,18 @@ def list_event_reviews(
     db: Session = Depends(get_db),
 ):
     """List reviews with optional filters."""
-    query = (
-        db.query(SignalReview, ScannerEvent.ticker, ScannerEvent.event_date, ScannerEvent.scanner_type)
-        .join(ScannerEvent, SignalReview.scanner_event_id == ScannerEvent.id)
-    )
+    query = db.query(
+        SignalReview,
+        ScannerEvent.ticker,
+        ScannerEvent.event_date,
+        ScannerEvent.scanner_type,
+    ).join(ScannerEvent, SignalReview.scanner_event_id == ScannerEvent.id)
     if scanner_type == "liquidity_hunt":
-        query = query.filter(ScannerEvent.scanner_type.in_(["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]))
+        query = query.filter(
+            ScannerEvent.scanner_type.in_(
+                ["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]
+            )
+        )
     else:
         query = query.filter(ScannerEvent.scanner_type == scanner_type)
     if start_date:
@@ -798,10 +856,12 @@ def get_review_stats(
     db: Session = Depends(get_db),
 ):
     """Aggregate review stats: coverage, acceptance rate, by-type breakdown, top rejection reasons."""
-    from sqlalchemy import func, distinct
+    from sqlalchemy import distinct, func
 
     event_q = db.query(func.count(ScannerEvent.id))
-    review_q = db.query(SignalReview).join(ScannerEvent, SignalReview.scanner_event_id == ScannerEvent.id)
+    review_q = db.query(SignalReview).join(
+        ScannerEvent, SignalReview.scanner_event_id == ScannerEvent.id
+    )
 
     if scanner_type:
         if scanner_type == "liquidity_hunt":
@@ -820,13 +880,18 @@ def get_review_stats(
 
     total_events = event_q.scalar() or 0
     reviewed_count = (
-        review_q.with_entities(func.count(distinct(SignalReview.scanner_event_id))).scalar() or 0
+        review_q.with_entities(
+            func.count(distinct(SignalReview.scanner_event_id))
+        ).scalar()
+        or 0
     )
 
     confirmed_count = review_q.filter(SignalReview.verdict == "confirmed").count()
     rejected_count = review_q.filter(SignalReview.verdict == "rejected").count()
     denominator = confirmed_count + rejected_count
-    acceptance_rate = round(confirmed_count / denominator, 3) if denominator > 0 else 0.0
+    acceptance_rate = (
+        round(confirmed_count / denominator, 3) if denominator > 0 else 0.0
+    )
 
     by_type_rows = (
         review_q.with_entities(
@@ -840,7 +905,14 @@ def get_review_stats(
     type_map: dict = {}
     for stype, v, cnt in by_type_rows:
         if stype not in type_map:
-            type_map[stype] = {"scanner_type": stype, "total": 0, "confirmed": 0, "rejected": 0, "uncertain": 0, "enhanced": 0}
+            type_map[stype] = {
+                "scanner_type": stype,
+                "total": 0,
+                "confirmed": 0,
+                "rejected": 0,
+                "uncertain": 0,
+                "enhanced": 0,
+            }
         type_map[stype]["total"] += cnt
         if v in type_map[stype]:
             type_map[stype][v] += cnt

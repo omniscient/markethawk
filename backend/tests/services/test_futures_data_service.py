@@ -10,12 +10,12 @@ These tests validate:
 """
 
 import inspect
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
 import pandas as pd
+import pytest
 
 from app.services.futures_data import FuturesDataService, _resolve_exchange
-
 
 # ---------------------------------------------------------------------------
 # Public interface contract
@@ -25,7 +25,8 @@ from app.services.futures_data import FuturesDataService, _resolve_exchange
 def test_public_interface_has_exactly_two_methods():
     """FuturesDataService must expose exactly 2 public methods."""
     public_methods = [
-        name for name in dir(FuturesDataService)
+        name
+        for name in dir(FuturesDataService)
         if not name.startswith("_")
         and callable(getattr(FuturesDataService, name))
         and not name.startswith("__")
@@ -105,7 +106,6 @@ def test_resolve_exchange_case_insensitive():
 
 def test_get_continuous_series_opens_own_session(db):
     """get_continuous_series opens its own DB session and returns a DataFrame."""
-    from app.core.database import SessionLocal
 
     with patch("app.services.futures_data.SessionLocal", return_value=db):
         result = FuturesDataService.get_continuous_series("ZZ")
@@ -115,7 +115,6 @@ def test_get_continuous_series_opens_own_session(db):
 
 def test_get_continuous_series_returns_empty_for_unknown_symbol(db):
     """Returns empty DataFrame when no data exists."""
-    from app.core.database import SessionLocal
 
     with patch("app.services.futures_data.SessionLocal", return_value=db):
         result = FuturesDataService.get_continuous_series("ZZ")

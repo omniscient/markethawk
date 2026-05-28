@@ -18,11 +18,10 @@ on Daylight Saving Time).
 
 from typing import Sequence, Union
 
-import sqlalchemy as sa
 from alembic import op
 
-revision: str = 'c5d6e7f8a9b0'
-down_revision: Union[str, tuple] = 'b3c4d5e6f7a8'
+revision: str = "c5d6e7f8a9b0"
+down_revision: Union[str, tuple] = "b3c4d5e6f7a8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

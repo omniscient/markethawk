@@ -4,11 +4,18 @@ Pydantic schemas for signal review endpoints.
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, ConfigDict, field_validator
 
-
 VALID_VERDICTS = {"confirmed", "rejected", "enhanced", "uncertain"}
-VALID_REJECT_REASONS = {"noise", "too_late", "stale_data", "split_artifact", "threshold_too_loose", "other"}
+VALID_REJECT_REASONS = {
+    "noise",
+    "too_late",
+    "stale_data",
+    "split_artifact",
+    "threshold_too_loose",
+    "other",
+}
 
 
 class SignalReviewCreate(BaseModel):
@@ -39,6 +46,7 @@ class SignalReviewCreate(BaseModel):
 
 class SignalReviewRequest(BaseModel):
     """Schema for UUID-based review endpoint where scanner_event_id comes from the URL."""
+
     verdict: str
     reject_reason: Optional[str] = None
     notes: Optional[str] = None

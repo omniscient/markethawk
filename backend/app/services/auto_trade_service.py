@@ -22,17 +22,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone, date as date_type
+from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional, Tuple
+from typing import Optional
 
 import redis
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.auto_trade_order import AutoTradeOrder
 from app.models.alert_rule import AlertRule
+from app.models.auto_trade_order import AutoTradeOrder
 from app.models.scanner_event import ScannerEvent
 from app.models.system_config import SystemConfig
 from app.models.trading_strategy import TradingStrategy
@@ -45,10 +44,10 @@ logger = logging.getLogger(__name__)
 # Unknown / neutral → None (fallback to strategy.direction)
 SCANNER_DIRECTION_HINTS: dict[str, str] = {
     "pre_market_volume_spike": "long",
-    "live_volume_spike":       "long",
-    "live_price_move":         "long",   # could be either; refined below from indicators
-    "oversold_bounce":         "long",
-    "liquidity_hunt":          None,     # depends on sweep direction
+    "live_volume_spike": "long",
+    "live_price_move": "long",  # could be either; refined below from indicators
+    "oversold_bounce": "long",
+    "liquidity_hunt": None,  # depends on sweep direction
 }
 
 
@@ -56,10 +55,11 @@ SCANNER_DIRECTION_HINTS: dict[str, str] = {
 # Position sizing result
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PositionCalc:
     quantity: int
-    entry: float          # adjusted limit price, or None for market
+    entry: float  # adjusted limit price, or None for market
     stop: float
     target: float
     risk_amount_usd: float
@@ -69,6 +69,7 @@ class PositionCalc:
 # ---------------------------------------------------------------------------
 # AutoTradeExecutor
 # ---------------------------------------------------------------------------
+
 
 class AutoTradeExecutor:
     """
@@ -116,13 +117,16 @@ class AutoTradeExecutor:
 
         # Global kill-switch only blocks live orders, not paper.
         if not strategy.paper_mode:
-            cfg = db.query(SystemConfig).filter(
-                SystemConfig.key == "AUTO_TRADING_ENABLED"
-            ).first()
+            cfg = (
+                db.query(SystemConfig)
+                .filter(SystemConfig.key == "AUTO_TRADING_ENABLED")
+                .first()
+            )
             if not cfg or cfg.value.lower() != "true":
                 logger.info(
                     "AutoTradeExecutor: AUTO_TRADING_ENABLED is off — "
-                    "blocking live order for rule %s", rule.id
+                    "blocking live order for rule %s",
+                    rule.id,
                 )
                 return None
 
@@ -149,9 +153,7 @@ class AutoTradeExecutor:
         lock_key = f"auto_trade_lock:{event.ticker}:{strategy.id}:{today}"
         acquired = redis_client.set(lock_key, "1", nx=True, ex=30)
         if not acquired:
-            logger.debug(
-                f"AutoTradeExecutor: lock contention on {lock_key} — skipping"
-            )
+            logger.debug(f"AutoTradeExecutor: lock contention on {lock_key} — skipping")
             return None
 
         try:
@@ -178,7 +180,9 @@ class AutoTradeExecutor:
                 db.query(AutoTradeOrder)
                 .filter(
                     AutoTradeOrder.trading_strategy_id == strategy.id,
-                    AutoTradeOrder.status.in_(["submitted", "open", "pending_approval", "pending"]),
+                    AutoTradeOrder.status.in_(
+                        ["submitted", "open", "pending_approval", "pending"]
+                    ),
                 )
                 .count()
             )
@@ -226,7 +230,9 @@ class AutoTradeExecutor:
                 return None
 
             # ── 10. Position sizing ──────────────────────────────────────
-            calc = self._calculate_position(strategy, trigger_price, side, account_equity)
+            calc = self._calculate_position(
+                strategy, trigger_price, side, account_equity
+            )
             if calc.quantity <= 0:
                 logger.info(
                     f"AutoTradeExecutor: calculated quantity=0 for "
@@ -235,7 +241,9 @@ class AutoTradeExecutor:
                 return None
 
             # ── 11. Create AutoTradeOrder ────────────────────────────────
-            initial_status = "pending_approval" if strategy.requires_approval else "pending"
+            initial_status = (
+                "pending_approval" if strategy.requires_approval else "pending"
+            )
             order = AutoTradeOrder(
                 alert_rule_id=rule.id,
                 scanner_event_id=event.id,
@@ -245,7 +253,9 @@ class AutoTradeExecutor:
                 event_date=today,
                 status=initial_status,
                 trigger_price=Decimal(str(round(trigger_price, 4))),
-                entry_price_target=Decimal(str(round(calc.entry, 4))) if calc.entry else None,
+                entry_price_target=Decimal(str(round(calc.entry, 4)))
+                if calc.entry
+                else None,
                 calculated_stop=Decimal(str(round(calc.stop, 4))),
                 calculated_target=Decimal(str(round(calc.target, 4))),
                 quantity=calc.quantity,
@@ -305,13 +315,19 @@ class AutoTradeExecutor:
         pending_approval and are now manually approved.  All sizing values
         are read directly from the order record so no recalculation happens.
         """
-        entry_price = float(order.entry_price_target) if order.entry_price_target is not None else None
+        entry_price = (
+            float(order.entry_price_target)
+            if order.entry_price_target is not None
+            else None
+        )
         calc = PositionCalc(
             quantity=order.quantity or 0,
             entry=entry_price,
             stop=float(order.calculated_stop),
             target=float(order.calculated_target),
-            risk_amount_usd=float(order.risk_amount_usd) if order.risk_amount_usd else 0.0,
+            risk_amount_usd=float(order.risk_amount_usd)
+            if order.risk_amount_usd
+            else 0.0,
             stop_distance=0.0,  # not used by _submit_to_ibkr
         )
         self._submit_to_ibkr(order, calc, db)
@@ -493,9 +509,7 @@ class AutoTradeExecutor:
 
     # ── Account equity ───────────────────────────────────────────────────
 
-    def _get_account_equity(
-        self, strategy: TradingStrategy, db: Session
-    ) -> float:
+    def _get_account_equity(self, strategy: TradingStrategy, db: Session) -> float:
         """
         Return account net liquidation value.
 
@@ -503,9 +517,11 @@ class AutoTradeExecutor:
         In live mode: query IBKR synchronously.
         """
         if strategy.paper_mode:
-            cfg = db.query(SystemConfig).filter(
-                SystemConfig.key == "PAPER_ACCOUNT_SIZE"
-            ).first()
+            cfg = (
+                db.query(SystemConfig)
+                .filter(SystemConfig.key == "PAPER_ACCOUNT_SIZE")
+                .first()
+            )
             if cfg:
                 try:
                     return float(cfg.value)

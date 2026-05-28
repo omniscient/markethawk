@@ -7,8 +7,8 @@ import pandas as pd
 
 from app.services.stock_data import StockDataService
 
-
 # ── helpers ────────────────────────────────────────────────────────────────
+
 
 def _mock_db_futures_lookup(is_futures: bool):
     db = MagicMock()
@@ -38,19 +38,28 @@ def _make_df(rows=10):
 
 # ── is_futures_ticker ──────────────────────────────────────────────────────
 
+
 def test_is_futures_ticker_true():
-    assert StockDataService.is_futures_ticker(_mock_db_futures_lookup(True), "ES") is True
+    assert (
+        StockDataService.is_futures_ticker(_mock_db_futures_lookup(True), "ES") is True
+    )
 
 
 def test_is_futures_ticker_false():
-    assert StockDataService.is_futures_ticker(_mock_db_futures_lookup(False), "AAPL") is False
+    assert (
+        StockDataService.is_futures_ticker(_mock_db_futures_lookup(False), "AAPL")
+        is False
+    )
 
 
 # ── get_historical_enriched ────────────────────────────────────────────────
 
+
 def test_enriched_returns_empty_when_no_data():
     db = _mock_db_futures_lookup(False)
-    with patch.object(StockDataService, "get_historical_from_db", return_value=pd.DataFrame()):
+    with patch.object(
+        StockDataService, "get_historical_from_db", return_value=pd.DataFrame()
+    ):
         result = StockDataService.get_historical_enriched(db, "AAPL", "30d", "day", 1)
     assert result.empty
 
@@ -67,8 +76,10 @@ def test_enriched_coerces_decimal_to_float():
 def test_enriched_no_indicators_for_day_timespan():
     db = _mock_db_futures_lookup(False)
     df = _make_df(10)
-    with patch.object(StockDataService, "get_historical_from_db", return_value=df), \
-         patch("app.services.stock_data.ChartIndicatorsService") as mock_ci:
+    with (
+        patch.object(StockDataService, "get_historical_from_db", return_value=df),
+        patch("app.services.stock_data.ChartIndicatorsService") as mock_ci,
+    ):
         StockDataService.get_historical_enriched(db, "AAPL", "30d", "day", 1)
     mock_ci.add_indicators.assert_not_called()
 
@@ -76,8 +87,10 @@ def test_enriched_no_indicators_for_day_timespan():
 def test_enriched_adds_indicators_for_minute_under_limit():
     db = _mock_db_futures_lookup(False)
     df = _make_df(100)
-    with patch.object(StockDataService, "get_historical_from_db", return_value=df), \
-         patch("app.services.stock_data.ChartIndicatorsService") as mock_ci:
+    with (
+        patch.object(StockDataService, "get_historical_from_db", return_value=df),
+        patch("app.services.stock_data.ChartIndicatorsService") as mock_ci,
+    ):
         mock_ci.add_indicators.return_value = df
         StockDataService.get_historical_enriched(db, "AAPL", "30d", "minute", 1)
     mock_ci.add_indicators.assert_called_once_with(df, is_intraday=True)
@@ -86,8 +99,10 @@ def test_enriched_adds_indicators_for_minute_under_limit():
 def test_enriched_no_indicators_for_minute_over_limit():
     db = _mock_db_futures_lookup(False)
     df = _make_df(3001)  # INDICATOR_ROW_LIMIT = 3000
-    with patch.object(StockDataService, "get_historical_from_db", return_value=df), \
-         patch("app.services.stock_data.ChartIndicatorsService") as mock_ci:
+    with (
+        patch.object(StockDataService, "get_historical_from_db", return_value=df),
+        patch("app.services.stock_data.ChartIndicatorsService") as mock_ci,
+    ):
         StockDataService.get_historical_enriched(db, "AAPL", "30d", "minute", 1)
     mock_ci.add_indicators.assert_not_called()
 
@@ -114,8 +129,12 @@ def test_enriched_truncates_at_max_datapoints():
 def test_enriched_dispatches_to_futures_path():
     db = _mock_db_futures_lookup(True)
     df = _make_df(5)
-    with patch.object(StockDataService, "get_futures_historical_from_db", return_value=df) as mock_fut, \
-         patch.object(StockDataService, "get_historical_from_db") as mock_stock:
+    with (
+        patch.object(
+            StockDataService, "get_futures_historical_from_db", return_value=df
+        ) as mock_fut,
+        patch.object(StockDataService, "get_historical_from_db") as mock_stock,
+    ):
         StockDataService.get_historical_enriched(db, "ES", "30d", "day", 1)
     mock_fut.assert_called_once()
     mock_stock.assert_not_called()

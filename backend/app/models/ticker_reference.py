@@ -1,6 +1,9 @@
-from sqlalchemy import Column, String, Float, DateTime, Boolean
 from datetime import datetime, timezone
+
+from sqlalchemy import Boolean, Column, DateTime, Float, String
+
 from app.core.database import Base
+
 
 class TickerReference(Base):
     __tablename__ = "ticker_references"
@@ -11,13 +14,19 @@ class TickerReference(Base):
     outstanding_shares = Column(Float)
     sector = Column(String)
     industry = Column(String)
-    last_updated = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    
+    last_updated = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+
     # New fields for detailed info
     description = Column(String, nullable=True)
     primary_exchange = Column(String, nullable=True)
-    list_date = Column(String, nullable=True) # Kept as string for simplicity 'YYYY-MM-DD'
-    total_employees = Column(Float, nullable=True) # Float because sometimes API returns weird numbers
+    list_date = Column(
+        String, nullable=True
+    )  # Kept as string for simplicity 'YYYY-MM-DD'
+    total_employees = Column(
+        Float, nullable=True
+    )  # Float because sometimes API returns weird numbers
     share_class_shares_outstanding = Column(Float, nullable=True)
     weighted_shares_outstanding = Column(Float, nullable=True)
     sic_code = Column(String, nullable=True)

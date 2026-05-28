@@ -1,5 +1,5 @@
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 
 class UniverseStatsService:
@@ -12,8 +12,8 @@ class UniverseStatsService:
         No caching — callers are responsible for persisting results to cached columns.
         """
         from app.models import StockUniverseTicker
-        from app.models.stock_aggregate import StockAggregate
         from app.models.futures_aggregate import FuturesAggregate
+        from app.models.stock_aggregate import StockAggregate
 
         ticker_count = (
             db.query(func.count(StockUniverseTicker.id))
@@ -57,11 +57,13 @@ class UniverseStatsService:
             if stock_stats and stock_stats[0]:
                 count_aggs += stock_stats[0]
                 min_date = (
-                    stock_stats[1] if min_date is None
+                    stock_stats[1]
+                    if min_date is None
                     else (min(min_date, stock_stats[1]) if stock_stats[1] else min_date)
                 )
                 max_date = (
-                    stock_stats[2] if max_date is None
+                    stock_stats[2]
+                    if max_date is None
                     else (max(max_date, stock_stats[2]) if stock_stats[2] else max_date)
                 )
 
@@ -78,12 +80,22 @@ class UniverseStatsService:
             if futures_stats and futures_stats[0]:
                 count_aggs += futures_stats[0]
                 min_date = (
-                    futures_stats[1] if min_date is None
-                    else (min(min_date, futures_stats[1]) if futures_stats[1] else min_date)
+                    futures_stats[1]
+                    if min_date is None
+                    else (
+                        min(min_date, futures_stats[1])
+                        if futures_stats[1]
+                        else min_date
+                    )
                 )
                 max_date = (
-                    futures_stats[2] if max_date is None
-                    else (max(max_date, futures_stats[2]) if futures_stats[2] else max_date)
+                    futures_stats[2]
+                    if max_date is None
+                    else (
+                        max(max_date, futures_stats[2])
+                        if futures_stats[2]
+                        else max_date
+                    )
                 )
 
         timespans_set: set = set()
@@ -94,7 +106,11 @@ class UniverseStatsService:
                 .distinct()
                 .all()
             ):
-                label = f"{row.multiplier}{row.timespan}" if row.multiplier > 1 else row.timespan
+                label = (
+                    f"{row.multiplier}{row.timespan}"
+                    if row.multiplier > 1
+                    else row.timespan
+                )
                 timespans_set.add(label)
         if futures_tickers:
             for row in (
@@ -103,7 +119,11 @@ class UniverseStatsService:
                 .distinct()
                 .all()
             ):
-                label = f"{row.multiplier}{row.timespan}" if row.multiplier > 1 else row.timespan
+                label = (
+                    f"{row.multiplier}{row.timespan}"
+                    if row.multiplier > 1
+                    else row.timespan
+                )
                 timespans_set.add(label)
 
         return {

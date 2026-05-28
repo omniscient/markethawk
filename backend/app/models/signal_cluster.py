@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.schema import Index
 
@@ -24,6 +25,4 @@ class SignalCluster(Base):
         DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
 
-    __table_args__ = (
-        Index("ix_signal_clusters_analysis_run_id", "analysis_run_id"),
-    )
+    __table_args__ = (Index("ix_signal_clusters_analysis_run_id", "analysis_run_id"),)

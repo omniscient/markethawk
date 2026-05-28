@@ -3,7 +3,7 @@ Futures seed helpers.
 Each function inserts rows and flushes; the caller's transaction provides rollback.
 """
 
-from datetime import datetime, timezone, timedelta, date
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -28,7 +28,11 @@ def seed_futures_contracts(
             symbol=symbol,
             exchange=exchange,
             contract_month=contract_month,
-            expiry_date=date(base_year, int(months[i % len(months)][:2]), int(months[i % len(months)][2:])),
+            expiry_date=date(
+                base_year,
+                int(months[i % len(months)][:2]),
+                int(months[i % len(months)][2:]),
+            ),
             is_expired=(i < count - 1),
             data_downloaded=True,
         )

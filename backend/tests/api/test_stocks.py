@@ -4,12 +4,13 @@ Runs against a real Postgres DB (via testcontainers).
 Polygon is never called — the mock_polygon_provider fixture intercepts all provider calls.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from tests.fixtures.providers import mock_polygon_provider  # noqa: F401 — imported for fixture discovery
+from tests.fixtures.providers import (
+    mock_polygon_provider,  # noqa: F401 — imported for fixture discovery
+)
 from tests.fixtures.stocks import seed_stock_aggregates
 
 client = TestClient(app)
@@ -60,12 +61,12 @@ def test_historical_data_contains_required_columns(db: Session):
     assert response.status_code == 200
     compact = response.json()["data"]
     # Compact format keys
-    assert "t" in compact   # timestamp
-    assert "o" in compact   # open
-    assert "h" in compact   # high
-    assert "l" in compact   # low
-    assert "c" in compact   # close
-    assert "v" in compact   # volume
+    assert "t" in compact  # timestamp
+    assert "o" in compact  # open
+    assert "h" in compact  # high
+    assert "l" in compact  # low
+    assert "c" in compact  # close
+    assert "v" in compact  # volume
     assert len(compact["t"]) == 2
 
 
@@ -141,9 +142,12 @@ def test_details_ticker_is_case_insensitive(db: Session, mock_polygon_provider):
     assert response.json()["ticker"] == "MSFT"
 
 
-def test_details_mock_provider_not_called_for_futures(db: Session, mock_polygon_provider):
+def test_details_mock_provider_not_called_for_futures(
+    db: Session, mock_polygon_provider
+):
     """Futures tickers bypass Polygon entirely — mock should not be invoked."""
     from datetime import date
+
     from app.models import MonitoredStock
 
     futures = MonitoredStock(

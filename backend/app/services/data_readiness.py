@@ -34,7 +34,6 @@ class ReadinessReport:
 
 
 class DataReadinessService:
-
     @staticmethod
     def check(db: Session, ticker: str, scanner_type: str) -> ReadinessReport:
         config = (
@@ -60,14 +59,18 @@ class DataReadinessService:
             req_from = today - timedelta(days=lookback)
             req_to = today
 
-            row = db.query(
-                func.min(func.date(StockAggregate.timestamp)).label("first"),
-                func.max(func.date(StockAggregate.timestamp)).label("last"),
-            ).filter(
-                StockAggregate.ticker == ticker,
-                StockAggregate.timespan == ts,
-                StockAggregate.multiplier == mult,
-            ).first()
+            row = (
+                db.query(
+                    func.min(func.date(StockAggregate.timestamp)).label("first"),
+                    func.max(func.date(StockAggregate.timestamp)).label("last"),
+                )
+                .filter(
+                    StockAggregate.ticker == ticker,
+                    StockAggregate.timespan == ts,
+                    StockAggregate.multiplier == mult,
+                )
+                .first()
+            )
 
             avail_from = row.first if row else None
             avail_to = row.last if row else None
@@ -80,15 +83,17 @@ class DataReadinessService:
             if not ready:
                 all_ready = False
 
-            report.coverages.append(TimespanCoverage(
-                timespan=ts,
-                multiplier=mult,
-                required_from=req_from,
-                required_to=req_to,
-                available_from=avail_from,
-                available_to=avail_to,
-                is_ready=ready,
-            ))
+            report.coverages.append(
+                TimespanCoverage(
+                    timespan=ts,
+                    multiplier=mult,
+                    required_from=req_from,
+                    required_to=req_to,
+                    available_from=avail_from,
+                    available_to=avail_to,
+                    is_ready=ready,
+                )
+            )
 
         report.is_ready = all_ready
         if not all_ready:

@@ -1,12 +1,12 @@
 # backend/tests/providers/test_ibkr_orders.py
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
 
 
 def _make_manager():
     with patch("app.providers.ibkr_orders.IB_INSYNC_AVAILABLE", True):
         from app.providers.ibkr_orders import IBKROrderManager
+
         return IBKROrderManager.__new__(IBKROrderManager)
 
 
@@ -18,9 +18,17 @@ def _make_account_item(tag, value, currency="USD"):
     return item
 
 
-def _make_trade(order_id=1001, symbol="AAPL", action="BUY",
-                order_type="LMT", total_qty=100.0, status="Submitted",
-                filled=0.0, avg_fill_price=0.0, perm_id=9001):
+def _make_trade(
+    order_id=1001,
+    symbol="AAPL",
+    action="BUY",
+    order_type="LMT",
+    total_qty=100.0,
+    status="Submitted",
+    filled=0.0,
+    avg_fill_price=0.0,
+    perm_id=9001,
+):
     trade = MagicMock()
     trade.order.orderId = order_id
     trade.order.permId = perm_id
@@ -39,6 +47,7 @@ class TestGetAccountAndOrders:
 
     def _run(self, account_items, open_trades):
         from app.providers.ibkr_orders import IBKROrderManager
+
         manager = IBKROrderManager.__new__(IBKROrderManager)
 
         ib_mock = AsyncMock()
@@ -86,6 +95,7 @@ class TestGetAccountAndOrders:
         connect_calls = []
 
         from app.providers.ibkr_orders import IBKROrderManager
+
         manager = IBKROrderManager.__new__(IBKROrderManager)
 
         ib_mock = AsyncMock()

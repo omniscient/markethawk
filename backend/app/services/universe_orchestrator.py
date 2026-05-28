@@ -44,7 +44,9 @@ def discover_and_refresh(universe_id: int, db: Session) -> dict:
         raise UniverseNotFoundError(universe_id)
 
     db.query(MonitoredStock).filter(MonitoredStock.universe_id == universe_id).delete()
-    db.query(StockUniverseTicker).filter(StockUniverseTicker.universe_id == universe_id).delete()
+    db.query(StockUniverseTicker).filter(
+        StockUniverseTicker.universe_id == universe_id
+    ).delete()
 
     service = DiscoveryService(db)
     criteria = universe.criteria or {}
@@ -116,7 +118,9 @@ def sync_missing_aggregates(universe_id: int, db: Session) -> dict:
 
     stocks = (
         db.query(MonitoredStock)
-        .filter(MonitoredStock.universe_id == universe_id, MonitoredStock.is_active == True)
+        .filter(
+            MonitoredStock.universe_id == universe_id, MonitoredStock.is_active == True
+        )
         .all()
     )
     if not stocks:
@@ -144,10 +148,14 @@ def sync_missing_aggregates(universe_id: int, db: Session) -> dict:
         )
         for combo in combos:
             from_dt = (
-                (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=7))
+                (combo.max_ts + timedelta(seconds=1))
+                if combo.max_ts
+                else (now_utc - timedelta(days=7))
             )
             if from_dt > now_utc:
-                summary.append(f"{combo.timespan}×{combo.multiplier}: already up to date")
+                summary.append(
+                    f"{combo.timespan}×{combo.multiplier}: already up to date"
+                )
                 continue
             from_date = from_dt.strftime("%Y-%m-%d")
             for ticker in stock_tickers:
@@ -177,10 +185,14 @@ def sync_missing_aggregates(universe_id: int, db: Session) -> dict:
         stock_map = {s.ticker: s for s in futures_stocks}
         for combo in combos:
             from_dt = (
-                (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=7))
+                (combo.max_ts + timedelta(seconds=1))
+                if combo.max_ts
+                else (now_utc - timedelta(days=7))
             )
             if from_dt > now_utc:
-                summary.append(f"{combo.timespan}×{combo.multiplier} futures: already up to date")
+                summary.append(
+                    f"{combo.timespan}×{combo.multiplier} futures: already up to date"
+                )
                 continue
             from_date = from_dt.strftime("%Y-%m-%d")
             for symbol in futures_tickers:
@@ -216,11 +228,13 @@ def sync_missing_aggregates(universe_id: int, db: Session) -> dict:
         r.setex(
             f"universe:{universe_id}:sync",
             14400,
-            json.dumps({
-                "task_ids": task_ids,
-                "total": len(task_ids),
-                "started_at": datetime.now(timezone.utc).isoformat(),
-            }),
+            json.dumps(
+                {
+                    "task_ids": task_ids,
+                    "total": len(task_ids),
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
         )
     except Exception as e:
         logger.warning(f"Could not store sync-missing status in Redis: {e}")
@@ -237,7 +251,13 @@ def get_sync_status(universe_id: int) -> dict:
     r = redis_lib.from_url(settings.REDIS_URL)
     raw = r.get(f"universe:{universe_id}:sync")
     if not raw:
-        return {"is_syncing": False, "pending": 0, "success": 0, "failed": 0, "total": 0}
+        return {
+            "is_syncing": False,
+            "pending": 0,
+            "success": 0,
+            "failed": 0,
+            "total": 0,
+        }
 
     data = json.loads(raw)
     task_ids = data.get("task_ids", [])
@@ -245,11 +265,19 @@ def get_sync_status(universe_id: int) -> dict:
 
     if started_at_str:
         try:
-            started_at = datetime.fromisoformat(started_at_str).replace(tzinfo=timezone.utc)
+            started_at = datetime.fromisoformat(started_at_str).replace(
+                tzinfo=timezone.utc
+            )
             age_hours = (datetime.now(timezone.utc) - started_at).total_seconds() / 3600
             if age_hours > 4:
                 r.delete(f"universe:{universe_id}:sync")
-                return {"is_syncing": False, "pending": 0, "success": 0, "failed": 0, "total": 0}
+                return {
+                    "is_syncing": False,
+                    "pending": 0,
+                    "success": 0,
+                    "failed": 0,
+                    "total": 0,
+                }
         except (ValueError, TypeError):
             pass
 
@@ -312,7 +340,8 @@ def sync_aggregates(
         try:
             data = json.loads(existing)
             states = [
-                AsyncResult(tid, app=celery_app).state for tid in data.get("task_ids", [])
+                AsyncResult(tid, app=celery_app).state
+                for tid in data.get("task_ids", [])
             ]
             pending = sum(1 for s in states if s in ("PENDING", "STARTED", "RETRY"))
             if pending > 0:
@@ -381,14 +410,16 @@ def sync_aggregates(
         r.setex(
             f"universe:{universe_id}:sync",
             14400,
-            json.dumps({
-                "task_ids": task_ids,
-                "total": len(task_ids),
-                "started_at": datetime.now(timezone.utc).isoformat(),
-                "timespan": timespan,
-                "from_date": from_date,
-                "to_date": to_date,
-            }),
+            json.dumps(
+                {
+                    "task_ids": task_ids,
+                    "total": len(task_ids),
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                    "timespan": timespan,
+                    "from_date": from_date,
+                    "to_date": to_date,
+                }
+            ),
         )
     except Exception as e:
         logger.warning(f"Could not store sync status in Redis: {e}")
@@ -483,10 +514,13 @@ def queue_normalization(
         report.normalization_data = None
     db.commit()
 
-    normalize_universe_quality.delay(universe_id, resume=resume, target_tickers=target_tickers)
+    normalize_universe_quality.delay(
+        universe_id, resume=resume, target_tickers=target_tickers
+    )
 
     return {
         "status": "accepted",
         "resume": resume,
-        "message": "Normalization queued." + (" Resuming from checkpoint." if resume else ""),
+        "message": "Normalization queued."
+        + (" Resuming from checkpoint." if resume else ""),
     }

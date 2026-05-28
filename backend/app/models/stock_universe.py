@@ -2,9 +2,20 @@
 StockUniverse SQLAlchemy model.
 """
 
-from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Text, Uuid as UUID, BigInteger
 import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy import Uuid as UUID
 
 from app.core.database import Base
 
@@ -19,8 +30,14 @@ class StockUniverse(Base):
     name = Column(String(100), nullable=False)
     description = Column(Text)
     criteria = Column(JSON, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+    )
     is_active = Column(Boolean, default=True)
 
     # Cached aggregate stats — refreshed on demand via POST /{id}/refresh-stats

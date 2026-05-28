@@ -1,27 +1,28 @@
-import logging
-import httpx
-import redis
 import asyncio
+import json
+import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+
+import httpx
+import redis
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
-from app.core.database import SessionLocal
 from app.core.config import settings
-from app.models.ticker_reference import TickerReference
-from app.models.stock_aggregate import StockAggregate
-from app.services.stock_data import StockDataService
-from app.models.news_preference import NewsPreference
-from app.models.news_article import NewsArticle
+from app.core.database import SessionLocal
 from app.models.monitored_stock import MonitoredStock
+from app.models.news_article import NewsArticle
+from app.models.news_preference import NewsPreference
+from app.models.stock_aggregate import StockAggregate
 from app.models.stock_split import StockSplit
-import json
+from app.models.ticker_reference import TickerReference
+from app.services.stock_data import StockDataService
 
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=3, name='app.tasks.sync_tickers_batch')
+@celery_app.task(bind=True, max_retries=3, name="app.tasks.sync_tickers_batch")
 def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
     """
     Celery task to sync tickers in batches using strict rate limiting (recursive chaining).
@@ -65,7 +66,11 @@ def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
                     continue
 
                 # Upsert Ticker
-                stmt = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
+                stmt = (
+                    db.query(TickerReference)
+                    .filter(TickerReference.ticker == ticker)
+                    .first()
+                )
                 if not stmt:
                     stmt = TickerReference(ticker=ticker)
                     db.add(stmt)
@@ -97,12 +102,14 @@ def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
         # 4. Schedule Next Batch (Recursive Chain)
         next_page = data.get("next_url")
         if next_page:
-            logger.info(f"⏭️ Next page found. Scheduling next batch in {delay_seconds} seconds...")
+            logger.info(
+                f"⏭️ Next page found. Scheduling next batch in {delay_seconds} seconds..."
+            )
             # Schedule next task 15 seconds from now
             sync_tickers_batch.apply_async(
                 args=[next_page],
                 kwargs={"delay_seconds": delay_seconds},
-                countdown=delay_seconds
+                countdown=delay_seconds,
             )
         else:
             logger.info("🎉 Sync Complete! No more pages.")
@@ -115,7 +122,7 @@ def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, name='app.tasks.sync_ticker_details')
+@celery_app.task(bind=True, max_retries=3, name="app.tasks.sync_ticker_details")
 def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
     """
     Slow crawler task to fetch details for ONE ticker.
@@ -123,7 +130,9 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
     """
     db: Session = SessionLocal()
     try:
-        logger.info(f"🔍 Fetching details for ticker: {ticker} (Delay: {delay_seconds}s)")
+        logger.info(
+            f"🔍 Fetching details for ticker: {ticker} (Delay: {delay_seconds}s)"
+        )
 
         # 1. Fetch Data
         url = f"https://api.polygon.io/v3/reference/tickers/{ticker}"
@@ -145,25 +154,35 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
                 results = data.get("results", {})
 
                 # 2. Update DB
-                stmt = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
+                stmt = (
+                    db.query(TickerReference)
+                    .filter(TickerReference.ticker == ticker)
+                    .first()
+                )
                 if stmt:
                     stmt.description = results.get("description")
                     stmt.market_cap = results.get("market_cap")
                     stmt.primary_exchange = results.get("primary_exchange")
                     stmt.list_date = results.get("list_date")
                     stmt.total_employees = results.get("total_employees")
-                    stmt.share_class_shares_outstanding = results.get("share_class_shares_outstanding")
-                    stmt.weighted_shares_outstanding = results.get("weighted_shares_outstanding")
+                    stmt.share_class_shares_outstanding = results.get(
+                        "share_class_shares_outstanding"
+                    )
+                    stmt.weighted_shares_outstanding = results.get(
+                        "weighted_shares_outstanding"
+                    )
                     stmt.sic_code = results.get("sic_code")
                     stmt.sic_description = results.get("sic_description")
                     # Map SIC description to Industry as a fallback/primary
                     stmt.industry = results.get("sic_description")
                     # Clear out the incorrect 'CS' sector values if present
-                    if stmt.sector == 'CS':
+                    if stmt.sector == "CS":
                         stmt.sector = None
 
                     stmt.homepage_url = results.get("homepage_url")
-                    stmt.last_details_update = datetime.now(timezone.utc).replace(tzinfo=None)
+                    stmt.last_details_update = datetime.now(timezone.utc).replace(
+                        tzinfo=None
+                    )
 
                     db.commit()
                     logger.info(f"✅ Updated details for {ticker}")
@@ -173,10 +192,13 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
         next_ticker = (
             db.query(TickerReference.ticker)
             .filter(
-                (TickerReference.last_details_update == None) |
-                (TickerReference.last_details_update < datetime.now(timezone.utc).date())
+                (TickerReference.last_details_update == None)
+                | (
+                    TickerReference.last_details_update
+                    < datetime.now(timezone.utc).date()
+                )
             )
-            .order_by(TickerReference.last_updated.desc()) # Prioritize recently active
+            .order_by(TickerReference.last_updated.desc())  # Prioritize recently active
             .first()
         )
 
@@ -190,11 +212,13 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
             except Exception as e:
                 logger.error(f"Redis check failed: {e}")
 
-            logger.info(f"⏭️ Scheduling details sync for {next_ticker.ticker} in {delay_seconds} seconds...")
+            logger.info(
+                f"⏭️ Scheduling details sync for {next_ticker.ticker} in {delay_seconds} seconds..."
+            )
             sync_ticker_details.apply_async(
                 args=[next_ticker.ticker],
                 kwargs={"delay_seconds": delay_seconds},
-                countdown=delay_seconds
+                countdown=delay_seconds,
             )
         else:
             logger.info("🎉 All tickers updated! Crawler sleeping.")
@@ -209,7 +233,7 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
         db.close()
 
 
-@celery_app.task(bind=True, name='app.tasks.start_details_crawl')
+@celery_app.task(bind=True, name="app.tasks.start_details_crawl")
 def start_details_crawl(self, delay_seconds: float = 15.0, resync: bool = False):
     """
     Kicks off the details crawler if it's not running.
@@ -217,31 +241,42 @@ def start_details_crawl(self, delay_seconds: float = 15.0, resync: bool = False)
     db: Session = SessionLocal()
     try:
         if resync:
-            logger.info("♻️ Force Resync requested. Resetting crawl status for all tickers...")
-            db.query(TickerReference).update({TickerReference.last_details_update: None})
+            logger.info(
+                "♻️ Force Resync requested. Resetting crawl status for all tickers..."
+            )
+            db.query(TickerReference).update(
+                {TickerReference.last_details_update: None}
+            )
             db.commit()
 
         # Clear Stop Flag to allow restart
         try:
-             r = redis.from_url(settings.REDIS_URL)
-             r.delete("CRAWLER_STOP_FLAG")
+            r = redis.from_url(settings.REDIS_URL)
+            r.delete("CRAWLER_STOP_FLAG")
         except Exception:
-             pass
+            pass
 
         # Find first candidate (Priority: Never updated > Updated long ago)
         next_ticker = (
             db.query(TickerReference.ticker)
             .filter(
-                (TickerReference.last_details_update == None) |
-                (TickerReference.last_details_update < datetime.now(timezone.utc).date())
+                (TickerReference.last_details_update == None)
+                | (
+                    TickerReference.last_details_update
+                    < datetime.now(timezone.utc).date()
+                )
             )
             .order_by(TickerReference.last_updated.desc())
             .first()
         )
 
         if next_ticker:
-            logger.info(f"🚀 Starting Details Crawler with {next_ticker.ticker} (Delay: {delay_seconds}s)")
-            sync_ticker_details.delay(ticker=next_ticker.ticker, delay_seconds=delay_seconds)
+            logger.info(
+                f"🚀 Starting Details Crawler with {next_ticker.ticker} (Delay: {delay_seconds}s)"
+            )
+            sync_ticker_details.delay(
+                ticker=next_ticker.ticker, delay_seconds=delay_seconds
+            )
         else:
             logger.info("No tickers need detail updates.")
 
@@ -249,7 +284,7 @@ def start_details_crawl(self, delay_seconds: float = 15.0, resync: bool = False)
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, name='app.tasks.sync_stock_aggregates')
+@celery_app.task(bind=True, max_retries=3, name="app.tasks.sync_stock_aggregates")
 def sync_stock_aggregates(
     self,
     ticker: str,
@@ -259,7 +294,7 @@ def sync_stock_aggregates(
     timespan: str = "minute",
     adjusted: bool = True,
     sort: str = "asc",
-    limit: int = 50000
+    limit: int = 50000,
 ):
     """
     Fetch and store aggregates for a specific ticker and date range.
@@ -302,31 +337,32 @@ def sync_stock_aggregates(
             StockAggregate.timespan == timespan,
             StockAggregate.multiplier == multiplier,
             StockAggregate.timestamp >= start_dt,
-            StockAggregate.timestamp < end_dt
+            StockAggregate.timestamp < end_dt,
         ).delete(synchronize_session=False)
 
         # 3. Insert new data
         from app.utils.session import classify_session
+
         new_records = []
         for agg in aggs:
-            ts_utc = agg['timestamp']
+            ts_utc = agg["timestamp"]
             is_pre_market, is_after_market = classify_session(ts_utc)
 
             record = StockAggregate(
                 ticker=ticker,
-                timestamp=ts_utc.replace(tzinfo=None), # Store naive UTC in DB
+                timestamp=ts_utc.replace(tzinfo=None),  # Store naive UTC in DB
                 multiplier=multiplier,
                 timespan=timespan,
-                open=agg['open'],
-                high=agg['high'],
-                low=agg['low'],
-                close=agg['close'],
-                volume=agg['volume'],
-                vwap=agg['vwap'],
-                transactions=agg['transactions'],
+                open=agg["open"],
+                high=agg["high"],
+                low=agg["low"],
+                close=agg["close"],
+                volume=agg["volume"],
+                vwap=agg["vwap"],
+                transactions=agg["transactions"],
                 is_pre_market=is_pre_market,
                 is_after_market=is_after_market,
-                provider='polygon',
+                provider="polygon",
             )
             new_records.append(record)
 
@@ -342,7 +378,7 @@ def sync_stock_aggregates(
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, name='app.tasks.poll_massive_news')
+@celery_app.task(bind=True, max_retries=3, name="app.tasks.poll_massive_news")
 def poll_massive_news(self, limit: int = 50, force: bool = False):
     """
     Celery task to poll Polygon.io News API based on NewsPreference settings.
@@ -391,9 +427,11 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
             tickers_to_poll.update(pref.tracked_tickers)
 
         if pref.tracked_universes:
-            db_tickers = db.query(MonitoredStock.ticker).filter(
-                MonitoredStock.universe_id.in_(pref.tracked_universes)
-            ).all()
+            db_tickers = (
+                db.query(MonitoredStock.ticker)
+                .filter(MonitoredStock.universe_id.in_(pref.tracked_universes))
+                .all()
+            )
             for (t,) in db_tickers:
                 tickers_to_poll.add(t)
 
@@ -404,26 +442,38 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
             headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
 
             # Ensure we don't fetch archaic news
-            seven_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+            seven_days_ago = datetime.now(timezone.utc).replace(
+                tzinfo=None
+            ) - timedelta(days=7)
             query_params["published_utc.gte"] = seven_days_ago.strftime("%Y-%m-%d")
 
             with httpx.Client(timeout=30.0) as client:
                 response = client.get(url, headers=headers, params=query_params)
                 if response.status_code == 429:
-                     logger.warning("Rate limit hit polling news.")
-                     return
+                    logger.warning("Rate limit hit polling news.")
+                    return
                 response.raise_for_status()
                 data = response.json()
 
             results = data.get("results", [])
             new_articles = 0
-            for item in reversed(results): # Process oldest to newest
+            for item in reversed(results):  # Process oldest to newest
                 article_url = item.get("article_url")
-                if db.query(NewsArticle).filter(NewsArticle.article_url == article_url).first():
-                     continue
+                if (
+                    db.query(NewsArticle)
+                    .filter(NewsArticle.article_url == article_url)
+                    .first()
+                ):
+                    continue
 
                 pub_utc = item.get("published_utc")
-                dt = datetime.strptime(pub_utc.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z") if pub_utc else datetime.now(timezone.utc)
+                dt = (
+                    datetime.strptime(
+                        pub_utc.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z"
+                    )
+                    if pub_utc
+                    else datetime.now(timezone.utc)
+                )
                 dt = dt.replace(tzinfo=None)
 
                 if dt < seven_days_ago:
@@ -437,7 +487,7 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
                     image_url=item.get("image_url"),
                     description=item.get("description"),
                     provider=item.get("publisher", {}).get("name"),
-                    tickers=item.get("tickers", [])
+                    tickers=item.get("tickers", []),
                 )
                 db.add(article)
                 db.commit()
@@ -453,11 +503,13 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
                     "image_url": article.image_url,
                     "description": article.description,
                     "provider": article.provider,
-                    "tickers": article.tickers
+                    "tickers": article.tickers,
                 }
                 r.publish("news_updates", json.dumps(msg))
             if new_articles > 0:
-                logger.info(f"Polled news params={query_params}. Found {new_articles} new articles.")
+                logger.info(
+                    f"Polled news params={query_params}. Found {new_articles} new articles."
+                )
 
         if tickers_to_poll:
             for t in tickers_to_poll:
@@ -474,7 +526,7 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, name='app.tasks.sync_futures_aggregates')
+@celery_app.task(bind=True, max_retries=3, name="app.tasks.sync_futures_aggregates")
 def sync_futures_aggregates(
     self,
     symbol: str,
@@ -526,6 +578,7 @@ def sync_futures_aggregates(
         # Release the IBKR clientId so the next task in this worker process
         # can connect without hitting error 326 "clientId already in use".
         from app.providers import DataProviderFactory
+
         ibkr = DataProviderFactory.get_or_none("ibkr")
         if ibkr:
             ibkr.disconnect()
@@ -533,7 +586,7 @@ def sync_futures_aggregates(
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=3, name='app.tasks.sync_stock_splits')
+@celery_app.task(bind=True, max_retries=3, name="app.tasks.sync_stock_splits")
 def sync_stock_splits(self):
     """
     Celery task to fetch recent stock splits from Polygon.io.
@@ -541,14 +594,16 @@ def sync_stock_splits(self):
     """
     db: Session = SessionLocal()
     try:
-        six_months_ago = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d")
+        six_months_ago = (datetime.now(timezone.utc) - timedelta(days=180)).strftime(
+            "%Y-%m-%d"
+        )
         url = "https://api.polygon.io/v3/reference/splits"
         headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
         params = {
             "execution_date.gte": six_months_ago,
             "limit": 1000,
             "sort": "execution_date",
-            "order": "desc"
+            "order": "desc",
         }
 
         with httpx.Client(timeout=30.0) as client:
@@ -574,10 +629,14 @@ def sync_stock_splits(self):
             execution_date = datetime.strptime(execution_date_str, "%Y-%m-%d").date()
 
             # Check if exists
-            existing = db.query(StockSplit).filter(
-                StockSplit.ticker == ticker,
-                StockSplit.execution_date == execution_date
-            ).first()
+            existing = (
+                db.query(StockSplit)
+                .filter(
+                    StockSplit.ticker == ticker,
+                    StockSplit.execution_date == execution_date,
+                )
+                .first()
+            )
 
             if not existing:
                 split = StockSplit(
@@ -595,6 +654,7 @@ def sync_stock_splits(self):
             logger.info(f"✅ Synced {count} new stock splits.")
 
         from app.services.split_adjustment import SplitAdjustmentService
+
         adj_results = SplitAdjustmentService.apply_all_pending(db)
         applied = [r for r in adj_results if not r.get("skipped")]
         if applied:
@@ -608,7 +668,7 @@ def sync_stock_splits(self):
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=2, name='app.tasks.trigger_tweet_monitor')
+@celery_app.task(bind=True, max_retries=2, name="app.tasks.trigger_tweet_monitor")
 def trigger_tweet_monitor(self):
     """HTTP trigger for the tweet-monitor microservice (POST /poll)."""
     try:

@@ -3,7 +3,7 @@ Base Data Provider - Abstract interface all data providers must implement.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class BaseDataProvider(ABC):
@@ -81,7 +81,9 @@ class BaseDataProvider(ABC):
         ...
 
     @abstractmethod
-    def get_snapshots(self, symbols: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def get_snapshots(
+        self, symbols: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
         """
         Fetch market snapshots, optionally filtered to a list of symbols.
 

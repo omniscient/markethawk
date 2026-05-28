@@ -1,7 +1,7 @@
 """
 Tests for SplitAdjustmentService — pure math helpers that require no DB.
 """
-from datetime import date
+
 from decimal import Decimal
 from unittest.mock import MagicMock
 
@@ -18,6 +18,7 @@ def _split(split_from, split_to):
 
 
 # ── compute_price_factor ──────────────────────────────────────────────────────
+
 
 def test_reverse_split_10_to_1_factor_is_10():
     factor = SplitAdjustmentService.compute_price_factor(_split(10, 1))
@@ -45,6 +46,7 @@ def test_reverse_4_for_1_factor_is_4():
 
 
 # ── get_unapplied_splits ──────────────────────────────────────────────────────
+
 
 def test_get_unapplied_splits_returns_list(db):
     result = SplitAdjustmentService.get_unapplied_splits(db)

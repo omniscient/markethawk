@@ -20,9 +20,9 @@ import redis.asyncio as aioredis
 
 from app.core.database import SessionLocal
 from app.models.scanner_event import ScannerEvent
-from app.services.event_helpers import generate_event_summary, compute_event_severity
+from app.services.event_helpers import compute_event_severity, generate_event_summary
 from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
-from live_scanner.bar_aggregator import MinuteBar, ET
+from live_scanner.bar_aggregator import ET, MinuteBar
 from live_scanner.conditions import ConditionResult
 
 logger = logging.getLogger(__name__)
@@ -49,54 +49,61 @@ class LivePublisher:
         """Publish a raw 5-second IBKR bar to Redis."""
         t = bar.time
         ts_int = int(t.timestamp()) if isinstance(t, datetime) else int(t)
-        msg = json.dumps({
-            "type": "tick",
-            "symbol": symbol,
-            "time": ts_int,
-            "open": float(bar.open_),
-            "high": float(bar.high),
-            "low": float(bar.low),
-            "close": float(bar.close),
-            "volume": int(bar.volume),
-            "wap": float(bar.wap),
-        })
+        msg = json.dumps(
+            {
+                "type": "tick",
+                "symbol": symbol,
+                "time": ts_int,
+                "open": float(bar.open_),
+                "high": float(bar.high),
+                "low": float(bar.low),
+                "close": float(bar.close),
+                "volume": int(bar.volume),
+                "wap": float(bar.wap),
+            }
+        )
         await self._redis.publish(f"stock_updates:{symbol}:second", msg)
         await self._redis.publish("watchlist:live_data", msg)
 
     async def publish_quote(self, symbol: str, quote: dict) -> None:
         """Publish a reqMktData price update — fires on every last-price change."""
-        msg = json.dumps({
-            "type": "quote",
-            "symbol": symbol,
-            "last": quote["last"],
-            "bid":  quote.get("bid"),
-            "ask":  quote.get("ask"),
-            "time": quote["time"],
-        })
+        msg = json.dumps(
+            {
+                "type": "quote",
+                "symbol": symbol,
+                "last": quote["last"],
+                "bid": quote.get("bid"),
+                "ask": quote.get("ask"),
+                "time": quote["time"],
+            }
+        )
         await self._redis.publish("watchlist:live_data", msg)
 
     async def publish_minute_bar(self, symbol: str, bar: MinuteBar) -> None:
         """Publish a completed 1-minute bar to Redis."""
         price_change_pct = (
             round((bar.close - bar.prior_close) / bar.prior_close * 100, 2)
-            if bar.prior_close > 0 else 0.0
+            if bar.prior_close > 0
+            else 0.0
         )
-        msg = json.dumps({
-            "type": "minute_bar",
-            "symbol": symbol,
-            "minute_ts": bar.minute_ts.isoformat(),
-            "open": bar.open,
-            "high": bar.high,
-            "low": bar.low,
-            "close": bar.close,
-            "volume": bar.volume,
-            "vwap": bar.vwap,
-            "session": bar.session,
-            "session_volume": bar.session_volume,
-            "minutes_elapsed": bar.minutes_elapsed,
-            "prior_close": bar.prior_close,
-            "price_change_pct": price_change_pct,
-        })
+        msg = json.dumps(
+            {
+                "type": "minute_bar",
+                "symbol": symbol,
+                "minute_ts": bar.minute_ts.isoformat(),
+                "open": bar.open,
+                "high": bar.high,
+                "low": bar.low,
+                "close": bar.close,
+                "volume": bar.volume,
+                "vwap": bar.vwap,
+                "session": bar.session,
+                "session_volume": bar.session_volume,
+                "minutes_elapsed": bar.minutes_elapsed,
+                "prior_close": bar.prior_close,
+                "price_change_pct": price_change_pct,
+            }
+        )
         await self._redis.publish(f"stock_updates:{symbol}:minute", msg)
         await self._redis.publish("watchlist:live_data", msg)
 
@@ -104,7 +111,9 @@ class LivePublisher:
     # Alert publishing
     # ------------------------------------------------------------------
 
-    async def fire_alert_if_new(self, bar: MinuteBar, condition: ConditionResult) -> None:
+    async def fire_alert_if_new(
+        self, bar: MinuteBar, condition: ConditionResult
+    ) -> None:
         """
         Dedup → write ScannerEvent to DB → publish to watchlist:alerts.
 
@@ -131,20 +140,26 @@ class LivePublisher:
                 self._write_scanner_event, bar, condition, summary, severity
             )
         except Exception as e:
-            logger.error(f"LivePublisher: DB write failed for {bar.symbol} {condition.scanner_type}: {e}")
+            logger.error(
+                f"LivePublisher: DB write failed for {bar.symbol} {condition.scanner_type}: {e}"
+            )
             return
 
-        alert_msg = json.dumps({
-            "type": "alert",
-            "symbol": bar.symbol,
-            "scanner_type": condition.scanner_type,
-            "summary": summary,
-            "severity": severity,
-            "indicators": condition.indicators,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        alert_msg = json.dumps(
+            {
+                "type": "alert",
+                "symbol": bar.symbol,
+                "scanner_type": condition.scanner_type,
+                "summary": summary,
+                "severity": severity,
+                "indicators": condition.indicators,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         await self._redis.publish("watchlist:alerts", alert_msg)
-        logger.info(f"LivePublisher: alert fired — {bar.symbol} [{condition.scanner_type}] {summary}")
+        logger.info(
+            f"LivePublisher: alert fired — {bar.symbol} [{condition.scanner_type}] {summary}"
+        )
 
         # Trigger alert rule evaluation (notifications + auto-trading)
         if event_id:
@@ -180,9 +195,13 @@ class LivePublisher:
             with SessionLocal() as cfg_session:
                 ranker_cfg = load_ranker_config(cfg_session)
             if ranker_cfg.get("enabled") and ranker_cfg.get("weights"):
-                score = compute_signal_quality_score(condition.indicators, ranker_cfg["weights"])
+                score = compute_signal_quality_score(
+                    condition.indicators, ranker_cfg["weights"]
+                )
         except Exception:
-            logger.debug("LivePublisher: signal ranker config load failed — scoring skipped")
+            logger.debug(
+                "LivePublisher: signal ranker config load failed — scoring skipped"
+            )
 
         event = ScannerEvent(
             uuid=uuid_module.uuid4(),
@@ -223,5 +242,8 @@ class LivePublisher:
         Runs in a background thread (called via asyncio.to_thread).
         """
         from app.core.celery_app import celery_app
+
         celery_app.send_task("app.tasks.evaluate_scanner_alerts", args=[event_id])
-        logger.debug(f"LivePublisher: queued evaluate_scanner_alerts for event {event_id}")
+        logger.debug(
+            f"LivePublisher: queued evaluate_scanner_alerts for event {event_id}"
+        )

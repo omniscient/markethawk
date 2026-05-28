@@ -2,18 +2,16 @@
 Alerts router — CRUD for alert rules, delivery log, stats, and Web Push endpoints.
 """
 
-import json
 import logging
-from datetime import datetime, timezone, date
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime, timezone
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.core.database import get_db
-from app.models.alert_rule import AlertRule
 from app.models.alert_delivery_log import AlertDeliveryLog
+from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
 
@@ -24,6 +22,7 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────────────────────────────────────
 # Stats
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/stats")
 def get_alert_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
@@ -40,10 +39,16 @@ def get_alert_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
         )
         .count()
     )
-    total_sent = db.query(AlertDeliveryLog).filter(AlertDeliveryLog.status == "sent").count()
-    total_failed = db.query(AlertDeliveryLog).filter(AlertDeliveryLog.status == "failed").count()
+    total_sent = (
+        db.query(AlertDeliveryLog).filter(AlertDeliveryLog.status == "sent").count()
+    )
+    total_failed = (
+        db.query(AlertDeliveryLog).filter(AlertDeliveryLog.status == "failed").count()
+    )
     total_attempts = total_sent + total_failed
-    delivery_rate = round((total_sent / total_attempts * 100), 1) if total_attempts > 0 else 100.0
+    delivery_rate = (
+        round((total_sent / total_attempts * 100), 1) if total_attempts > 0 else 100.0
+    )
 
     push_sub_count = db.query(PushSubscription).count()
 
@@ -59,6 +64,7 @@ def get_alert_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
 # ──────────────────────────────────────────────────────────────────────────────
 # Alert Rules — CRUD
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _rule_to_dict(rule: AlertRule) -> Dict[str, Any]:
     return {
@@ -85,7 +91,9 @@ def list_rules(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
 
 
 @router.post("/rules", status_code=201)
-def create_rule(payload: Dict[str, Any], db: Session = Depends(get_db)) -> Dict[str, Any]:
+def create_rule(
+    payload: Dict[str, Any], db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """Create a new alert rule."""
     rule = AlertRule(
         name=payload.get("name", "Untitled Rule"),
@@ -106,16 +114,24 @@ def create_rule(payload: Dict[str, Any], db: Session = Depends(get_db)) -> Dict[
 
 
 @router.patch("/rules/{rule_id}")
-def update_rule(rule_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)) -> Dict[str, Any]:
+def update_rule(
+    rule_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """Update an alert rule (full or partial). Used for toggles too."""
     rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
     if not rule:
         raise HTTPException(status_code=404, detail="Alert rule not found.")
 
     updatable = {
-        "name", "is_active", "scanner_types", "severity_filter",
-        "cooldown_minutes", "channels", "channel_config",
-        "auto_trade", "trading_strategy_id",
+        "name",
+        "is_active",
+        "scanner_types",
+        "severity_filter",
+        "cooldown_minutes",
+        "channels",
+        "channel_config",
+        "auto_trade",
+        "trading_strategy_id",
     }
     for key, value in payload.items():
         if key in updatable:
@@ -142,6 +158,7 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db)) -> None:
 # Test Alert
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @router.post("/rules/{rule_id}/test")
 def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Send a test notification through all channels configured on this rule."""
@@ -154,15 +171,22 @@ def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
         id=-1,
         ticker="TEST",
         event_date=date.today(),
-        scanner_type=rule.scanner_types[0] if rule.scanner_types else "pre_market_volume_spike",
+        scanner_type=rule.scanner_types[0]
+        if rule.scanner_types
+        else "pre_market_volume_spike",
         summary="This is a test alert from MarketHawk. Your notification channel is working!",
         severity=rule.severity_filter if rule.severity_filter != "any" else "high",
-        indicators={"relative_volume": 5.2, "gap_pct": 3.1, "pre_market_volume": 500000},
+        indicators={
+            "relative_volume": 5.2,
+            "gap_pct": 3.1,
+            "pre_market_volume": 500000,
+        },
         criteria_met={},
         metadata_={},
     )
 
     from app.services.alert_service import NotificationDispatcher
+
     results = []
     channels = rule.channels or []
     config = rule.channel_config or {}
@@ -194,7 +218,9 @@ def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
                     raise ValueError("No webhook URL configured.")
                 NotificationDispatcher._send_webhook(
                     url=url,
-                    payload=NotificationDispatcher._build_webhook_payload(test_event, rule),
+                    payload=NotificationDispatcher._build_webhook_payload(
+                        test_event, rule
+                    ),
                 )
             results.append({"channel": channel, "status": "sent"})
         except Exception as exc:
@@ -206,6 +232,7 @@ def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
 # ──────────────────────────────────────────────────────────────────────────────
 # Delivery Log
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @router.get("/logs")
 def list_delivery_logs(
@@ -239,10 +266,12 @@ def list_delivery_logs(
 # Browser Push — VAPID + Subscriptions
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 @router.get("/push/vapid-key")
 def get_vapid_public_key() -> Dict[str, str]:
     """Return the VAPID public key so the frontend can subscribe."""
     from app.core.config import settings
+
     if not settings.VAPID_PUBLIC_KEY:
         raise HTTPException(
             status_code=503,
@@ -258,9 +287,13 @@ def generate_vapid_keys() -> Dict[str, str]:
     This endpoint should be removed or restricted in production.
     """
     import base64
+
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.serialization import (
-        Encoding, PrivateFormat, PublicFormat, NoEncryption,
+        Encoding,
+        NoEncryption,
+        PrivateFormat,
+        PublicFormat,
     )
 
     private_key = ec.generate_private_key(ec.SECP256R1())
@@ -268,12 +301,16 @@ def generate_vapid_keys() -> Dict[str, str]:
     # Raw 32-byte private scalar — base64url encoded.
     # py_vapid's from_string() only accepts this format (not PEM).
     # Single-line, safe for .env and Docker env var injection.
-    der = private_key.private_bytes(Encoding.DER, PrivateFormat.TraditionalOpenSSL, NoEncryption())
+    der = private_key.private_bytes(
+        Encoding.DER, PrivateFormat.TraditionalOpenSSL, NoEncryption()
+    )
     raw_priv = der[7:39]  # SEC1 DER: 7-byte header, then 32-byte key scalar
     private_b64 = base64.urlsafe_b64encode(raw_priv).decode().rstrip("=")
 
     # Uncompressed EC point, URL-safe base64 — what browsers expect for applicationServerKey
-    pub_bytes = private_key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    pub_bytes = private_key.public_key().public_bytes(
+        Encoding.X962, PublicFormat.UncompressedPoint
+    )
     public_b64 = base64.urlsafe_b64encode(pub_bytes).decode().rstrip("=")
 
     return {
@@ -287,7 +324,9 @@ def generate_vapid_keys() -> Dict[str, str]:
 
 
 @router.post("/push/subscribe", status_code=201)
-def subscribe_push(payload: Dict[str, Any], request: Request, db: Session = Depends(get_db)) -> Dict[str, Any]:
+def subscribe_push(
+    payload: Dict[str, Any], request: Request, db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
     Save a browser PushSubscription.
     Payload matches the JSON serialization of the browser's PushSubscription object:
@@ -299,10 +338,14 @@ def subscribe_push(payload: Dict[str, Any], request: Request, db: Session = Depe
     auth = keys.get("auth")
 
     if not endpoint or not p256dh or not auth:
-        raise HTTPException(status_code=422, detail="endpoint, keys.p256dh, and keys.auth are required.")
+        raise HTTPException(
+            status_code=422, detail="endpoint, keys.p256dh, and keys.auth are required."
+        )
 
     # Upsert: update keys if endpoint already exists
-    existing = db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+    existing = (
+        db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+    )
     if existing:
         existing.p256dh = p256dh
         existing.auth = auth
@@ -323,13 +366,17 @@ def subscribe_push(payload: Dict[str, Any], request: Request, db: Session = Depe
 
 
 @router.delete("/push/unsubscribe")
-def unsubscribe_push(payload: Dict[str, Any], db: Session = Depends(get_db)) -> Dict[str, str]:
+def unsubscribe_push(
+    payload: Dict[str, Any], db: Session = Depends(get_db)
+) -> Dict[str, str]:
     """Remove a push subscription by endpoint URL."""
     endpoint = payload.get("endpoint")
     if not endpoint:
         raise HTTPException(status_code=422, detail="endpoint is required.")
 
-    sub = db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+    sub = (
+        db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+    )
     if sub:
         db.delete(sub)
         db.commit()

@@ -1,7 +1,7 @@
 """Tests that create_engine() pool attributes match settings values."""
 
-from app.core.database import engine
 from app.core.config import settings
+from app.core.database import engine
 
 
 def test_engine_pool_size_matches_settings():

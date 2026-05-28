@@ -18,32 +18,32 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
 
-from app.models.stock_aggregate import StockAggregate
 from app.models.monitored_stock import MonitoredStock
-from app.models.ticker_reference import TickerReference
+from app.models.stock_aggregate import StockAggregate
 from app.models.stock_split import StockSplit
-from app.services.catalyst_parser import CatalystParser
+from app.models.ticker_reference import TickerReference
 from app.services.alert_service import save_event as _save_event
+from app.services.catalyst_parser import CatalystParser
 from app.utils.session import get_market_today
 
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    "volume_ratio_min": 4.0,           # criterion 1: session vol / 20d avg session vol
-    "volume_pct_of_daily_min": 0.30,   # criterion 2: session vol / 20d avg total daily vol
-    "spike_pct_min": 0.10,             # criterion 3: (session_high / reference_close) - 1
+    "volume_ratio_min": 4.0,  # criterion 1: session vol / 20d avg session vol
+    "volume_pct_of_daily_min": 0.30,  # criterion 2: session vol / 20d avg total daily vol
+    "spike_pct_min": 0.10,  # criterion 3: (session_high / reference_close) - 1
     # criterion 4: regular vol / 20d avg regular vol. Effectively disabled (1000.0) —
     # criterion 5 (regular range ratio) is the meaningful "orderly regular session"
     # filter. Tracking high regular volume actively excludes the canonical liquidity
     # hunt pattern where retail piles in after a pre-market spike but price stays
     # range-bound. Kept in the indicators dict for inspection.
     "regular_vol_ratio_max": 1000.0,
-    "regular_range_ratio_max": 1.50,   # criterion 5: today range% / 20d avg range%
-    "session_volume_floor": 50_000,    # criterion 6: absolute minimum shares
+    "regular_range_ratio_max": 1.50,  # criterion 5: today range% / 20d avg range%
+    "session_volume_floor": 50_000,  # criterion 6: absolute minimum shares
 }
 
 
@@ -71,7 +71,9 @@ def _evaluate_criteria(
     cfg = {**DEFAULT_CONFIG, **(config or {})}
 
     avg_session_vol = (
-        baselines["avg_pre_vol_20d"] if session == "pre" else baselines["avg_post_vol_20d"]
+        baselines["avg_pre_vol_20d"]
+        if session == "pre"
+        else baselines["avg_post_vol_20d"]
     )
     avg_regular_vol = baselines["avg_regular_vol_20d"]
     avg_total_daily_vol = baselines["avg_total_daily_vol_20d"]
@@ -94,7 +96,8 @@ def _evaluate_criteria(
     # Criterion 3: UP spike
     spike_pct = (
         (session_high - reference_close) / reference_close
-        if reference_close > 0 else 0.0
+        if reference_close > 0
+        else 0.0
     )
     c3 = spike_pct >= cfg["spike_pct_min"]
 
@@ -129,10 +132,14 @@ def _evaluate_criteria(
         "session_spike_pct": round(spike_pct, 4),
         "regular_volume": int(regular_vol),
         "avg_regular_volume_20d": int(avg_regular_vol),
-        "regular_volume_ratio": round(regular_vol_ratio, 4) if math.isfinite(regular_vol_ratio) else None,
+        "regular_volume_ratio": round(regular_vol_ratio, 4)
+        if math.isfinite(regular_vol_ratio)
+        else None,
         "regular_range_pct": round(regular_range_pct, 4),
         "avg_regular_range_pct_20d": round(avg_range_pct, 4),
-        "regular_range_ratio": round(regular_range_ratio, 4) if math.isfinite(regular_range_ratio) else None,
+        "regular_range_ratio": round(regular_range_ratio, 4)
+        if math.isfinite(regular_range_ratio)
+        else None,
     }
 
     criteria_met: dict[str, bool] = {
@@ -251,7 +258,9 @@ def _get_event_date_regular_close(
         .replace(tzinfo=None)
     )
     reg_end_utc = (
-        datetime.combine(event_date, time(16, 0), tzinfo=_ET)  # 4:00 PM ET (regular close)
+        datetime.combine(
+            event_date, time(16, 0), tzinfo=_ET
+        )  # 4:00 PM ET (regular close)
         .astimezone(timezone.utc)
         .replace(tzinfo=None)
     )
@@ -321,9 +330,7 @@ def _get_rolling_baselines(
             daily[d]["regular"].append(r)
 
     # Keep only days that have regular-session bars; take the 20 most recent
-    trading_days = sorted(
-        [d for d, sess in daily.items() if sess["regular"]]
-    )[-20:]
+    trading_days = sorted([d for d, sess in daily.items() if sess["regular"]])[-20:]
 
     if len(trading_days) < 10:
         return None
@@ -343,10 +350,10 @@ def _get_rolling_baselines(
         reg = sess["regular"]
         if reg:
             h = float(max(r.high for r in reg))
-            l = float(min(r.low for r in reg))
+            lo = float(min(r.low for r in reg))
             o = float(reg[0].open)
             if o > 0:
-                range_pcts.append((h - l) / o)
+                range_pcts.append((h - lo) / o)
 
     n = len(trading_days)
     return {
@@ -354,14 +361,14 @@ def _get_rolling_baselines(
         "avg_post_vol_20d": sum(post_vols) / n,
         "avg_regular_vol_20d": sum(regular_vols) / n,
         "avg_total_daily_vol_20d": sum(total_vols) / n,
-        "avg_regular_range_pct_20d": sum(range_pcts) / len(range_pcts) if range_pcts else 0.0,
+        "avg_regular_range_pct_20d": sum(range_pcts) / len(range_pcts)
+        if range_pcts
+        else 0.0,
         "days_available": n,
     }
 
 
-def _get_enrichment(
-    db: Session, ticker: str, event_date: date
-) -> dict[str, Any]:
+def _get_enrichment(db: Session, ticker: str, event_date: date) -> dict[str, Any]:
     """Fetch catalyst, split, market-cap, and float enrichment for one ticker."""
     monitored = db.query(MonitoredStock).filter(MonitoredStock.ticker == ticker).first()
     ref = db.query(TickerReference).filter(TickerReference.ticker == ticker).first()
@@ -377,11 +384,19 @@ def _get_enrichment(
         .first()
     )
     cat = CatalystParser.analyze(ticker, event_date, db)
-    outstanding = float(ref.share_class_shares_outstanding) if ref and ref.share_class_shares_outstanding else None
+    outstanding = (
+        float(ref.share_class_shares_outstanding)
+        if ref and ref.share_class_shares_outstanding
+        else None
+    )
     return {
-        "market_cap": float(monitored.market_cap) if monitored and monitored.market_cap else None,
+        "market_cap": float(monitored.market_cap)
+        if monitored and monitored.market_cap
+        else None,
         "outstanding_shares": outstanding,
-        "recent_split_date": recent_split.execution_date.isoformat() if recent_split else None,
+        "recent_split_date": recent_split.execution_date.isoformat()
+        if recent_split
+        else None,
         "catalyst_tags": cat.get("tags", []),
         "catalyst_summary": cat.get("summary"),
     }
@@ -486,7 +501,9 @@ async def run_liquidity_hunt_scan(
                     counts["no_prior_close"] += 1
                     continue
 
-                event_date_regular_close = _get_event_date_regular_close(db, ticker, event_date)
+                event_date_regular_close = _get_event_date_regular_close(
+                    db, ticker, event_date
+                )
 
                 baselines = _get_rolling_baselines(db, ticker, event_date)
                 if baselines is None:
@@ -500,11 +517,16 @@ async def run_liquidity_hunt_scan(
                 except Exception:
                     _LOG.warning(
                         "Enrichment failed for %s on %s; proceeding with empty enrichment",
-                        ticker, event_date, exc_info=True,
+                        ticker,
+                        event_date,
+                        exc_info=True,
                     )
                     enrichment = {
-                        "market_cap": None, "outstanding_shares": None,
-                        "recent_split_date": None, "catalyst_tags": [], "catalyst_summary": None,
+                        "market_cap": None,
+                        "outstanding_shares": None,
+                        "recent_split_date": None,
+                        "catalyst_tags": [],
+                        "catalyst_summary": None,
                     }
 
                 # Pre-market variant
@@ -522,10 +544,12 @@ async def run_liquidity_hunt_scan(
                 )
                 if fires_pre:
                     indicators_pre = _build_indicators(
-                        "pre", base_ind_pre,
+                        "pre",
+                        base_ind_pre,
                         session_metrics["regular_open"],
                         session_metrics["regular_close"],
-                        enrichment, event_date,
+                        enrichment,
+                        event_date,
                         session_metrics["pre_vol"],
                     )
                     event_dict = _save_event(
@@ -559,10 +583,12 @@ async def run_liquidity_hunt_scan(
                     )
                     if fires_post:
                         indicators_post = _build_indicators(
-                            "post", base_ind_post,
+                            "post",
+                            base_ind_post,
                             session_metrics["regular_open"],
                             session_metrics["regular_close"],
-                            enrichment, event_date,
+                            enrichment,
+                            event_date,
                             session_metrics["post_vol"],
                         )
                         event_dict = _save_event(
@@ -582,31 +608,41 @@ async def run_liquidity_hunt_scan(
 
             except Exception:
                 counts["errors"] += 1
-                _LOG.exception("Error in liquidity_hunt scan for %s on %s", ticker, event_date)
+                _LOG.exception(
+                    "Error in liquidity_hunt scan for %s on %s", ticker, event_date
+                )
 
     _LOG.info(
         "liquidity_hunt scan complete: tickers=%d days=%d "
         "dropped=(no_data:%d no_prior_close:%d no_baseline:%d) "
         "evaluated=%d fired=(pre:%d post:%d) errors=%d",
-        len(tickers), len(trading_days),
-        counts["no_session_metrics"], counts["no_prior_close"], counts["no_baseline"],
-        counts["evaluated"], counts["fired_pre"], counts["fired_post"], counts["errors"],
+        len(tickers),
+        len(trading_days),
+        counts["no_session_metrics"],
+        counts["no_prior_close"],
+        counts["no_baseline"],
+        counts["evaluated"],
+        counts["fired_pre"],
+        counts["fired_post"],
+        counts["errors"],
     )
 
     if diagnostics_out is not None:
-        diagnostics_out.update({
-            "tickers": len(tickers),
-            "days": len(trading_days),
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-            "no_data": counts["no_session_metrics"],
-            "no_prior_close": counts["no_prior_close"],
-            "no_baseline": counts["no_baseline"],
-            "evaluated": counts["evaluated"],
-            "fired_pre": counts["fired_pre"],
-            "fired_post": counts["fired_post"],
-            "errors": counts["errors"],
-        })
+        diagnostics_out.update(
+            {
+                "tickers": len(tickers),
+                "days": len(trading_days),
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "no_data": counts["no_session_metrics"],
+                "no_prior_close": counts["no_prior_close"],
+                "no_baseline": counts["no_baseline"],
+                "evaluated": counts["evaluated"],
+                "fired_pre": counts["fired_pre"],
+                "fired_post": counts["fired_post"],
+                "errors": counts["errors"],
+            }
+        )
 
     return results
 
@@ -624,7 +660,7 @@ async def run_liquidity_hunt_scan_for_date(
 
 # ── Orchestrator self-registration ────────────────────────────────────────────
 
-from app.services.scan_orchestrator import ScannerDescriptor, register
+from app.services.scan_orchestrator import ScannerDescriptor, register  # noqa: E402
 
 
 async def _orchestrator_run(tickers: list, db: Any, event_date: date) -> list[dict]:
@@ -639,8 +675,24 @@ async def _orchestrator_run(tickers: list, db: Any, event_date: date) -> list[di
 
 for _key, _display, _desc in [
     ("liquidity_hunt", "Liquidity Hunt", "Intraday liquidity concentration scanner."),
-    ("liquidity_hunt_pre", "Liquidity Hunt (Pre-Market)", "Pre-market liquidity concentration scanner."),
-    ("liquidity_hunt_post", "Liquidity Hunt (Post-Market)", "Post-market liquidity concentration scanner."),
+    (
+        "liquidity_hunt_pre",
+        "Liquidity Hunt (Pre-Market)",
+        "Pre-market liquidity concentration scanner.",
+    ),
+    (
+        "liquidity_hunt_post",
+        "Liquidity Hunt (Post-Market)",
+        "Post-market liquidity concentration scanner.",
+    ),
 ]:
     # All three keys share the same _orchestrator_run — run_liquidity_hunt_scan emits all variant types.
-    register(ScannerDescriptor(key=_key, display_name=_display, description=_desc, run=_orchestrator_run, supports_date_range=True))
+    register(
+        ScannerDescriptor(
+            key=_key,
+            display_name=_display,
+            description=_desc,
+            run=_orchestrator_run,
+            supports_date_range=True,
+        )
+    )

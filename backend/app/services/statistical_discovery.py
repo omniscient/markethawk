@@ -6,13 +6,13 @@ All methods are stateless; they receive DataFrames and return typed dicts/lists.
 import logging
 from typing import Any
 
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
+import shap
 from scipy import stats as scipy_stats
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
-import lightgbm as lgb
-import shap
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,6 @@ MIN_NULL_FRACTION = 0.5
 
 
 class StatisticalDiscoveryService:
-
     def build_feature_matrix(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Accepts a raw DataFrame with columns event_id, interval_key, pct_change,
@@ -36,7 +35,9 @@ class StatisticalDiscoveryService:
         for col in feature_cols:
             null_frac = df[col].isna().mean()
             if null_frac >= MIN_NULL_FRACTION:
-                logger.debug("Dropping sparse column %s (null_frac=%.2f)", col, null_frac)
+                logger.debug(
+                    "Dropping sparse column %s (null_frac=%.2f)", col, null_frac
+                )
                 continue
             try:
                 df[col] = pd.to_numeric(df[col], errors="raise")
@@ -66,7 +67,9 @@ class StatisticalDiscoveryService:
             p_row: list[float] = []
             s_row: list[float] = []
             for interval in intervals:
-                subset = df[df["interval_key"] == interval][[feature, "pct_change"]].dropna()
+                subset = df[df["interval_key"] == interval][
+                    [feature, "pct_change"]
+                ].dropna()
                 if len(subset) < 10:
                     p_row.append(0.0)
                     s_row.append(0.0)
@@ -97,9 +100,15 @@ class StatisticalDiscoveryService:
 
         all_weights: list[dict[str, Any]] = []
         for interval in intervals:
-            subset = df[df["interval_key"] == interval][feature_cols + ["pct_change"]].dropna()
+            subset = df[df["interval_key"] == interval][
+                feature_cols + ["pct_change"]
+            ].dropna()
             if len(subset) < 50:
-                logger.warning("Skipping SHAP for interval %s — only %d rows", interval, len(subset))
+                logger.warning(
+                    "Skipping SHAP for interval %s — only %d rows",
+                    interval,
+                    len(subset),
+                )
                 continue
             X = subset[feature_cols].values
             y = subset["pct_change"].values
@@ -112,12 +121,14 @@ class StatisticalDiscoveryService:
             mean_shap = np.abs(shap_values).mean(axis=0)
 
             for feat, importance in zip(feature_cols, mean_shap):
-                all_weights.append({
-                    "feature": feat,
-                    "interval": interval,
-                    "shap_importance": round(float(importance), 6),
-                    "rank": 0,
-                })
+                all_weights.append(
+                    {
+                        "feature": feat,
+                        "interval": interval,
+                        "shap_importance": round(float(importance), 6),
+                        "rank": 0,
+                    }
+                )
 
         all_weights.sort(key=lambda w: w["shap_importance"], reverse=True)
         for i, w in enumerate(all_weights, start=1):
@@ -137,11 +148,7 @@ class StatisticalDiscoveryService:
         reserved = {"event_id", "interval_key", "pct_change"}
         feature_cols = [c for c in df.columns if c not in reserved]
 
-        event_features = (
-            df.groupby("event_id")[feature_cols]
-            .mean()
-            .dropna()
-        )
+        event_features = df.groupby("event_id")[feature_cols].mean().dropna()
 
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(event_features.values)
@@ -150,8 +157,7 @@ class StatisticalDiscoveryService:
         km.fit(X_scaled)
 
         labels: dict[int, int] = {
-            int(eid): int(label)
-            for eid, label in zip(event_features.index, km.labels_)
+            int(eid): int(label) for eid, label in zip(event_features.index, km.labels_)
         }
 
         centroid_values = scaler.inverse_transform(km.cluster_centers_)
@@ -181,10 +187,17 @@ class StatisticalDiscoveryService:
             cluster_df = df[df["cluster"] == cluster_idx]
             result[cluster_idx] = {}
             for interval in sorted(cluster_df["interval_key"].unique()):
-                subset = cluster_df[cluster_df["interval_key"] == interval]["pct_change"].dropna()
+                subset = cluster_df[cluster_df["interval_key"] == interval][
+                    "pct_change"
+                ].dropna()
                 n = len(subset)
                 if n == 0:
-                    result[cluster_idx][interval] = {"median_pct": 0.0, "win_rate": 0.0, "sharpe": 0.0, "n": 0}
+                    result[cluster_idx][interval] = {
+                        "median_pct": 0.0,
+                        "win_rate": 0.0,
+                        "sharpe": 0.0,
+                        "n": 0,
+                    }
                     continue
                 median_pct = float(subset.median())
                 win_rate = float((subset > 0).mean())

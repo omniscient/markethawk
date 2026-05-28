@@ -1,6 +1,6 @@
 """Unit tests for the liquidity_hunt scanner."""
-import pytest
-from app.services.liquidity_hunt import _evaluate_criteria, DEFAULT_CONFIG
+
+from app.services.liquidity_hunt import _evaluate_criteria
 
 # Baseline fixture representing a ticker with 20 days of history
 BASELINES = {
@@ -8,20 +8,20 @@ BASELINES = {
     "avg_post_vol_20d": 30_000,
     "avg_regular_vol_20d": 950_000,
     "avg_total_daily_vol_20d": 1_000_000,
-    "avg_regular_range_pct_20d": 0.020,   # 2% average daily range
+    "avg_regular_range_pct_20d": 0.020,  # 2% average daily range
     "days_available": 20,
 }
 
 # Kwargs for a clean "pre" fire — all six criteria satisfied
 CLEAN_PRE = dict(
     session="pre",
-    session_vol=350_000,    # c1: 350k/35k=10x ≥ 4 ✓  c2: 350k/1M=35% ≥ 30% ✓  c6: >50k ✓
-    session_high=12.11,     # c3: (12.11-11.00)/11.00 = 10.09% ≥ 10% ✓
+    session_vol=350_000,  # c1: 350k/35k=10x ≥ 4 ✓  c2: 350k/1M=35% ≥ 30% ✓  c6: >50k ✓
+    session_high=12.11,  # c3: (12.11-11.00)/11.00 = 10.09% ≥ 10% ✓
     reference_close=11.00,
-    regular_vol=900_000,    # c4: 900k/950k = 0.947 ≤ 1.2 ✓
+    regular_vol=900_000,  # c4: 900k/950k = 0.947 ≤ 1.2 ✓
     regular_high=11.20,
     regular_low=10.90,
-    regular_open=11.05,     # c5: (11.20-10.90)/11.05=2.71% → ratio 1.36 ≤ 1.5 ✓
+    regular_open=11.05,  # c5: (11.20-10.90)/11.05=2.71% → ratio 1.36 ≤ 1.5 ✓
     baselines=BASELINES,
     config=None,
 )
@@ -36,9 +36,7 @@ def test_pre_variant_fires():
 
 def test_c2_materiality_fails_when_vol_too_small():
     """200k/1M = 20% < 30% — materiality criterion fails."""
-    fires, _, criteria = _evaluate_criteria(
-        **{**CLEAN_PRE, "session_vol": 200_000}
-    )
+    fires, _, criteria = _evaluate_criteria(**{**CLEAN_PRE, "session_vol": 200_000})
     assert fires is False
     assert criteria["volume_materiality"] is False
 
@@ -46,7 +44,7 @@ def test_c2_materiality_fails_when_vol_too_small():
 def test_c3_spike_fails_when_less_than_10_pct():
     """6% spike — does not meet the 10% threshold."""
     fires, _, criteria = _evaluate_criteria(
-        **{**CLEAN_PRE, "session_high": 11.66}   # (11.66-11.00)/11.00 = 6%
+        **{**CLEAN_PRE, "session_high": 11.66}  # (11.66-11.00)/11.00 = 6%
     )
     assert fires is False
     assert criteria["session_spike"] is False
@@ -55,8 +53,11 @@ def test_c3_spike_fails_when_less_than_10_pct():
 def test_c4_fails_when_regular_vol_exceeds_threshold():
     """2× regular vol fails c4 when threshold is explicitly set to 1.2 (default is 1000.0)."""
     fires, _, criteria = _evaluate_criteria(
-        **{**CLEAN_PRE, "regular_vol": 2_000_000,   # 2M/950k = 2.1 > 1.2
-           "config": {"regular_vol_ratio_max": 1.2}}
+        **{
+            **CLEAN_PRE,
+            "regular_vol": 2_000_000,  # 2M/950k = 2.1 > 1.2
+            "config": {"regular_vol_ratio_max": 1.2},
+        }
     )
     assert fires is False
     assert criteria["quiet_regular_vol"] is False
@@ -66,8 +67,8 @@ def test_c6_fails_when_below_absolute_floor():
     """40k shares < 50k floor — only c6 fails, all others pass."""
     isolated_baselines = {
         **BASELINES,
-        "avg_pre_vol_20d": 1_000,           # 40k/1k = 40x ≥ 4 ✓ (c1 passes)
-        "avg_total_daily_vol_20d": 100_000, # 40k/100k = 40% ≥ 30% ✓ (c2 passes)
+        "avg_pre_vol_20d": 1_000,  # 40k/1k = 40x ≥ 4 ✓ (c1 passes)
+        "avg_total_daily_vol_20d": 100_000,  # 40k/100k = 40% ≥ 30% ✓ (c2 passes)
     }
     fires, _, criteria = _evaluate_criteria(
         **{**CLEAN_PRE, "session_vol": 40_000, "baselines": isolated_baselines}
@@ -93,15 +94,15 @@ def test_zero_session_baseline_fires_when_floor_and_materiality_pass():
     zero_baselines = {
         **BASELINES,
         "avg_pre_vol_20d": 0,
-        "avg_total_daily_vol_20d": 200_000,   # 75k/200k = 37.5% ≥ 30%
+        "avg_total_daily_vol_20d": 200_000,  # 75k/200k = 37.5% ≥ 30%
         "avg_regular_vol_20d": 190_000,
     }
     fires, indicators, criteria = _evaluate_criteria(
         session="pre",
-        session_vol=75_000,       # > 50k floor ✓  and 37.5% of daily ✓
+        session_vol=75_000,  # > 50k floor ✓  and 37.5% of daily ✓
         session_high=12.11,
         reference_close=11.00,
-        regular_vol=180_000,      # 180k/190k = 0.95 ≤ 1.2 ✓
+        regular_vol=180_000,  # 180k/190k = 0.95 ≤ 1.2 ✓
         regular_high=11.20,
         regular_low=10.90,
         regular_open=11.05,
@@ -109,7 +110,7 @@ def test_zero_session_baseline_fires_when_floor_and_materiality_pass():
         config=None,
     )
     assert fires is True
-    assert criteria["volume_ratio"] is True   # trivially satisfied
+    assert criteria["volume_ratio"] is True  # trivially satisfied
     assert indicators["session_volume_ratio"] is None  # signals "infinite"
 
 
@@ -141,7 +142,7 @@ def test_c1_fails_for_post_when_after_market_vol_too_low():
     """Post variant: 60k / 30k = 2x < 4x threshold."""
     fires, _, criteria = _evaluate_criteria(
         session="post",
-        session_vol=60_000,       # 60k/30k = 2x < 4 ✗  (also: 60k/1M = 6% < 30%)
+        session_vol=60_000,  # 60k/30k = 2x < 4 ✗  (also: 60k/1M = 6% < 30%)
         session_high=12.11,
         reference_close=11.00,
         regular_vol=900_000,
@@ -158,19 +159,23 @@ def test_c1_fails_for_post_when_after_market_vol_too_low():
 
 # ─── DB helper tests ───────────────────────────────────────────────────────
 
-from datetime import date as _date, datetime as _datetime, timezone as _tz
+from datetime import date as _date
+from datetime import datetime as _datetime
 from datetime import timedelta
+from datetime import timezone as _tz
 from unittest.mock import MagicMock
+
 from app.models.stock_aggregate import StockAggregate
 from app.services.liquidity_hunt import (
-    _get_session_metrics,
-    _get_prior_day_close,
     _get_event_date_regular_close,
+    _get_prior_day_close,
+    _get_session_metrics,
 )
 
 
-def _make_minute_bar(ticker, ts_utc, open_, high, low, close, volume,
-                     is_pre=False, is_after=False):
+def _make_minute_bar(
+    ticker, ts_utc, open_, high, low, close, volume, is_pre=False, is_after=False
+):
     b = StockAggregate()
     b.ticker = ticker
     b.timestamp = ts_utc
@@ -211,15 +216,19 @@ def _make_db_returning(rows):
 
 EVENT_DATE = _date(2025, 6, 10)
 # 2025-06-10 09:00 ET = 13:00 UTC
-_PRE_TS = _datetime(2025, 6, 10, 8, 0, tzinfo=_tz.utc).replace(tzinfo=None)    # 4 AM ET
-_REG_TS = _datetime(2025, 6, 10, 14, 0, tzinfo=_tz.utc).replace(tzinfo=None)   # 10 AM ET
+_PRE_TS = _datetime(2025, 6, 10, 8, 0, tzinfo=_tz.utc).replace(tzinfo=None)  # 4 AM ET
+_REG_TS = _datetime(2025, 6, 10, 14, 0, tzinfo=_tz.utc).replace(tzinfo=None)  # 10 AM ET
 _POST_TS = _datetime(2025, 6, 10, 21, 0, tzinfo=_tz.utc).replace(tzinfo=None)  # 5 PM ET
 
 
 def test_get_session_metrics_returns_correct_buckets():
-    pre_bar = _make_minute_bar("TEST", _PRE_TS, 10.0, 12.0, 9.9, 11.8, 200_000, is_pre=True)
+    pre_bar = _make_minute_bar(
+        "TEST", _PRE_TS, 10.0, 12.0, 9.9, 11.8, 200_000, is_pre=True
+    )
     reg_bar = _make_minute_bar("TEST", _REG_TS, 11.8, 12.1, 11.5, 11.9, 900_000)
-    post_bar = _make_minute_bar("TEST", _POST_TS, 11.9, 13.0, 11.8, 12.5, 150_000, is_after=True)
+    post_bar = _make_minute_bar(
+        "TEST", _POST_TS, 11.9, 13.0, 11.8, 12.5, 150_000, is_after=True
+    )
 
     db = _make_db_returning([pre_bar, reg_bar, post_bar])
     metrics = _get_session_metrics(db, "TEST", EVENT_DATE)
@@ -237,7 +246,9 @@ def test_get_session_metrics_returns_correct_buckets():
 
 
 def test_get_session_metrics_returns_none_when_no_regular_bars():
-    pre_bar = _make_minute_bar("TEST", _PRE_TS, 10.0, 12.0, 9.9, 11.8, 200_000, is_pre=True)
+    pre_bar = _make_minute_bar(
+        "TEST", _PRE_TS, 10.0, 12.0, 9.9, 11.8, 200_000, is_pre=True
+    )
     db = _make_db_returning([pre_bar])
     assert _get_session_metrics(db, "TEST", EVENT_DATE) is None
 
@@ -274,7 +285,7 @@ def test_get_prior_day_close_falls_back_to_minute_bar():
     mock_q.filter.return_value = mock_q
     mock_q.order_by.return_value = mock_q
     mock_q.limit.return_value = mock_q
-    mock_q.first.side_effect = [None, (10.25,)]   # day query miss, minute query hit
+    mock_q.first.side_effect = [None, (10.25,)]  # day query miss, minute query hit
     db.query.return_value = mock_q
 
     result = _get_prior_day_close(db, "TEST", EVENT_DATE)
@@ -299,33 +310,62 @@ def test_get_event_date_regular_close():
 from app.services.liquidity_hunt import _get_rolling_baselines
 
 
-def _make_history(ticker, event_date, n_days, pre_vol, regular_vol, post_vol,
-                  regular_high_pct=0.01):
+def _make_history(
+    ticker, event_date, n_days, pre_vol, regular_vol, post_vol, regular_high_pct=0.01
+):
     """
     Generate n_days of fake minute-bar history before event_date.
     Each day gets one pre bar, one regular bar, one post bar at 08:00/14:00/21:00 UTC.
     regular_high_pct: regular high = regular_open * (1 + regular_high_pct).
     """
     from zoneinfo import ZoneInfo
+
     _ET2 = ZoneInfo("America/New_York")
     bars = []
     for i in range(1, n_days + 1):
         d = event_date - timedelta(days=i)
-        pre_ts = _datetime.combine(d, _datetime.min.time(), tzinfo=_ET2).replace(
-            hour=8).astimezone(_tz.utc).replace(tzinfo=None)
+        pre_ts = (
+            _datetime.combine(d, _datetime.min.time(), tzinfo=_ET2)
+            .replace(hour=8)
+            .astimezone(_tz.utc)
+            .replace(tzinfo=None)
+        )
         reg_ts = pre_ts.replace(hour=14)
         post_ts = pre_ts.replace(hour=21)
 
-        bars.append(_make_minute_bar(ticker, pre_ts, 10.0, 10.5, 9.8, 10.3, pre_vol, is_pre=True))
-        bars.append(_make_minute_bar(ticker, reg_ts, 10.3, 10.3 * (1 + regular_high_pct),
-                                     10.3 * (1 - regular_high_pct), 10.2, regular_vol))
-        bars.append(_make_minute_bar(ticker, post_ts, 10.2, 10.4, 10.1, 10.3, post_vol, is_after=True))
+        bars.append(
+            _make_minute_bar(
+                ticker, pre_ts, 10.0, 10.5, 9.8, 10.3, pre_vol, is_pre=True
+            )
+        )
+        bars.append(
+            _make_minute_bar(
+                ticker,
+                reg_ts,
+                10.3,
+                10.3 * (1 + regular_high_pct),
+                10.3 * (1 - regular_high_pct),
+                10.2,
+                regular_vol,
+            )
+        )
+        bars.append(
+            _make_minute_bar(
+                ticker, post_ts, 10.2, 10.4, 10.1, 10.3, post_vol, is_after=True
+            )
+        )
     return bars
 
 
 def test_get_rolling_baselines_returns_correct_averages():
-    bars = _make_history("TEST", EVENT_DATE, n_days=20,
-                         pre_vol=40_000, regular_vol=800_000, post_vol=25_000)
+    bars = _make_history(
+        "TEST",
+        EVENT_DATE,
+        n_days=20,
+        pre_vol=40_000,
+        regular_vol=800_000,
+        post_vol=25_000,
+    )
     db = _make_db_returning(bars)
     result = _get_rolling_baselines(db, "TEST", EVENT_DATE)
 
@@ -338,8 +378,14 @@ def test_get_rolling_baselines_returns_correct_averages():
 
 
 def test_get_rolling_baselines_returns_none_when_fewer_than_10_days():
-    bars = _make_history("TEST", EVENT_DATE, n_days=8,
-                         pre_vol=40_000, regular_vol=800_000, post_vol=25_000)
+    bars = _make_history(
+        "TEST",
+        EVENT_DATE,
+        n_days=8,
+        pre_vol=40_000,
+        regular_vol=800_000,
+        post_vol=25_000,
+    )
     db = _make_db_returning(bars)
     result = _get_rolling_baselines(db, "TEST", EVENT_DATE)
     assert result is None
@@ -347,8 +393,14 @@ def test_get_rolling_baselines_returns_none_when_fewer_than_10_days():
 
 def test_get_rolling_baselines_uses_at_most_20_days():
     """Even with 25 days of history, only the most recent 20 are averaged."""
-    bars = _make_history("TEST", EVENT_DATE, n_days=25,
-                         pre_vol=40_000, regular_vol=800_000, post_vol=25_000)
+    bars = _make_history(
+        "TEST",
+        EVENT_DATE,
+        n_days=25,
+        pre_vol=40_000,
+        regular_vol=800_000,
+        post_vol=25_000,
+    )
     db = _make_db_returning(bars)
     result = _get_rolling_baselines(db, "TEST", EVENT_DATE)
     assert result["days_available"] == 20
@@ -389,8 +441,8 @@ def test_get_rolling_baselines_lookback_starts_45_days_before_event():
 
 import asyncio
 from unittest.mock import patch
-from app.services.liquidity_hunt import run_liquidity_hunt_scan
 
+from app.services.liquidity_hunt import run_liquidity_hunt_scan
 
 # Shared baselines for scan-loop tests
 _SCAN_BASELINES = {
@@ -404,10 +456,15 @@ _SCAN_BASELINES = {
 
 # Metrics for a day where both pre and post qualify
 _CLEAN_METRICS = {
-    "pre_vol": 350_000, "pre_high": 12.11,
-    "regular_vol": 900_000, "regular_high": 11.20,
-    "regular_low": 10.90, "regular_open": 11.05, "regular_close": 11.10,
-    "post_vol": 350_000, "post_high": 12.25,
+    "pre_vol": 350_000,
+    "pre_high": 12.11,
+    "regular_vol": 900_000,
+    "regular_high": 11.20,
+    "regular_low": 10.90,
+    "regular_open": 11.05,
+    "regular_close": 11.10,
+    "post_vol": 350_000,
+    "post_high": 12.25,
 }
 
 
@@ -428,16 +485,33 @@ def _mock_enrichment():
 def test_scan_fires_liquidity_hunt_pre():
     """Clean pre-market hunt: pre fires."""
     db = MagicMock()
-    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
-         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
-         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
-         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
-         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.liquidity_hunt._save_event", return_value={"id": 1}) as mock_save:
-
-        results = _run(run_liquidity_hunt_scan(
-            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
-        ))
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            return_value=_CLEAN_METRICS,
+        ),
+        patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00),
+        patch(
+            "app.services.liquidity_hunt._get_event_date_regular_close",
+            return_value=11.10,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_rolling_baselines",
+            return_value=_SCAN_BASELINES,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_enrichment",
+            return_value=_mock_enrichment(),
+        ),
+        patch(
+            "app.services.liquidity_hunt._save_event", return_value={"id": 1}
+        ) as mock_save,
+    ):
+        results = _run(
+            run_liquidity_hunt_scan(
+                ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+            )
+        )
 
     saved_types = [c.kwargs["scanner_type"] for c in mock_save.call_args_list]
     assert "liquidity_hunt_pre" in saved_types
@@ -447,16 +521,33 @@ def test_scan_fires_liquidity_hunt_pre():
 def test_scan_fires_both_variants():
     """Both pre and post qualify on the same day — two separate events."""
     db = MagicMock()
-    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
-         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
-         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
-         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
-         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.liquidity_hunt._save_event", return_value={"id": 1}) as mock_save:
-
-        _run(run_liquidity_hunt_scan(
-            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
-        ))
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            return_value=_CLEAN_METRICS,
+        ),
+        patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00),
+        patch(
+            "app.services.liquidity_hunt._get_event_date_regular_close",
+            return_value=11.10,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_rolling_baselines",
+            return_value=_SCAN_BASELINES,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_enrichment",
+            return_value=_mock_enrichment(),
+        ),
+        patch(
+            "app.services.liquidity_hunt._save_event", return_value={"id": 1}
+        ) as mock_save,
+    ):
+        _run(
+            run_liquidity_hunt_scan(
+                ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+            )
+        )
 
     saved_types = [c.kwargs["scanner_type"] for c in mock_save.call_args_list]
     assert "liquidity_hunt_pre" in saved_types
@@ -466,16 +557,28 @@ def test_scan_fires_both_variants():
 def test_scan_skips_ticker_when_sparse_history():
     """No events emitted when _get_rolling_baselines returns None."""
     db = MagicMock()
-    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
-         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
-         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
-         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=None), \
-         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.liquidity_hunt._save_event") as mock_save:
-
-        results = _run(run_liquidity_hunt_scan(
-            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
-        ))
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            return_value=_CLEAN_METRICS,
+        ),
+        patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00),
+        patch(
+            "app.services.liquidity_hunt._get_event_date_regular_close",
+            return_value=11.10,
+        ),
+        patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=None),
+        patch(
+            "app.services.liquidity_hunt._get_enrichment",
+            return_value=_mock_enrichment(),
+        ),
+        patch("app.services.liquidity_hunt._save_event") as mock_save,
+    ):
+        results = _run(
+            run_liquidity_hunt_scan(
+                ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+            )
+        )
 
     mock_save.assert_not_called()
     assert results == []
@@ -484,16 +587,31 @@ def test_scan_skips_ticker_when_sparse_history():
 def test_scan_skips_ticker_when_no_prior_close():
     """No events when prior_day_close is unavailable."""
     db = MagicMock()
-    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
-         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=None), \
-         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
-         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
-         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.liquidity_hunt._save_event") as mock_save:
-
-        results = _run(run_liquidity_hunt_scan(
-            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
-        ))
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            return_value=_CLEAN_METRICS,
+        ),
+        patch("app.services.liquidity_hunt._get_prior_day_close", return_value=None),
+        patch(
+            "app.services.liquidity_hunt._get_event_date_regular_close",
+            return_value=11.10,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_rolling_baselines",
+            return_value=_SCAN_BASELINES,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_enrichment",
+            return_value=_mock_enrichment(),
+        ),
+        patch("app.services.liquidity_hunt._save_event") as mock_save,
+    ):
+        results = _run(
+            run_liquidity_hunt_scan(
+                ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+            )
+        )
 
     mock_save.assert_not_called()
     assert results == []
@@ -502,18 +620,38 @@ def test_scan_skips_ticker_when_no_prior_close():
 def test_split_in_lookback_flag():
     """Recent split within 28 days sets split_in_lookback=True in indicators."""
     split_date = EVENT_DATE - timedelta(days=10)
-    enrichment_with_split = {**_mock_enrichment(), "recent_split_date": split_date.isoformat()}
+    enrichment_with_split = {
+        **_mock_enrichment(),
+        "recent_split_date": split_date.isoformat(),
+    }
     db = MagicMock()
-    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=_CLEAN_METRICS), \
-         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
-         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
-         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
-         patch("app.services.liquidity_hunt._get_enrichment", return_value=enrichment_with_split), \
-         patch("app.services.liquidity_hunt._save_event", return_value={"id": 1}) as mock_save:
-
-        _run(run_liquidity_hunt_scan(
-            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
-        ))
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            return_value=_CLEAN_METRICS,
+        ),
+        patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00),
+        patch(
+            "app.services.liquidity_hunt._get_event_date_regular_close",
+            return_value=11.10,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_rolling_baselines",
+            return_value=_SCAN_BASELINES,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_enrichment",
+            return_value=enrichment_with_split,
+        ),
+        patch(
+            "app.services.liquidity_hunt._save_event", return_value={"id": 1}
+        ) as mock_save,
+    ):
+        _run(
+            run_liquidity_hunt_scan(
+                ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+            )
+        )
 
     indicators_list = [c.kwargs["indicators"] for c in mock_save.call_args_list]
     assert any(ind.get("split_in_lookback") is True for ind in indicators_list)
@@ -527,16 +665,33 @@ def test_scan_fires_post_only_when_pre_does_not_qualify():
         # post_high=12.25 gives (12.25-11.10)/11.10 = 10.36% ✓ (uses event_date_regular_close)
     }
     db = MagicMock()
-    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=post_only_metrics), \
-         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
-         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
-         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
-         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.liquidity_hunt._save_event", return_value={"id": 1}) as mock_save:
-
-        results = _run(run_liquidity_hunt_scan(
-            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
-        ))
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            return_value=post_only_metrics,
+        ),
+        patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00),
+        patch(
+            "app.services.liquidity_hunt._get_event_date_regular_close",
+            return_value=11.10,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_rolling_baselines",
+            return_value=_SCAN_BASELINES,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_enrichment",
+            return_value=_mock_enrichment(),
+        ),
+        patch(
+            "app.services.liquidity_hunt._save_event", return_value={"id": 1}
+        ) as mock_save,
+    ):
+        results = _run(
+            run_liquidity_hunt_scan(
+                ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+            )
+        )
 
     saved_types = [c.kwargs["scanner_type"] for c in mock_save.call_args_list]
     assert "liquidity_hunt_post" in saved_types
@@ -556,15 +711,30 @@ def test_scan_fires_events_despite_high_regular_vol():
         "regular_vol": 2_000_000,  # 2M/950k = 2.1 — below the 1000.0 default threshold
     }
     db = MagicMock()
-    with patch("app.services.liquidity_hunt._get_session_metrics", return_value=noisy_day_metrics), \
-         patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00), \
-         patch("app.services.liquidity_hunt._get_event_date_regular_close", return_value=11.10), \
-         patch("app.services.liquidity_hunt._get_rolling_baselines", return_value=_SCAN_BASELINES), \
-         patch("app.services.liquidity_hunt._get_enrichment", return_value=_mock_enrichment()), \
-         patch("app.services.liquidity_hunt._save_event") as mock_save:
-
-        _run(run_liquidity_hunt_scan(
-            ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
-        ))
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            return_value=noisy_day_metrics,
+        ),
+        patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00),
+        patch(
+            "app.services.liquidity_hunt._get_event_date_regular_close",
+            return_value=11.10,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_rolling_baselines",
+            return_value=_SCAN_BASELINES,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_enrichment",
+            return_value=_mock_enrichment(),
+        ),
+        patch("app.services.liquidity_hunt._save_event") as mock_save,
+    ):
+        _run(
+            run_liquidity_hunt_scan(
+                ["TEST"], db, start_date=EVENT_DATE, end_date=EVENT_DATE
+            )
+        )
 
     assert mock_save.call_count == 2  # pre + post both fire

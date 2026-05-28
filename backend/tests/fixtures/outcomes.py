@@ -5,6 +5,7 @@ Each function inserts rows and flushes; the caller's transaction provides rollba
 
 from datetime import date, timedelta
 from decimal import Decimal
+
 from sqlalchemy.orm import Session
 
 from app.models.scanner_event import ScannerEvent

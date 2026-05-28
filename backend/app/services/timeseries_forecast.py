@@ -38,7 +38,9 @@ def _get_model():
             _timesfm_available = True
             logger.info("TimesFM model loaded successfully")
         except Exception as exc:
-            logger.warning("TimesFM unavailable — falling back to static threshold: %s", exc)
+            logger.warning(
+                "TimesFM unavailable — falling back to static threshold: %s", exc
+            )
             _timesfm_available = False
 
     return _timesfm_model if _timesfm_available else None
@@ -65,8 +67,8 @@ def get_volume_forecast(ticker: str, volumes: list[float]) -> Optional[dict]:
 
         # quantile_forecast shape: [batch, horizon, n_quantiles]
         mean_log = float(point_forecast[0][0])
-        p50_log = float(quantile_forecast[0][0][1])   # index 1 → p50
-        p90_log = float(quantile_forecast[0][0][3])   # index 3 → p90
+        p50_log = float(quantile_forecast[0][0][1])  # index 1 → p50
+        p90_log = float(quantile_forecast[0][0][3])  # index 3 → p90
 
         # Approximate std from p90-mean spread (1.28 σ for normal distribution)
         std_log = max((p90_log - mean_log) / 1.28, 1e-6)

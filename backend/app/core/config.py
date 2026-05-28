@@ -2,7 +2,9 @@
 Application configuration using pydantic-settings.
 """
 
+import os
 from functools import lru_cache
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,7 +23,9 @@ class Settings(BaseSettings):
 
     # Redis / Celery
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
-    RATE_LIMITING_ENABLED: bool = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
+    RATE_LIMITING_ENABLED: bool = (
+        os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
+    )
 
     # Application
     APP_NAME: str = "Stock Scanner API"
