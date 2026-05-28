@@ -23,6 +23,7 @@ These must be set before starting the stack. The application will start without 
 | `PGADMIN_DEFAULT_EMAIL` | Login email for pgAdmin web UI | `admin@example.com` |
 | `PGADMIN_DEFAULT_PASSWORD` | Login password for pgAdmin web UI | `change_me` |
 | `SEQ_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Seq admin password. Generate with: `echo 'YourPassword' \| docker run --rm -i datalust/seq config hash` | `$2a$11$...` |
+| `FLOWER_BASIC_AUTH` | Basic auth credentials for the Flower Celery UI (http://localhost:5555). Flower reads this automatically. Format: `user:password` | `admin:change_me_flower_password` |
 
 ---
 
