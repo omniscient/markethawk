@@ -27,6 +27,7 @@ httpx==0.28.1
 # Background Tasks
 celery==5.6.3
 redis==7.4.0
+slowapi==0.1.9
 flower==2.0.1
 
 # Environment Variables

@@ -29,7 +29,8 @@ class Settings:
     
     # Redis / Celery
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")
-    
+    RATE_LIMITING_ENABLED: bool = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
+
     # Application
     APP_NAME: str = "Stock Scanner API"
     APP_VERSION: str = "1.0.0"
