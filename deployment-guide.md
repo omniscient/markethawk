@@ -23,15 +23,15 @@ Before exposing this stack outside your local machine, address the following:
 
 ### Network Exposure
 
-- [ ] Bind management service ports to `127.0.0.1` in `docker-compose.yml` to prevent external access:
+- [x] Bind management service ports to `127.0.0.1` in `docker-compose.yml` to prevent external access:
   ```yaml
   ports:
     - "127.0.0.1:5050:80"    # pgAdmin — localhost only
     - "127.0.0.1:5555:5555"  # Flower — localhost only
     - "127.0.0.1:5380:80"    # Seq — localhost only
   ```
-- [ ] Only expose port 3000 (frontend) and 8000 (backend API) to the network or a reverse proxy.
-- [ ] Add authentication to Flower: set `FLOWER_BASIC_AUTH=user:password` and add it to the Flower command in `docker-compose.yml`.
+- [ ] Only expose port 3333 (frontend) and 8000 (backend API) to the network or a reverse proxy.
+- [x] Add authentication to Flower: set `FLOWER_BASIC_AUTH=user:password` in `.env` — Flower reads it automatically from the environment.
 
 ### IB Gateway
 

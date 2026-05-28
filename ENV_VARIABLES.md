@@ -24,6 +24,7 @@ These must be set before starting the stack. The application will start without 
 | `PGADMIN_DEFAULT_EMAIL` | Login email for pgAdmin web UI | `admin@example.com` |
 | `PGADMIN_DEFAULT_PASSWORD` | Login password for pgAdmin web UI | `change_me` |
 | `SEQ_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Seq admin password. Generate with: `echo 'YourPassword' \| docker run --rm -i datalust/seq config hash` | `$2a$11$...` |
+| `FLOWER_BASIC_AUTH` | Basic auth credentials for the Flower Celery UI (http://localhost:5555). Flower reads this automatically. Format: `user:password` | `admin:change_me_flower_password` |
 
 ---
 
@@ -41,6 +42,11 @@ These must be set before starting the stack. The application will start without 
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | JWT access token lifetime in minutes. Short values improve security; longer values reduce refresh frequency. |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime in days. Stored in Redis; deleting the Redis key revokes the session. |
 | `CORS_ORIGINS` | `http://localhost:3333` | Comma-separated list of allowed frontend origins. Wildcard `*` is intentionally rejected; list explicit origins instead. |
+| `DB_POOL_SIZE` | `20` | SQLAlchemy connection pool size per process. Increase if you add more Celery workers. |
+| `DB_POOL_MAX_OVERFLOW` | `10` | Extra connections allowed above `DB_POOL_SIZE` during bursts. |
+| `DB_POOL_PRE_PING` | `true` | When `true`, tests each connection before use to automatically recover after PostgreSQL restarts. |
+| `DB_POOL_RECYCLE` | `3600` | Seconds before a pooled connection is replaced. Prevents stale connections after long idle periods. |
+| `DB_POOL_TIMEOUT` | `30` | Seconds to wait for a connection from the pool before raising an error. |
 
 ---
 

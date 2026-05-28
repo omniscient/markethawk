@@ -55,8 +55,8 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Archon CLI (from source)
-RUN git clone https://github.com/coleam00/Archon.git /opt/archon && \
+# Archon CLI (from fork — includes workflow cost tracking)
+RUN git clone -b feat/workflow-cost-tracking https://github.com/omniscient/Archon.git /opt/archon && \
     cd /opt/archon && bun install && \
     cd /opt/archon/packages/cli && bun link
 

@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
@@ -27,7 +27,7 @@ services:
     image: redis:7-alpine
     container_name: stockscanner-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -237,8 +237,9 @@ services:
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH}
     ports:
-      - "5555:5555"
+      - "127.0.0.1:5555:5555"
     depends_on:
       redis:
         condition: service_healthy
@@ -256,7 +257,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
@@ -273,8 +274,8 @@ services:
       ACCEPT_EULA: Y
       SEQ_FIRSTRUN_ADMINPASSWORDHASH: ${SEQ_ADMIN_PASSWORD_HASH}
     ports:
-      - "5380:80"        # UI Port (Web Interface)
-      - "5341:5341"      # Ingestion Port (API)
+      - "127.0.0.1:5380:80"        # UI Port (Web Interface)
+      - "127.0.0.1:5341:5341"      # Ingestion Port (API)
     volumes:
       - seq_data:/data
     networks:
@@ -349,7 +350,7 @@ services:
     container_name: markethawk-tweet-monitor
     restart: unless-stopped
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0

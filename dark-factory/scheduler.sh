@@ -423,7 +423,24 @@ while true; do
     DISPATCHED="Fix issue #${ISSUE}"
   done < <(echo "$BLOCKED" | jq -c '.[]')
 
-  # --- Priority 4: Backlog items (refinement — prepare future work) ---
+  # --- Priority 4: Refined items (plan generation — advance refined work before pulling new backlog) ---
+  while IFS= read -r item; do
+    [ -n "$DISPATCHED" ] && break
+    ISSUE=$(get_issue_number "$item")
+    if has_refine_skip_label "$item"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+    if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
+
+    gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "📋 **Refinement Pipeline** — Starting plan generation and architect validation.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+    dispatch "Plan issue #${ISSUE}"
+    DISPATCHED="Plan issue #${ISSUE}"
+    REFINE_RUNNING=$((REFINE_RUNNING + 1))
+  done < <(echo "$REFINED" | jq -c '.[]')
+
+  # --- Priority 5: Backlog items (refinement — prepare future work) ---
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
@@ -459,23 +476,6 @@ while true; do
     DISPATCHED="Refine issue #${ISSUE}"
     REFINE_RUNNING=$((REFINE_RUNNING + 1))
   done < <(echo "$BACKLOG" | jq -c '.[]')
-
-  # --- Priority 5: Refined items (plan generation — prepare future work) ---
-  while IFS= read -r item; do
-    [ -n "$DISPATCHED" ] && break
-    ISSUE=$(get_issue_number "$item")
-    if has_refine_skip_label "$item"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
-    if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
-
-    gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "📋 **Refinement Pipeline** — Starting plan generation and architect validation.
-
----
-*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-    dispatch "Plan issue #${ISSUE}"
-    DISPATCHED="Plan issue #${ISSUE}"
-    REFINE_RUNNING=$((REFINE_RUNNING + 1))
-  done < <(echo "$REFINED" | jq -c '.[]')
 
   # --- Log cycle summary ---
   BUDGET=$(gh api rate_limit --jq '.resources.graphql | "\(.used)/\(.limit)"' 2>/dev/null) || BUDGET="?"
