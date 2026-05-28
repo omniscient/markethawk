@@ -1,4 +1,8 @@
 import os
+
+os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
+os.environ.setdefault("POLYGON_API_KEY", "test-key-for-unit-tests-only")
+
 import pytest
 import logging as _logging
 from typing import Generator
