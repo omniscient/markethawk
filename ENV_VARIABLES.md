@@ -37,6 +37,11 @@ These must be set before starting the stack. The application will start without 
 | `LOG_LEVEL` | `INFO` | Backend and Celery log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
 | `SEQ_URL` | `http://seq:5341` | Seq ingestion endpoint. Set to `disabled` or leave empty to fall back to stdout-only logging. |
 | `POLYGON_DELAYED` | `true` | When `true`, treats Polygon data as potentially delayed. Set to `false` if your plan provides real-time data. |
+| `DB_POOL_SIZE` | `20` | SQLAlchemy connection pool size per process. Increase if you add more Celery workers. |
+| `DB_POOL_MAX_OVERFLOW` | `10` | Extra connections allowed above `DB_POOL_SIZE` during bursts. |
+| `DB_POOL_PRE_PING` | `true` | When `true`, tests each connection before use to automatically recover after PostgreSQL restarts. |
+| `DB_POOL_RECYCLE` | `3600` | Seconds before a pooled connection is replaced. Prevents stale connections after long idle periods. |
+| `DB_POOL_TIMEOUT` | `30` | Seconds to wait for a connection from the pool before raising an error. |
 
 ---
 
