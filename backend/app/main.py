@@ -3,17 +3,20 @@ Stock Scanner Backend API
 FastAPI-based REST API for stock scanning and alert system
 """
 
+import asyncio
 import logging
 import os
+import time as _time
 import traceback
 import hashlib
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from prometheus_client import generate_latest, CollectorRegistry, REGISTRY
 from slowapi.middleware import SlowAPIASGIMiddleware
 from slowapi.errors import RateLimitExceeded
 from jose import JWTError, jwt
@@ -83,9 +86,26 @@ async def lifespan(app: FastAPI):
     websocket_manager.start()
     logging.info("Stock WebSocket Manager started")
 
+    from app.core.metrics import db_pool_size, db_pool_checked_out, db_pool_overflow
+
+    async def _update_pool_metrics():
+        while True:
+            try:
+                pool = engine.pool
+                db_pool_size.set(pool.size())
+                db_pool_checked_out.set(pool.checkedout())
+                db_pool_overflow.set(pool.overflow())
+            except Exception:
+                pass
+            await asyncio.sleep(15)
+
+    _pool_task = asyncio.create_task(_update_pool_metrics())
+    logging.info("DB pool metrics background task started")
+
     yield
 
     # --- Shutdown ---
+    _pool_task.cancel()
     engine.dispose()
     logging.info("Database connection closed")
 
@@ -203,6 +223,41 @@ def create_app() -> FastAPI:
             status_code=429,
             headers={"Retry-After": str(retry_after)},
             content={"message": "Rate limit exceeded", "error_id": None, "retry_after": retry_after},
+        )
+
+    # Prometheus HTTP metrics middleware
+    from app.core.metrics import http_requests_total, http_request_duration_seconds
+
+    @app.middleware("http")
+    async def prometheus_middleware(request: Request, call_next):
+        if request.url.path == "/metrics":
+            return await call_next(request)
+        start = _time.monotonic()
+        response = await call_next(request)
+        duration = _time.monotonic() - start
+        handler = request.url.path
+        http_requests_total.labels(
+            method=request.method,
+            handler=handler,
+            status_code=str(response.status_code),
+        ).inc()
+        http_request_duration_seconds.labels(
+            method=request.method,
+            handler=handler,
+        ).observe(duration)
+        return response
+
+    @app.get("/metrics", include_in_schema=False)
+    def prometheus_metrics():
+        if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+            from prometheus_client.multiprocess import MultiProcessCollector
+            reg = CollectorRegistry()
+            MultiProcessCollector(reg)
+        else:
+            reg = REGISTRY
+        return Response(
+            content=generate_latest(reg),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
         )
 
     # Include routers
