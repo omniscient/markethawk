@@ -77,7 +77,9 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 
 | File | Responsibility |
 |------|---------------|
-| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks/scanning.py`. `get_all()` enumerates entries for `GET /api/scanner/types`. |
+| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks/scanning.py`. `get_all()` enumerates entries for `GET /api/scanner/types`. `compute_next_run(scanner_type)` returns next scheduled fire time. `get_scan_progress(redis_url, universe_id, scanner_type)` reads Redis progress state. `request_scan_cancel(redis_url, scan_id)` sets Redis cancel flag. `enqueue_scan(db, request)` creates `ScannerRun` row and dispatches Celery task. |
+| `scanner_query_service.py` | `ScannerQueryService` — DB aggregation queries extracted from `routers/scanner.py`. `get_scan_status_block()` builds the Scan Status card payload. `get_signal_quality_distribution()` computes decile outcome stats. `get_review_stats()` aggregates signal review coverage, acceptance rate, and rejection reasons. |
+| `system_service.py` | `SystemService` — business logic extracted from `routers/system.py`. `get_market_status()` returns the current ET session. `check_ibkr_reachable()` socket probe. `format_bytes()` human-readable size. `get_storage_stats()` per-table PostgreSQL size queries. `get_active_tasks()` async Redis + DB poll for the `/ws/tasks` WebSocket. |
 | `pre_market_scan.py` | Self-registers `"pre_market_volume_spike"` in the orchestrator. Delegates to `ScannerService.run_pre_market_scan` (interim; body inlined in Task 8). |
 | `oversold_bounce_scan.py` | Self-registers `"oversold_bounce"` in the orchestrator. Delegates to `ScannerService.run_oversold_bounce_scan` (interim). |
 | `scanner.py` | `ScannerService` — `calculate_day_metrics()`, `_get_batch_enrichment_data()` (3-tuple with ES/NQ context and sector ETF changes), Phase 2a 19-key feature enrichment. `_save_event()` delegates to `alert_service.save_event`. `run_pre_market_scan`/`run_oversold_bounce_scan` accept optional `scanner_run` param; per-ticker domain failures accumulated into `scanner_run.failed_tickers`. |
@@ -94,6 +96,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `websocket_manager.py` | WebSocket connection pool; `broadcast()` to all connected clients. |
 | `normalization.py` | Data normalization helpers (price/volume units, split adjustments). |
 | `data_quality.py` | Quality checks and `UniverseQualityReport` generation. |
+| `auto_trade_service.py` | `AutoTradeExecutor` — full auto-trade lifecycle (guard checks, sizing, IBKR submission). `approve_order(order, strategy, db)` handles paper vs. live approval. `cancel_order(order, db)` cancels via IBKR or marks paper cancelled. `get_account()` fetches IBKR account summary with graceful fallback. `get_stats(db, days)` computes P&L, win rate, and status breakdown. |
 | `stats.py` | Aggregate statistics helpers for dashboard metrics. |
 | `event_helpers.py` | Utility functions for `ScannerEvent` construction and querying. |
 | `statistical_discovery.py` | Pure-Python statistical analysis service: `build_feature_matrix`, `compute_correlations` (Pearson + Spearman), `compute_shap_weights` (LightGBM + SHAP), `run_kmeans`, `compute_conditional_stats`, `generate_label`. No DB dependencies; accepts DataFrames, returns typed dicts. |

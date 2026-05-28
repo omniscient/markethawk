@@ -79,3 +79,51 @@ def test_liquidity_hunt_variants_registered():
     import app.services.liquidity_hunt  # noqa: F401
     for key in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
         assert key in orchestrator._REGISTRY, f"Expected {key!r} in registry"
+
+
+# ── New orchestration functions ────────────────────────────────────────────
+
+import fakeredis
+from unittest.mock import patch
+
+from app.services.scan_orchestrator import (
+    compute_next_run,
+    get_scan_progress,
+    request_scan_cancel,
+)
+
+
+def test_compute_next_run_returns_none_for_non_scheduled():
+    assert compute_next_run("pre_market_volume_spike") is None
+
+
+def test_compute_next_run_returns_future_weekday_for_liquidity_hunt():
+    from datetime import datetime, timezone
+    result = compute_next_run("liquidity_hunt")
+    assert result is not None
+    assert result > datetime.now(timezone.utc)
+    assert result.weekday() < 5  # not a weekend
+
+
+def test_compute_next_run_returns_value_for_pre_variant():
+    result = compute_next_run("liquidity_hunt_pre")
+    assert result is not None
+
+
+def test_compute_next_run_returns_value_for_post_variant():
+    result = compute_next_run("liquidity_hunt_post")
+    assert result is not None
+
+
+def test_get_scan_progress_returns_none_when_no_key():
+    server = fakeredis.FakeRedis(decode_responses=True)
+    with patch("app.services.scan_orchestrator._redis.Redis.from_url", return_value=server):
+        result = get_scan_progress("redis://localhost", universe_id=1, scanner_type="liquidity_hunt")
+    assert result is None
+
+
+def test_request_scan_cancel_sets_redis_key():
+    server = fakeredis.FakeRedis(decode_responses=True)
+    with patch("app.services.scan_orchestrator._redis.Redis.from_url", return_value=server):
+        request_scan_cancel("redis://localhost", "test-scan-uuid")
+        assert server.get("scan_cancel:test-scan-uuid") == "1"

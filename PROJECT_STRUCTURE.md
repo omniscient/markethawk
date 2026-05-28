@@ -67,11 +67,13 @@ MarketHawk/
 │   │   ├── services/
 │   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags; is_futures_ticker(); get_historical_enriched() (coercion + indicators + guardrails)
 │   │   │   ├── universe_stats.py       # UniverseStatsService.compute() — universe aggregate stats (ticker count, bar count, date range, timespans)
-│   │   │   ├── scan_orchestrator.py    # Scanner registry (ScannerDescriptor, _REGISTRY, register, get_all, run); single dispatch entry point
+│   │   │   ├── scan_orchestrator.py    # Scanner registry (ScannerDescriptor, _REGISTRY, register, get_all, run); also compute_next_run, get_scan_progress, request_scan_cancel, enqueue_scan
+│   │   │   ├── scanner_query_service.py # ScannerQueryService: get_scan_status_block, get_signal_quality_distribution, get_review_stats
+│   │   │   ├── system_service.py       # SystemService: get_market_status, check_ibkr_reachable, format_bytes, get_storage_stats, get_active_tasks
+│   │   │   ├── auto_trade_service.py   # AutoTradeExecutor (lifecycle); approve_order, cancel_order, get_account, get_stats
 │   │   │   ├── pre_market_scan.py      # Self-registers "pre_market_volume_spike" in orchestrator
 │   │   │   ├── oversold_bounce_scan.py # Self-registers "oversold_bounce" in orchestrator
 │   │   │   ├── scanner.py              # ScannerService; calculate_day_metrics; _save_event delegates to alert_service.save_event
-│   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags
 │   │   │   ├── discovery_service.py    # Bulk ticker sync from Polygon; rate-limit-aware paging
 │   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis; returns latest_article_utc for recency enrichment
 │   │   │   ├── futures_data.py         # 2-method public interface: get_continuous_series, sync_contracts; private write-path helpers

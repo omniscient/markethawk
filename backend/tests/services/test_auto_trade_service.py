@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 from app.models.alert_rule import AlertRule
 from app.models.scanner_event import ScannerEvent
 from app.models.trading_strategy import TradingStrategy
-from app.services.auto_trade_service import AutoTradeExecutor, PositionCalc
+from app.models.auto_trade_order import AutoTradeOrder
+from app.services.auto_trade_service import AutoTradeExecutor, PositionCalc, approve_order, cancel_order, get_account, get_stats
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
@@ -247,3 +248,97 @@ def test_maybe_execute_live_mode_isolates_ibkr(db: Session):
     assert order is not None
     assert order.status == "submitted"
     assert order.broker_order_id == "IB-PARENT-1"
+
+
+# ── New service functions ──────────────────────────────────────────────────
+
+
+def _make_order(db, strategy, paper=True, status="pending_approval"):
+    order = AutoTradeOrder(
+        trading_strategy_id=strategy.id,
+        symbol="AAPL",
+        side="long",
+        event_date=date.today(),
+        status=status,
+        is_paper=paper,
+        trigger_price=Decimal("50.00"),
+        calculated_stop=Decimal("49.00"),
+        calculated_target=Decimal("52.00"),
+        quantity=10,
+    )
+    db.add(order)
+    db.flush()
+    return order
+
+
+# ── approve_order ──────────────────────────────────────────────────────────
+
+def test_approve_order_paper_sets_submitted(db):
+    s = _strategy(db, paper_mode=True)
+    o = _make_order(db, s)
+    result = approve_order(o, s, db)
+    assert result.status == "submitted"
+    assert result.broker_order_id.startswith("PAPER-")
+
+
+def test_approve_order_live_queues_celery(db):
+    s = _strategy(db, paper_mode=False)
+    o = _make_order(db, s)
+    with patch("app.services.auto_trade_service.AutoTradeExecutor._get_account_equity"):
+        with patch("app.core.celery_app.celery_app.send_task") as mock_send:
+            result = approve_order(o, s, db)
+    assert result.status == "pending"
+    mock_send.assert_called_once_with(
+        "app.tasks.submit_approved_order",
+        kwargs={"order_id": o.id},
+    )
+
+
+# ── cancel_order ───────────────────────────────────────────────────────────
+
+def test_cancel_order_paper_sets_cancelled(db):
+    s = _strategy(db, paper_mode=True)
+    o = _make_order(db, s, paper=True, status="submitted")
+    result = cancel_order(o, db)
+    assert result.status == "cancelled"
+
+
+def test_cancel_order_live_calls_ibkr_cancel(db):
+    s = _strategy(db, paper_mode=False)
+    o = _make_order(db, s, paper=False, status="submitted")
+    o.broker_order_id = "12345"
+    o.broker_stop_id = "12346"
+    o.broker_target_id = "12347"
+    db.flush()
+
+    mock_mgr = MagicMock()
+    mock_mgr.cancel_bracket = AsyncMock()
+
+    with patch("app.providers.ibkr_orders.IBKROrderManager", return_value=mock_mgr):
+        result = cancel_order(o, db)
+
+    assert result.status == "cancelled"
+    mock_mgr.cancel_bracket.assert_awaited_once()
+
+
+# ── get_account ────────────────────────────────────────────────────────────
+
+def test_get_account_returns_disconnected_on_error():
+    result = get_account()
+    # In test env IBKR is not running — should return a graceful fallback
+    assert "connected" in result
+    # Either connected (if somehow IBKR is up) or not
+    if not result["connected"]:
+        assert result["net_liquidation"] is None
+        assert "error" in result
+
+
+# ── get_stats ──────────────────────────────────────────────────────────────
+
+def test_get_stats_returns_expected_shape(db):
+    result = get_stats(db, days=30)
+    assert "period_days" in result
+    assert "total_orders" in result
+    assert "by_status" in result
+    assert "win_rate" in result
+    assert result["period_days"] == 30
