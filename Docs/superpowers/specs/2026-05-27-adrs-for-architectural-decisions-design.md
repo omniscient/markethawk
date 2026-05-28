@@ -9,19 +9,21 @@ MarketHawk has exactly one Architecture Decision Record (ADR-001, covering the P
 
 ## Requirements
 
-1. A reusable ADR template file is added to `Docs/adr/` using Michael Nygard's lightweight format (Context, Decision, Consequences, Status).
+1. A reusable ADR template file is added to `Docs/adr/` using a lightweight format: `Status:` is the only mandatory field; Context / Decision / Consequences sections are organizational suggestions for longer ADRs, not required scaffolding.
 2. ADR-002 through ADR-008 are written as individual files in `Docs/adr/`, numbered sequentially.
 3. ADR-002 (authentication strategy) is written as a **Pending stub** because the decision depends on issue #84, which has not yet shipped. The stub reserves the slot and forward-references #84.
 4. ADRs 003–008 are written as complete, accurate records of decisions already made and visible in the codebase.
 5. ADR-003 explicitly acknowledges the inconsistency between the current sync ORM and the partially-async codebase, and includes a forward pointer to the planned async migration issue.
 6. ARCHITECTURE.md's service topology diagram currently shows `asyncpg` as the ORM transport; ADR-003 notes this inaccuracy. The diagram correction itself is a separate follow-up change.
-7. ADR-001's informal paragraph style is not retroactively reformatted; it predates this standard and the issue scope does not include it.
+7. ADR-001's informal paragraph style is compatible with the format (adding a `Status: Accepted` line would be sufficient to bring it into compliance). Whether to add that line is left to the implementer; retroactive reformatting is not required.
 
 ## Approach
 
-### Format: Nygard Structured Sections
+### Format: Status Line + Free-Form Prose
 
-All new ADRs and the template use the structured Nygard format. ADR-001 used a single informal paragraph — that predates this standard and is left unchanged.
+All new ADRs include a `Status:` line at the top. This is the only mandatory structural element.
+
+ADR-001 is not "wrong" — it contains what was decided, why, and what the trade-offs were. The one thing it lacks is a `Status:` field, which makes it impossible to tell from the file whether the decision is still in force, superseded, or under review. The full four-section scaffold (Context / Decision / Consequences) adds discoverability for long, dense ADRs but is overhead for brief decisions.
 
 Template structure:
 ```
@@ -32,6 +34,7 @@ Template structure:
 
 ## Context
 <Why did this decision need to be made? What forces were at play?>
+(Optional for short ADRs — may be folded into prose below)
 
 ## Decision
 <What was decided? Be specific.>
@@ -39,6 +42,8 @@ Template structure:
 ## Consequences
 <What are the known trade-offs, follow-on work, or risks?>
 ```
+
+The template note: sections are organizational suggestions. Short decisions (1–2 paragraphs) may use continuous prose with just the `Status:` header. Longer ADRs (003, 005, 006, 007) benefit from explicit sections due to content density.
 
 ### ADR Content Summary
 
@@ -85,16 +90,20 @@ Write ADR-002 with a "Proposed" status guessing at the auth approach before #84 
 ### B: Template only, all 7 ADRs as empty stubs
 Reserve all slots but write no content. **Rejected**: very low value delivery; the decisions for ADRs 003–008 are already made and fully visible in the codebase.
 
-### C (chosen): Template + ADRs 003–008 fully written + ADR-002 as Pending stub
-Maximizes knowledge capture for decisions already made, correctly represents ADR-002's undecided state, and establishes the standard for future ADRs.
+### C: Full Nygard four-section scaffold for every ADR (mandatory Context / Decision / Consequences sections)
+Enforce the full structured format on all ADRs including short ones. **Rejected** based on owner feedback: ADR-001's informal paragraph format is not wrong — it lacks only a Status field. Mandatory sections add overhead for brief decisions without improving their quality. The template should guide, not constrain.
+
+### D (chosen): Status line required + free-form prose + optional sections
+Mandates the one field that matters for ADR lifecycle tracking (Status), leaves structure flexible for the implementer. Short ADRs can use prose; long ones use sections. ADR-001 is compatible with a one-line addition.
 
 ## Open Questions
 
 - The issue body references issue #103 for the async SQLAlchemy migration; the issue comments reference #101. The ADR notes both numbers. The correct issue number should be verified before merging.
 - ADR-002 content: the stub is intentionally empty. A follow-up task should be created to fill it in after #84 ships.
+- Adding `Status: Accepted` to ADR-001 is optional but harmless; implementer should decide.
 
 ## Assumptions
 
 - The `Docs/adr/` directory (uppercase D) is the canonical location; `docs/adr/` (lowercase) referenced in some internal docs is a discrepancy in documentation, not a second directory.
-- ADR-001's informal paragraph format is treated as legacy; no migration of its content is required.
+- ADR-001's content is accurate and does not need reformatting — at most, a `Status: Accepted` line addition.
 - The ARCHITECTURE.md diagram correction (asyncpg vs psycopg2) is out of scope for this issue and should be a separate PR.
