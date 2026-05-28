@@ -2,6 +2,9 @@ import os
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 os.environ.setdefault("POLYGON_API_KEY", "test-key-for-unit-tests-only")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests-only-32chars!")
+# Disable rate limiting in tests: Redis is not available in the test environment,
+# and SlowAPIASGIMiddleware would raise ConnectionError on every request.
+os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
 
 from app.core.config import get_settings
 get_settings.cache_clear()

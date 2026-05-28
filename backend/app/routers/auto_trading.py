@@ -28,7 +28,8 @@ from datetime import datetime, timezone, date as date_type, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from app.core.rate_limits import limiter, TRADING_LIMIT
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -270,7 +271,9 @@ def get_order(
 
 
 @router.post("/orders/{order_id}/approve")
+@limiter.limit(TRADING_LIMIT)
 def approve_order(
+    request: Request,
     order_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -323,7 +326,9 @@ def approve_order(
 
 
 @router.post("/orders/{order_id}/reject")
+@limiter.limit(TRADING_LIMIT)
 def reject_order(
+    request: Request,
     order_id: int,
     payload: Dict[str, Any] = {},
     db: Session = Depends(get_db),
@@ -348,7 +353,9 @@ def reject_order(
 
 
 @router.post("/orders/{order_id}/cancel")
+@limiter.limit(TRADING_LIMIT)
 def cancel_order(
+    request: Request,
     order_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:

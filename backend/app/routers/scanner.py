@@ -6,7 +6,8 @@ from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
+from app.core.rate_limits import limiter, SCANNER_LIMIT
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import cast
 from sqlalchemy.dialects.postgresql import JSONB
@@ -64,8 +65,10 @@ def list_scanner_types():
 
 
 @router.post("/run", response_model=ScannerRunAsyncResponse, status_code=202)
+@limiter.limit(SCANNER_LIMIT)
 def run_scanner(
-    request: ScannerRunRequest,
+    request: Request,
+    body: ScannerRunRequest,
     db: Session = Depends(get_db),
 ):
     """Enqueue a scan and return immediately.
@@ -81,14 +84,14 @@ def run_scanner(
     from app.core.config import settings as _settings
     from app.tasks import run_universe_scan
 
-    if not request.universe_id:
+    if not body.universe_id:
         raise HTTPException(
             status_code=400,
             detail="universe_id is required (per-ticker scans go through /run-range)",
         )
 
     in_flight = ScannerService.check_concurrency(
-        _settings.REDIS_URL, request.universe_id, request.scanner_type
+        _settings.REDIS_URL, body.universe_id, body.scanner_type
     )
     if in_flight:
         raise HTTPException(
@@ -103,12 +106,12 @@ def run_scanner(
 
     try:
         start_date, end_date = ScannerService.resolve_date_range(
-            request.start_date, request.end_date
+            body.start_date, body.end_date
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    ticker_count = ScannerService.count_active_tickers(db, request.universe_id)
+    ticker_count = ScannerService.count_active_tickers(db, body.universe_id)
     if ticker_count == 0:
         raise HTTPException(
             status_code=400, detail="No tickers found in the selected universe"
@@ -117,8 +120,8 @@ def run_scanner(
     scan_id = str(uuid.uuid4())
     scanner_run = ScannerRun(
         uuid=uuid.UUID(scan_id),
-        scanner_type=request.scanner_type,
-        universe_id=request.universe_id,
+        scanner_type=body.scanner_type,
+        universe_id=body.universe_id,
         status="queued",
         stocks_scanned=ticker_count,
         scan_start_date=start_date,
@@ -130,8 +133,8 @@ def run_scanner(
 
     async_result = run_universe_scan.delay(
         scan_id=scan_id,
-        scanner_type=request.scanner_type,
-        universe_id=request.universe_id,
+        scanner_type=body.scanner_type,
+        universe_id=body.universe_id,
         start_date_iso=start_date.isoformat(),
         end_date_iso=end_date.isoformat(),
     )
@@ -147,8 +150,8 @@ def run_scanner(
         scan_id=scan_id,
         task_id=async_result.id,
         started_at=started_at,
-        scanner_type=request.scanner_type,
-        universe_id=request.universe_id,
+        scanner_type=body.scanner_type,
+        universe_id=body.universe_id,
         scan_start_date=start_date,
         scan_end_date=end_date,
         status="queued",
@@ -235,6 +238,7 @@ def cancel_scan(scan_id: str, db: Session = Depends(get_db)):
 
 
 @router.websocket("/ws/runs/{task_id}")
+@limiter.exempt
 async def scan_run_websocket(websocket: WebSocket, task_id: str):
     """Stream progress messages for one running scan.
 
@@ -679,18 +683,20 @@ def get_pre_market_movers(
 
 
 @router.post("/run-range")
+@limiter.limit(SCANNER_LIMIT)
 def run_scanner_range(
-    request: ScannerRangeRequest,
+    request: Request,
+    body: ScannerRangeRequest,
     db: Session = Depends(get_db),
 ):
     """Enqueue a date-range scan for a single ticker as a background Celery task."""
     from app.tasks import run_range_scan
     task = run_range_scan.delay(
-        ticker=request.ticker.upper(),
-        scanner_types=request.scanner_types,
-        start_date_str=request.start_date.isoformat(),
-        end_date_str=request.end_date.isoformat(),
-        fetch_missing_data=request.fetch_missing_data,
+        ticker=body.ticker.upper(),
+        scanner_types=body.scanner_types,
+        start_date_str=body.start_date.isoformat(),
+        end_date_str=body.end_date.isoformat(),
+        fetch_missing_data=body.fetch_missing_data,
     )
     return {"task_id": task.id, "status": "queued"}
 
