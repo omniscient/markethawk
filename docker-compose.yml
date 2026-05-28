@@ -287,10 +287,11 @@ services:
 
   # Prometheus — metrics scraper
   prometheus:
-    image: prom/prometheus:v2.53.0
+    build:
+      context: ./monitoring/prometheus
+      dockerfile: Dockerfile
     container_name: stockscanner-prometheus
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -304,7 +305,9 @@ services:
 
   # Grafana — metrics visualization
   grafana:
-    image: grafana/grafana:11.1.0
+    build:
+      context: ./grafana
+      dockerfile: Dockerfile
     container_name: stockscanner-grafana
     ports:
       - "3001:3000"
@@ -313,7 +316,6 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
     networks:

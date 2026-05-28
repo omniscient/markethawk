@@ -181,7 +181,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    EXEMPT_PREFIXES = ("/api/auth/", "/api/health", "/docs", "/redoc", "/openapi.json")
+    EXEMPT_PREFIXES = ("/api/auth/", "/api/health", "/metrics", "/api/alerts/infrastructure", "/docs", "/redoc", "/openapi.json")
 
     @app.middleware("http")
     async def auth_middleware(request: Request, call_next):

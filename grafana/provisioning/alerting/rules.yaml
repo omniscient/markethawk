@@ -15,11 +15,6 @@ groups:
         labels:
           severity: critical
         data:
-          - refId: A
-            datasourceUid: "-- Grafana --"
-            model:
-              type: math
-              expression: $B
           - refId: B
             relativeTimeRange:
               from: 300
@@ -29,6 +24,9 @@ groups:
               expr: ibkr_connection_status
               refId: B
           - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
             datasourceUid: "-- Grafana --"
             model:
               type: math
@@ -55,6 +53,9 @@ groups:
                 sum(rate(celery_tasks_total[5m]))
               refId: B
           - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
             datasourceUid: "-- Grafana --"
             model:
               type: math
@@ -78,6 +79,9 @@ groups:
               expr: db_pool_overflow
               refId: B
           - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
             datasourceUid: "-- Grafana --"
             model:
               type: math
@@ -101,6 +105,9 @@ groups:
               expr: sum(rate(http_requests_total{status_code=~"5.."}[1m])) * 60
               refId: B
           - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
             datasourceUid: "-- Grafana --"
             model:
               type: math
