@@ -1,4 +1,4 @@
-import React from 'react';
+
 import ScannerResults from '../../components/ScannerResults';
 import SignalReviewStats from '../../components/SignalReviewStats';
 

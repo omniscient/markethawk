@@ -26,7 +26,7 @@ const addToWatchlist = (payload: AddToWatchlistPayload): Promise<WatchlistItem> 
   apiClient.post('/watchlist/', payload).then((r) => r.data);
 
 const removeFromWatchlist = (symbol: string): Promise<void> =>
-  apiClient.delete(`/watchlist/${symbol}`).then(() => undefined);
+  apiClient.delete(`/watchlist/${symbol}`).then((): void => undefined);
 
 const updateWatchlistNotes = (symbol: string, notes: string | null): Promise<WatchlistItem> =>
   apiClient.patch(`/watchlist/${symbol}`, { notes }).then((r) => r.data);

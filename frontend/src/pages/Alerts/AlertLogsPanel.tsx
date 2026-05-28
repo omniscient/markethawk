@@ -1,4 +1,4 @@
-import React from 'react';
+
 import {
   Activity, RefreshCw, CheckCircle, AlertCircle,
   Smartphone, Mail, MessageSquare, Webhook,
