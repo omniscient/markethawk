@@ -140,6 +140,19 @@ dispatch() {
   docker compose -f /workspace/project/docker-compose.yml --profile factory run -d --rm dark-factory "$command"
 }
 
+# --- Move an issue to a board status (used by the orphaned-in-progress sweep) ---
+set_board_status() {
+  local issue_num="$1"
+  local option_id="$2"
+  local item_id
+  item_id=$(gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --format json --limit 200 2>/dev/null \
+    | jq -r ".items[] | select(.content.number == $issue_num and .content.type == \"Issue\") | .id")
+  if [ -n "$item_id" ]; then
+    gh project item-edit --project-id "$PROJECT_ID" --id "$item_id" \
+      --field-id "$STATUS_FIELD" --single-select-option-id "$option_id" >/dev/null 2>&1 || true
+  fi
+}
+
 # --- Board state ---
 fetch_board_items() {
   local raw
@@ -364,6 +377,27 @@ while true; do
   BACKLOG_COUNT=$(echo "$BACKLOG" | jq 'length')
   REFINED_COUNT=$(echo "$REFINED" | jq 'length')
   REFINE_RUNNING=$(count_refine_running)
+
+  # --- Sweep: recover orphaned "In progress" items ---
+  # We only reach here when no factory container is running (FACTORY_RUNNING guard
+  # above), so any issue still in "In progress" was abandoned mid-run. The usual
+  # failure path (entrypoint on_failure -> Blocked) cannot fire for untrappable
+  # deaths — host reboot, OOM/SIGKILL — so those issues would otherwise sit stuck
+  # forever and silently consume a WIP slot. Route them into the Blocked retry path,
+  # exactly what on_failure would have done. (Skip-labels let a human park an item.)
+  while IFS= read -r item; do
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+    echo "[$(date -u +%FT%TZ)] sweep=orphaned_in_progress issue=#${ISSUE} action=move_to_blocked"
+    set_board_status "$ISSUE" "$STATUS_BLOCKED"
+    gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "## Dark Factory — Orphaned Run Recovered
+
+This issue was left in **In progress** with no running factory container — the run died without its error handler executing (e.g. a host restart or OOM/SIGKILL). The scheduler has moved it to **Blocked** so it will be retried automatically.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+  done < <(echo "$IN_PROGRESS" | jq -c '.[]')
 
   # --- Priority 1: In Review items with new comments (unblock existing work) ---
   while IFS= read -r item; do

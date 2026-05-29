@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     git \
     jq \
+    bc \
     bubblewrap \
     socat \
     ca-certificates \

@@ -168,7 +168,7 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
-      PADDED=$(printf "%02d" "$ISSUE")
+      PADDED=$(printf "%02d" $((ISSUE % 100)))  # slot 00-99 keeps preview ports <= 65535 (3-digit issues would overflow, e.g. #100 -> 110033)
 
       echo "Tearing down mh-preview-${ISSUE}..."
       docker compose -p "mh-preview-${ISSUE}" down -v 2>/dev/null || echo "No preview stack found"
@@ -290,7 +290,11 @@ nodes:
   - id: preview-up
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
-      PADDED=$(printf "%02d" "$ISSUE")
+      # Preview ports follow 1{SLOT}{suffix} (e.g. slot 03 -> frontend 10333, backend 10380).
+      # SLOT must stay 2 digits or the port exceeds 65535 (issue #100 produced 110033 -> "invalid hostPort").
+      # Map the issue number into a 2-digit slot via modulo. Caveat: two previews whose issue numbers are
+      # congruent mod 100 collide on ports; acceptable given the single-factory guard + teardown on close.
+      PADDED=$(printf "%02d" $((ISSUE % 100)))  # slot 00-99 keeps preview ports <= 65535 (3-digit issues would overflow, e.g. #100 -> 110033)
       export ISSUE_NUM_PADDED="$PADDED"
       export POLYGON_API_KEY="${POLYGON_API_KEY:-}"
 
@@ -358,7 +362,7 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
-      PADDED=$(printf "%02d" "$ISSUE")
+      PADDED=$(printf "%02d" $((ISSUE % 100)))  # slot 00-99 keeps preview ports <= 65535 (3-digit issues would overflow, e.g. #100 -> 110033)
       BRANCH=$(git branch --show-current)
       echo "Pushing branch and creating/updating PR for issue #${ISSUE}..."
 
@@ -424,7 +428,7 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
-      PADDED=$(printf "%02d" "$ISSUE")
+      PADDED=$(printf "%02d" $((ISSUE % 100)))  # slot 00-99 keeps preview ports <= 65535 (3-digit issues would overflow, e.g. #100 -> 110033)
       INTENT=$parse-intent.output.intent
       BRANCH=$(git branch --show-current)
       echo "Posting summary to issue #${ISSUE}..."
