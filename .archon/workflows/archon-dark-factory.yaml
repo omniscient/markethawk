@@ -329,7 +329,19 @@ nodes:
       fi
 
       PREVIEW_NET="mh-preview-${ISSUE}_preview-network"
+      # Connect to the preview network so we can reach the backend by container hostname.
+      # We stay connected for the lifetime of this job — the validate command step that
+      # follows needs direct network access to run endpoint smoke tests.  Disconnect
+      # happens in the validate step's cleanup (or on container exit).
       docker network connect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
+
+      # Backend is reachable inside the preview network via its container hostname.
+      # Using the container hostname avoids the localhost:<hostPort> approach, which
+      # does not work when the dark-factory container and the preview containers are on
+      # different Docker networks (the host port IS reachable from the Docker host but
+      # NOT from inside another container).
+      BACKEND_HOSTNAME="mh-preview-${ISSUE}-backend-1"
+      BACKEND_INTERNAL="http://${BACKEND_HOSTNAME}:8000"
 
       echo "Waiting for backend health..."
       for i in $(seq 1 60); do
@@ -337,9 +349,16 @@ nodes:
           PREVIEW_SECS=$(( $(date +%s) - PREVIEW_START ))
           echo "Backend healthy!"
           echo "PREVIEW_FRONTEND=http://localhost:1${PADDED}33"
-          echo "PREVIEW_BACKEND=http://localhost:1${PADDED}80"
+          echo "PREVIEW_BACKEND=${BACKEND_INTERNAL}"
           echo "PREVIEW_MOUNT_SECS=${PREVIEW_SECS}"
-          docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
+          # Write env file so the validate command can source it reliably without
+          # having to parse raw step output or guess the URL.
+          mkdir -p "$ARTIFACTS_DIR"
+          cat > "$ARTIFACTS_DIR/preview_env.sh" <<EOF
+export PREVIEW_FRONTEND="http://localhost:1${PADDED}33"
+export PREVIEW_BACKEND="${BACKEND_INTERNAL}"
+export PREVIEW_NET="${PREVIEW_NET}"
+EOF
           exit 0
         fi
         sleep 3
