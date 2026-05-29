@@ -17,6 +17,7 @@ engine = create_engine(
     pool_pre_ping=settings.DB_POOL_PRE_PING,
     pool_recycle=settings.DB_POOL_RECYCLE,
     pool_timeout=settings.DB_POOL_TIMEOUT,
+    echo=(settings.ENVIRONMENT == "development"),
 )
 
 # Session factory

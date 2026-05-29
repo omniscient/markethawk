@@ -68,14 +68,15 @@ class ScannerEvent(Base):
     )
 
     reviews = relationship(
-        "SignalReview", back_populates="event", cascade="all, delete-orphan"
+        "SignalReview",
+        back_populates="event",
+        cascade="all, delete-orphan",
+        order_by="SignalReview.reviewed_at.desc()",
     )
 
     @property
     def latest_review(self):
-        if not self.reviews:
-            return None
-        return max(self.reviews, key=lambda r: r.reviewed_at)
+        return self.reviews[0] if self.reviews else None
 
     __table_args__ = (
         UniqueConstraint(
