@@ -259,8 +259,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Gzip middleware for large payloads
-    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    # Gzip middleware for large payloads — skip /metrics to avoid
+    # BaseHTTPMiddleware ASGI message ordering conflict with compressed responses.
+    class SelectiveGZipMiddleware(GZipMiddleware):
+        async def __call__(self, scope, receive, send):
+            if scope["type"] == "http" and scope.get("path", "").startswith("/metrics"):
+                await self.app(scope, receive, send)
+            else:
+                await super().__call__(scope, receive, send)
+
+    app.add_middleware(SelectiveGZipMiddleware, minimum_size=1000)
 
     # Rate limiting — added last = outermost middleware (LIFO stacking = first to process
     # inbound requests). When RATE_LIMITING_ENABLED=False, limiter.enabled=False means
