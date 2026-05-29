@@ -80,6 +80,13 @@ JSON and corrupts it.
 Inserted in the main loop **before** the existing Priority 1 comment handler, so a red
 PR is pulled from review before any "looks good → merge" comment can be acted on.
 
+The gate (and the board-state fetch it needs) runs **above the single-factory
+concurrency guard**, so it executes on every poll even while a factory run is in
+progress. This is safe because the gate only sets board status + posts a comment — it
+never dispatches a factory container. Everything that *does* dispatch (the orphaned
+sweep and Priorities 1–5) stays below the guard. Without this, a red in-review PR would
+wait for the current (possibly long) factory run to finish before being gated.
+
 ```bash
 # --- Priority 0: In Review items with failing CI (gate red PRs out of review) ---
 CI_BLOCKED=""   # space-padded list of issues blocked this cycle (so Priority 1 skips them)
