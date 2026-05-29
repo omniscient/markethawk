@@ -115,22 +115,22 @@ has_new_comment_after_report() {
   local comments
   comments=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" --json comments -q '.comments' 2>/dev/null) || { echo "no"; return; }
 
-  local report_idx
-  report_idx=$(echo "$comments" | jq "map(.body) | to_entries | map(select(.value | test(\"$report_marker\"))) | last | .key // -1")
+  # A comment counts as reviewer feedback only if it appears AFTER the last spec report
+  # AND is not one of our own automated comments. The dark factory posts its cost report
+  # after the spec on the success path (entrypoint.sh post_cost_report), and the scheduler
+  # posts pipeline-status comments — none are feedback, so re-running the spec on them
+  # loops the pipeline (issue #124: cost report -> spurious second spec). Match on
+  # footer/marker, NOT author: every comment is authored by the same PAT account.
+  local bot_re="Posted by MarketHawk Refinement Pipeline|Posted by MarketHawk Backlog Scheduler|Posted by MarketHawk Dark Factory|Updated by MarketHawk Dark Factory|dark-factory-cost-report"
 
-  if [ "$report_idx" = "-1" ]; then
-    echo "no"
-    return
-  fi
+  local has_human
+  has_human=$(echo "$comments" | jq --arg marker "$report_marker" --arg bot "$bot_re" '
+    (to_entries | map(select(.value.body | test($marker))) | last | .key // -1) as $ridx
+    | if $ridx == -1 then false
+      else (to_entries | any(.key > $ridx and (.value.body | test($bot) | not)))
+      end')
 
-  local total
-  total=$(echo "$comments" | jq 'length')
-  local next_idx=$((report_idx + 1))
-  if [ "$next_idx" -lt "$total" ]; then
-    echo "yes"
-  else
-    echo "no"
-  fi
+  if [ "$has_human" = "true" ]; then echo "yes"; else echo "no"; fi
 }
 
 # --- Dispatch ---
@@ -363,6 +363,13 @@ ${comment_text}"
       ;;
   esac
 }
+
+# When sourced for testing (SCHEDULER_SOURCE_ONLY=1) stop here: the helper functions
+# and constants above are now defined, but the startup probes and poll loop below must
+# not run (they would call gh and block forever in `while true`).
+if [ "${SCHEDULER_SOURCE_ONLY:-0}" = "1" ]; then
+  return 0
+fi
 
 # --- Fetch WIP limits once at startup (cached until restart) ---
 WIP_DATA=$(fetch_wip_limits)
