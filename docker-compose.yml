@@ -210,6 +210,7 @@ services:
     command: python -m live_scanner.main
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
