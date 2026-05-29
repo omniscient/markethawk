@@ -130,7 +130,10 @@ post_cost_report() {
   local PRIOR_RUNS="" PREV_COST="0" PREV_IN="0" PREV_OUT="0"
   if [ -n "$COMMENT_ID" ]; then
     local EXISTING_BODY
-    EXISTING_BODY=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments/${COMMENT_ID}" \
+    # Single-comment endpoint omits the issue number: /issues/comments/{id}, NOT
+    # /issues/{n}/comments/{id} (the latter 404s — it silently lost all prior-run
+    # history and left the report frozen on its first run).
+    EXISTING_BODY=$(gh api "repos/omniscient/markethawk/issues/comments/${COMMENT_ID}" \
       --jq '.body' 2>/dev/null || true)
     PRIOR_RUNS=$(echo "$EXISTING_BODY" | sed -n '/^### Run:/,/^---$/p' | head -n -1 || true)
     # Extract previous grand total from hidden data marker
@@ -187,9 +190,12 @@ ${RUN_ROWS}
   echo "$BODY" > "$TMPFILE"
 
   if [ -n "$COMMENT_ID" ]; then
-    gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments/${COMMENT_ID}" \
-      --method PATCH -F "body=@${TMPFILE}" > /dev/null 2>&1 \
-      || echo "WARNING: Could not update cost report comment"
+    # Same canonical single-comment endpoint (no issue number). Let gh's stderr through
+    # on failure — swallowing it with 2>&1 is what hid the 404 path bug for so long.
+    if ! gh api "repos/omniscient/markethawk/issues/comments/${COMMENT_ID}" \
+        --method PATCH -F "body=@${TMPFILE}" >/dev/null; then
+      echo "WARNING: Could not update cost report comment ${COMMENT_ID}"
+    fi
   else
     gh issue comment "$ISSUE_NUM" --body-file "$TMPFILE" 2>/dev/null \
       || echo "WARNING: Could not post cost report"
