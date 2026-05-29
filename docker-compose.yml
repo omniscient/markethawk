@@ -395,6 +395,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - factory-network
+      - stockscanner-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://host.docker.internal:12201"
+        tag: "dark-factory"
     profiles:
       - factory
 
@@ -414,6 +420,12 @@ services:
       - .:/workspace/project:ro
     networks:
       - factory-network
+      - stockscanner-network
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://host.docker.internal:12201"
+        tag: "backlog-scheduler"
     profiles:
       - scheduler
 
