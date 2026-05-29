@@ -57,6 +57,7 @@ npm run lint      # ESLint
 | pgAdmin     | http://localhost:5050         |
 | Flower      | http://localhost:5555         |
 | Seq Logs    | http://localhost:5380         |
+| Seq GELF    | udp://localhost:12201         |
 | Prometheus  | http://localhost:9090         |
 | Grafana     | http://localhost:3001         |
 
