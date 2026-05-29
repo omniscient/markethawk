@@ -2,6 +2,7 @@
 Active Watchlist router — CRUD for the manually curated live-observation list.
 """
 
+import asyncio
 import logging
 from typing import List
 
@@ -21,23 +22,30 @@ router = APIRouter(prefix="/api/v1/watchlist", tags=["watchlist"])
 
 
 @router.get("/", response_model=List[ActiveWatchlistItem])
-def list_watchlist(db: Session = Depends(get_db)):
+async def list_watchlist(db: Session = Depends(get_db)):
     """Return all symbols currently in the active watchlist, oldest first."""
-    return db.query(ActiveWatchlist).order_by(ActiveWatchlist.added_at.asc()).all()
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        lambda: db.query(ActiveWatchlist).order_by(ActiveWatchlist.added_at.asc()).all(),
+    )
 
 
 @router.post("/", response_model=ActiveWatchlistItem, status_code=201)
-def add_to_watchlist(payload: ActiveWatchlistAdd, db: Session = Depends(get_db)):
+async def add_to_watchlist(payload: ActiveWatchlistAdd, db: Session = Depends(get_db)):
     """
     Add a symbol to the active watchlist.
 
     Returns 409 if the symbol is already present.
     Returns 422 if the soft limit of 50 symbols would be exceeded.
     """
-    existing = (
-        db.query(ActiveWatchlist)
+    loop = asyncio.get_running_loop()
+
+    existing = await loop.run_in_executor(
+        None,
+        lambda: db.query(ActiveWatchlist)
         .filter(ActiveWatchlist.symbol == payload.symbol)
-        .first()
+        .first(),
     )
     if existing:
         raise HTTPException(
@@ -45,7 +53,9 @@ def add_to_watchlist(payload: ActiveWatchlistAdd, db: Session = Depends(get_db))
             detail=f"{payload.symbol} is already in the active watchlist.",
         )
 
-    count = db.query(ActiveWatchlist).count()
+    count = await loop.run_in_executor(
+        None, lambda: db.query(ActiveWatchlist).count()
+    )
     if count >= WATCHLIST_SOFT_LIMIT:
         raise HTTPException(
             status_code=422,
@@ -55,45 +65,68 @@ def add_to_watchlist(payload: ActiveWatchlistAdd, db: Session = Depends(get_db))
             ),
         )
 
-    entry = ActiveWatchlist(
-        symbol=payload.symbol,
-        security_type=payload.security_type,
-        exchange=payload.exchange,
-        notes=payload.notes,
-    )
-    db.add(entry)
-    db.commit()
-    db.refresh(entry)
-    logger.info(f"ActiveWatchlist: added {payload.symbol}")
-    return entry
+    def _add():
+        entry = ActiveWatchlist(
+            symbol=payload.symbol,
+            security_type=payload.security_type,
+            exchange=payload.exchange,
+            notes=payload.notes,
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        logger.info(f"ActiveWatchlist: added {payload.symbol}")
+        return entry
+
+    return await loop.run_in_executor(None, _add)
 
 
 @router.patch("/{symbol}", response_model=ActiveWatchlistItem)
-def update_watchlist_entry(
+async def update_watchlist_entry(
     symbol: str,
     payload: ActiveWatchlistUpdate,
     db: Session = Depends(get_db),
 ):
     """Update the notes for a watchlist entry."""
     symbol = symbol.strip().upper()
-    entry = db.query(ActiveWatchlist).filter(ActiveWatchlist.symbol == symbol).first()
+    loop = asyncio.get_running_loop()
+
+    entry = await loop.run_in_executor(
+        None,
+        lambda: db.query(ActiveWatchlist)
+        .filter(ActiveWatchlist.symbol == symbol)
+        .first(),
+    )
     if not entry:
         raise HTTPException(status_code=404, detail=f"{symbol} not found in watchlist.")
 
-    entry.notes = payload.notes
-    db.commit()
-    db.refresh(entry)
-    return entry
+    def _update():
+        entry.notes = payload.notes
+        db.commit()
+        db.refresh(entry)
+        return entry
+
+    return await loop.run_in_executor(None, _update)
 
 
 @router.delete("/{symbol}", status_code=204)
-def remove_from_watchlist(symbol: str, db: Session = Depends(get_db)):
+async def remove_from_watchlist(symbol: str, db: Session = Depends(get_db)):
     """Remove a symbol from the active watchlist."""
     symbol = symbol.strip().upper()
-    entry = db.query(ActiveWatchlist).filter(ActiveWatchlist.symbol == symbol).first()
+    loop = asyncio.get_running_loop()
+
+    entry = await loop.run_in_executor(
+        None,
+        lambda: db.query(ActiveWatchlist)
+        .filter(ActiveWatchlist.symbol == symbol)
+        .first(),
+    )
     if not entry:
         raise HTTPException(status_code=404, detail=f"{symbol} not found in watchlist.")
 
-    db.delete(entry)
-    db.commit()
-    logger.info(f"ActiveWatchlist: removed {symbol}")
+    def _delete():
+        db.delete(entry)
+        db.commit()
+        logger.info(f"ActiveWatchlist: removed {symbol}")
+
+    await loop.run_in_executor(None, _delete)

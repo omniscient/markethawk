@@ -56,34 +56,39 @@ async def get_recent_tweets(
     promoted_only: bool = Query(False),
 ):
     """Return recent tweet signals from DB, newest first."""
-    db: Session = SessionLocal()
-    try:
-        q = db.query(TweetSignal).join(MonitoredAccount)
-        if classification:
-            q = q.filter(TweetSignal.classification == classification.upper())
-        if promoted_only:
-            q = q.filter(TweetSignal.promoted == True)
-        signals = q.order_by(TweetSignal.posted_at.desc()).limit(limit).all()
+    loop = asyncio.get_running_loop()
 
-        return [
-            {
-                "id": s.id,
-                "tweet_id": s.tweet_id,
-                "tweet_url": s.tweet_url,
-                "handle": s.account.handle if s.account else None,
-                "display_name": s.account.display_name if s.account else None,
-                "full_text": s.full_text,
-                "classification": s.classification,
-                "confidence": s.confidence,
-                "tickers": s.tickers,
-                "price_levels": s.price_levels,
-                "direction": s.direction,
-                "promoted": s.promoted,
-                "scanner_event_id": s.scanner_event_id,
-                "posted_at": s.posted_at.isoformat() if s.posted_at else None,
-                "scraped_at": s.scraped_at.isoformat() if s.scraped_at else None,
-            }
-            for s in signals
-        ]
-    finally:
-        db.close()
+    def _query():
+        db: Session = SessionLocal()
+        try:
+            q = db.query(TweetSignal).join(MonitoredAccount)
+            if classification:
+                q = q.filter(TweetSignal.classification == classification.upper())
+            if promoted_only:
+                q = q.filter(TweetSignal.promoted == True)
+            signals = q.order_by(TweetSignal.posted_at.desc()).limit(limit).all()
+
+            return [
+                {
+                    "id": s.id,
+                    "tweet_id": s.tweet_id,
+                    "tweet_url": s.tweet_url,
+                    "handle": s.account.handle if s.account else None,
+                    "display_name": s.account.display_name if s.account else None,
+                    "full_text": s.full_text,
+                    "classification": s.classification,
+                    "confidence": s.confidence,
+                    "tickers": s.tickers,
+                    "price_levels": s.price_levels,
+                    "direction": s.direction,
+                    "promoted": s.promoted,
+                    "scanner_event_id": s.scanner_event_id,
+                    "posted_at": s.posted_at.isoformat() if s.posted_at else None,
+                    "scraped_at": s.scraped_at.isoformat() if s.scraped_at else None,
+                }
+                for s in signals
+            ]
+        finally:
+            db.close()
+
+    return await loop.run_in_executor(None, _query)

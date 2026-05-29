@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api", tags=["health"])
 
 @router.get("/health")
 @limiter.exempt
-def health_check():
+async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
