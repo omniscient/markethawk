@@ -327,6 +327,24 @@ services:
         limits:
           memory: 1G
 
+  # GELF input sidecar — receives GELF from Docker log driver and forwards to Seq
+  seq-gelf:
+    image: datalust/seq-input-gelf:latest
+    container_name: stockscanner-seq-gelf
+    environment:
+      SEQ_ADDRESS: "http://seq:5341"
+    ports:
+      - "127.0.0.1:12201:12201/udp"
+    depends_on:
+      - seq
+    networks:
+      - stockscanner-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
   # Prometheus — metrics scraper
   prometheus:
     build:
