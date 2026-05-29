@@ -376,14 +376,6 @@ echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
 while true; do
   DISPATCHED=""
 
-  # Guard: only one factory container at a time (Claude Max rate limit)
-  FACTORY_RUNNING=$(count_factory_running)
-  if [ "$FACTORY_RUNNING" -gt 0 ]; then
-    echo "[$(date -u +%FT%TZ)] skip=factory_running count=${FACTORY_RUNNING}"
-    sleep "$POLL_INTERVAL"
-    continue
-  fi
-
   # Guard against rate limit exhaustion (REST call, doesn't cost GraphQL points)
   check_rate_limit
 
@@ -404,32 +396,14 @@ while true; do
   REFINED_COUNT=$(echo "$REFINED" | jq 'length')
   REFINE_RUNNING=$(count_refine_running)
 
-  # --- Sweep: recover orphaned "In progress" items ---
-  # We only reach here when no factory container is running (FACTORY_RUNNING guard
-  # above), so any issue still in "In progress" was abandoned mid-run. The usual
-  # failure path (entrypoint on_failure -> Blocked) cannot fire for untrappable
-  # deaths — host reboot, OOM/SIGKILL — so those issues would otherwise sit stuck
-  # forever and silently consume a WIP slot. Route them into the Blocked retry path,
-  # exactly what on_failure would have done. (Skip-labels let a human park an item.)
-  while IFS= read -r item; do
-    ISSUE=$(get_issue_number "$item")
-    if has_skip_label "$item"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
-    echo "[$(date -u +%FT%TZ)] sweep=orphaned_in_progress issue=#${ISSUE} action=move_to_blocked"
-    set_board_status "$ISSUE" "$STATUS_BLOCKED"
-    gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "## Dark Factory — Orphaned Run Recovered
-
-This issue was left in **In progress** with no running factory container — the run died without its error handler executing (e.g. a host restart or OOM/SIGKILL). The scheduler has moved it to **Blocked** so it will be retried automatically.
-
----
-*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-  done < <(echo "$IN_PROGRESS" | jq -c '.[]')
-
   # --- Priority 0: In Review items with failing CI (gate red PRs out of review) ---
-  # A PR with red CI must not sit in review (a human could approve/merge it). Move it
-  # to Blocked + comment; the branch-aware Blocked retry below then continues the
-  # existing PR branch and re-runs validate (pytest) to fix the failures. Blocking is
-  # cheap (status + comment), so we gate every red ticket this cycle — no DISPATCHED/break.
+  # Runs on EVERY cycle, independent of the factory-concurrency guard below: a PR with
+  # red CI must not sit in review (a human could approve/merge it) just because the
+  # factory happens to be busy. This only sets board status + posts a comment (it never
+  # dispatches a factory container), so it is safe to run while a factory run is active.
+  # The branch-aware Blocked retry below later continues the existing PR branch and
+  # re-runs validate (pytest) to fix the failures. Cheap, so we gate every red ticket
+  # this cycle — no DISPATCHED/break.
   CI_BLOCKED=""   # space-padded list of issues gated this cycle (Priority 1 skips them)
   while IFS= read -r item; do
     ISSUE=$(get_issue_number "$item")
@@ -458,6 +432,37 @@ ${FAIL_LIST}
 
     CI_BLOCKED="${CI_BLOCKED} ${ISSUE} "
   done < <(echo "$IN_REVIEW" | jq -c '.[]')
+
+  # Guard: only one factory container at a time (Claude Max rate limit). Everything
+  # below DISPATCHES factory work, so it waits for the current run; the CI gate above
+  # has already run regardless of factory activity.
+  FACTORY_RUNNING=$(count_factory_running)
+  if [ "$FACTORY_RUNNING" -gt 0 ]; then
+    echo "[$(date -u +%FT%TZ)] skip=factory_running count=${FACTORY_RUNNING}"
+    sleep "$POLL_INTERVAL"
+    continue
+  fi
+
+  # --- Sweep: recover orphaned "In progress" items ---
+  # We only reach here when no factory container is running (FACTORY_RUNNING guard
+  # above), so any issue still in "In progress" was abandoned mid-run. The usual
+  # failure path (entrypoint on_failure -> Blocked) cannot fire for untrappable
+  # deaths — host reboot, OOM/SIGKILL — so those issues would otherwise sit stuck
+  # forever and silently consume a WIP slot. Route them into the Blocked retry path,
+  # exactly what on_failure would have done. (Skip-labels let a human park an item.)
+  while IFS= read -r item; do
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+    if is_issue_running "$ISSUE"; then continue; fi
+    echo "[$(date -u +%FT%TZ)] sweep=orphaned_in_progress issue=#${ISSUE} action=move_to_blocked"
+    set_board_status "$ISSUE" "$STATUS_BLOCKED"
+    gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "## Dark Factory — Orphaned Run Recovered
+
+This issue was left in **In progress** with no running factory container — the run died without its error handler executing (e.g. a host restart or OOM/SIGKILL). The scheduler has moved it to **Blocked** so it will be retried automatically.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+  done < <(echo "$IN_PROGRESS" | jq -c '.[]')
 
   # --- Priority 1: In Review items with new comments (unblock existing work) ---
   while IFS= read -r item; do
