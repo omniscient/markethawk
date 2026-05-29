@@ -7,7 +7,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import { PageLoader } from './components/ui/PageLoader';
 import { GlobalErrorToast } from './components/ui/GlobalErrorToast';
-import { apiClient } from './api/client';
+import { getMe } from './api/auth';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Scanner = lazy(() => import('./pages/Scanner'));
@@ -35,7 +35,9 @@ const queryClient = new QueryClient({
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isLoading, isError } = useQuery({
     queryKey: ['auth', 'me'],
-    queryFn: () => apiClient.get('/auth/me').then((r) => r.data),
+    // Auth lives at /api/auth/me (unversionedClient), NOT /api/v1/auth/me. Using the
+    // shared getMe() helper avoids hitting a 404 that would bounce every login to /login.
+    queryFn: getMe,
     retry: false,
   });
   if (isLoading) return <div className="min-h-screen bg-financial-dark" />;

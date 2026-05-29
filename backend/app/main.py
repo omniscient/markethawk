@@ -238,26 +238,46 @@ def create_app() -> FastAPI:
         "/openapi.json",
     )
 
-    @app.middleware("http")
-    async def auth_middleware(request: Request, call_next):
-        path = request.url.path
-        if any(path.startswith(p) for p in EXEMPT_PREFIXES):
-            return await call_next(request)
-        token = request.cookies.get("access_token")
-        if not token:
-            return JSONResponse(
-                status_code=401, content={"detail": "Not authenticated"}
-            )
-        _settings = get_settings()
-        try:
-            jwt.decode(
-                token, _settings.JWT_SECRET_KEY, algorithms=[_settings.JWT_ALGORITHM]
-            )
-        except JWTError:
-            return JSONResponse(
-                status_code=401, content={"detail": "Token expired or invalid"}
-            )
-        return await call_next(request)
+    # Pure ASGI auth middleware (deliberately NOT BaseHTTPMiddleware). BaseHTTPMiddleware
+    # re-emits every response as a stream, which forces GZipMiddleware into chunked mode;
+    # under starlette 1.0.0 that chunked-gzip body is never terminated, so browsers (which
+    # send Accept-Encoding: gzip) hang waiting for the body. A pure ASGI passthrough leaves
+    # the app's single-message response intact so GZip compresses it correctly.
+    class AuthMiddleware:
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                await self.app(scope, receive, send)
+                return
+            request = Request(scope)
+            if any(request.url.path.startswith(p) for p in EXEMPT_PREFIXES):
+                await self.app(scope, receive, send)
+                return
+            token = request.cookies.get("access_token")
+            if not token:
+                await JSONResponse(
+                    status_code=401, content={"detail": "Not authenticated"}
+                )(scope, receive, send)
+                return
+            _settings = get_settings()
+            try:
+                jwt.decode(
+                    token,
+                    _settings.JWT_SECRET_KEY,
+                    algorithms=[_settings.JWT_ALGORITHM],
+                )
+            except JWTError:
+                await JSONResponse(
+                    status_code=401, content={"detail": "Token expired or invalid"}
+                )(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+
+    # Added first => innermost middleware (closest to the routes), matching the prior
+    # @app.middleware("http") ordering.
+    app.add_middleware(AuthMiddleware)
 
     # CORS middleware
     app.add_middleware(
@@ -301,24 +321,41 @@ def create_app() -> FastAPI:
     # Prometheus HTTP metrics middleware
     from app.core.metrics import http_request_duration_seconds, http_requests_total
 
-    @app.middleware("http")
-    async def prometheus_middleware(request: Request, call_next):
-        if request.url.path == "/metrics":
-            return await call_next(request)
-        start = _time.monotonic()
-        response = await call_next(request)
-        duration = _time.monotonic() - start
-        handler = request.url.path
-        http_requests_total.labels(
-            method=request.method,
-            handler=handler,
-            status_code=str(response.status_code),
-        ).inc()
-        http_request_duration_seconds.labels(
-            method=request.method,
-            handler=handler,
-        ).observe(duration)
-        return response
+    # Pure ASGI metrics middleware (see AuthMiddleware note on avoiding BaseHTTPMiddleware).
+    class PrometheusMiddleware:
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http" or scope.get("path") == "/metrics":
+                await self.app(scope, receive, send)
+                return
+            start = _time.monotonic()
+            status_code = 500
+
+            async def send_wrapper(message):
+                nonlocal status_code
+                if message["type"] == "http.response.start":
+                    status_code = message["status"]
+                await send(message)
+
+            await self.app(scope, receive, send_wrapper)
+            duration = _time.monotonic() - start
+            handler = scope["path"]
+            method = scope["method"]
+            http_requests_total.labels(
+                method=method,
+                handler=handler,
+                status_code=str(status_code),
+            ).inc()
+            http_request_duration_seconds.labels(
+                method=method,
+                handler=handler,
+            ).observe(duration)
+
+    # Added last => outermost middleware, so it measures total request time including the
+    # other layers, matching the prior @app.middleware("http") ordering.
+    app.add_middleware(PrometheusMiddleware)
 
     @app.get("/metrics", include_in_schema=False)
     def prometheus_metrics():
