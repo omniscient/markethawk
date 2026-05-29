@@ -91,7 +91,7 @@ post_cost_report() {
   # Archon's pino logger writes to stdout; use --quiet to suppress, fall back to jq filtering
   local RAW_OUTPUT RUN_JSON
   RAW_OUTPUT=$(archon workflow cost --last --json --quiet 2>/dev/null || true)
-  RUN_JSON=$(echo "$RAW_OUTPUT" | jq -s 'map(select(.run_id?)) | .[0] // empty' 2>/dev/null || true)
+  RUN_JSON=$(echo "$RAW_OUTPUT" | jq -s 'map(select((.run_id // .runId) != null)) | .[0] // empty' 2>/dev/null || true)
   if [ -z "$RUN_JSON" ] || [ "$RUN_JSON" = "null" ]; then return; fi
 
   echo "Posting cost report to issue #${ISSUE_NUM}..."
@@ -105,9 +105,9 @@ post_cost_report() {
   local RUN_ROWS TOTAL_COST TOTAL_IN TOTAL_OUT RUN_STATUS TIMESTAMP
   TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
   RUN_STATUS=$(echo "$RUN_JSON" | jq -r '.status // "unknown"')
-  TOTAL_COST=$(echo "$RUN_JSON" | jq -r '.totals.cost_usd // 0')
-  TOTAL_IN=$(echo "$RUN_JSON" | jq -r '.totals.input_tokens // 0')
-  TOTAL_OUT=$(echo "$RUN_JSON" | jq -r '.totals.output_tokens // 0')
+  TOTAL_COST=$(echo "$RUN_JSON" | jq -r '.totals.cost_usd // .totals.costUsd // 0')
+  TOTAL_IN=$(echo "$RUN_JSON" | jq -r '.totals.input_tokens // .totals.inputTokens // 0')
+  TOTAL_OUT=$(echo "$RUN_JSON" | jq -r '.totals.output_tokens // .totals.outputTokens // 0')
 
   # jq helper functions for human-readable formatting
   RUN_ROWS=$(echo "$RUN_JSON" | jq -r '
@@ -118,10 +118,10 @@ post_cost_report() {
                  elif . < 60000 then "\(. / 100 | round / 10)s"
                  else "\(. / 60000 | floor)m \((. % 60000 / 1000) | round)s" end;
     def fmt_cost: "$\(. * 10000 | round / 10000)";
-    def fmt_model: ((.modelUsage // {}) | keys[0] // "") |
+    def fmt_model: (((.modelUsage // .model_usage) // {}) | keys[0] // "") |
                    gsub("^claude-"; "") | gsub("-2025.*$"; "");
-    .nodes[] |
-    "| \(.nodeId) | \(fmt_model) | \(.inputTokens | fmt_tokens) | \(.outputTokens | fmt_tokens) | \(.costUsd | fmt_cost) | \(.durationMs | fmt_dur) |"
+    (.nodes // [])[] |
+    "| \(.nodeId // .node_id) | \(fmt_model) | \((.inputTokens // .input_tokens // 0) | fmt_tokens) | \((.outputTokens // .output_tokens // 0) | fmt_tokens) | \((.costUsd // .cost_usd // 0) | fmt_cost) | \((.durationMs // .duration_ms // 0) | fmt_dur) |"
   ' 2>/dev/null || true)
 
   if [ -z "$RUN_ROWS" ]; then return; fi
@@ -198,7 +198,6 @@ ${RUN_ROWS}
 # --- Error handler: move ticket back to Ready and post comment ---
 on_failure() {
   local EXIT_CODE=$?
-  post_cost_report
   if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
     if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ]; then
       echo "Refinement pipeline failed (exit $EXIT_CODE) for issue #$ISSUE_NUM"
@@ -230,6 +229,10 @@ docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
 *Posted by MarketHawk Dark Factory*" 2>/dev/null || true
     fi
   fi
+  # Cost report runs LAST and is non-fatal: a failure here (missing dependency,
+  # cost-JSON schema drift) must never abort the trap before the Blocked transition
+  # and failure comment above have run.
+  post_cost_report || true
 }
 trap on_failure ERR
 
@@ -260,5 +263,5 @@ export ARCHON_SUPPRESS_NESTED_CLAUDE_WARNING=1
 echo "Starting dark factory: $ARGUMENTS"
 archon workflow run archon-dark-factory "$ARGUMENTS"
 
-# --- Post cost report to GitHub issue (success path) ---
-post_cost_report
+# --- Post cost report to GitHub issue (success path) — non-fatal ---
+post_cost_report || true
