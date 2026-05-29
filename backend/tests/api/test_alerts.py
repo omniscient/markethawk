@@ -19,7 +19,7 @@ client = TestClient(app)
 
 
 def test_stats_returns_correct_shape(db: Session):
-    response = client.get("/api/alerts/stats")
+    response = client.get("/api/v1/alerts/stats")
 
     assert response.status_code == 200
     data = response.json()
@@ -36,7 +36,7 @@ def test_stats_returns_correct_shape(db: Session):
 def test_stats_counts_active_rules(db: Session):
     seed_alert_rules(db)  # 3 active, 1 inactive
 
-    response = client.get("/api/alerts/stats")
+    response = client.get("/api/v1/alerts/stats")
 
     data = response.json()
     assert data["active_rules"] == 3
@@ -47,7 +47,7 @@ def test_stats_delivery_rate_reflects_sent_vs_failed(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)  # 4 sent, 2 failed out of 6 total
 
-    response = client.get("/api/alerts/stats")
+    response = client.get("/api/v1/alerts/stats")
 
     data = response.json()
     # 4 sent / 6 total = 66.7%
@@ -55,7 +55,7 @@ def test_stats_delivery_rate_reflects_sent_vs_failed(db: Session):
 
 
 def test_stats_empty_db_returns_100_delivery_rate(db: Session):
-    response = client.get("/api/alerts/stats")
+    response = client.get("/api/v1/alerts/stats")
 
     assert response.status_code == 200
     assert response.json()["delivery_rate"] == 100.0
@@ -69,7 +69,7 @@ def test_stats_empty_db_returns_100_delivery_rate(db: Session):
 def test_list_rules_returns_all_rules(db: Session):
     seed_alert_rules(db)
 
-    response = client.get("/api/alerts/rules")
+    response = client.get("/api/v1/alerts/rules")
 
     assert response.status_code == 200
     data = response.json()
@@ -80,7 +80,7 @@ def test_list_rules_returns_all_rules(db: Session):
 
 
 def test_list_rules_empty_returns_empty_list(db: Session):
-    response = client.get("/api/alerts/rules")
+    response = client.get("/api/v1/alerts/rules")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -89,7 +89,7 @@ def test_list_rules_empty_returns_empty_list(db: Session):
 def test_list_rules_response_shape(db: Session):
     seed_alert_rules(db)
 
-    response = client.get("/api/alerts/rules")
+    response = client.get("/api/v1/alerts/rules")
 
     assert response.status_code == 200
     rule = response.json()[0]
@@ -112,7 +112,7 @@ def test_list_rules_ordered_newest_first(db: Session):
     rules = seed_alert_rules(db)
     last_created_name = rules[-1].name  # last inserted = most recently created
 
-    response = client.get("/api/alerts/rules")
+    response = client.get("/api/v1/alerts/rules")
 
     assert response.status_code == 200
     assert response.json()[0]["name"] == last_created_name
@@ -133,7 +133,7 @@ def test_create_rule_returns_201_and_persists(db: Session):
         "channel_config": {},
     }
 
-    response = client.post("/api/alerts/rules", json=payload)
+    response = client.post("/api/v1/alerts/rules", json=payload)
 
     assert response.status_code == 201
     data = response.json()
@@ -146,7 +146,7 @@ def test_create_rule_returns_201_and_persists(db: Session):
 
 
 def test_create_rule_applies_defaults(db: Session):
-    response = client.post("/api/alerts/rules", json={})
+    response = client.post("/api/v1/alerts/rules", json={})
 
     assert response.status_code == 201
     data = response.json()
@@ -160,8 +160,8 @@ def test_create_rule_applies_defaults(db: Session):
 def test_create_rule_appears_in_list(db: Session):
     payload = {"name": "Discoverable Rule"}
 
-    client.post("/api/alerts/rules", json=payload)
-    list_response = client.get("/api/alerts/rules")
+    client.post("/api/v1/alerts/rules", json=payload)
+    list_response = client.get("/api/v1/alerts/rules")
 
     names = [r["name"] for r in list_response.json()]
     assert "Discoverable Rule" in names
@@ -177,7 +177,7 @@ def test_update_rule_name(db: Session):
     rule_id = rules[0].id
 
     response = client.patch(
-        f"/api/alerts/rules/{rule_id}", json={"name": "Renamed Rule"}
+        f"/api/v1/alerts/rules/{rule_id}", json={"name": "Renamed Rule"}
     )
 
     assert response.status_code == 200
@@ -189,7 +189,7 @@ def test_update_rule_toggle_active(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id  # starts active
 
-    response = client.patch(f"/api/alerts/rules/{rule_id}", json={"is_active": False})
+    response = client.patch(f"/api/v1/alerts/rules/{rule_id}", json={"is_active": False})
 
     assert response.status_code == 200
     assert response.json()["is_active"] is False
@@ -200,7 +200,7 @@ def test_update_rule_channels(db: Session):
     rule_id = rules[1].id
 
     response = client.patch(
-        f"/api/alerts/rules/{rule_id}",
+        f"/api/v1/alerts/rules/{rule_id}",
         json={
             "channels": ["webhook"],
             "channel_config": {"webhook_url": "https://example.com/hook"},
@@ -214,7 +214,7 @@ def test_update_rule_channels(db: Session):
 
 
 def test_update_rule_not_found(db: Session):
-    response = client.patch("/api/alerts/rules/99999", json={"name": "Ghost"})
+    response = client.patch("/api/v1/alerts/rules/99999", json={"name": "Ghost"})
 
     assert response.status_code == 404
 
@@ -228,7 +228,7 @@ def test_delete_rule_returns_204(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id
 
-    response = client.delete(f"/api/alerts/rules/{rule_id}")
+    response = client.delete(f"/api/v1/alerts/rules/{rule_id}")
 
     assert response.status_code == 204
 
@@ -237,15 +237,15 @@ def test_delete_rule_removes_from_list(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id
 
-    client.delete(f"/api/alerts/rules/{rule_id}")
-    list_response = client.get("/api/alerts/rules")
+    client.delete(f"/api/v1/alerts/rules/{rule_id}")
+    list_response = client.get("/api/v1/alerts/rules")
 
     ids = [r["id"] for r in list_response.json()]
     assert rule_id not in ids
 
 
 def test_delete_rule_not_found(db: Session):
-    response = client.delete("/api/alerts/rules/99999")
+    response = client.delete("/api/v1/alerts/rules/99999")
 
     assert response.status_code == 404
 
@@ -259,7 +259,7 @@ def test_list_logs_returns_seeded_entries(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)
 
-    response = client.get("/api/alerts/logs")
+    response = client.get("/api/v1/alerts/logs")
 
     assert response.status_code == 200
     data = response.json()
@@ -267,7 +267,7 @@ def test_list_logs_returns_seeded_entries(db: Session):
 
 
 def test_list_logs_empty_returns_empty_list(db: Session):
-    response = client.get("/api/alerts/logs")
+    response = client.get("/api/v1/alerts/logs")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -277,7 +277,7 @@ def test_list_logs_response_shape(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)
 
-    response = client.get("/api/alerts/logs")
+    response = client.get("/api/v1/alerts/logs")
 
     assert response.status_code == 200
     log = response.json()[0]
@@ -297,7 +297,7 @@ def test_list_logs_ordered_newest_first(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)  # first entry has newest delivered_at
 
-    response = client.get("/api/alerts/logs")
+    response = client.get("/api/v1/alerts/logs")
 
     data = response.json()
     assert data[0]["ticker"] == "AAPL"  # most recently delivered
@@ -308,7 +308,7 @@ def test_list_logs_limit_param(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)  # 6 entries
 
-    response = client.get("/api/alerts/logs?limit=3")
+    response = client.get("/api/v1/alerts/logs?limit=3")
 
     assert response.status_code == 200
     assert len(response.json()) == 3
@@ -318,7 +318,7 @@ def test_list_logs_includes_failed_entries(db: Session):
     rules = seed_alert_rules(db)
     seed_alert_delivery_logs(db, rules)
 
-    response = client.get("/api/alerts/logs")
+    response = client.get("/api/v1/alerts/logs")
 
     statuses = {log["status"] for log in response.json()}
     assert "sent" in statuses

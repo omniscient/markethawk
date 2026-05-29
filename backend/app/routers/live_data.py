@@ -12,7 +12,7 @@ from app.services.websocket_manager import websocket_manager
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/live", tags=["live"])
+router = APIRouter(prefix="/api/v1/live", tags=["live"])
 
 
 @router.websocket("/ws/{ticker}/{resolution}")

@@ -16,7 +16,7 @@ from app.core.rate_limits import limiter
 from app.models.system_config import SystemConfig
 from app.services.system_service import SystemService
 
-router = APIRouter(prefix="/api/system", tags=["system"])
+router = APIRouter(prefix="/api/v1/system", tags=["system"])
 logger = logging.getLogger(__name__)
 
 

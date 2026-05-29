@@ -72,7 +72,7 @@ export function useWatchlistLive() {
       if (destroyed) return;
 
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${protocol}://${window.location.host}/api/live/ws/watchlist`);
+      const ws = new WebSocket(`${protocol}://${window.location.host}/api/v1/live/ws/watchlist`);
       wsRef.current = ws;
 
       ws.onopen = () => {

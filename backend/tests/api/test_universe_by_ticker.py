@@ -26,7 +26,7 @@ def test_returns_universes_for_ticker(db: Session):
     _seed(db, "Momentum", "AAPL")
     _seed(db, "Tech Picks", "AAPL")
 
-    response = client.get("/api/universe/by-ticker/AAPL")
+    response = client.get("/api/v1/universe/by-ticker/AAPL")
 
     assert response.status_code == 200
     names = [u["name"] for u in response.json()]
@@ -35,7 +35,7 @@ def test_returns_universes_for_ticker(db: Session):
 
 
 def test_returns_empty_for_unknown_ticker(db: Session):
-    response = client.get("/api/universe/by-ticker/ZZZZ")
+    response = client.get("/api/v1/universe/by-ticker/ZZZZ")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -45,7 +45,7 @@ def test_excludes_inactive_universes(db: Session):
     _seed(db, "Active Universe", "MSFT", is_active=True)
     _seed(db, "Inactive Universe", "MSFT", is_active=False)
 
-    response = client.get("/api/universe/by-ticker/MSFT")
+    response = client.get("/api/v1/universe/by-ticker/MSFT")
 
     assert response.status_code == 200
     names = [u["name"] for u in response.json()]
@@ -56,7 +56,7 @@ def test_excludes_inactive_universes(db: Session):
 def test_ticker_lookup_is_case_insensitive(db: Session):
     _seed(db, "Mixed Case", "NVDA")
 
-    response = client.get("/api/universe/by-ticker/nvda")
+    response = client.get("/api/v1/universe/by-ticker/nvda")
 
     assert response.status_code == 200
     assert len(response.json()) == 1

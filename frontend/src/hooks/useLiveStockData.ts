@@ -25,7 +25,7 @@ export const useLiveStockData = (symbol: string | undefined, resolution: 'minute
     const host = window.location.host;
     
     // Updated to include resolution in the path
-    const wsUrl = `${protocol}//${host}/api/live/ws/${symbol.toUpperCase()}/${resolution}`;
+    const wsUrl = `${protocol}//${host}/api/v1/live/ws/${symbol.toUpperCase()}/${resolution}`;
 
     console.log(`Connecting to live updates: ${wsUrl}`);
     

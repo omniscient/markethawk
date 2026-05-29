@@ -59,7 +59,7 @@ const EdgeExplorer: React.FC = () => {
       if (ticker) params.append('ticker', ticker);
       if (scannerType) params.append('scanner_type', scannerType);
       
-      const response = await fetch(`/api/scanner/edge-stats?${params.toString()}`);
+      const response = await fetch(`/api/v1/scanner/edge-stats?${params.toString()}`);
       if (!response.ok) return [];
       return response.json();
     }
@@ -73,7 +73,7 @@ const EdgeExplorer: React.FC = () => {
       if (ticker) params.append('ticker', ticker);
       if (scannerType) params.append('scanner_type', scannerType);
       
-      const response = await fetch(`/api/scanner/edge-distribution?${params.toString()}`);
+      const response = await fetch(`/api/v1/scanner/edge-distribution?${params.toString()}`);
       if (!response.ok) return { events: [] };
       return response.json();
     }

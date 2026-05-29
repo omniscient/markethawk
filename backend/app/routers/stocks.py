@@ -15,7 +15,7 @@ from app.exceptions import DataFetchError
 from app.services import StockDataService
 from app.utils.session import get_market_today
 
-router = APIRouter(prefix="/api/stocks", tags=["stocks"])
+router = APIRouter(prefix="/api/v1/stocks", tags=["stocks"])
 
 
 @router.get("/historical/{ticker}")

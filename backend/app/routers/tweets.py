@@ -21,7 +21,7 @@ from app.models.tweet_signal import TweetSignal
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/tweets", tags=["tweets"])
+router = APIRouter(prefix="/api/v1/tweets", tags=["tweets"])
 
 
 @router.websocket("/feed")

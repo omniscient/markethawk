@@ -1,9 +1,19 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Separate client for unversioned endpoints (auth, health). Auth stays at /api/auth
+// regardless of API version so tokens work across all versions.
+export const unversionedClient = axios.create({
+  baseURL: '/api',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -19,7 +29,7 @@ apiClient.interceptors.response.use(
     if (status === 401 && !error.config._retried && !error.config.url?.includes('/auth/')) {
       error.config._retried = true;
       try {
-        await apiClient.post('/auth/refresh');
+        await unversionedClient.post('/auth/refresh');
         return apiClient(error.config);
       } catch {
         window.location.href = '/login';

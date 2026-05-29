@@ -19,7 +19,7 @@ from app.providers import DataProviderFactory
 from app.services.futures_data import FuturesDataService
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/futures", tags=["futures"])
+router = APIRouter(prefix="/api/v1/futures", tags=["futures"])
 
 
 @router.get("/history/{symbol}")

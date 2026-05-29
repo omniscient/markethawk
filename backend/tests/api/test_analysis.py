@@ -15,13 +15,13 @@ client = TestClient(app)
 
 
 def test_correlations_returns_404_when_no_run(db: Session):
-    response = client.get("/api/outcomes/correlations")
+    response = client.get("/api/v1/outcomes/correlations")
     assert response.status_code == 404
 
 
 def test_correlations_returns_correct_shape(db: Session):
     seed_completed_analysis_run(db)
-    response = client.get("/api/outcomes/correlations")
+    response = client.get("/api/v1/outcomes/correlations")
 
     assert response.status_code == 200
     data = response.json()
@@ -36,7 +36,7 @@ def test_correlations_returns_correct_shape(db: Session):
 
 def test_correlations_filters_by_scanner_type(db: Session):
     seed_completed_analysis_run(db)
-    response = client.get("/api/outcomes/correlations?scanner_type=nonexistent_type")
+    response = client.get("/api/v1/outcomes/correlations?scanner_type=nonexistent_type")
     assert response.status_code == 404
 
 
@@ -46,13 +46,13 @@ def test_correlations_filters_by_scanner_type(db: Session):
 
 
 def test_latest_returns_404_when_no_run(db: Session):
-    response = client.get("/api/outcomes/analysis/latest")
+    response = client.get("/api/v1/outcomes/analysis/latest")
     assert response.status_code == 404
 
 
 def test_latest_returns_feature_weights_and_clusters(db: Session):
     seed_completed_analysis_run(db)
-    response = client.get("/api/outcomes/analysis/latest")
+    response = client.get("/api/v1/outcomes/analysis/latest")
 
     assert response.status_code == 200
     data = response.json()
@@ -81,7 +81,7 @@ def test_trigger_analysis_returns_202(db: Session):
     mock_result = type("R", (), {"id": "test-task-123"})()
     with patch("app.tasks.analyze_signal_features") as mock_task:
         mock_task.delay.return_value = mock_result
-        response = client.post("/api/outcomes/analyze")
+        response = client.post("/api/v1/outcomes/analyze")
         assert response.status_code == 202
     data = response.json()
     assert "task_id" in data

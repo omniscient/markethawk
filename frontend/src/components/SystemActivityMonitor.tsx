@@ -24,7 +24,7 @@ export const SystemActivityMonitor: React.FC = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
       
-      ws = new WebSocket(`${protocol}//${host}/api/system/ws/tasks`);
+      ws = new WebSocket(`${protocol}//${host}/api/v1/system/ws/tasks`);
 
       ws.onopen = () => {
         if (!isMounted) {
