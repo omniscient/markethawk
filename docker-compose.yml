@@ -21,6 +21,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   # Redis for caching and Celery broker
   redis:
@@ -37,6 +41,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # IB Gateway — headless Interactive Brokers connection
   # Logs in automatically using IBC; exposes the TWS socket API on port 4002 (paper).
@@ -69,6 +77,10 @@ services:
       timeout: 5s
       retries: 18          # allow up to 3 min for initial login
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   # Backend API
   backend:
@@ -113,6 +125,11 @@ services:
     networks:
       - stockscanner-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
 
   # Frontend
   frontend:
@@ -174,6 +191,11 @@ services:
     networks:
       - stockscanner-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
 
   # Live Scanner — streams real-time IBKR bars for watchlist symbols
   live-scanner:
@@ -204,6 +226,10 @@ services:
     networks:
       - stockscanner-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # Celery Beat for reliable scheduling
   celery-beat:
@@ -230,6 +256,10 @@ services:
     networks:
       - stockscanner-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # Flower for Celery monitoring
   flower:
@@ -251,6 +281,10 @@ services:
         condition: service_started
     networks:
       - stockscanner-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # pgAdmin for PostgreSQL management
   pgadmin:
@@ -269,6 +303,10 @@ services:
         condition: service_healthy
     networks:
       - stockscanner-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # Seq for centralized structured error logging
   seq:
@@ -284,6 +322,10 @@ services:
       - seq_data:/data
     networks:
       - stockscanner-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   # Prometheus — metrics scraper
   prometheus:
