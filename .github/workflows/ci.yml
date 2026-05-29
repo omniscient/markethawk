@@ -119,10 +119,12 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/markethawk_test
+          POLYGON_API_KEY: dummy-key-for-ci
         run: python -m alembic upgrade head
 
       - name: Check migration sync
         working-directory: backend
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/markethawk_test
+          POLYGON_API_KEY: dummy-key-for-ci
         run: python -m alembic check
