@@ -2,6 +2,7 @@
 Universe router - CRUD operations for stock universes.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -49,82 +50,113 @@ class NormalizeRequest(BaseModel):
 
 
 @router.post("/create", response_model=StockUniverseResponse)
-def create_stock_universe(
+async def create_stock_universe(
     universe: StockUniverseCreate,
     db: Session = Depends(get_db),
 ):
     """Create a new stock universe."""
-    db_universe = StockUniverse(**universe.dict())
-    db.add(db_universe)
-    db.commit()
-    db.refresh(db_universe)
-    return db_universe
+    loop = asyncio.get_running_loop()
+
+    def _create():
+        db_universe = StockUniverse(**universe.dict())
+        db.add(db_universe)
+        db.commit()
+        db.refresh(db_universe)
+        return db_universe
+
+    return await loop.run_in_executor(None, _create)
 
 
 @router.get("/by-ticker/{ticker}", response_model=List[UniverseSummary])
-def get_universes_for_ticker(
+async def get_universes_for_ticker(
     ticker: str,
     db: Session = Depends(get_db),
 ):
     """Return all active universes that contain the given ticker."""
-    ticker_upper = ticker.upper()
-    rows = (
-        db.query(StockUniverse)
-        .join(StockUniverseTicker, StockUniverseTicker.universe_id == StockUniverse.id)
-        .filter(
-            StockUniverseTicker.ticker == ticker_upper,
-            StockUniverse.is_active == True,
+    loop = asyncio.get_running_loop()
+
+    def _query():
+        ticker_upper = ticker.upper()
+        return (
+            db.query(StockUniverse)
+            .join(StockUniverseTicker, StockUniverseTicker.universe_id == StockUniverse.id)
+            .filter(
+                StockUniverseTicker.ticker == ticker_upper,
+                StockUniverse.is_active == True,
+            )
+            .order_by(StockUniverse.name)
+            .all()
         )
-        .order_by(StockUniverse.name)
-        .all()
-    )
-    return rows
+
+    return await loop.run_in_executor(None, _query)
 
 
 @router.put("/{universe_id}", response_model=StockUniverseResponse)
-def update_stock_universe(
+async def update_stock_universe(
     universe_id: int,
     universe_update: StockUniverseUpdate,
     db: Session = Depends(get_db),
 ):
     """Update a stock universe."""
-    db_universe = (
-        db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
-    )
+    loop = asyncio.get_running_loop()
+
+    def _update():
+        db_universe = (
+            db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+        )
+        return db_universe
+
+    db_universe = await loop.run_in_executor(None, _update)
     if not db_universe:
         raise HTTPException(status_code=404, detail="Universe not found")
 
     update_data = universe_update.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_universe, key, value)
 
-    db.commit()
-    db.refresh(db_universe)
-    return db_universe
+    def _apply():
+        for key, value in update_data.items():
+            setattr(db_universe, key, value)
+        db.commit()
+        db.refresh(db_universe)
+        return db_universe
+
+    return await loop.run_in_executor(None, _apply)
 
 
 @router.delete("/{universe_id}")
-def delete_stock_universe(
+async def delete_stock_universe(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
     """Delete (soft delete) a stock universe."""
-    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+    loop = asyncio.get_running_loop()
+
+    def _fetch():
+        return db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+
+    universe = await loop.run_in_executor(None, _fetch)
     if not universe:
         raise HTTPException(status_code=404, detail="Universe not found")
 
-    universe.is_active = False
-    db.commit()
+    def _delete():
+        universe.is_active = False
+        db.commit()
+
+    await loop.run_in_executor(None, _delete)
     return {"message": "Universe deleted successfully"}
 
 
 @router.get("/list", response_model=List[StockUniverseResponse])
-def list_stock_universes(
+async def list_stock_universes(
     include_stats: bool = True,
     db: Session = Depends(get_db),
 ):
     """List all active stock universes. include_stats=false skips aggregate stats (for dropdowns)."""
-    universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+    loop = asyncio.get_running_loop()
+
+    def _list():
+        return db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+
+    universes = await loop.run_in_executor(None, _list)
 
     results = []
     for universe in universes:
@@ -150,25 +182,33 @@ def list_stock_universes(
 
 
 @router.post("/{universe_id}/refresh-stats", response_model=StockUniverseResponse)
-def refresh_universe_stats(
+async def refresh_universe_stats(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
     """Recompute and persist aggregate stats. Call after sync or refresh to update the cache."""
-    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+    loop = asyncio.get_running_loop()
+
+    def _fetch():
+        return db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
+
+    universe = await loop.run_in_executor(None, _fetch)
     if not universe:
         raise HTTPException(status_code=404, detail="Universe not found")
 
-    stats = UniverseStatsService.compute(universe_id, db)
+    def _compute_and_save():
+        stats = UniverseStatsService.compute(universe_id, db)
+        universe.cached_ticker_count = stats["ticker_count"]
+        universe.cached_aggregate_count = stats["aggregate_count"]
+        universe.cached_min_date = stats["min_date"]
+        universe.cached_max_date = stats["max_date"]
+        universe.cached_timespans = stats["timespans"]
+        universe.stats_refreshed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.commit()
+        db.refresh(universe)
+        return universe
 
-    universe.cached_ticker_count = stats["ticker_count"]
-    universe.cached_aggregate_count = stats["aggregate_count"]
-    universe.cached_min_date = stats["min_date"]
-    universe.cached_max_date = stats["max_date"]
-    universe.cached_timespans = stats["timespans"]
-    universe.stats_refreshed_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.commit()
-    db.refresh(universe)
+    universe = await loop.run_in_executor(None, _compute_and_save)
 
     universe_data = StockUniverseResponse.from_orm(universe)
     universe_data.ticker_count = universe.cached_ticker_count or 0
@@ -182,14 +222,15 @@ def refresh_universe_stats(
 
 @router.post("/sync/fundamentals")
 @limiter.limit(SCANNER_LIMIT)
-def sync_fundamental_data(
+async def sync_fundamental_data(
     request: Request,
     background_tasks: BackgroundTasks,
     delay: float = 15.0,
     db: Session = Depends(get_db),
 ):
     """Trigger background sync of fundamental data from Polygon."""
-    service = DiscoveryService(db)
+    loop = asyncio.get_running_loop()
+    service = await loop.run_in_executor(None, lambda: DiscoveryService(db))
     background_tasks.add_task(service.sync_fundamental_data, delay_seconds=delay)
     return {
         "status": "accepted",
@@ -199,7 +240,7 @@ def sync_fundamental_data(
 
 @router.post("/sync/details")
 @limiter.limit(SCANNER_LIMIT)
-def sync_ticker_details(
+async def sync_ticker_details(
     request: Request,
     background_tasks: BackgroundTasks,
     delay: float = 15.0,
@@ -207,7 +248,8 @@ def sync_ticker_details(
     db: Session = Depends(get_db),
 ):
     """Trigger background sync of ticker details. delay: 15.0=Free, 0.2=Paid. resync: force re-crawl."""
-    service = DiscoveryService(db)
+    loop = asyncio.get_running_loop()
+    service = await loop.run_in_executor(None, lambda: DiscoveryService(db))
     background_tasks.add_task(service.sync_ticker_details_crawler, delay, resync)
     return {
         "status": "accepted",
@@ -216,7 +258,7 @@ def sync_ticker_details(
 
 
 @router.post("/sync/stop")
-def stop_sync(
+async def stop_sync(
     db: Session = Depends(get_db),
 ):
     """Stops any running sync process by setting a Stop Flag in Redis and purging the queue."""
@@ -225,13 +267,19 @@ def stop_sync(
     from app.core.celery_app import celery_app
     from app.core.config import settings
 
-    try:
-        r = redis.from_url(settings.REDIS_URL)
-        r.setex("CRAWLER_STOP_FLAG", 60, "1")
-        redis_status = "Flag set."
-    except Exception as e:
-        redis_status = f"Redis error: {e}"
-    purged_count = celery_app.control.purge()
+    loop = asyncio.get_running_loop()
+
+    def _stop():
+        try:
+            r = redis.from_url(settings.REDIS_URL)
+            r.setex("CRAWLER_STOP_FLAG", 60, "1")
+            redis_status = "Flag set."
+        except Exception as e:
+            redis_status = f"Redis error: {e}"
+        purged_count = celery_app.control.purge()
+        return redis_status, purged_count
+
+    redis_status, purged_count = await loop.run_in_executor(None, _stop)
     return {
         "status": "stopped",
         "message": f"Stop signal sent ({redis_status}). {purged_count} pending tasks removed.",
@@ -240,13 +288,14 @@ def stop_sync(
 
 @router.post("/sync/metrics")
 @limiter.limit(SCANNER_LIMIT)
-def sync_daily_metrics(
+async def sync_daily_metrics(
     request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """Trigger background update of daily technical metrics."""
-    service = DiscoveryService(db)
+    loop = asyncio.get_running_loop()
+    service = await loop.run_in_executor(None, lambda: DiscoveryService(db))
     background_tasks.add_task(service.update_daily_metrics_snapshot)
     return {
         "status": "accepted",
@@ -255,65 +304,81 @@ def sync_daily_metrics(
 
 
 @router.post("/{universe_id}/refresh")
-def refresh_universe(
+async def refresh_universe(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
     """Refresh stocks in a universe using the Universe Discovery Engine."""
+    loop = asyncio.get_running_loop()
     try:
-        return universe_orchestrator.discover_and_refresh(universe_id, db)
+        return await loop.run_in_executor(
+            None, lambda: universe_orchestrator.discover_and_refresh(universe_id, db)
+        )
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
 
 
 @router.post("/{universe_id}/sync-missing")
-def sync_missing_aggregates(
+async def sync_missing_aggregates(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
     """For every recorded (timespan, multiplier), queue a sync from last bar to today."""
-    return universe_orchestrator.sync_missing_aggregates(universe_id, db)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None, lambda: universe_orchestrator.sync_missing_aggregates(universe_id, db)
+    )
 
 
 @router.get("/{universe_id}/sync-status")
-def get_universe_sync_status(universe_id: int):
+async def get_universe_sync_status(universe_id: int):
     """Return the current sync progress for a universe."""
-    return universe_orchestrator.get_sync_status(universe_id)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None, lambda: universe_orchestrator.get_sync_status(universe_id)
+    )
 
 
 @router.post("/{universe_id}/export-aggregates")
-def export_universe_aggregates(
+async def export_universe_aggregates(
     universe_id: int,
     request: ExportAggregatesRequest,
     db: Session = Depends(get_db),
 ):
     """Stream a ZIP file containing aggregate (OHLCV) data for the requested tickers."""
+    loop = asyncio.get_running_loop()
     try:
-        return universe_export.export_aggregates(universe_id, request, db)
+        return await loop.run_in_executor(
+            None, lambda: universe_export.export_aggregates(universe_id, request, db)
+        )
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
 
 
 @router.get("/{universe_id}/stocks", response_model=List[MonitoredStockResponse])
-def get_universe_stocks(
+async def get_universe_stocks(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
     """List all stocks in a universe."""
-    stocks = (
-        db.query(MonitoredStock)
-        .filter(
-            MonitoredStock.universe_id == universe_id,
-            MonitoredStock.is_active == True,
+    loop = asyncio.get_running_loop()
+
+    def _query():
+        return (
+            db.query(MonitoredStock)
+            .filter(
+                MonitoredStock.universe_id == universe_id,
+                MonitoredStock.is_active == True,
+            )
+            .all()
         )
-        .all()
-    )
-    return stocks
+
+    return await loop.run_in_executor(None, _query)
 
 
 @router.post("/{universe_id}/sync-aggregates")
 @limiter.limit(SCANNER_LIMIT)
-def sync_universe_aggregates(
+async def sync_universe_aggregates(
     request: Request,
     universe_id: int,
     from_date: str,
@@ -326,27 +391,34 @@ def sync_universe_aggregates(
     db: Session = Depends(get_db),
 ):
     """Trigger backfill of aggregates for all stocks in the universe."""
-    return universe_orchestrator.sync_aggregates(
-        universe_id, from_date, to_date, multiplier, timespan, adjusted, sort, limit, db
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        lambda: universe_orchestrator.sync_aggregates(
+            universe_id, from_date, to_date, multiplier, timespan, adjusted, sort, limit, db
+        ),
     )
 
 
 @router.post("/{universe_id}/analyze-quality")
 @limiter.limit(SCANNER_LIMIT)
-def trigger_quality_analysis(
+async def trigger_quality_analysis(
     request: Request,
     universe_id: int,
     db: Session = Depends(get_db),
 ):
     """Queue a background data-quality analysis. Poll GET .../quality-report for results."""
+    loop = asyncio.get_running_loop()
     try:
-        return universe_orchestrator.queue_quality_analysis(universe_id, db)
+        return await loop.run_in_executor(
+            None, lambda: universe_orchestrator.queue_quality_analysis(universe_id, db)
+        )
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
 
 
 @router.delete("/{universe_id}/aggregates")
-def delete_ticker_aggregates(
+async def delete_ticker_aggregates(
     universe_id: int,
     request: DeleteAggregatesRequest,
     db: Session = Depends(get_db),
@@ -354,29 +426,35 @@ def delete_ticker_aggregates(
     """Delete aggregate bars for a ticker (optionally scoped to timespan/multiplier) and remove from universe."""
     from app.models.futures_aggregate import FuturesAggregate
 
-    if request.asset_class == "futures":
-        q = db.query(FuturesAggregate).filter(FuturesAggregate.symbol == request.ticker)
-        if request.timespan is not None:
-            q = q.filter(
-                FuturesAggregate.timespan == request.timespan,
-                FuturesAggregate.multiplier == request.multiplier,
-            )
-        deleted = q.delete(synchronize_session=False)
-    else:
-        q = db.query(StockAggregate).filter(StockAggregate.ticker == request.ticker)
-        if request.timespan is not None:
-            q = q.filter(
-                StockAggregate.timespan == request.timespan,
-                StockAggregate.multiplier == request.multiplier,
-            )
-        deleted = q.delete(synchronize_session=False)
+    loop = asyncio.get_running_loop()
 
-    db.query(StockUniverseTicker).filter(
-        StockUniverseTicker.universe_id == universe_id,
-        StockUniverseTicker.ticker == request.ticker,
-    ).delete(synchronize_session=False)
+    def _delete():
+        if request.asset_class == "futures":
+            q = db.query(FuturesAggregate).filter(FuturesAggregate.symbol == request.ticker)
+            if request.timespan is not None:
+                q = q.filter(
+                    FuturesAggregate.timespan == request.timespan,
+                    FuturesAggregate.multiplier == request.multiplier,
+                )
+            deleted = q.delete(synchronize_session=False)
+        else:
+            q = db.query(StockAggregate).filter(StockAggregate.ticker == request.ticker)
+            if request.timespan is not None:
+                q = q.filter(
+                    StockAggregate.timespan == request.timespan,
+                    StockAggregate.multiplier == request.multiplier,
+                )
+            deleted = q.delete(synchronize_session=False)
 
-    db.commit()
+        db.query(StockUniverseTicker).filter(
+            StockUniverseTicker.universe_id == universe_id,
+            StockUniverseTicker.ticker == request.ticker,
+        ).delete(synchronize_session=False)
+
+        db.commit()
+        return deleted
+
+    deleted = await loop.run_in_executor(None, _delete)
     return {
         "deleted_bars": deleted,
         "ticker": request.ticker,
@@ -385,18 +463,23 @@ def delete_ticker_aggregates(
 
 
 @router.get("/{universe_id}/quality-report")
-def get_quality_report(
+async def get_quality_report(
     universe_id: int,
     db: Session = Depends(get_db),
 ):
     """Return the latest quality report for a universe (or null if none exists)."""
     from app.models.universe_quality_report import UniverseQualityReport
 
-    report = (
-        db.query(UniverseQualityReport)
-        .filter(UniverseQualityReport.universe_id == universe_id)
-        .first()
-    )
+    loop = asyncio.get_running_loop()
+
+    def _fetch():
+        return (
+            db.query(UniverseQualityReport)
+            .filter(UniverseQualityReport.universe_id == universe_id)
+            .first()
+        )
+
+    report = await loop.run_in_executor(None, _fetch)
     if not report:
         return None
     return {
@@ -420,7 +503,7 @@ def get_quality_report(
 
 @router.post("/{universe_id}/normalize")
 @limiter.limit(SCANNER_LIMIT)
-def trigger_normalization(
+async def trigger_normalization(
     request: Request,
     universe_id: int,
     body: Optional[NormalizeRequest] = None,
@@ -428,9 +511,13 @@ def trigger_normalization(
 ):
     """Start (or resume) a normalization run. Poll GET .../quality-report for status."""
     target_tickers = body.target_tickers if body else None
+    loop = asyncio.get_running_loop()
     try:
-        return universe_orchestrator.queue_normalization(
-            universe_id, target_tickers, db
+        return await loop.run_in_executor(
+            None,
+            lambda: universe_orchestrator.queue_normalization(
+                universe_id, target_tickers, db
+            ),
         )
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
