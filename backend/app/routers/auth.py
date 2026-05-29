@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime
 
@@ -69,30 +70,46 @@ class UserResponse(BaseModel):
 
 
 @router.get("/status")
-def auth_status(db: Session = Depends(get_db)):
-    count = db.execute(select(func.count()).select_from(User)).scalar_one()
+async def auth_status(db: Session = Depends(get_db)):
+    loop = asyncio.get_running_loop()
+    count = await loop.run_in_executor(
+        None, lambda: db.execute(select(func.count()).select_from(User)).scalar_one()
+    )
     return {"bootstrapped": count > 0}
 
 
 @router.post("/register", response_model=UserResponse)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
-    count = db.execute(select(func.count()).select_from(User)).scalar_one()
-    if count > 0:
+async def register(body: RegisterRequest, db: Session = Depends(get_db)):
+    loop = asyncio.get_running_loop()
+
+    def _register():
+        count = db.execute(select(func.count()).select_from(User)).scalar_one()
+        if count > 0:
+            return None
+        user = User(username=body.username, password_hash=hash_password(body.password))
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    user = await loop.run_in_executor(None, _register)
+    if user is None:
         raise HTTPException(
             status_code=403, detail="Registration is closed — a user already exists"
         )
-    user = User(username=body.username, password_hash=hash_password(body.password))
-    db.add(user)
-    db.commit()
-    db.refresh(user)
     return UserResponse(id=user.id, username=user.username, created_at=user.created_at)
 
 
 @router.post("/login")
-def login(body: LoginRequest, db: Session = Depends(get_db)):
-    user = db.execute(
-        select(User).where(User.username == body.username, User.is_active == True)
-    ).scalar_one_or_none()
+async def login(body: LoginRequest, db: Session = Depends(get_db)):
+    loop = asyncio.get_running_loop()
+
+    user = await loop.run_in_executor(
+        None,
+        lambda: db.execute(
+            select(User).where(User.username == body.username, User.is_active == True)
+        ).scalar_one_or_none(),
+    )
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
@@ -102,12 +119,16 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     refresh_token = create_refresh_token()
 
     settings = get_settings()
-    r = _get_redis()
-    r.setex(
-        f"auth:refresh:{refresh_token}",
-        settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
-        str(user.id),
-    )
+
+    def _store_token():
+        r = _get_redis()
+        r.setex(
+            f"auth:refresh:{refresh_token}",
+            settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+            str(user.id),
+        )
+
+    await loop.run_in_executor(None, _store_token)
 
     response = JSONResponse(content={"message": "Logged in"})
     _set_auth_cookies(response, access_token, refresh_token)
@@ -115,13 +136,14 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/logout")
-def logout(
+async def logout(
     refresh_token: str | None = Cookie(default=None),
     _current_user: User = Depends(get_current_user),
 ):
     if refresh_token:
-        r = _get_redis()
-        r.delete(f"auth:refresh:{refresh_token}")
+        loop = asyncio.get_running_loop()
+        token_key = f"auth:refresh:{refresh_token}"
+        await loop.run_in_executor(None, lambda: _get_redis().delete(token_key))
 
     response = JSONResponse(content={"message": "Logged out"})
     response.delete_cookie("access_token", path="/")
@@ -130,12 +152,18 @@ def logout(
 
 
 @router.post("/refresh")
-def refresh(refresh_token: str | None = Cookie(default=None)):
+async def refresh(refresh_token: str | None = Cookie(default=None)):
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-    r = _get_redis()
-    user_id = r.get(f"auth:refresh:{refresh_token}")
+    loop = asyncio.get_running_loop()
+
+    def _fetch_and_rotate():
+        r = _get_redis()
+        user_id = r.get(f"auth:refresh:{refresh_token}")
+        return user_id, r
+
+    user_id, r = await loop.run_in_executor(None, _fetch_and_rotate)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -146,12 +174,15 @@ def refresh(refresh_token: str | None = Cookie(default=None)):
     new_access_token = create_access_token(user_id)
     new_refresh_token = create_refresh_token()
 
-    r.delete(f"auth:refresh:{refresh_token}")
-    r.setex(
-        f"auth:refresh:{new_refresh_token}",
-        settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
-        user_id,
-    )
+    def _rotate_token():
+        r.delete(f"auth:refresh:{refresh_token}")
+        r.setex(
+            f"auth:refresh:{new_refresh_token}",
+            settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+            user_id,
+        )
+
+    await loop.run_in_executor(None, _rotate_token)
 
     response = JSONResponse(content={"message": "Token refreshed"})
     _set_auth_cookies(response, new_access_token, new_refresh_token)
@@ -159,7 +190,7 @@ def refresh(refresh_token: str | None = Cookie(default=None)):
 
 
 @router.get("/me", response_model=UserResponse)
-def me(current_user: User = Depends(get_current_user)):
+async def me(current_user: User = Depends(get_current_user)):
     return UserResponse(
         id=current_user.id,
         username=current_user.username,

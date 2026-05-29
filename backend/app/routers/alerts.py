@@ -2,6 +2,7 @@
 Alerts router — CRUD for alert rules, delivery log, stats, and Web Push endpoints.
 """
 
+import asyncio
 import json
 import logging
 from datetime import date, datetime, timezone
@@ -26,40 +27,45 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/stats")
-def get_alert_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_alert_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Return dashboard stats for the alerts page header cards."""
-    today_start = datetime.combine(date.today(), datetime.min.time())
+    loop = asyncio.get_running_loop()
 
-    active_count = db.query(AlertRule).filter(AlertRule.is_active == True).count()
-    total_count = db.query(AlertRule).count()
-    triggered_today = (
-        db.query(AlertDeliveryLog)
-        .filter(
-            AlertDeliveryLog.delivered_at >= today_start,
-            AlertDeliveryLog.status == "sent",
+    def _query():
+        today_start = datetime.combine(date.today(), datetime.min.time())
+
+        active_count = db.query(AlertRule).filter(AlertRule.is_active == True).count()
+        total_count = db.query(AlertRule).count()
+        triggered_today = (
+            db.query(AlertDeliveryLog)
+            .filter(
+                AlertDeliveryLog.delivered_at >= today_start,
+                AlertDeliveryLog.status == "sent",
+            )
+            .count()
         )
-        .count()
-    )
-    total_sent = (
-        db.query(AlertDeliveryLog).filter(AlertDeliveryLog.status == "sent").count()
-    )
-    total_failed = (
-        db.query(AlertDeliveryLog).filter(AlertDeliveryLog.status == "failed").count()
-    )
-    total_attempts = total_sent + total_failed
-    delivery_rate = (
-        round((total_sent / total_attempts * 100), 1) if total_attempts > 0 else 100.0
-    )
+        total_sent = (
+            db.query(AlertDeliveryLog).filter(AlertDeliveryLog.status == "sent").count()
+        )
+        total_failed = (
+            db.query(AlertDeliveryLog).filter(AlertDeliveryLog.status == "failed").count()
+        )
+        total_attempts = total_sent + total_failed
+        delivery_rate = (
+            round((total_sent / total_attempts * 100), 1) if total_attempts > 0 else 100.0
+        )
 
-    push_sub_count = db.query(PushSubscription).count()
+        push_sub_count = db.query(PushSubscription).count()
 
-    return {
-        "active_rules": active_count,
-        "total_rules": total_count,
-        "triggered_today": triggered_today,
-        "delivery_rate": delivery_rate,
-        "push_subscriptions": push_sub_count,
-    }
+        return {
+            "active_rules": active_count,
+            "total_rules": total_count,
+            "triggered_today": triggered_today,
+            "delivery_rate": delivery_rate,
+            "push_subscriptions": push_sub_count,
+        }
+
+    return await loop.run_in_executor(None, _query)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -85,41 +91,53 @@ def _rule_to_dict(rule: AlertRule) -> Dict[str, Any]:
 
 
 @router.get("/rules")
-def list_rules(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+async def list_rules(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
     """Return all alert rules ordered by creation date (newest first)."""
-    rules = db.query(AlertRule).order_by(AlertRule.created_at.desc()).all()
+    loop = asyncio.get_running_loop()
+    rules = await loop.run_in_executor(
+        None, lambda: db.query(AlertRule).order_by(AlertRule.created_at.desc()).all()
+    )
     return [_rule_to_dict(r) for r in rules]
 
 
 @router.post("/rules", status_code=201)
-def create_rule(
+async def create_rule(
     payload: Dict[str, Any], db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Create a new alert rule."""
-    rule = AlertRule(
-        name=payload.get("name", "Untitled Rule"),
-        is_active=payload.get("is_active", True),
-        scanner_types=payload.get("scanner_types", []),
-        severity_filter=payload.get("severity_filter", "any"),
-        cooldown_minutes=int(payload.get("cooldown_minutes", 60)),
-        channels=payload.get("channels", []),
-        channel_config=payload.get("channel_config", {}),
-        auto_trade=payload.get("auto_trade", False),
-        trading_strategy_id=payload.get("trading_strategy_id"),
-    )
-    db.add(rule)
-    db.commit()
-    db.refresh(rule)
-    logger.info(f"Created alert rule id={rule.id} name='{rule.name}'")
+    loop = asyncio.get_running_loop()
+
+    def _create():
+        rule = AlertRule(
+            name=payload.get("name", "Untitled Rule"),
+            is_active=payload.get("is_active", True),
+            scanner_types=payload.get("scanner_types", []),
+            severity_filter=payload.get("severity_filter", "any"),
+            cooldown_minutes=int(payload.get("cooldown_minutes", 60)),
+            channels=payload.get("channels", []),
+            channel_config=payload.get("channel_config", {}),
+            auto_trade=payload.get("auto_trade", False),
+            trading_strategy_id=payload.get("trading_strategy_id"),
+        )
+        db.add(rule)
+        db.commit()
+        db.refresh(rule)
+        logger.info(f"Created alert rule id={rule.id} name='{rule.name}'")
+        return rule
+
+    rule = await loop.run_in_executor(None, _create)
     return _rule_to_dict(rule)
 
 
 @router.patch("/rules/{rule_id}")
-def update_rule(
+async def update_rule(
     rule_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Update an alert rule (full or partial). Used for toggles too."""
-    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    loop = asyncio.get_running_loop()
+    rule = await loop.run_in_executor(
+        None, lambda: db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    )
     if not rule:
         raise HTTPException(status_code=404, detail="Alert rule not found.")
 
@@ -134,24 +152,31 @@ def update_rule(
         "auto_trade",
         "trading_strategy_id",
     }
-    for key, value in payload.items():
-        if key in updatable:
-            setattr(rule, key, value)
 
-    rule.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.commit()
-    db.refresh(rule)
+    def _update():
+        for key, value in payload.items():
+            if key in updatable:
+                setattr(rule, key, value)
+        rule.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.commit()
+        db.refresh(rule)
+        return rule
+
+    rule = await loop.run_in_executor(None, _update)
     return _rule_to_dict(rule)
 
 
 @router.delete("/rules/{rule_id}", status_code=204)
-def delete_rule(rule_id: int, db: Session = Depends(get_db)) -> None:
+async def delete_rule(rule_id: int, db: Session = Depends(get_db)) -> None:
     """Delete an alert rule."""
-    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    loop = asyncio.get_running_loop()
+    rule = await loop.run_in_executor(
+        None, lambda: db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    )
     if not rule:
         raise HTTPException(status_code=404, detail="Alert rule not found.")
-    db.delete(rule)
-    db.commit()
+
+    await loop.run_in_executor(None, lambda: (db.delete(rule), db.commit()))
     logger.info(f"Deleted alert rule id={rule_id}")
 
 
@@ -161,9 +186,12 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db)) -> None:
 
 
 @router.post("/rules/{rule_id}/test")
-def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Send a test notification through all channels configured on this rule."""
-    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    loop = asyncio.get_running_loop()
+    rule = await loop.run_in_executor(
+        None, lambda: db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    )
     if not rule:
         raise HTTPException(status_code=404, detail="Alert rule not found.")
 
@@ -192,41 +220,45 @@ def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     channels = rule.channels or []
     config = rule.channel_config or {}
 
-    for channel in channels:
-        try:
-            if channel == "browser_push":
-                NotificationDispatcher._send_browser_push(test_event, db)
-            elif channel == "email":
-                to = config.get("email")
-                if not to:
-                    raise ValueError("No email configured.")
-                NotificationDispatcher._send_email(
-                    to=to,
-                    subject="✅ MarketHawk Test Alert",
-                    body=NotificationDispatcher._build_email_body(test_event),
-                )
-            elif channel == "google_chat":
-                webhook_url = config.get("google_chat_webhook")
-                if not webhook_url:
-                    raise ValueError("No Google Chat webhook configured.")
-                NotificationDispatcher._send_google_chat(
-                    webhook_url=webhook_url,
-                    message=f"✅ TEST: {NotificationDispatcher._build_chat_message(test_event)}",
-                )
-            elif channel == "webhook":
-                url = config.get("webhook_url")
-                if not url:
-                    raise ValueError("No webhook URL configured.")
-                NotificationDispatcher._send_webhook(
-                    url=url,
-                    payload=NotificationDispatcher._build_webhook_payload(
-                        test_event, rule
-                    ),
-                )
-            results.append({"channel": channel, "status": "sent"})
-        except Exception as exc:
-            results.append({"channel": channel, "status": "failed", "error": str(exc)})
+    def _run_channels():
+        channel_results = []
+        for channel in channels:
+            try:
+                if channel == "browser_push":
+                    NotificationDispatcher._send_browser_push(test_event, db)
+                elif channel == "email":
+                    to = config.get("email")
+                    if not to:
+                        raise ValueError("No email configured.")
+                    NotificationDispatcher._send_email(
+                        to=to,
+                        subject="✅ MarketHawk Test Alert",
+                        body=NotificationDispatcher._build_email_body(test_event),
+                    )
+                elif channel == "google_chat":
+                    webhook_url = config.get("google_chat_webhook")
+                    if not webhook_url:
+                        raise ValueError("No Google Chat webhook configured.")
+                    NotificationDispatcher._send_google_chat(
+                        webhook_url=webhook_url,
+                        message=f"✅ TEST: {NotificationDispatcher._build_chat_message(test_event)}",
+                    )
+                elif channel == "webhook":
+                    url = config.get("webhook_url")
+                    if not url:
+                        raise ValueError("No webhook URL configured.")
+                    NotificationDispatcher._send_webhook(
+                        url=url,
+                        payload=NotificationDispatcher._build_webhook_payload(
+                            test_event, rule
+                        ),
+                    )
+                channel_results.append({"channel": channel, "status": "sent"})
+            except Exception as exc:
+                channel_results.append({"channel": channel, "status": "failed", "error": str(exc)})
+        return channel_results
 
+    results = await loop.run_in_executor(None, _run_channels)
     return {"results": results}
 
 
@@ -236,16 +268,20 @@ def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
 
 
 @router.get("/logs")
-def list_delivery_logs(
+async def list_delivery_logs(
     limit: int = 50,
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Return the most recent alert delivery log entries."""
-    logs = (
-        db.query(AlertDeliveryLog)
-        .order_by(AlertDeliveryLog.delivered_at.desc())
-        .limit(min(limit, 200))
-        .all()
+    loop = asyncio.get_running_loop()
+    logs = await loop.run_in_executor(
+        None,
+        lambda: (
+            db.query(AlertDeliveryLog)
+            .order_by(AlertDeliveryLog.delivered_at.desc())
+            .limit(min(limit, 200))
+            .all()
+        ),
     )
     return [
         {
@@ -269,7 +305,7 @@ def list_delivery_logs(
 
 
 @router.get("/push/vapid-key")
-def get_vapid_public_key() -> Dict[str, str]:
+async def get_vapid_public_key() -> Dict[str, str]:
     """Return the VAPID public key so the frontend can subscribe."""
     from app.core.config import settings
 
@@ -282,7 +318,7 @@ def get_vapid_public_key() -> Dict[str, str]:
 
 
 @router.get("/push/generate-keys")
-def generate_vapid_keys() -> Dict[str, str]:
+async def generate_vapid_keys() -> Dict[str, str]:
     """
     One-time key generation helper. Run once, copy output to .env.
     This endpoint should be removed or restricted in production.
@@ -297,35 +333,40 @@ def generate_vapid_keys() -> Dict[str, str]:
         PublicFormat,
     )
 
-    private_key = ec.generate_private_key(ec.SECP256R1())
+    loop = asyncio.get_running_loop()
 
-    # Raw 32-byte private scalar — base64url encoded.
-    # py_vapid's from_string() only accepts this format (not PEM).
-    # Single-line, safe for .env and Docker env var injection.
-    der = private_key.private_bytes(
-        Encoding.DER, PrivateFormat.TraditionalOpenSSL, NoEncryption()
-    )
-    raw_priv = der[7:39]  # SEC1 DER: 7-byte header, then 32-byte key scalar
-    private_b64 = base64.urlsafe_b64encode(raw_priv).decode().rstrip("=")
+    def _generate():
+        private_key = ec.generate_private_key(ec.SECP256R1())
 
-    # Uncompressed EC point, URL-safe base64 — what browsers expect for applicationServerKey
-    pub_bytes = private_key.public_key().public_bytes(
-        Encoding.X962, PublicFormat.UncompressedPoint
-    )
-    public_b64 = base64.urlsafe_b64encode(pub_bytes).decode().rstrip("=")
+        # Raw 32-byte private scalar — base64url encoded.
+        # py_vapid's from_string() only accepts this format (not PEM).
+        # Single-line, safe for .env and Docker env var injection.
+        der = private_key.private_bytes(
+            Encoding.DER, PrivateFormat.TraditionalOpenSSL, NoEncryption()
+        )
+        raw_priv = der[7:39]  # SEC1 DER: 7-byte header, then 32-byte key scalar
+        private_b64 = base64.urlsafe_b64encode(raw_priv).decode().rstrip("=")
 
-    return {
-        "VAPID_PUBLIC_KEY": public_b64,
-        "VAPID_PRIVATE_KEY": private_b64,
-        "instructions": (
-            "Paste both values into .env without quotes. "
-            "Then run: docker-compose up -d --force-recreate backend"
-        ),
-    }
+        # Uncompressed EC point, URL-safe base64 — what browsers expect for applicationServerKey
+        pub_bytes = private_key.public_key().public_bytes(
+            Encoding.X962, PublicFormat.UncompressedPoint
+        )
+        public_b64 = base64.urlsafe_b64encode(pub_bytes).decode().rstrip("=")
+
+        return {
+            "VAPID_PUBLIC_KEY": public_b64,
+            "VAPID_PRIVATE_KEY": private_b64,
+            "instructions": (
+                "Paste both values into .env without quotes. "
+                "Then run: docker-compose up -d --force-recreate backend"
+            ),
+        }
+
+    return await loop.run_in_executor(None, _generate)
 
 
 @router.post("/push/subscribe", status_code=201)
-def subscribe_push(
+async def subscribe_push(
     payload: Dict[str, Any], request: Request, db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -343,31 +384,37 @@ def subscribe_push(
             status_code=422, detail="endpoint, keys.p256dh, and keys.auth are required."
         )
 
-    # Upsert: update keys if endpoint already exists
-    existing = (
-        db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
-    )
-    if existing:
-        existing.p256dh = p256dh
-        existing.auth = auth
-        db.commit()
-        return {"status": "updated", "id": existing.id}
+    user_agent = request.headers.get("User-Agent", "")[:500]
+    loop = asyncio.get_running_loop()
 
-    sub = PushSubscription(
-        endpoint=endpoint,
-        p256dh=p256dh,
-        auth=auth,
-        user_agent=request.headers.get("User-Agent", "")[:500],
-    )
-    db.add(sub)
-    db.commit()
-    db.refresh(sub)
-    logger.info(f"New push subscription registered id={sub.id}")
-    return {"status": "created", "id": sub.id}
+    def _upsert():
+        # Upsert: update keys if endpoint already exists
+        existing = (
+            db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+        )
+        if existing:
+            existing.p256dh = p256dh
+            existing.auth = auth
+            db.commit()
+            return {"status": "updated", "id": existing.id}
+
+        sub = PushSubscription(
+            endpoint=endpoint,
+            p256dh=p256dh,
+            auth=auth,
+            user_agent=user_agent,
+        )
+        db.add(sub)
+        db.commit()
+        db.refresh(sub)
+        logger.info(f"New push subscription registered id={sub.id}")
+        return {"status": "created", "id": sub.id}
+
+    return await loop.run_in_executor(None, _upsert)
 
 
 @router.delete("/push/unsubscribe")
-def unsubscribe_push(
+async def unsubscribe_push(
     payload: Dict[str, Any], db: Session = Depends(get_db)
 ) -> Dict[str, str]:
     """Remove a push subscription by endpoint URL."""
@@ -375,18 +422,23 @@ def unsubscribe_push(
     if not endpoint:
         raise HTTPException(status_code=422, detail="endpoint is required.")
 
-    sub = (
-        db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
-    )
-    if sub:
-        db.delete(sub)
-        db.commit()
-        return {"status": "unsubscribed"}
-    return {"status": "not_found"}
+    loop = asyncio.get_running_loop()
+
+    def _delete():
+        sub = (
+            db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
+        )
+        if sub:
+            db.delete(sub)
+            db.commit()
+            return {"status": "unsubscribed"}
+        return {"status": "not_found"}
+
+    return await loop.run_in_executor(None, _delete)
 
 
 @router.post("/infrastructure", status_code=200)
-def receive_infrastructure_alert(payload: Dict[str, Any]) -> Dict[str, str]:
+async def receive_infrastructure_alert(payload: Dict[str, Any]) -> Dict[str, str]:
     """Receive Grafana alerting webhook payloads and log them."""
     title = payload.get("title") or payload.get("message") or "unknown"
     state = payload.get("state") or payload.get("status") or "unknown"
