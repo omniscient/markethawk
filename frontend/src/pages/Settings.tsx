@@ -93,7 +93,6 @@ const Settings: React.FC = () => {
     try {
       setStopping(true);
       const res = await stopSync();
-      // @ts-ignore
       alert(res.message);
     } catch {
       alert('Failed to stop sync');
