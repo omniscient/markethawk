@@ -19,6 +19,7 @@ MarketHawk/
 │   │   │   ├── database.py             # Async SQLAlchemy engine and session factory
 │   │   │   ├── celery_app.py           # Celery instance and beat schedule definitions
 │   │   │   ├── error_tracking.py       # ErrorTracker protocol; Seq + stdout implementations
+│   │   │   ├── cache.py                # Redis caching: get_redis() singleton, get_cached() read-through helper, invalidate(), @cache_response decorator; mh: key prefix
 │   │   │   └── tracing.py              # OtelTraceIdFilter (log correlation); setup_otel() (TracerProvider init); instrument_fastapi()
 │   │   ├── models/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlist — manually curated live-observation list (soft limit 50)
