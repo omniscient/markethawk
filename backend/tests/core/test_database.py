@@ -4,6 +4,10 @@ from app.core.config import settings
 from app.core.database import engine
 
 
+def test_engine_echo_matches_environment():
+    assert engine.echo == (settings.ENVIRONMENT == "development")
+
+
 def test_engine_pool_size_matches_settings():
     assert engine.pool.size() == settings.DB_POOL_SIZE
 

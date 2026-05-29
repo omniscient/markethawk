@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.trade import JournalEntry, Tag, Trade, TradeExecution
 from app.schemas.journal import (
@@ -17,7 +17,10 @@ from app.schemas.journal import (
 
 
 def get_trades(db: Session, symbol: Optional[str] = None, status: Optional[str] = None):
-    query = db.query(Trade)
+    query = db.query(Trade).options(
+        selectinload(Trade.executions),
+        selectinload(Trade.tags),
+    )
     if symbol:
         query = query.filter(Trade.symbol == symbol.upper())
     if status:

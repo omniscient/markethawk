@@ -141,3 +141,40 @@ def test_create_and_get_tag(db: Session):
     tags = get_tags(db)
     names = [t.name for t in tags]
     assert "momentum" in names
+
+
+# ── eager loading ─────────────────────────────────────────────────────────
+
+
+def test_get_trades_preloads_executions_and_tags(db: Session):
+    """get_trades() must selectinload executions and tags so they survive session expunge."""
+    from datetime import datetime
+
+    from app.models.trade import Tag, Trade, TradeExecution
+
+    tag = Tag(name="eager-load-test")
+    db.add(tag)
+    db.flush()
+
+    trade = Trade(symbol="EAGER", status="open")
+    db.add(trade)
+    db.flush()
+
+    execution = TradeExecution(
+        trade_id=trade.id,
+        timestamp=datetime(2026, 5, 1, 9, 30),
+        side="buy",
+        price=Decimal("100.00"),
+        quantity=Decimal("10"),
+    )
+    db.add(execution)
+    trade.tags = [tag]
+    db.flush()
+
+    trades = get_trades(db)
+    db.expunge_all()
+
+    eager_trade = next(t for t in trades if t.symbol == "EAGER")
+    # Accessing these after expunge raises DetachedInstanceError if not eagerly loaded
+    assert len(eager_trade.executions) == 1
+    assert len(eager_trade.tags) == 1
