@@ -16,7 +16,7 @@ MarketHawk/
 │   │   ├── exceptions.py               # Domain exception hierarchy: MarketHawkError base + ScanError, DataFetchError, ProviderError subclasses; is_retryable flag drives Celery retry logic
 │   │   ├── core/
 │   │   │   ├── config.py               # Settings class; all env vars with typed defaults
-│   │   │   ├── database.py             # Async SQLAlchemy engine and session factory
+│   │   │   ├── database.py             # Dual-engine: sync engine (psycopg2, Celery/Alembic) + async engine (asyncpg, FastAPI); get_db() sync dep + get_async_db() async dep
 │   │   │   ├── celery_app.py           # Celery instance and beat schedule definitions
 │   │   │   ├── error_tracking.py       # ErrorTracker protocol; Seq + stdout implementations
 │   │   │   └── tracing.py              # OtelTraceIdFilter (log correlation); setup_otel() (TracerProvider init); instrument_fastapi()

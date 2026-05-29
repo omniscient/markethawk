@@ -60,7 +60,7 @@ A full pre-market scan proceeds as follows:
 | File | Responsibility |
 |------|---------------|
 | `config.py` | `Settings` class; reads all env vars with typed defaults. Accessed via `get_settings()` (cached). |
-| `database.py` | Async SQLAlchemy engine and session factory (`AsyncSession`). `get_db()` dependency. |
+| `database.py` | Dual-engine setup: sync `engine` (psycopg2, used by Celery tasks and Alembic) + async `async_engine` (asyncpg, used by FastAPI routers). Exports `get_db()` (sync generator for Celery/Alembic) and `get_async_db()` (async generator for FastAPI route handlers via `Depends`). |
 | `celery_app.py` | Celery instance; beat schedule definitions (scan times, sync intervals). |
 | `error_tracking.py` | `ErrorTracker` protocol; `SeqErrorTracker` and `StdoutErrorTracker` implementations; MD5-based `ErrorId` generation. |
 | `rate_limits.py` | SlowAPI `limiter` instance + three tier constants: `GLOBAL_LIMIT` (100/min), `SCANNER_LIMIT` (5/min), `TRADING_LIMIT` (10/min). Lives in `core/` (not `main.py`) to break the circular import from routers importing `limiter`. Redis db 1 storage when `RATE_LIMITING_ENABLED=true`. |
@@ -115,6 +115,8 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `ibkr.py` | `ib_insync`-based Interactive Brokers provider. Futures-only (`get_bars`/`get_snapshots` return empty stubs). Connects to the `ib-gateway` container on port 4002. |
 
 ### Routers (`app/routers/`)
+
+All router endpoint functions are declared `async def`. Synchronous service and DB calls are dispatched to a thread-pool executor via `asyncio.run_in_executor` so FastAPI's event loop remains free. The `Depends(get_async_db)` dependency injects an `AsyncSession` into each handler.
 
 | File | Endpoints |
 |------|-----------|
