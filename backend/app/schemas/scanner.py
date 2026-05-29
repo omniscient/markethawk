@@ -94,7 +94,7 @@ class ScannerConfigResponse(BaseModel):
     """Schema for scanner configuration response."""
 
     id: int
-    uuid: UUID
+    uuid: Optional[UUID] = None
     name: str
     description: Optional[str] = None
     scanner_type: str
