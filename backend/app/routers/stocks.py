@@ -2,6 +2,7 @@
 Stocks router - historical data endpoints.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/api/v1/stocks", tags=["stocks"])
 
 
 @router.get("/historical/{ticker}")
-def get_historical_data(
+async def get_historical_data(
     ticker: str,
     period: str = "30d",
     timespan: str = "day",
@@ -30,8 +31,12 @@ def get_historical_data(
     """Get historical stock data from DB."""
     ticker = ticker.upper()
     try:
-        data = StockDataService.get_historical_enriched(
-            db, ticker, period, timespan, multiplier
+        loop = asyncio.get_running_loop()
+        data = await loop.run_in_executor(
+            None,
+            lambda: StockDataService.get_historical_enriched(
+                db, ticker, period, timespan, multiplier
+            ),
         )
 
         if data.empty:
@@ -101,7 +106,7 @@ def get_historical_data(
 
 
 @router.post("/refresh/{ticker}")
-def refresh_stock_data(
+async def refresh_stock_data(
     ticker: str,
     timespan: str = "day",
     multiplier: int = 1,
@@ -112,13 +117,20 @@ def refresh_stock_data(
     """Trigger a refresh of stock data from Polygon to DB."""
     try:
         ticker = ticker.upper()
-        if StockDataService.is_futures_ticker(db, ticker):
+        loop = asyncio.get_running_loop()
+        is_futures = await loop.run_in_executor(
+            None, lambda: StockDataService.is_futures_ticker(db, ticker)
+        )
+        if is_futures:
             return {
                 "status": "skipped",
                 "message": "Futures data is synced via IBKR, not Polygon.",
             }
-        result = StockDataService.refresh_stock_data(
-            db, ticker, timespan, multiplier, full_history, period
+        result = await loop.run_in_executor(
+            None,
+            lambda: StockDataService.refresh_stock_data(
+                db, ticker, timespan, multiplier, full_history, period
+            ),
         )
         return result
     except DataFetchError as e:
@@ -129,7 +141,7 @@ def refresh_stock_data(
 
 
 @router.get("/details/{ticker}")
-def get_stock_detail_consolidated(
+async def get_stock_detail_consolidated(
     ticker: str,
     db: Session = Depends(get_db),
 ):
@@ -153,30 +165,37 @@ def get_stock_detail_consolidated(
     except Exception:
         pass  # Redis unavailable — fall through to live fetch
 
+    loop = asyncio.get_running_loop()
     try:
-        if StockDataService.is_futures_ticker(db, ticker):
+        is_futures = await loop.run_in_executor(
+            None, lambda: StockDataService.is_futures_ticker(db, ticker)
+        )
+        if is_futures:
             # Return cached info from MonitoredStock — no Polygon calls for futures
 
             from app.models import MonitoredStock
             from app.models.futures_aggregate import FuturesAggregate
 
-            stock = (
-                db.query(MonitoredStock)
-                .filter(
-                    MonitoredStock.ticker == ticker,
-                    MonitoredStock.asset_class == "futures",
-                    MonitoredStock.is_active == True,
+            def _query_futures_detail():
+                stock = (
+                    db.query(MonitoredStock)
+                    .filter(
+                        MonitoredStock.ticker == ticker,
+                        MonitoredStock.asset_class == "futures",
+                        MonitoredStock.is_active == True,
+                    )
+                    .first()
                 )
-                .first()
-            )
+                latest_close = (
+                    db.query(FuturesAggregate.close)
+                    .filter(FuturesAggregate.symbol == ticker)
+                    .order_by(FuturesAggregate.timestamp.desc())
+                    .limit(1)
+                    .scalar()
+                )
+                return stock, latest_close
 
-            latest_close = (
-                db.query(FuturesAggregate.close)
-                .filter(FuturesAggregate.symbol == ticker)
-                .order_by(FuturesAggregate.timestamp.desc())
-                .limit(1)
-                .scalar()
-            )
+            stock, latest_close = await loop.run_in_executor(None, _query_futures_detail)
 
             result = {
                 "ticker": ticker,
@@ -205,16 +224,23 @@ def get_stock_detail_consolidated(
             return result
 
         # 1. Fundamental Info
-        info = StockDataService.get_stock_info(ticker)
+        info = await loop.run_in_executor(
+            None, lambda: StockDataService.get_stock_info(ticker)
+        )
 
         # 2. Pre-market / Extended Hours data
-        pre_market = StockDataService.get_pre_market_data(ticker)
+        pre_market = await loop.run_in_executor(
+            None, lambda: StockDataService.get_pre_market_data(ticker)
+        )
 
         # 3. Latest aggregates for summary (e.g. today's close if available)
         # Fetching last 1 day minute data to get a accurate "current" or "close" price
         today = get_market_today().strftime("%Y-%m-%d")
-        minute_aggs = StockDataService.get_aggregates(
-            ticker, 1, "minute", today, today, limit=1
+        minute_aggs = await loop.run_in_executor(
+            None,
+            lambda: StockDataService.get_aggregates(
+                ticker, 1, "minute", today, today, limit=1
+            ),
         )
 
         latest_price = None
@@ -223,12 +249,13 @@ def get_stock_detail_consolidated(
 
         from app.models.stock_split import StockSplit
 
-        recent_splits_query = (
-            db.query(StockSplit)
+        recent_splits_query = await loop.run_in_executor(
+            None,
+            lambda: db.query(StockSplit)
             .filter(StockSplit.ticker == ticker)
             .order_by(StockSplit.execution_date.desc())
             .limit(5)
-            .all()
+            .all(),
         )
         recent_splits = [
             {
@@ -265,7 +292,7 @@ def get_stock_detail_consolidated(
 
 
 @router.post("/{ticker}/sync-missing")
-def sync_missing_stock_aggregates(
+async def sync_missing_stock_aggregates(
     ticker: str,
     db: Session = Depends(get_db),
 ):
@@ -288,7 +315,10 @@ def sync_missing_stock_aggregates(
     from app.tasks import sync_futures_aggregates, sync_stock_aggregates
 
     ticker = ticker.upper()
-    is_futures = StockDataService.is_futures_ticker(db, ticker)
+    loop = asyncio.get_running_loop()
+    is_futures = await loop.run_in_executor(
+        None, lambda: StockDataService.is_futures_ticker(db, ticker)
+    )
 
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     today = now_utc.strftime("%Y-%m-%d")
@@ -298,16 +328,19 @@ def sync_missing_stock_aggregates(
 
     if is_futures:
         # 1. Handle Futures
-        combos = (
-            db.query(
-                FuturesAggregate.timespan,
-                FuturesAggregate.multiplier,
-                func.max(FuturesAggregate.timestamp).label("max_ts"),
+        def _query_futures_combos():
+            return (
+                db.query(
+                    FuturesAggregate.timespan,
+                    FuturesAggregate.multiplier,
+                    func.max(FuturesAggregate.timestamp).label("max_ts"),
+                )
+                .filter(FuturesAggregate.symbol == ticker)
+                .group_by(FuturesAggregate.timespan, FuturesAggregate.multiplier)
+                .all()
             )
-            .filter(FuturesAggregate.symbol == ticker)
-            .group_by(FuturesAggregate.timespan, FuturesAggregate.multiplier)
-            .all()
-        )
+
+        combos = await loop.run_in_executor(None, _query_futures_combos)
 
         if not combos:
             # Default to standard sync for new futures
@@ -320,15 +353,18 @@ def sync_missing_stock_aggregates(
             )
 
         # Find exchange for futures instrument
-        stock = (
-            db.query(MonitoredStock)
-            .filter(
-                MonitoredStock.ticker == ticker,
-                MonitoredStock.asset_class == "futures",
-                MonitoredStock.is_active == True,
+        def _query_futures_stock():
+            return (
+                db.query(MonitoredStock)
+                .filter(
+                    MonitoredStock.ticker == ticker,
+                    MonitoredStock.asset_class == "futures",
+                    MonitoredStock.is_active == True,
+                )
+                .first()
             )
-            .first()
-        )
+
+        stock = await loop.run_in_executor(None, _query_futures_stock)
         metadata = (stock.stock_metadata or {}) if stock else {}
         exchange = metadata.get("primary_exchange")
         if not exchange or exchange == "Unknown":
@@ -364,16 +400,19 @@ def sync_missing_stock_aggregates(
 
     else:
         # 2. Handle Stocks
-        combos = (
-            db.query(
-                StockAggregate.timespan,
-                StockAggregate.multiplier,
-                func.max(StockAggregate.timestamp).label("max_ts"),
+        def _query_stock_combos():
+            return (
+                db.query(
+                    StockAggregate.timespan,
+                    StockAggregate.multiplier,
+                    func.max(StockAggregate.timestamp).label("max_ts"),
+                )
+                .filter(StockAggregate.ticker == ticker)
+                .group_by(StockAggregate.timespan, StockAggregate.multiplier)
+                .all()
             )
-            .filter(StockAggregate.ticker == ticker)
-            .group_by(StockAggregate.timespan, StockAggregate.multiplier)
-            .all()
-        )
+
+        combos = await loop.run_in_executor(None, _query_stock_combos)
 
         if not combos:
             # Default to standard sync for new stocks

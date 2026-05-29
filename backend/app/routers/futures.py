@@ -5,6 +5,7 @@ Provides REST API endpoints for accessing futures historical data,
 rollover schedules, and contract catalogs.
 """
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/api/v1/futures", tags=["futures"])
 
 
 @router.get("/history/{symbol}")
-def get_futures_history(
+async def get_futures_history(
     symbol: str,
     timespan: str = "day",
     multiplier: int = 1,
@@ -35,12 +36,16 @@ def get_futures_history(
     Uses the volume-based rollover map stored in the database.
     """
     try:
-        df = FuturesDataService.get_continuous_series(
-            symbol=symbol.upper(),
-            timespan=timespan,
-            multiplier=multiplier,
-            from_date=from_date,
-            to_date=to_date,
+        loop = asyncio.get_running_loop()
+        df = await loop.run_in_executor(
+            None,
+            lambda: FuturesDataService.get_continuous_series(
+                symbol=symbol.upper(),
+                timespan=timespan,
+                multiplier=multiplier,
+                from_date=from_date,
+                to_date=to_date,
+            ),
         )
 
         if df.empty:
@@ -79,17 +84,19 @@ def get_futures_history(
 
 
 @router.get("/contracts/{symbol}")
-def get_futures_contracts(
+async def get_futures_contracts(
     symbol: str,
     db: Session = Depends(get_db),
 ):
     """List all known contract months for a symbol."""
     try:
-        contracts = (
-            db.query(FuturesContract)
+        loop = asyncio.get_running_loop()
+        contracts = await loop.run_in_executor(
+            None,
+            lambda: db.query(FuturesContract)
             .filter(FuturesContract.symbol == symbol.upper())
             .order_by(FuturesContract.contract_month.asc())
-            .all()
+            .all(),
         )
         result = [
             {
@@ -119,17 +126,19 @@ def get_futures_contracts(
 
 
 @router.get("/rollovers/{symbol}")
-def get_futures_rollovers(
+async def get_futures_rollovers(
     symbol: str,
     db: Session = Depends(get_db),
 ):
     """List the detected rollover dates used to stitch the continuous series."""
     try:
-        rollovers = (
-            db.query(FuturesRollover)
+        loop = asyncio.get_running_loop()
+        rollovers = await loop.run_in_executor(
+            None,
+            lambda: db.query(FuturesRollover)
             .filter(FuturesRollover.symbol == symbol.upper())
             .order_by(FuturesRollover.roll_date.asc())
-            .all()
+            .all(),
         )
         result = [
             {
@@ -182,6 +191,6 @@ async def trigger_download(
 
 
 @router.get("/providers")
-def list_providers():
+async def list_providers():
     """List all known data providers and their supported asset classes."""
     return {"available": DataProviderFactory.get_all_with_classes()}
