@@ -12,7 +12,7 @@ def test_run_range_returns_task_id(db):
         mock_task.delay.return_value = type("R", (), {"id": "test-task-123"})()
 
         response = client.post(
-            "/api/scanner/run-range",
+            "/api/v1/scanner/run-range",
             json={
                 "ticker": "AAPL",
                 "scanner_types": ["pre_market_volume_spike"],
@@ -31,7 +31,7 @@ def test_run_range_returns_task_id(db):
 def test_run_range_rejects_empty_scanner_types(db):
 
     response = client.post(
-        "/api/scanner/run-range",
+        "/api/v1/scanner/run-range",
         json={
             "ticker": "AAPL",
             "scanner_types": [],

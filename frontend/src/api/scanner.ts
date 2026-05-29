@@ -267,7 +267,7 @@ export const cancelScan = async (scanId: string): Promise<{ status: string; scan
 export const createScanRunWebSocket = (taskId: string): WebSocket | null => {
   try {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return new WebSocket(`${protocol}//${window.location.host}/api/scanner/ws/runs/${taskId}`);
+    return new WebSocket(`${protocol}//${window.location.host}/api/v1/scanner/ws/runs/${taskId}`);
   } catch (e) {
     console.error('[WS] Failed to open scanner run WS', e);
     return null;
@@ -719,7 +719,7 @@ export const fetchStorageStats = async (): Promise<StorageStats> => {
 export const createScannerWebSocket = (): WebSocket | null => {
   try {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws/scanner`);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws/scanner`);
     ws.onopen = () => console.log('[WS] Scanner connected');
     ws.onclose = () => console.log('[WS] Scanner disconnected');
     ws.onerror = (e) => console.error('[WS] Scanner error', e);

@@ -16,7 +16,7 @@ from app.schemas.journal import (
 )
 from app.services import journal_service
 
-router = APIRouter(prefix="/api/journal", tags=["Journal"])
+router = APIRouter(prefix="/api/v1/journal", tags=["Journal"])
 
 
 @router.get("/trades", response_model=List[TradeSchema])

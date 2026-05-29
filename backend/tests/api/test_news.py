@@ -25,7 +25,7 @@ client = TestClient(app)
 
 
 def test_recent_empty_db_returns_empty_list(db: Session):
-    response = client.get("/api/news/recent")
+    response = client.get("/api/v1/news/recent")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -34,7 +34,7 @@ def test_recent_empty_db_returns_empty_list(db: Session):
 def test_recent_returns_seeded_articles(db: Session):
     seed_news_articles(db, count=3)
 
-    response = client.get("/api/news/recent")
+    response = client.get("/api/v1/news/recent")
 
     assert response.status_code == 200
     data = response.json()
@@ -44,7 +44,7 @@ def test_recent_returns_seeded_articles(db: Session):
 def test_recent_response_shape(db: Session):
     seed_news_articles(db, count=1)
 
-    response = client.get("/api/news/recent")
+    response = client.get("/api/v1/news/recent")
 
     assert response.status_code == 200
     article = response.json()[0]
@@ -58,7 +58,7 @@ def test_recent_response_shape(db: Session):
 def test_recent_ordered_newest_first(db: Session):
     seed_news_articles(db, count=3)
 
-    response = client.get("/api/news/recent")
+    response = client.get("/api/v1/news/recent")
 
     assert response.status_code == 200
     articles = response.json()
@@ -69,7 +69,7 @@ def test_recent_ordered_newest_first(db: Session):
 def test_recent_capped_at_100_articles(db: Session):
     seed_news_articles(db, count=105)
 
-    response = client.get("/api/news/recent")
+    response = client.get("/api/v1/news/recent")
 
     assert response.status_code == 200
     assert len(response.json()) == 100
@@ -84,7 +84,7 @@ def test_recent_ticker_filter_returns_matching_articles(db: Session):
     seed_news_articles(db, count=2, tickers=["AAPL"])
     seed_news_articles(db, count=2, tickers=["MSFT"])
 
-    response = client.get("/api/news/recent?ticker=AAPL")
+    response = client.get("/api/v1/news/recent?ticker=AAPL")
 
     assert response.status_code == 200
     data = response.json()
@@ -96,7 +96,7 @@ def test_recent_ticker_filter_returns_matching_articles(db: Session):
 def test_recent_ticker_filter_no_match_returns_empty(db: Session):
     seed_news_articles(db, count=3, tickers=["NVDA"])
 
-    response = client.get("/api/news/recent?ticker=TSLA")
+    response = client.get("/api/v1/news/recent?ticker=TSLA")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -105,7 +105,7 @@ def test_recent_ticker_filter_no_match_returns_empty(db: Session):
 def test_recent_ticker_filter_is_case_insensitive(db: Session):
     seed_news_articles(db, count=2, tickers=["AAPL"])
 
-    response = client.get("/api/news/recent?ticker=aapl")
+    response = client.get("/api/v1/news/recent?ticker=aapl")
 
     assert response.status_code == 200
     assert len(response.json()) == 2
@@ -115,7 +115,7 @@ def test_recent_no_ticker_param_returns_all_articles(db: Session):
     seed_news_articles(db, count=2, tickers=["AAPL"])
     seed_news_articles(db, count=2, tickers=["MSFT"])
 
-    response = client.get("/api/news/recent")
+    response = client.get("/api/v1/news/recent")
 
     assert response.status_code == 200
     assert len(response.json()) == 4
@@ -127,7 +127,7 @@ def test_recent_no_ticker_param_returns_all_articles(db: Session):
 
 
 def test_get_preferences_creates_default_when_none(db: Session):
-    response = client.get("/api/news/preferences")
+    response = client.get("/api/v1/news/preferences")
 
     assert response.status_code == 200
     data = response.json()
@@ -136,7 +136,7 @@ def test_get_preferences_creates_default_when_none(db: Session):
 
 
 def test_get_preferences_response_shape(db: Session):
-    response = client.get("/api/news/preferences")
+    response = client.get("/api/v1/news/preferences")
 
     assert response.status_code == 200
     data = response.json()
@@ -149,8 +149,8 @@ def test_get_preferences_response_shape(db: Session):
 
 
 def test_get_preferences_idempotent(db: Session):
-    r1 = client.get("/api/news/preferences")
-    r2 = client.get("/api/news/preferences")
+    r1 = client.get("/api/v1/news/preferences")
+    r2 = client.get("/api/v1/news/preferences")
 
     assert r1.status_code == 200
     assert r2.status_code == 200
@@ -164,7 +164,7 @@ def test_get_preferences_idempotent(db: Session):
 
 def test_put_preferences_updates_tracked_tickers(db: Session):
     response = client.put(
-        "/api/news/preferences",
+        "/api/v1/news/preferences",
         json={"tracked_tickers": ["AAPL", "NVDA"], "tracked_universes": []},
     )
 
@@ -175,7 +175,7 @@ def test_put_preferences_updates_tracked_tickers(db: Session):
 
 def test_put_preferences_updates_refresh_interval(db: Session):
     response = client.put(
-        "/api/news/preferences",
+        "/api/v1/news/preferences",
         json={
             "tracked_tickers": [],
             "tracked_universes": [],
@@ -189,10 +189,10 @@ def test_put_preferences_updates_refresh_interval(db: Session):
 
 def test_put_preferences_persists_on_get(db: Session):
     client.put(
-        "/api/news/preferences",
+        "/api/v1/news/preferences",
         json={"tracked_tickers": ["TSLA"], "tracked_universes": []},
     )
-    response = client.get("/api/news/preferences")
+    response = client.get("/api/v1/news/preferences")
 
     assert response.status_code == 200
     assert "TSLA" in response.json()["tracked_tickers"]
@@ -200,7 +200,7 @@ def test_put_preferences_persists_on_get(db: Session):
 
 def test_put_preferences_creates_if_none_exist(db: Session):
     response = client.put(
-        "/api/news/preferences",
+        "/api/v1/news/preferences",
         json={"tracked_tickers": ["AMD"], "tracked_universes": []},
     )
 
@@ -218,7 +218,7 @@ def test_refresh_returns_ok_and_task_id(mock_news_provider):
     fake_result.id = "test-task-id-abc123"
 
     with patch("app.tasks.poll_massive_news.apply_async", return_value=fake_result):
-        response = client.post("/api/news/refresh")
+        response = client.post("/api/v1/news/refresh")
 
     assert response.status_code == 200
     data = response.json()
@@ -231,6 +231,6 @@ def test_refresh_polygon_not_called_directly(mock_news_provider):
     fake_result.id = "test-task-id-def456"
 
     with patch("app.tasks.poll_massive_news.apply_async", return_value=fake_result):
-        client.post("/api/news/refresh")
+        client.post("/api/v1/news/refresh")
 
     mock_news_provider.assert_not_called()

@@ -9,7 +9,7 @@ All services run as Docker containers on the `stockscanner-network` bridge netwo
                          │          stockscanner-network            │
                          │                                          │
   Browser ──HTTP:3000──> │ frontend ──HTTP──> backend:8000          │
-                         │   │ WS:3000/api/live/ws/*                │
+                         │   │ WS:3000/api/v1/live/ws/*             │
                          │                       │                  │
                          │                  asyncpg ──> postgres:5432
                          │                  aioredis ──> redis:6379  │
@@ -41,7 +41,7 @@ All services run as Docker containers on the `stockscanner-network` bridge netwo
 
 A full pre-market scan proceeds as follows:
 
-1. **Trigger** — Celery Beat fires `run_scanner` at a scheduled time, or a user POSTs to `/api/scanner/run`.
+1. **Trigger** — Celery Beat fires `run_scanner` at a scheduled time, or a user POSTs to `/api/v1/scanner/run`.
 2. **Session classification** — `ScannerService.calculate_day_metrics()` (`services/scanner.py`) determines the active market session (pre-market 04:00–09:30, regular, post-market) using `ZoneInfo("America/New_York")`, then maps session boundaries to UTC for database queries.
 3. **Ticker list** — The service resolves the universe's ticker list from `StockUniverseTicker` records.
 4. **Parallel data fetch** — Tickers are fetched from Polygon in batches. An `asyncio.Semaphore(10)` bounds concurrency to 10 in-flight requests; `asyncio.gather()` parallelises within that bound.
@@ -49,7 +49,7 @@ A full pre-market scan proceeds as follows:
 6. **News catalyst analysis** — `CatalystParser.analyze_batch()` (`services/catalyst_parser.py`) queries the `NewsArticle` table once for a 72-hour window covering all tickers, then matches articles to tickers in memory.
 7. **Criteria evaluation** — Each ticker is evaluated against the five scanner criteria (see README). Passing tickers produce `ScannerEvent` records.
 8. **Persistence** — A `ScannerRun` row is written with metadata; `ScannerEvent` rows are written for each hit.
-9. **Delivery** — The frontend polls `/api/scanner/results` via React Query. Live pushes are broadcast through `services/websocket_manager.py`.
+9. **Delivery** — The frontend polls `/api/v1/scanner/results` via React Query. Live pushes are broadcast through `services/websocket_manager.py`.
 
 ## Backend Module Map
 
@@ -80,7 +80,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 
 | File | Responsibility |
 |------|---------------|
-| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks/scanning.py`. `get_all()` enumerates entries for `GET /api/scanner/types`. `compute_next_run(scanner_type)` returns next scheduled fire time. `get_scan_progress(redis_url, universe_id, scanner_type)` reads Redis progress state. `request_scan_cancel(redis_url, scan_id)` sets Redis cancel flag. `enqueue_scan(db, request)` creates `ScannerRun` row and dispatches Celery task. |
+| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks/scanning.py`. `get_all()` enumerates entries for `GET /api/v1/scanner/types`. `compute_next_run(scanner_type)` returns next scheduled fire time. `get_scan_progress(redis_url, universe_id, scanner_type)` reads Redis progress state. `request_scan_cancel(redis_url, scan_id)` sets Redis cancel flag. `enqueue_scan(db, request)` creates `ScannerRun` row and dispatches Celery task. |
 | `scanner_query_service.py` | `ScannerQueryService` — DB aggregation queries extracted from `routers/scanner.py`. `get_scan_status_block()` builds the Scan Status card payload. `get_signal_quality_distribution()` computes decile outcome stats. `get_review_stats()` aggregates signal review coverage, acceptance rate, and rejection reasons. |
 | `system_service.py` | `SystemService` — business logic extracted from `routers/system.py`. `get_market_status()` returns the current ET session. `check_ibkr_reachable()` socket probe. `format_bytes()` human-readable size. `get_storage_stats()` per-table PostgreSQL size queries. `get_active_tasks()` async Redis + DB poll for the `/ws/tasks` WebSocket. |
 | `pre_market_scan.py` | Self-registers `"pre_market_volume_spike"` in the orchestrator. Delegates to `ScannerService.run_pre_market_scan` (interim; body inlined in Task 8). |
@@ -117,18 +117,18 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | File | Endpoints |
 |------|-----------|
 | `auth.py` | `GET /api/auth/status` (bootstrap check), `POST /api/auth/register` (first-user only), `POST /api/auth/login` (sets HttpOnly JWT cookies), `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me` |
-| `scanner.py` | `/api/scanner/run`, `/api/scanner/results` (eager-loads reviews, default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/scanner/history`, `/api/scanner/signal-quality-distribution`, `POST /api/scanner/events/{uuid}/review` (submit verdict), `GET /api/scanner/events/reviews?scanner_type=` (list with `liquidity_hunt` alias), `GET /api/scanner/reviews/stats` (coverage, acceptance rate, by-type breakdown) |
-| `universe.py` | `/api/universe/*` — CRUD for stock universes and memberships |
-| `stocks.py` | `/api/stocks/*` — historical data, ticker search, stock details |
-| `news.py` | `/api/news/*` — news articles and preferences |
-| `live_data.py` | `/api/live/ws/{ticker}/{resolution}` — per-symbol WebSocket; `/api/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts) |
-| `futures.py` | `/api/futures/*` — `GET /history/{symbol}`, `GET /contracts/{symbol}`, `GET /rollovers/{symbol}`, `POST /download/{symbol}` (catalog refresh), `GET /providers` |
-| `journal.py` | `/api/journal/*` — trade journal entries |
-| `watchlist.py` | `/api/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |
-| `health.py` | `GET /health` — liveness probe |
-| `system.py` | `/api/system/*` — configuration, status |
-| `outcomes.py` | `/api/outcomes/*` — scorecard, intervals, distribution, edge decay, signals, event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
-| `tweets.py` | `GET /api/tweets/recent` — recent TweetSignals (filter by classification/promoted); `WS /api/tweets/feed` — live WebSocket stream of all new tweet signals from Redis `tweet_signals:all` channel |
+| `scanner.py` | `/api/v1/scanner/run`, `/api/v1/scanner/results` (eager-loads reviews, default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/v1/scanner/history`, `/api/v1/scanner/signal-quality-distribution`, `POST /api/v1/scanner/events/{uuid}/review` (submit verdict), `GET /api/v1/scanner/events/reviews?scanner_type=` (list with `liquidity_hunt` alias), `GET /api/v1/scanner/reviews/stats` (coverage, acceptance rate, by-type breakdown) |
+| `universe.py` | `/api/v1/universe/*` — CRUD for stock universes and memberships |
+| `stocks.py` | `/api/v1/stocks/*` — historical data, ticker search, stock details |
+| `news.py` | `/api/v1/news/*` — news articles and preferences |
+| `live_data.py` | `/api/v1/live/ws/{ticker}/{resolution}` — per-symbol WebSocket; `/api/v1/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts) |
+| `futures.py` | `/api/v1/futures/*` — `GET /history/{symbol}`, `GET /contracts/{symbol}`, `GET /rollovers/{symbol}`, `POST /download/{symbol}` (catalog refresh), `GET /providers` |
+| `journal.py` | `/api/v1/journal/*` — trade journal entries |
+| `watchlist.py` | `/api/v1/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |
+| `health.py` | `GET /api/health` — liveness probe (unversioned; consumed by Docker and monitoring tools) |
+| `system.py` | `/api/v1/system/*` — configuration, status |
+| `outcomes.py` | `/api/v1/outcomes/*` — scorecard, intervals, distribution, edge decay, signals, event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
+| `tweets.py` | `GET /api/v1/tweets/recent` — recent TweetSignals (filter by classification/promoted); `WS /api/v1/tweets/feed` — live WebSocket stream of all new tweet signals from Redis `tweet_signals:all` channel |
 
 ### Database Models (`app/models/`)
 
@@ -270,7 +270,7 @@ IB Gateway
                                       └── publish → Redis watchlist:alerts {"type":"alert"}
 
 Redis pub/sub
-  └── FastAPI /api/live/ws/watchlist (subscribes to watchlist:live_data + watchlist:alerts)
+  └── FastAPI /api/v1/live/ws/watchlist (subscribes to watchlist:live_data + watchlist:alerts)
         └── WebSocket → Browser (ActiveWatchlist page)
 ```
 
@@ -308,16 +308,16 @@ Defined in `app/tasks/` (package), scheduled via `app/core/celery_app.py`. All t
 | `sync.py` | `sync_stock_splits` | Beat (01:00 UTC daily) | Fetch 180-day splits from Polygon and apply adjustments |
 | `sync.py` | `poll_massive_news` | Beat (weekdays) | Poll Polygon news API per tracked tickers/universes |
 | `sync.py` | `trigger_tweet_monitor` | Beat (every 45s) | HTTP trigger for tweet-monitor microservice |
-| `scanning.py` | `run_universe_scan` | On-demand via `POST /api/scanner/runs` | Full universe scan over a date range with Redis progress |
-| `scanning.py` | `run_range_scan` | On-demand via `POST /api/scanner/scan` | Single-ticker scan over a date range |
+| `scanning.py` | `run_universe_scan` | On-demand via `POST /api/v1/scanner/runs` | Full universe scan over a date range with Redis progress |
+| `scanning.py` | `run_range_scan` | On-demand via `POST /api/v1/scanner/scan` | Single-ticker scan over a date range |
 | `scanning.py` | `run_liquidity_hunt_scheduled` | Beat (02:00 UTC weekdays) | Nightly liquidity-hunt scan over all active configs |
 | `scanning.py` | `evaluate_scanner_alerts` | On scanner event create | Match alert rules; dispatch notifications; queue auto-trade |
 | `trading.py` | `execute_auto_trade` | Queued by `evaluate_scanner_alerts` | Run AutoTradeExecutor for a matched rule/event pair |
-| `trading.py` | `submit_approved_order` | On-demand via `POST /api/auto-trading/orders/{id}/approve` | Submit a pending AutoTradeOrder to IBKR |
+| `trading.py` | `submit_approved_order` | On-demand via `POST /api/v1/trading/orders/{id}/approve` | Submit a pending AutoTradeOrder to IBKR |
 | `trading.py` | `poll_auto_trade_fills` | Beat (every minute, weekdays 09–23 UTC) | Poll IBKR fills; simulate paper exits; update Trade records |
-| `quality.py` | `analyze_universe_quality` | On-demand via `POST /api/universe/{id}/quality` | Run data-quality analysis and persist grade/score |
-| `quality.py` | `normalize_universe_quality` | On-demand via `POST /api/universe/{id}/normalize` | Fix data gaps/duplicates and re-run quality analysis |
-| `quality.py` | `analyze_signal_features` | Beat (11:00 UTC weekdays) / on-demand via `POST /api/outcomes/analyze` | Statistical discovery: correlation, SHAP, K-means clustering. Requires ≥500 complete events. |
+| `quality.py` | `analyze_universe_quality` | On-demand via `POST /api/v1/universe/{id}/quality` | Run data-quality analysis and persist grade/score |
+| `quality.py` | `normalize_universe_quality` | On-demand via `POST /api/v1/universe/{id}/normalize` | Fix data gaps/duplicates and re-run quality analysis |
+| `quality.py` | `analyze_signal_features` | Beat (11:00 UTC weekdays) / on-demand via `POST /api/v1/outcomes/analyze` | Statistical discovery: correlation, SHAP, K-means clustering. Requires ≥500 complete events. |
 
 Redis is used as both the Celery broker and result backend. Worker and beat run as separate containers so the scheduler doesn't compete with task execution.
 
@@ -424,7 +424,7 @@ Four pre-provisioned dashboards load automatically from the `grafana/provisionin
 - **Celery Tasks** — success/failure rates and P95 duration per task
 - **Infrastructure** — IBKR status, DB pool utilization, WebSocket count
 
-Alerting rules (`grafana/provisioning/alerting/rules.yaml`) fire when IBKR disconnects for >2 min, Celery failure rate exceeds 10%, DB pool overflows, or HTTP 5xx rate spikes. Alerts POST to `backend:8000/api/alerts/infrastructure`.
+Alerting rules (`grafana/provisioning/alerting/rules.yaml`) fire when IBKR disconnects for >2 min, Celery failure rate exceeds 10%, DB pool overflows, or HTTP 5xx rate spikes. Alerts POST to `backend:8000/api/v1/alerts/infrastructure`.
 
 ## Test Architecture
 

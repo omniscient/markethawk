@@ -16,7 +16,7 @@ from app.schemas.news_preference import (
     NewsPreferenceUpdate,
 )
 
-router = APIRouter(prefix="/api/news", tags=["news"])
+router = APIRouter(prefix="/api/v1/news", tags=["news"])
 
 
 @router.get("/preferences", response_model=NewsPreferenceResponse)

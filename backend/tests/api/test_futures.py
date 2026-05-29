@@ -28,7 +28,7 @@ client = TestClient(app)
 def test_contracts_returns_correct_shape(db: Session):
     seed_futures_contracts(db, symbol="ES", exchange="CME", count=2)
 
-    response = client.get("/api/futures/contracts/ES")
+    response = client.get("/api/v1/futures/contracts/ES")
 
     assert response.status_code == 200
     data = response.json()
@@ -45,7 +45,7 @@ def test_contracts_returns_correct_shape(db: Session):
 def test_contracts_symbol_is_case_insensitive(db: Session):
     seed_futures_contracts(db, symbol="NQ", exchange="CME", count=1)
 
-    response = client.get("/api/futures/contracts/nq")
+    response = client.get("/api/v1/futures/contracts/nq")
 
     assert response.status_code == 200
     data = response.json()
@@ -54,7 +54,7 @@ def test_contracts_symbol_is_case_insensitive(db: Session):
 
 
 def test_contracts_empty_db_returns_zero(db: Session):
-    response = client.get("/api/futures/contracts/ZZ")
+    response = client.get("/api/v1/futures/contracts/ZZ")
 
     assert response.status_code == 200
     data = response.json()
@@ -77,7 +77,7 @@ def test_rollovers_returns_correct_shape(db: Session):
         to_contract="20250620",
     )
 
-    response = client.get("/api/futures/rollovers/ES")
+    response = client.get("/api/v1/futures/rollovers/ES")
 
     assert response.status_code == 200
     data = response.json()
@@ -92,7 +92,7 @@ def test_rollovers_returns_correct_shape(db: Session):
 
 
 def test_rollovers_empty_db_returns_zero(db: Session):
-    response = client.get("/api/futures/rollovers/ZZ")
+    response = client.get("/api/v1/futures/rollovers/ZZ")
 
     assert response.status_code == 200
     data = response.json()
@@ -111,7 +111,7 @@ def test_history_returns_correct_shape(db: Session):
     seed_futures_aggregates(db, symbol="ES", contract_month="20250321", count=5)
 
     with patch("app.services.futures_data.SessionLocal", return_value=db):
-        response = client.get("/api/futures/history/ES")
+        response = client.get("/api/v1/futures/history/ES")
 
     assert response.status_code == 200
     data = response.json()
@@ -129,7 +129,7 @@ def test_history_returns_correct_shape(db: Session):
 
 def test_history_empty_db_returns_zero_data_points(db: Session):
     with patch("app.services.futures_data.SessionLocal", return_value=db):
-        response = client.get("/api/futures/history/ZZ")
+        response = client.get("/api/v1/futures/history/ZZ")
 
     assert response.status_code == 200
     data = response.json()
@@ -143,7 +143,7 @@ def test_history_symbol_is_case_insensitive(db: Session):
     seed_futures_aggregates(db, symbol="NQ", contract_month="20250321", count=3)
 
     with patch("app.services.futures_data.SessionLocal", return_value=db):
-        response = client.get("/api/futures/history/nq")
+        response = client.get("/api/v1/futures/history/nq")
 
     assert response.status_code == 200
     data = response.json()
@@ -157,7 +157,7 @@ def test_history_symbol_is_case_insensitive(db: Session):
 
 
 def test_providers_lists_ibkr(mock_futures_provider):
-    response = client.get("/api/futures/providers")
+    response = client.get("/api/v1/futures/providers")
 
     assert response.status_code == 200
     data = response.json()
@@ -168,7 +168,7 @@ def test_providers_lists_ibkr(mock_futures_provider):
 
 
 def test_providers_response_shape(mock_futures_provider):
-    response = client.get("/api/futures/providers")
+    response = client.get("/api/v1/futures/providers")
 
     assert response.status_code == 200
     data = response.json()

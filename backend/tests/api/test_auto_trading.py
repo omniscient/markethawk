@@ -57,7 +57,7 @@ def _order(db, strategy, symbol="AAPL", status="submitted"):
 
 
 def test_list_strategies_returns_200(db: Session):
-    response = client.get("/api/trading/strategies")
+    response = client.get("/api/v1/trading/strategies")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
@@ -65,7 +65,7 @@ def test_list_strategies_returns_200(db: Session):
 def test_list_strategies_contains_created(db: Session):
     _strategy(db, name="Visible Strategy")
     db.flush()
-    response = client.get("/api/trading/strategies")
+    response = client.get("/api/v1/trading/strategies")
     names = [s["name"] for s in response.json()]
     assert "Visible Strategy" in names
 
@@ -75,7 +75,7 @@ def test_list_strategies_contains_created(db: Session):
 
 def test_create_strategy_returns_201(db: Session):
     payload = {"name": "New Strategy", "stop_pct": 2.5, "direction": "long_only"}
-    response = client.post("/api/trading/strategies", json=payload)
+    response = client.post("/api/v1/trading/strategies", json=payload)
     assert response.status_code == 201
     data = response.json()
     assert data["name"] == "New Strategy"
@@ -84,7 +84,7 @@ def test_create_strategy_returns_201(db: Session):
 
 
 def test_create_strategy_defaults_paper_mode(db: Session):
-    response = client.post("/api/trading/strategies", json={"name": "Safe"})
+    response = client.post("/api/v1/trading/strategies", json={"name": "Safe"})
     assert response.status_code == 201
     assert response.json()["paper_mode"] is True
 
@@ -94,13 +94,13 @@ def test_create_strategy_defaults_paper_mode(db: Session):
 
 def test_get_strategy_returns_200(db: Session):
     s = _strategy(db)
-    response = client.get(f"/api/trading/strategies/{s.id}")
+    response = client.get(f"/api/v1/trading/strategies/{s.id}")
     assert response.status_code == 200
     assert response.json()["id"] == s.id
 
 
 def test_get_strategy_not_found_returns_404(db: Session):
-    response = client.get("/api/trading/strategies/999999")
+    response = client.get("/api/v1/trading/strategies/999999")
     assert response.status_code == 404
 
 
@@ -110,7 +110,7 @@ def test_get_strategy_not_found_returns_404(db: Session):
 def test_patch_strategy_updates_field(db: Session):
     s = _strategy(db)
     response = client.patch(
-        f"/api/trading/strategies/{s.id}",
+        f"/api/v1/trading/strategies/{s.id}",
         json={"is_active": False},
     )
     assert response.status_code == 200
@@ -118,7 +118,7 @@ def test_patch_strategy_updates_field(db: Session):
 
 
 def test_patch_strategy_not_found_returns_404(db: Session):
-    response = client.patch("/api/trading/strategies/999999", json={"is_active": True})
+    response = client.patch("/api/v1/trading/strategies/999999", json={"is_active": True})
     assert response.status_code == 404
 
 
@@ -127,13 +127,13 @@ def test_patch_strategy_not_found_returns_404(db: Session):
 
 def test_delete_strategy_returns_204(db: Session):
     s = _strategy(db)
-    response = client.delete(f"/api/trading/strategies/{s.id}")
+    response = client.delete(f"/api/v1/trading/strategies/{s.id}")
     assert response.status_code == 204
 
 
 def test_delete_strategy_soft_deletes(db: Session):
     s = _strategy(db)
-    client.delete(f"/api/trading/strategies/{s.id}")
+    client.delete(f"/api/v1/trading/strategies/{s.id}")
     db.refresh(s)
     assert s.is_active is False
 
@@ -141,12 +141,12 @@ def test_delete_strategy_soft_deletes(db: Session):
 def test_delete_strategy_with_open_orders_returns_409(db: Session):
     s = _strategy(db)
     _order(db, s, status="submitted")
-    response = client.delete(f"/api/trading/strategies/{s.id}")
+    response = client.delete(f"/api/v1/trading/strategies/{s.id}")
     assert response.status_code == 409
 
 
 def test_delete_strategy_not_found_returns_404(db: Session):
-    response = client.delete("/api/trading/strategies/999999")
+    response = client.delete("/api/v1/trading/strategies/999999")
     assert response.status_code == 404
 
 
@@ -154,7 +154,7 @@ def test_delete_strategy_not_found_returns_404(db: Session):
 
 
 def test_list_orders_returns_200(db: Session):
-    response = client.get("/api/trading/orders")
+    response = client.get("/api/v1/trading/orders")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
@@ -162,7 +162,7 @@ def test_list_orders_returns_200(db: Session):
 def test_list_orders_contains_created(db: Session):
     s = _strategy(db)
     o = _order(db, s, symbol="TSLA")
-    response = client.get("/api/trading/orders")
+    response = client.get("/api/v1/trading/orders")
     ids = [r["id"] for r in response.json()]
     assert o.id in ids
 
@@ -173,13 +173,13 @@ def test_list_orders_contains_created(db: Session):
 def test_get_order_returns_200(db: Session):
     s = _strategy(db)
     o = _order(db, s)
-    response = client.get(f"/api/trading/orders/{o.id}")
+    response = client.get(f"/api/v1/trading/orders/{o.id}")
     assert response.status_code == 200
     assert response.json()["id"] == o.id
 
 
 def test_get_order_not_found_returns_404(db: Session):
-    response = client.get("/api/trading/orders/999999")
+    response = client.get("/api/v1/trading/orders/999999")
     assert response.status_code == 404
 
 
@@ -189,7 +189,7 @@ def test_get_order_not_found_returns_404(db: Session):
 def test_approve_pending_order_sets_submitted(db: Session):
     s = _strategy(db)
     o = _order(db, s, status="pending_approval")
-    response = client.post(f"/api/trading/orders/{o.id}/approve")
+    response = client.post(f"/api/v1/trading/orders/{o.id}/approve")
     assert response.status_code == 200
     assert response.json()["status"] == "submitted"
 
@@ -201,7 +201,7 @@ def test_reject_pending_order_sets_rejected(db: Session):
     s = _strategy(db)
     o = _order(db, s, status="pending_approval")
     response = client.post(
-        f"/api/trading/orders/{o.id}/reject",
+        f"/api/v1/trading/orders/{o.id}/reject",
         json={"reason": "Too risky"},
     )
     assert response.status_code == 200
@@ -214,7 +214,7 @@ def test_reject_pending_order_sets_rejected(db: Session):
 def test_cancel_submitted_order_sets_cancelled(db: Session):
     s = _strategy(db)
     o = _order(db, s, status="submitted")
-    response = client.post(f"/api/trading/orders/{o.id}/cancel")
+    response = client.post(f"/api/v1/trading/orders/{o.id}/cancel")
     assert response.status_code == 200
     assert response.json()["status"] == "cancelled"
 
@@ -222,7 +222,7 @@ def test_cancel_submitted_order_sets_cancelled(db: Session):
 def test_cancel_already_closed_order_returns_409(db: Session):
     s = _strategy(db)
     o = _order(db, s, status="closed")
-    response = client.post(f"/api/trading/orders/{o.id}/cancel")
+    response = client.post(f"/api/v1/trading/orders/{o.id}/cancel")
     assert response.status_code == 409
 
 
@@ -230,7 +230,7 @@ def test_cancel_already_closed_order_returns_409(db: Session):
 
 
 def test_stats_returns_expected_shape(db: Session):
-    response = client.get("/api/trading/stats")
+    response = client.get("/api/v1/trading/stats")
     assert response.status_code == 200
     data = response.json()
     assert "total_orders" in data
@@ -243,7 +243,7 @@ def test_stats_returns_expected_shape(db: Session):
 
 
 def test_get_config_returns_200(db: Session):
-    response = client.get("/api/trading/config")
+    response = client.get("/api/v1/trading/config")
     assert response.status_code == 200
     data = response.json()
     assert "AUTO_TRADING_ENABLED" in data
@@ -252,7 +252,7 @@ def test_get_config_returns_200(db: Session):
 
 def test_patch_config_updates_enabled_flag(db: Session):
     response = client.patch(
-        "/api/trading/config",
+        "/api/v1/trading/config",
         json={"AUTO_TRADING_ENABLED": True},
     )
     assert response.status_code == 200

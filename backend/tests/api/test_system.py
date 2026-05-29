@@ -18,7 +18,7 @@ client = TestClient(app)
 
 
 def test_get_config_empty_db_returns_empty_dict(db: Session):
-    response = client.get("/api/system/config")
+    response = client.get("/api/v1/system/config")
 
     assert response.status_code == 200
     assert response.json() == {}
@@ -27,7 +27,7 @@ def test_get_config_empty_db_returns_empty_dict(db: Session):
 def test_get_config_returns_seeded_keys(db: Session):
     seed_system_config(db)
 
-    response = client.get("/api/system/config")
+    response = client.get("/api/v1/system/config")
 
     assert response.status_code == 200
     data = response.json()
@@ -39,7 +39,7 @@ def test_get_config_returns_seeded_keys(db: Session):
 def test_get_config_returns_flat_dict(db: Session):
     seed_system_config(db)
 
-    response = client.get("/api/system/config")
+    response = client.get("/api/v1/system/config")
 
     data = response.json()
     assert isinstance(data, dict)
@@ -52,7 +52,7 @@ def test_get_config_returns_flat_dict(db: Session):
 
 
 def test_patch_config_inserts_new_key(db: Session):
-    response = client.patch("/api/system/config", json={"new_key": "new_value"})
+    response = client.patch("/api/v1/system/config", json={"new_key": "new_value"})
 
     assert response.status_code == 200
     data = response.json()
@@ -62,7 +62,7 @@ def test_patch_config_inserts_new_key(db: Session):
 def test_patch_config_updates_existing_key(db: Session):
     seed_system_config(db)
 
-    response = client.patch("/api/system/config", json={"scan_enabled": "false"})
+    response = client.patch("/api/v1/system/config", json={"scan_enabled": "false"})
 
     assert response.status_code == 200
     data = response.json()
@@ -71,7 +71,7 @@ def test_patch_config_updates_existing_key(db: Session):
 
 def test_patch_config_multiple_keys(db: Session):
     response = client.patch(
-        "/api/system/config",
+        "/api/v1/system/config",
         json={"key_a": "val_a", "key_b": "val_b", "key_c": "val_c"},
     )
 
@@ -85,7 +85,7 @@ def test_patch_config_multiple_keys(db: Session):
 def test_patch_config_returns_full_config(db: Session):
     seed_system_config(db)
 
-    response = client.patch("/api/system/config", json={"new_setting": "42"})
+    response = client.patch("/api/v1/system/config", json={"new_setting": "42"})
 
     data = response.json()
     # Original seeded keys still present
@@ -97,8 +97,8 @@ def test_patch_config_returns_full_config(db: Session):
 
 
 def test_patch_config_persists_across_get(db: Session):
-    client.patch("/api/system/config", json={"persisted_key": "persisted_value"})
-    response = client.get("/api/system/config")
+    client.patch("/api/v1/system/config", json={"persisted_key": "persisted_value"})
+    response = client.get("/api/v1/system/config")
 
     assert response.status_code == 200
     assert response.json()["persisted_key"] == "persisted_value"
@@ -107,7 +107,7 @@ def test_patch_config_persists_across_get(db: Session):
 def test_patch_config_empty_payload_returns_current_config(db: Session):
     seed_system_config(db)
 
-    response = client.patch("/api/system/config", json={})
+    response = client.patch("/api/v1/system/config", json={})
 
     assert response.status_code == 200
     data = response.json()
@@ -115,7 +115,7 @@ def test_patch_config_empty_payload_returns_current_config(db: Session):
 
 
 def test_patch_config_numeric_value_stored_as_string(db: Session):
-    response = client.patch("/api/system/config", json={"threshold": 5})
+    response = client.patch("/api/v1/system/config", json={"threshold": 5})
 
     assert response.status_code == 200
     data = response.json()

@@ -43,7 +43,7 @@ from app.services.auto_trade_service import (
     get_stats,
 )
 
-router = APIRouter(prefix="/api/trading", tags=["auto-trading"])
+router = APIRouter(prefix="/api/v1/trading", tags=["auto-trading"])
 logger = logging.getLogger(__name__)
 
 

@@ -21,5 +21,5 @@ def test_health_is_exempt_from_auth():
 
 def test_protected_endpoint_returns_401_without_cookie():
     c = TestClient(app, raise_server_exceptions=False)
-    response = c.get("/api/scanner/runs")
+    response = c.get("/api/v1/scanner/runs")
     assert response.status_code == 401

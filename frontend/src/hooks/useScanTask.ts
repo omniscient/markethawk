@@ -39,7 +39,7 @@ export const useScanTask = (
     setState({ ...INITIAL_STATE, status: 'connecting' });
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/live/ws/scan-task/${taskId}`;
+    const wsUrl = `${protocol}//${window.location.host}/api/v1/live/ws/scan-task/${taskId}`;
 
     let isMounted = true;
 

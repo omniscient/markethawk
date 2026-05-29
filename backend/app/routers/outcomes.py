@@ -33,7 +33,7 @@ from app.services.data_readiness import DataReadinessService
 from app.services.outcome_service import OutcomeService
 from app.services.stats import StatsService
 
-router = APIRouter(prefix="/api/outcomes", tags=["outcomes"])
+router = APIRouter(prefix="/api/v1/outcomes", tags=["outcomes"])
 
 
 @router.get("/scorecard")

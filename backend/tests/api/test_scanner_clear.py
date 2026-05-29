@@ -24,7 +24,7 @@ def test_clear_events_returns_count(db: Session):
     db.add(_make_event("AAPL", "oversold_bounce"))
     db.flush()
 
-    response = client.delete("/api/scanner/events/AAPL")
+    response = client.delete("/api/v1/scanner/events/AAPL")
 
     assert response.status_code == 200
     body = response.json()
@@ -33,7 +33,7 @@ def test_clear_events_returns_count(db: Session):
 
 
 def test_clear_events_zero_when_none_exist(db: Session):
-    response = client.delete("/api/scanner/events/ZZZZ")
+    response = client.delete("/api/v1/scanner/events/ZZZZ")
 
     assert response.status_code == 200
     assert response.json()["deleted_count"] == 0
@@ -44,7 +44,7 @@ def test_clear_events_does_not_affect_other_tickers(db: Session):
     db.add(_make_event("MSFT"))
     db.flush()
 
-    response = client.delete("/api/scanner/events/TSLA")
+    response = client.delete("/api/v1/scanner/events/TSLA")
 
     assert response.status_code == 200
     assert response.json()["deleted_count"] == 1
@@ -56,7 +56,7 @@ def test_clear_events_normalises_ticker_case(db: Session):
     db.add(_make_event("AMZN"))
     db.flush()
 
-    response = client.delete("/api/scanner/events/amzn")
+    response = client.delete("/api/v1/scanner/events/amzn")
 
     assert response.status_code == 200
     body = response.json()

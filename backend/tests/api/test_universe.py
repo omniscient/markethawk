@@ -20,7 +20,7 @@ client = TestClient(app)
 def test_list_returns_only_active_universes(db: Session):
     seed_universes(db)
 
-    response = client.get("/api/universe/list")
+    response = client.get("/api/v1/universe/list")
 
     assert response.status_code == 200
     data = response.json()
@@ -32,7 +32,7 @@ def test_list_returns_only_active_universes(db: Session):
 
 
 def test_list_returns_empty_when_no_universes(db: Session):
-    response = client.get("/api/universe/list")
+    response = client.get("/api/v1/universe/list")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -41,7 +41,7 @@ def test_list_returns_empty_when_no_universes(db: Session):
 def test_list_response_shape(db: Session):
     seed_universes(db)
 
-    response = client.get("/api/universe/list")
+    response = client.get("/api/v1/universe/list")
 
     assert response.status_code == 200
     universe = response.json()[0]
@@ -60,7 +60,7 @@ def test_list_response_shape(db: Session):
 def test_list_include_stats_false_returns_zero_counts(db: Session):
     seed_universes(db)
 
-    response = client.get("/api/universe/list?include_stats=false")
+    response = client.get("/api/v1/universe/list?include_stats=false")
 
     assert response.status_code == 200
     for u in response.json():
@@ -80,7 +80,7 @@ def test_create_universe_returns_new_record(db: Session):
         "criteria": {"sector": "tech"},
     }
 
-    response = client.post("/api/universe/create", json=payload)
+    response = client.post("/api/v1/universe/create", json=payload)
 
     assert response.status_code == 200
     data = response.json()
@@ -95,7 +95,7 @@ def test_create_universe_returns_new_record(db: Session):
 def test_create_universe_without_description(db: Session):
     payload = {"name": "Minimal Universe", "criteria": {}}
 
-    response = client.post("/api/universe/create", json=payload)
+    response = client.post("/api/v1/universe/create", json=payload)
 
     assert response.status_code == 200
     assert response.json()["name"] == "Minimal Universe"
@@ -111,7 +111,7 @@ def test_update_universe_name(db: Session):
     universes = seed_universes(db)
     uid = universes[0].id
 
-    response = client.put(f"/api/universe/{uid}", json={"name": "Updated Name"})
+    response = client.put(f"/api/v1/universe/{uid}", json={"name": "Updated Name"})
 
     assert response.status_code == 200
     assert response.json()["name"] == "Updated Name"
@@ -123,7 +123,7 @@ def test_update_universe_description_and_criteria(db: Session):
     uid = universes[1].id
 
     response = client.put(
-        f"/api/universe/{uid}",
+        f"/api/v1/universe/{uid}",
         json={"description": "New desc", "criteria": {"sector": "pharma"}},
     )
 
@@ -134,7 +134,7 @@ def test_update_universe_description_and_criteria(db: Session):
 
 
 def test_update_universe_not_found(db: Session):
-    response = client.put("/api/universe/99999", json={"name": "Ghost"})
+    response = client.put("/api/v1/universe/99999", json={"name": "Ghost"})
 
     assert response.status_code == 404
 
@@ -148,20 +148,20 @@ def test_delete_universe_soft_deletes(db: Session):
     universes = seed_universes(db)
     uid = universes[0].id
 
-    response = client.delete(f"/api/universe/{uid}")
+    response = client.delete(f"/api/v1/universe/{uid}")
 
     assert response.status_code == 200
     assert "deleted" in response.json()["message"].lower()
 
     # Confirm it no longer appears in list
-    list_response = client.get("/api/universe/list")
+    list_response = client.get("/api/v1/universe/list")
 
     ids = [u["id"] for u in list_response.json()]
     assert uid not in ids
 
 
 def test_delete_universe_not_found(db: Session):
-    response = client.delete("/api/universe/99999")
+    response = client.delete("/api/v1/universe/99999")
 
     assert response.status_code == 404
 
@@ -176,7 +176,7 @@ def test_get_universe_stocks_returns_seeded_stocks(db: Session):
     seed_monitored_stocks(db, universes)
     uid = universes[0].id  # Tech Stocks: AAPL, MSFT, NVDA
 
-    response = client.get(f"/api/universe/{uid}/stocks")
+    response = client.get(f"/api/v1/universe/{uid}/stocks")
 
     assert response.status_code == 200
     tickers = {s["ticker"] for s in response.json()}
@@ -187,7 +187,7 @@ def test_get_universe_stocks_empty_when_none(db: Session):
     universes = seed_universes(db)
     uid = universes[0].id
 
-    response = client.get(f"/api/universe/{uid}/stocks")
+    response = client.get(f"/api/v1/universe/{uid}/stocks")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -198,7 +198,7 @@ def test_get_universe_stocks_response_shape(db: Session):
     seed_monitored_stocks(db, universes)
     uid = universes[0].id
 
-    response = client.get(f"/api/universe/{uid}/stocks")
+    response = client.get(f"/api/v1/universe/{uid}/stocks")
 
     assert response.status_code == 200
     stock = response.json()[0]
@@ -212,7 +212,7 @@ def test_get_universe_stocks_response_shape(db: Session):
 
 
 def test_refresh_universe_not_found(db: Session):
-    response = client.post("/api/universe/99999/refresh")
+    response = client.post("/api/v1/universe/99999/refresh")
 
     assert response.status_code == 404
 
@@ -221,7 +221,7 @@ def test_refresh_universe_returns_completed_status(db: Session):
     universes = seed_universes(db)
     uid = universes[0].id
 
-    response = client.post(f"/api/universe/{uid}/refresh")
+    response = client.post(f"/api/v1/universe/{uid}/refresh")
 
     assert response.status_code == 200
     data = response.json()
@@ -239,7 +239,7 @@ def test_by_ticker_returns_universes_containing_ticker(db: Session):
     universes = seed_universes(db)
     seed_tickers(db, universes)
 
-    response = client.get("/api/universe/by-ticker/AAPL")
+    response = client.get("/api/v1/universe/by-ticker/AAPL")
 
     assert response.status_code == 200
     names = [u["name"] for u in response.json()]
@@ -251,7 +251,7 @@ def test_by_ticker_excludes_inactive_universes(db: Session):
     universes = seed_universes(db)
     seed_tickers(db, universes)
 
-    response = client.get("/api/universe/by-ticker/AAPL")
+    response = client.get("/api/v1/universe/by-ticker/AAPL")
 
     assert response.status_code == 200
     names = [u["name"] for u in response.json()]
@@ -261,7 +261,7 @@ def test_by_ticker_excludes_inactive_universes(db: Session):
 def test_by_ticker_returns_empty_for_unknown_ticker(db: Session):
     seed_universes(db)
 
-    response = client.get("/api/universe/by-ticker/ZZZZ")
+    response = client.get("/api/v1/universe/by-ticker/ZZZZ")
 
     assert response.status_code == 200
     assert response.json() == []

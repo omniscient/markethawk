@@ -22,7 +22,7 @@ def _sym(prefix="T"):
 
 def _post(symbol, security_type="STK"):
     return client.post(
-        "/api/watchlist/", json={"symbol": symbol, "security_type": security_type}
+        "/api/v1/watchlist/", json={"symbol": symbol, "security_type": security_type}
     )
 
 
@@ -30,7 +30,7 @@ def _post(symbol, security_type="STK"):
 
 
 def test_list_watchlist_returns_200(db: Session):
-    response = client.get("/api/watchlist/")
+    response = client.get("/api/v1/watchlist/")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
@@ -38,7 +38,7 @@ def test_list_watchlist_returns_200(db: Session):
 def test_list_watchlist_contains_added_entry(db: Session):
     sym = _sym("L")
     _post(sym)
-    response = client.get("/api/watchlist/")
+    response = client.get("/api/v1/watchlist/")
     symbols = [e["symbol"] for e in response.json()]
     assert sym in symbols
 
@@ -84,13 +84,13 @@ def test_add_beyond_soft_limit_returns_422(db: Session):
 def test_update_watchlist_notes(db: Session):
     sym = _sym("U")
     _post(sym)
-    response = client.patch(f"/api/watchlist/{sym}", json={"notes": "Watching closely"})
+    response = client.patch(f"/api/v1/watchlist/{sym}", json={"notes": "Watching closely"})
     assert response.status_code == 200
     assert response.json()["notes"] == "Watching closely"
 
 
 def test_update_watchlist_not_found_returns_404(db: Session):
-    response = client.patch("/api/watchlist/ZZZZ9", json={"notes": "nothing"})
+    response = client.patch("/api/v1/watchlist/ZZZZ9", json={"notes": "nothing"})
     assert response.status_code == 404
 
 
@@ -100,19 +100,19 @@ def test_update_watchlist_not_found_returns_404(db: Session):
 def test_delete_from_watchlist_returns_204(db: Session):
     sym = _sym("E")
     _post(sym)
-    response = client.delete(f"/api/watchlist/{sym}")
+    response = client.delete(f"/api/v1/watchlist/{sym}")
     assert response.status_code == 204
 
 
 def test_delete_removes_entry_from_list(db: Session):
     sym = _sym("R")
     _post(sym)
-    client.delete(f"/api/watchlist/{sym}")
-    response = client.get("/api/watchlist/")
+    client.delete(f"/api/v1/watchlist/{sym}")
+    response = client.get("/api/v1/watchlist/")
     symbols = [e["symbol"] for e in response.json()]
     assert sym not in symbols
 
 
 def test_delete_not_found_returns_404(db: Session):
-    response = client.delete("/api/watchlist/ZZZZ8")
+    response = client.delete("/api/v1/watchlist/ZZZZ8")
     assert response.status_code == 404

@@ -46,7 +46,7 @@ from app.services.scanner import ScannerService
 from app.services.scanner_query_service import ScannerQueryService
 from app.utils.session import get_market_today
 
-router = APIRouter(prefix="/api/scanner", tags=["scanner"])
+router = APIRouter(prefix="/api/v1/scanner", tags=["scanner"])
 
 
 def _last_completed_weekday() -> "date":

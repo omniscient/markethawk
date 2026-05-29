@@ -28,7 +28,7 @@ client = TestClient(app)
 def test_results_returns_all_events(db: Session):
     seed_scanner_events(db)
 
-    response = client.get("/api/scanner/results")
+    response = client.get("/api/v1/scanner/results")
 
     assert response.status_code == 200
     data = response.json()
@@ -40,7 +40,7 @@ def test_results_returns_all_events(db: Session):
 def test_results_filter_by_ticker(db: Session):
     seed_scanner_events(db)
 
-    response = client.get("/api/scanner/results?ticker=AAPL")
+    response = client.get("/api/v1/scanner/results?ticker=AAPL")
 
     assert response.status_code == 200
     data = response.json()
@@ -51,7 +51,7 @@ def test_results_filter_by_ticker(db: Session):
 def test_results_filter_by_scanner_type(db: Session):
     seed_scanner_events(db)
 
-    response = client.get("/api/scanner/results?scanner_type=pre_market_volume_spike")
+    response = client.get("/api/v1/scanner/results?scanner_type=pre_market_volume_spike")
 
     assert response.status_code == 200
     data = response.json()
@@ -66,7 +66,7 @@ def test_results_filter_by_universe_id(db: Session):
 
     tech_universe_id = universes[0].id  # contains AAPL, MSFT, NVDA
 
-    response = client.get(f"/api/scanner/results?universe_id={tech_universe_id}")
+    response = client.get(f"/api/v1/scanner/results?universe_id={tech_universe_id}")
 
     assert response.status_code == 200
     data = response.json()
@@ -76,7 +76,7 @@ def test_results_filter_by_universe_id(db: Session):
 
 
 def test_results_empty_when_no_events(db: Session):
-    response = client.get("/api/scanner/results")
+    response = client.get("/api/v1/scanner/results")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -90,7 +90,7 @@ def test_results_empty_when_no_events(db: Session):
 def test_configs_returns_active_only(db: Session):
     seed_scanner_configs(db)
 
-    response = client.get("/api/scanner/configs")
+    response = client.get("/api/v1/scanner/configs")
 
     assert response.status_code == 200
     data = response.json()
@@ -101,7 +101,7 @@ def test_configs_returns_active_only(db: Session):
 
 
 def test_configs_returns_empty_when_none(db: Session):
-    response = client.get("/api/scanner/configs")
+    response = client.get("/api/v1/scanner/configs")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -110,7 +110,7 @@ def test_configs_returns_empty_when_none(db: Session):
 def test_configs_response_shape(db: Session):
     seed_scanner_configs(db)
 
-    response = client.get("/api/scanner/configs")
+    response = client.get("/api/v1/scanner/configs")
 
     cfg = response.json()[0]
     for field in (
@@ -133,7 +133,7 @@ def test_configs_response_shape(db: Session):
 def test_history_returns_runs_desc(db: Session):
     seed_scanner_runs(db)
 
-    response = client.get("/api/scanner/history")
+    response = client.get("/api/v1/scanner/history")
 
     assert response.status_code == 200
     data = response.json()
@@ -154,14 +154,14 @@ def test_history_returns_runs_desc(db: Session):
 def test_history_respects_limit(db: Session):
     seed_scanner_runs(db)
 
-    response = client.get("/api/scanner/history?limit=2")
+    response = client.get("/api/v1/scanner/history?limit=2")
 
     assert response.status_code == 200
     assert len(response.json()) == 2
 
 
 def test_history_empty_when_no_runs(db: Session):
-    response = client.get("/api/scanner/history")
+    response = client.get("/api/v1/scanner/history")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -176,7 +176,7 @@ def test_scan_status_block_without_universe(db: Session):
     seed_scanner_runs(db)
 
     response = client.get(
-        "/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
+        "/api/v1/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
     )
 
     assert response.status_code == 200
@@ -194,7 +194,7 @@ def test_scan_status_block_with_universe(db: Session):
     seed_scanner_runs(db, universe_id=universe_id)
 
     response = client.get(
-        f"/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike&universe_id={universe_id}"
+        f"/api/v1/scanner/scan-status-block?scanner_type=pre_market_volume_spike&universe_id={universe_id}"
     )
 
     assert response.status_code == 200
@@ -205,7 +205,7 @@ def test_scan_status_block_with_universe(db: Session):
 
 def test_scan_status_block_no_runs(db: Session):
     response = client.get(
-        "/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
+        "/api/v1/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
     )
 
     assert response.status_code == 200
@@ -219,7 +219,7 @@ def test_scan_status_block_sparkline(db: Session):
     seed_scanner_runs(db)
 
     response = client.get(
-        "/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
+        "/api/v1/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
     )
 
     data = response.json()
@@ -237,7 +237,7 @@ def test_scan_status_block_sparkline(db: Session):
 def test_stats_returns_counts(db: Session):
     seed_scanner_events(db)
 
-    response = client.get("/api/scanner/stats")
+    response = client.get("/api/v1/scanner/stats")
 
     assert response.status_code == 200
     data = response.json()
@@ -247,7 +247,7 @@ def test_stats_returns_counts(db: Session):
 
 
 def test_stats_empty_db(db: Session):
-    response = client.get("/api/scanner/stats")
+    response = client.get("/api/v1/scanner/stats")
 
     assert response.status_code == 200
     data = response.json()
@@ -260,7 +260,7 @@ def test_stats_empty_db(db: Session):
 def test_stats_today_events(db: Session):
     seed_scanner_events(db)
 
-    response = client.get("/api/scanner/stats")
+    response = client.get("/api/v1/scanner/stats")
 
     data = response.json()
     # seed_scanner_events seeds events on today's date — at least 5 of them
@@ -277,7 +277,7 @@ def test_results_filter_by_start_date(db: Session):
     today = get_market_today()
     today_str = str(today)
 
-    response = client.get(f"/api/scanner/results?start_date={today_str}")
+    response = client.get(f"/api/v1/scanner/results?start_date={today_str}")
 
     assert response.status_code == 200
     data = response.json()
@@ -290,7 +290,7 @@ def test_results_filter_by_end_date(db: Session):
     today = get_market_today()
     two_days_ago = str(today - timedelta(days=2))
 
-    response = client.get(f"/api/scanner/results?end_date={two_days_ago}")
+    response = client.get(f"/api/v1/scanner/results?end_date={two_days_ago}")
 
     assert response.status_code == 200
     data = response.json()
@@ -304,7 +304,7 @@ def test_results_filter_by_date_range(db: Session):
     yesterday = str(today - timedelta(days=1))
 
     response = client.get(
-        f"/api/scanner/results?start_date={yesterday}&end_date={yesterday}"
+        f"/api/v1/scanner/results?start_date={yesterday}&end_date={yesterday}"
     )
 
     assert response.status_code == 200
@@ -323,7 +323,7 @@ def test_list_scanner_types():
     import app.services.oversold_bounce_scan  # noqa: F401
     import app.services.pre_market_scan  # noqa: F401
 
-    response = client.get("/api/scanner/types")
+    response = client.get("/api/v1/scanner/types")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)

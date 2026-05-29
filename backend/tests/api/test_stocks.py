@@ -24,7 +24,7 @@ client = TestClient(app)
 def test_historical_returns_columnar_compact_format(db: Session):
     seed_stock_aggregates(db, ticker="AAPL", timespan="day", multiplier=1, count=5)
 
-    response = client.get("/api/stocks/historical/AAPL")
+    response = client.get("/api/v1/stocks/historical/AAPL")
 
     assert response.status_code == 200
     data = response.json()
@@ -36,7 +36,7 @@ def test_historical_returns_columnar_compact_format(db: Session):
 def test_historical_ticker_is_case_insensitive(db: Session):
     seed_stock_aggregates(db, ticker="MSFT", timespan="day", multiplier=1, count=3)
 
-    response = client.get("/api/stocks/historical/msft")
+    response = client.get("/api/v1/stocks/historical/msft")
 
     assert response.status_code == 200
     assert response.json()["ticker"] == "MSFT"
@@ -44,7 +44,7 @@ def test_historical_ticker_is_case_insensitive(db: Session):
 
 
 def test_historical_empty_db_returns_zero_data_points(db: Session):
-    response = client.get("/api/stocks/historical/NOOP")
+    response = client.get("/api/v1/stocks/historical/NOOP")
 
     assert response.status_code == 200
     data = response.json()
@@ -56,7 +56,7 @@ def test_historical_empty_db_returns_zero_data_points(db: Session):
 def test_historical_data_contains_required_columns(db: Session):
     seed_stock_aggregates(db, ticker="NVDA", timespan="day", multiplier=1, count=2)
 
-    response = client.get("/api/stocks/historical/NVDA")
+    response = client.get("/api/v1/stocks/historical/NVDA")
 
     assert response.status_code == 200
     compact = response.json()["data"]
@@ -75,7 +75,7 @@ def test_historical_respects_timespan_param(db: Session):
     # Day bars for same ticker — should NOT appear when requesting minute/5
     seed_stock_aggregates(db, ticker="TSLA", timespan="day", multiplier=1, count=10)
 
-    response = client.get("/api/stocks/historical/TSLA?timespan=minute&multiplier=5")
+    response = client.get("/api/v1/stocks/historical/TSLA?timespan=minute&multiplier=5")
 
     assert response.status_code == 200
     data = response.json()
@@ -88,7 +88,7 @@ def test_historical_respects_multiplier_param(db: Session):
     seed_stock_aggregates(db, ticker="AMD", timespan="hour", multiplier=1, count=3)
     seed_stock_aggregates(db, ticker="AMD", timespan="hour", multiplier=4, count=7)
 
-    response = client.get("/api/stocks/historical/AMD?timespan=hour&multiplier=4")
+    response = client.get("/api/v1/stocks/historical/AMD?timespan=hour&multiplier=4")
 
     assert response.status_code == 200
     assert response.json()["data_points"] == 7
@@ -99,7 +99,7 @@ def test_historical_period_filters_rows(db: Session):
     which is in the future relative to our test data anchor, so they appear outside the
     default 30d window only if we seed with a very old date. Here we verify that an
     absent ticker returns 0 data points when there's no data within the window."""
-    response = client.get("/api/stocks/historical/GHOST?period=1d")
+    response = client.get("/api/v1/stocks/historical/GHOST?period=1d")
 
     assert response.status_code == 200
     assert response.json()["data_points"] == 0
@@ -111,13 +111,13 @@ def test_historical_period_filters_rows(db: Session):
 
 
 def test_details_returns_200_with_mocked_provider(db: Session, mock_polygon_provider):
-    response = client.get("/api/stocks/details/AAPL")
+    response = client.get("/api/v1/stocks/details/AAPL")
 
     assert response.status_code == 200
 
 
 def test_details_response_shape(db: Session, mock_polygon_provider):
-    response = client.get("/api/stocks/details/AAPL")
+    response = client.get("/api/v1/stocks/details/AAPL")
 
     data = response.json()
     assert data["ticker"] == "AAPL"
@@ -129,14 +129,14 @@ def test_details_response_shape(db: Session, mock_polygon_provider):
 def test_details_polygon_never_called_without_mock(db: Session):
     """Without the mock fixture, the real provider is unavailable (no API key in test env).
     The endpoint should still return 200 with empty/null fields rather than 500."""
-    response = client.get("/api/stocks/details/FAKE")
+    response = client.get("/api/v1/stocks/details/FAKE")
 
     # Acceptable outcomes: 200 with partial data or a graceful non-500
     assert response.status_code in (200, 500)
 
 
 def test_details_ticker_is_case_insensitive(db: Session, mock_polygon_provider):
-    response = client.get("/api/stocks/details/msft")
+    response = client.get("/api/v1/stocks/details/msft")
 
     assert response.status_code == 200
     assert response.json()["ticker"] == "MSFT"
@@ -160,7 +160,7 @@ def test_details_mock_provider_not_called_for_futures(
     db.add(futures)
     db.flush()
 
-    response = client.get("/api/stocks/details/ES")
+    response = client.get("/api/v1/stocks/details/ES")
 
     assert response.status_code == 200
     mock_polygon_provider.get_bars.assert_not_called()

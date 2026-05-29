@@ -23,7 +23,7 @@ def _get_first_event(db: Session) -> ScannerEvent:
 def test_create_confirmed_review(db: Session):
     event = _get_first_event(db)
     response = client.post(
-        f"/api/scanner/events/{event.uuid}/review",
+        f"/api/v1/scanner/events/{event.uuid}/review",
         json={
             "verdict": "confirmed",
         },
@@ -37,7 +37,7 @@ def test_create_confirmed_review(db: Session):
 def test_create_uncertain_review(db: Session):
     event = _get_first_event(db)
     response = client.post(
-        f"/api/scanner/events/{event.uuid}/review",
+        f"/api/v1/scanner/events/{event.uuid}/review",
         json={
             "verdict": "uncertain",
             "notes": "Need to check chart",
@@ -50,7 +50,7 @@ def test_create_uncertain_review(db: Session):
 def test_create_rejected_review_requires_reason(db: Session):
     event = _get_first_event(db)
     response = client.post(
-        f"/api/scanner/events/{event.uuid}/review",
+        f"/api/v1/scanner/events/{event.uuid}/review",
         json={
             "verdict": "rejected",
         },
@@ -61,7 +61,7 @@ def test_create_rejected_review_requires_reason(db: Session):
 def test_create_rejected_review_with_reason(db: Session):
     event = _get_first_event(db)
     response = client.post(
-        f"/api/scanner/events/{event.uuid}/review",
+        f"/api/v1/scanner/events/{event.uuid}/review",
         json={
             "verdict": "rejected",
             "reject_reason": "noise",
@@ -74,7 +74,7 @@ def test_create_rejected_review_with_reason(db: Session):
 
 def test_create_review_invalid_uuid(db: Session):
     response = client.post(
-        "/api/scanner/events/not-a-uuid/review",
+        "/api/v1/scanner/events/not-a-uuid/review",
         json={
             "verdict": "confirmed",
         },
@@ -85,7 +85,7 @@ def test_create_review_invalid_uuid(db: Session):
 def test_create_review_nonexistent_event(db: Session):
     fake_uuid = str(uuid_lib.uuid4())
     response = client.post(
-        f"/api/scanner/events/{fake_uuid}/review",
+        f"/api/v1/scanner/events/{fake_uuid}/review",
         json={
             "verdict": "confirmed",
         },
@@ -96,7 +96,7 @@ def test_create_review_nonexistent_event(db: Session):
 def test_create_review_invalid_verdict(db: Session):
     event = _get_first_event(db)
     response = client.post(
-        f"/api/scanner/events/{event.uuid}/review",
+        f"/api/v1/scanner/events/{event.uuid}/review",
         json={
             "verdict": "maybe",
         },
@@ -111,7 +111,7 @@ def test_list_reviews_by_scanner_type(db: Session):
     db.flush()
 
     response = client.get(
-        f"/api/scanner/events/reviews?scanner_type={event.scanner_type}"
+        f"/api/v1/scanner/events/reviews?scanner_type={event.scanner_type}"
     )
     assert response.status_code == 200
     data = response.json()
@@ -126,7 +126,7 @@ def test_list_reviews_liquidity_hunt_alias(db: Session):
     db.add(review)
     db.flush()
 
-    response = client.get("/api/scanner/events/reviews?scanner_type=liquidity_hunt")
+    response = client.get("/api/v1/scanner/events/reviews?scanner_type=liquidity_hunt")
     assert response.status_code == 200
     data = response.json()
     assert len(data) >= 1
@@ -143,7 +143,7 @@ def test_list_reviews_filter_by_verdict(db: Session):
     db.flush()
 
     response = client.get(
-        f"/api/scanner/events/reviews?scanner_type={event.scanner_type}&verdict=confirmed"
+        f"/api/v1/scanner/events/reviews?scanner_type={event.scanner_type}&verdict=confirmed"
     )
     assert response.status_code == 200
     data = response.json()
@@ -151,7 +151,7 @@ def test_list_reviews_filter_by_verdict(db: Session):
 
 
 def test_list_reviews_missing_scanner_type(db: Session):
-    response = client.get("/api/scanner/events/reviews")
+    response = client.get("/api/v1/scanner/events/reviews")
     assert response.status_code == 422
 
 
@@ -166,7 +166,7 @@ def test_review_stats(db: Session):
     db.add(SignalReview(scanner_event_id=events[2].id, verdict="uncertain"))
     db.flush()
 
-    response = client.get("/api/scanner/reviews/stats")
+    response = client.get("/api/v1/scanner/reviews/stats")
     assert response.status_code == 200
     data = response.json()
     assert data["total_events"] > 0
@@ -184,7 +184,7 @@ def test_review_stats_with_scanner_type_filter(db: Session):
     db.flush()
 
     response = client.get(
-        "/api/scanner/reviews/stats?scanner_type=pre_market_volume_spike"
+        "/api/v1/scanner/reviews/stats?scanner_type=pre_market_volume_spike"
     )
     assert response.status_code == 200
     data = response.json()
@@ -200,7 +200,7 @@ def test_scanner_results_include_latest_review(db: Session):
     db.add(SignalReview(scanner_event_id=event.id, verdict="confirmed"))
     db.flush()
 
-    response = client.get(f"/api/scanner/results?scanner_type={event.scanner_type}")
+    response = client.get(f"/api/v1/scanner/results?scanner_type={event.scanner_type}")
     assert response.status_code == 200
     data = response.json()
     reviewed = [e for e in data if e.get("latest_review") is not None]

@@ -25,7 +25,7 @@ from app.services import universe_export, universe_orchestrator
 from app.services.discovery_service import DiscoveryService
 from app.services.universe_stats import UniverseStatsService
 
-router = APIRouter(prefix="/api/universe", tags=["universe"])
+router = APIRouter(prefix="/api/v1/universe", tags=["universe"])
 
 
 class ExportAggregatesRequest(BaseModel):
