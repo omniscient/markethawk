@@ -18,6 +18,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.cache import cache_response, get_cached
 from app.core.database import get_db
 from app.core.rate_limits import SCANNER_LIMIT, limiter
 from app.models import MonitoredStock, ScannerConfig, ScannerEvent, ScannerRun
@@ -60,6 +61,7 @@ def _last_completed_weekday() -> "date":
 
 
 @router.get("/types")
+@cache_response("mh:scanner:types", ttl=3600)
 def list_scanner_types():
     """Return all registered scanner types for frontend scanner pickers."""
     from app.services.scan_orchestrator import get_all
@@ -539,7 +541,13 @@ def get_scanner_configs(
     db: Session = Depends(get_db),
 ):
     """Get all available scanner configurations."""
-    return db.query(ScannerConfig).filter(ScannerConfig.is_active == True).all()
+    # NOTE: No mutation endpoints exist for ScannerConfig (seeded, admin-only).
+    # When mutation endpoints are added, they must call invalidate("mh:scanner:configs").
+    def _fetch():
+        configs = db.query(ScannerConfig).filter(ScannerConfig.is_active == True).all()
+        return [ScannerConfigResponse.model_validate(c).model_dump(mode="json") for c in configs]
+
+    return get_cached("mh:scanner:configs", 300, _fetch)
 
 
 @router.get("/movers/pre-market", response_model=PreMarketMoversResponse)

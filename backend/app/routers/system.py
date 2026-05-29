@@ -11,6 +11,7 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
+from app.core.cache import get_cached
 from app.core.database import SessionLocal, get_db
 from app.core.rate_limits import limiter
 from app.models.system_config import SystemConfig
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 @router.get("/storage")
 def get_storage_stats(db: Session = Depends(get_db)):
     """Get storage usage statistics for major database tables."""
-    return SystemService.get_storage_stats(db)
+    return get_cached("mh:system:storage", 300, lambda: SystemService.get_storage_stats(db))
 
 
 @router.get("/info", response_model=Dict[str, Any])
@@ -45,24 +46,27 @@ def get_system_status(db: Session = Depends(get_db)):
     from app.core.config import settings
     from app.models.scanner_run import ScannerRun
 
-    last_run = db.query(ScannerRun).order_by(ScannerRun.created_at.desc()).first()
-    last_scan_at: Optional[str] = None
-    if last_run and last_run.created_at:
-        ts = last_run.created_at
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        last_scan_at = ts.isoformat()
+    def _fetch():
+        last_run = db.query(ScannerRun).order_by(ScannerRun.created_at.desc()).first()
+        last_scan_at: Optional[str] = None
+        if last_run and last_run.created_at:
+            ts = last_run.created_at
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            last_scan_at = ts.isoformat()
 
-    ibkr_host = getattr(settings, "IBKR_HOST", "127.0.0.1")
-    ibkr_port = int(getattr(settings, "IBKR_PORT", 7497))
+        ibkr_host = getattr(settings, "IBKR_HOST", "127.0.0.1")
+        ibkr_port = int(getattr(settings, "IBKR_PORT", 7497))
 
-    return {
-        "market_status": SystemService.get_market_status(),
-        "last_scan_at": last_scan_at,
-        "ibkr_reachable": SystemService.check_ibkr_reachable(ibkr_host, ibkr_port),
-        "ibkr_host": ibkr_host,
-        "ibkr_port": ibkr_port,
-    }
+        return {
+            "market_status": SystemService.get_market_status(),
+            "last_scan_at": last_scan_at,
+            "ibkr_reachable": SystemService.check_ibkr_reachable(ibkr_host, ibkr_port),
+            "ibkr_host": ibkr_host,
+            "ibkr_port": ibkr_port,
+        }
+
+    return get_cached("mh:system:status", 30, _fetch)
 
 
 @router.get("/config")
