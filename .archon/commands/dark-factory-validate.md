@@ -30,10 +30,14 @@ cd frontend && npx tsc --noEmit
 ```
 
 ### Endpoint validation against preview
+Use `PREVIEW_BACKEND` (exported by the `preview-up` step, e.g. `http://localhost:19880`) as the base URL.
 For each new or changed endpoint identified in the implementation:
 ```bash
-curl -sf http://localhost:${PREVIEW_PORT}/api/<endpoint> | python -m json.tool
+curl -sf ${PREVIEW_BACKEND}/api/<endpoint> | python -m json.tool
 ```
+
+Note: `PREVIEW_BACKEND` is set by the `preview-up` workflow step (format: `http://localhost:1{PADDED}80`).
+Do not use `PREVIEW_PORT` — it is not defined in the workflow environment.
 
 Record all results — passes and failures.
 
