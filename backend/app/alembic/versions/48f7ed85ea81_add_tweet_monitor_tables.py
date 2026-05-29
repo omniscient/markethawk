@@ -107,22 +107,18 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_tweet_signals_tweet_id"), "tweet_signals", ["tweet_id"], unique=True
     )
-    op.drop_table("alert_history")
-    op.drop_table("alert_configs")
+    op.execute("DROP TABLE IF EXISTS alert_history CASCADE")
+    op.execute("DROP TABLE IF EXISTS alert_configs CASCADE")
     op.execute("DROP VIEW IF EXISTS scanner_performance_stats")
-    op.drop_index(
-        op.f("idx_scanner_execution_log_start_time"), table_name="scanner_execution_log"
-    )
-    op.drop_index(
-        op.f("idx_scanner_execution_log_status"), table_name="scanner_execution_log"
-    )
-    op.drop_table("scanner_execution_log")
-    op.drop_table("user_preferences")
-    op.drop_index(op.f("idx_market_data_cache_expires"), table_name="market_data_cache")
-    op.drop_index(op.f("idx_market_data_cache_ticker"), table_name="market_data_cache")
-    op.drop_index(op.f("idx_market_data_cache_type"), table_name="market_data_cache")
-    op.drop_table("market_data_cache")
-    op.drop_index(op.f("idx_scanner_events_score"), table_name="scanner_events")
+    op.execute("DROP INDEX IF EXISTS idx_scanner_execution_log_start_time")
+    op.execute("DROP INDEX IF EXISTS idx_scanner_execution_log_status")
+    op.execute("DROP TABLE IF EXISTS scanner_execution_log CASCADE")
+    op.execute("DROP TABLE IF EXISTS user_preferences CASCADE")
+    op.execute("DROP INDEX IF EXISTS idx_market_data_cache_expires")
+    op.execute("DROP INDEX IF EXISTS idx_market_data_cache_ticker")
+    op.execute("DROP INDEX IF EXISTS idx_market_data_cache_type")
+    op.execute("DROP TABLE IF EXISTS market_data_cache CASCADE")
+    op.execute("DROP INDEX IF EXISTS idx_scanner_events_score")
     # ### end Alembic commands ###
 
 
