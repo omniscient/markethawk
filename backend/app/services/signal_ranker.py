@@ -23,7 +23,11 @@ _NORM_CAPS: dict[str, float] = {
     "float_rotation_pct": 50.0,
 }
 
-_RANKER_KEYS = ["signal_ranker_enabled", "signal_ranker_weights", "signal_ranker_version"]
+_RANKER_KEYS = [
+    "signal_ranker_enabled",
+    "signal_ranker_weights",
+    "signal_ranker_version",
+]
 
 
 def _normalize(value: float, feature: str) -> float:
@@ -34,7 +38,9 @@ def _normalize(value: float, feature: str) -> float:
     return min(abs(value) / cap, 1.0)
 
 
-def compute_signal_quality_score(indicators: dict[str, Any], weights: dict[str, float]) -> float:
+def compute_signal_quality_score(
+    indicators: dict[str, Any], weights: dict[str, float]
+) -> float:
     """
     Weighted sum of normalized feature values, re-normalized over present features.
 

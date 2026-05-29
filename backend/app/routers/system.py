@@ -2,16 +2,17 @@
 System-level information and status router.
 """
 
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
-from app.core.rate_limits import limiter
-from sqlalchemy.orm import Session
-import logging
 import asyncio
-import redis.asyncio as aioredis
-from datetime import datetime, timezone
+import logging
+from datetime import timezone
+from typing import Any, Dict, Optional
 
-from app.core.database import get_db, SessionLocal
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
+
+from app.core.database import SessionLocal, get_db
+from app.core.rate_limits import limiter
 from app.models.system_config import SystemConfig
 from app.services.system_service import SystemService
 
@@ -29,11 +30,12 @@ def get_storage_stats(db: Session = Depends(get_db)):
 def get_app_info():
     """Get basic application information and configuration status."""
     from app.core.config import settings
+
     return {
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "data_mode": "delayed" if settings.POLYGON_DELAYED else "live",
-        "log_level": settings.LOG_LEVEL
+        "log_level": settings.LOG_LEVEL,
     }
 
 
@@ -88,6 +90,7 @@ def update_config(payload: Dict[str, Any], db: Session = Depends(get_db)):
 def apply_split_adjustments(db: Session = Depends(get_db)):
     """Manually trigger split adjustments for all pending splits."""
     from app.services.split_adjustment import SplitAdjustmentService
+
     results = SplitAdjustmentService.apply_all_pending(db)
     applied = [r for r in results if not r.get("skipped")]
     return {
@@ -104,6 +107,7 @@ async def system_tasks_websocket(websocket: WebSocket):
     WebSocket endpoint that aggregates and pushes active system tasks to clients every 2.5 seconds.
     """
     from app.core.config import settings
+
     await websocket.accept()
 
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)

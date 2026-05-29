@@ -5,19 +5,21 @@ Patch target: app.services.discovery_service.RESTClient
 (DiscoveryService imports `from polygon import RESTClient` so the module-local
 name must be patched, not `polygon.RESTClient` directly.)
 """
+
 from unittest.mock import MagicMock, patch
-import pytest
-from sqlalchemy.orm import Session
 
 from app.services.discovery_service import DiscoveryService
-
+from sqlalchemy.orm import Session
 
 # ── sync_fundamental_data ──────────────────────────────────────────────────
 
+
 def test_sync_fundamental_data_starts_celery_task(db: Session):
     """sync_fundamental_data delegates to Celery — verify it returns 'started'."""
-    with patch("app.services.discovery_service.RESTClient"), \
-         patch("app.tasks.sync_tickers_batch") as mock_task:
+    with (
+        patch("app.services.discovery_service.RESTClient"),
+        patch("app.tasks.sync_tickers_batch") as mock_task,
+    ):
         mock_task.delay = MagicMock()
         service = DiscoveryService(db)
         result = service.sync_fundamental_data()
@@ -27,6 +29,7 @@ def test_sync_fundamental_data_starts_celery_task(db: Session):
 
 
 # ── update_daily_metrics_snapshot ─────────────────────────────────────────
+
 
 def test_update_daily_metrics_no_aggs_returns_early(db: Session):
     """When Polygon returns no aggregates, method returns without error."""

@@ -34,6 +34,7 @@ MAX_GAPS_STORED = 50
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _score_to_grade(score: float) -> str:
     if score >= 95:
         return "A"
@@ -47,7 +48,9 @@ def _score_to_grade(score: float) -> str:
 
 
 def _grade_color(grade: str) -> str:
-    return {"A": "green", "B": "green", "C": "yellow", "D": "orange", "F": "red"}.get(grade, "gray")
+    return {"A": "green", "B": "green", "C": "yellow", "D": "orange", "F": "red"}.get(
+        grade, "gray"
+    )
 
 
 def _count_weekdays_between(d1, d2) -> int:
@@ -143,12 +146,14 @@ def _estimate_expected_bars(
             # Partial day — below the P90 baseline without a known explanation;
             # this is a genuine coverage shortfall
             expected += p90
-            partial_days.append({
-                "date": str(d),
-                "actual_bars": cnt,
-                "expected_bars": p90,
-                "shortfall": p90 - cnt,
-            })
+            partial_days.append(
+                {
+                    "date": str(d),
+                    "actual_bars": cnt,
+                    "expected_bars": p90,
+                    "shortfall": p90 - cnt,
+                }
+            )
 
         else:
             expected += p90
@@ -169,7 +174,9 @@ def _estimate_expected_bars(
     return expected, detail
 
 
-def _detect_gaps(timestamps: List[datetime], timespan: str, multiplier: int) -> List[Dict]:
+def _detect_gaps(
+    timestamps: List[datetime], timespan: str, multiplier: int
+) -> List[Dict]:
     """
     Return a list of data gaps.
 
@@ -222,6 +229,7 @@ def _detect_gaps(timestamps: List[datetime], timespan: str, multiplier: int) -> 
 
 # ── per-ticker analysis ───────────────────────────────────────────────────────
 
+
 def _analyze_ticker_timespan(
     db: Session,
     ticker: str,
@@ -230,8 +238,8 @@ def _analyze_ticker_timespan(
     is_futures: bool,
     exchange: str = "NYSE",
 ) -> Dict:
-    from app.models.stock_aggregate import StockAggregate
     from app.models.futures_aggregate import FuturesAggregate
+    from app.models.stock_aggregate import StockAggregate
 
     if is_futures:
         rows = (
@@ -299,6 +307,7 @@ def _analyze_ticker_timespan(
 
     # ── Holiday calendar ──────────────────────────────────────────────────────
     from app.models.market_holiday import MarketHoliday
+
     try:
         min_date = timestamps[0].date()
         max_date = timestamps[-1].date()
@@ -316,19 +325,35 @@ def _analyze_ticker_timespan(
         holiday_map = {}
 
     # ── Coverage ──────────────────────────────────────────────────────────────
-    expected_bars, coverage_detail = _estimate_expected_bars(timestamps, timespan, multiplier, holiday_map)
-    coverage_pct = min(100.0, (actual_bars / expected_bars * 100) if expected_bars > 0 else 100.0)
+    expected_bars, coverage_detail = _estimate_expected_bars(
+        timestamps, timespan, multiplier, holiday_map
+    )
+    coverage_pct = min(
+        100.0, (actual_bars / expected_bars * 100) if expected_bars > 0 else 100.0
+    )
 
     # ── Integrity ─────────────────────────────────────────────────────────────
     bad_bars = 0
     for r in rows:
         h = float(r.high)
-        l = float(r.low)
+        lo = float(r.low)
         o = float(r.open)
         c = float(r.close)
-        if h < l or h < o or h < c or l > o or l > c or o <= 0 or c <= 0 or h <= 0 or l <= 0:
+        if (
+            h < lo
+            or h < o
+            or h < c
+            or lo > o
+            or lo > c
+            or o <= 0
+            or c <= 0
+            or h <= 0
+            or lo <= 0
+        ):
             bad_bars += 1
-    integrity_pct = ((actual_bars - bad_bars) / actual_bars * 100) if actual_bars > 0 else 100.0
+    integrity_pct = (
+        ((actual_bars - bad_bars) / actual_bars * 100) if actual_bars > 0 else 100.0
+    )
 
     # ── Continuity ────────────────────────────────────────────────────────────
     gaps = _detect_gaps(timestamps, timespan, multiplier)
@@ -375,8 +400,8 @@ def _analyze_ticker_timespan(
 
 # ── main entry point ──────────────────────────────────────────────────────────
 
-class DataQualityService:
 
+class DataQualityService:
     @staticmethod
     def analyze_universe(db: Session, universe_id: int) -> Dict:
         """
@@ -384,9 +409,9 @@ class DataQualityService:
         in the universe.  Returns the complete report dict (also persisted by
         the caller / Celery task).
         """
-        from app.models.stock_universe_ticker import StockUniverseTicker
-        from app.models.stock_aggregate import StockAggregate
         from app.models.futures_aggregate import FuturesAggregate
+        from app.models.stock_aggregate import StockAggregate
+        from app.models.stock_universe_ticker import StockUniverseTicker
 
         tickers = (
             db.query(StockUniverseTicker)
@@ -458,7 +483,11 @@ class DataQualityService:
             for combo in combos:
                 try:
                     result = _analyze_ticker_timespan(
-                        db, ticker, combo.timespan, combo.multiplier, is_futures,
+                        db,
+                        ticker,
+                        combo.timespan,
+                        combo.multiplier,
+                        is_futures,
                         exchange=exchange,
                     )
                     ticker_results.append(result)
@@ -470,10 +499,16 @@ class DataQualityService:
 
         # ── Universe-level aggregation ────────────────────────────────────────
         # Weight by actual bar count so large tickers drive the score more
-        total_weight = sum(r["actual_bars"] for r in ticker_results if r.get("actual_bars"))
+        total_weight = sum(
+            r["actual_bars"] for r in ticker_results if r.get("actual_bars")
+        )
         if total_weight > 0:
             overall_score = (
-                sum(r["score"] * r["actual_bars"] for r in ticker_results if r.get("actual_bars"))
+                sum(
+                    r["score"] * r["actual_bars"]
+                    for r in ticker_results
+                    if r.get("actual_bars")
+                )
                 / total_weight
             )
         elif ticker_results:
@@ -486,7 +521,9 @@ class DataQualityService:
 
         timespans_analyzed = sorted(
             {
-                f"{r['multiplier']}{r['timespan']}" if r.get("multiplier", 1) != 1 else r["timespan"]
+                f"{r['multiplier']}{r['timespan']}"
+                if r.get("multiplier", 1) != 1
+                else r["timespan"]
                 for r in ticker_results
                 if r.get("timespan")
             }

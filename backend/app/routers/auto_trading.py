@@ -23,19 +23,25 @@ Endpoints:
 """
 
 import logging
-from datetime import datetime, timezone, date as date_type
+from datetime import date as date_type
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from app.core.rate_limits import limiter, TRADING_LIMIT
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.rate_limits import TRADING_LIMIT, limiter
 from app.models.auto_trade_order import AutoTradeOrder
 from app.models.system_config import SystemConfig
 from app.models.trading_strategy import TradingStrategy
-from app.schemas.auto_trade import TradingStrategyResponse, AutoTradeOrderResponse
-from app.services.auto_trade_service import approve_order, cancel_order, get_account, get_stats
+from app.schemas.auto_trade import AutoTradeOrderResponse, TradingStrategyResponse
+from app.services.auto_trade_service import (
+    approve_order,
+    cancel_order,
+    get_account,
+    get_stats,
+)
 
 router = APIRouter(prefix="/api/trading", tags=["auto-trading"])
 logger = logging.getLogger(__name__)
@@ -44,11 +50,22 @@ logger = logging.getLogger(__name__)
 # ── Trading Strategies — CRUD ────────────────────────────────────────────────
 
 _STRATEGY_UPDATABLE = {
-    "name", "description", "is_active", "paper_mode", "requires_approval",
-    "risk_per_trade_pct", "max_position_usd", "max_trades_per_day",
-    "max_concurrent_positions", "entry_type", "limit_offset_pct",
-    "stop_pct", "risk_reward_ratio", "max_slippage_pct",
-    "allowed_sessions", "direction",
+    "name",
+    "description",
+    "is_active",
+    "paper_mode",
+    "requires_approval",
+    "risk_per_trade_pct",
+    "max_position_usd",
+    "max_trades_per_day",
+    "max_concurrent_positions",
+    "entry_type",
+    "limit_offset_pct",
+    "stop_pct",
+    "risk_reward_ratio",
+    "max_slippage_pct",
+    "allowed_sessions",
+    "direction",
 }
 
 
@@ -147,7 +164,9 @@ def delete_strategy(
         db.query(AutoTradeOrder)
         .filter(
             AutoTradeOrder.trading_strategy_id == strategy_id,
-            AutoTradeOrder.status.in_(["submitted", "open", "pending", "pending_approval"]),
+            AutoTradeOrder.status.in_(
+                ["submitted", "open", "pending", "pending_approval"]
+            ),
         )
         .count()
     )
@@ -164,6 +183,7 @@ def delete_strategy(
 
 
 # ── Auto-Trade Orders ────────────────────────────────────────────────────────
+
 
 @router.get("/orders")
 def list_orders(
@@ -187,13 +207,11 @@ def list_orders(
             d = date_type.fromisoformat(from_date)
             q = q.filter(AutoTradeOrder.event_date >= d)
         except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid from_date format. Use YYYY-MM-DD.")
+            raise HTTPException(
+                status_code=422, detail="Invalid from_date format. Use YYYY-MM-DD."
+            )
 
-    orders = (
-        q.order_by(AutoTradeOrder.created_at.desc())
-        .limit(min(limit, 500))
-        .all()
-    )
+    orders = q.order_by(AutoTradeOrder.created_at.desc()).limit(min(limit, 500)).all()
     return [AutoTradeOrderResponse.from_orm_dict(o).model_dump() for o in orders]
 
 
@@ -225,9 +243,11 @@ def approve_order_endpoint(
             detail=f"Order is not pending approval (current status: {o.status}).",
         )
 
-    strategy = db.query(TradingStrategy).filter(
-        TradingStrategy.id == o.trading_strategy_id
-    ).first()
+    strategy = (
+        db.query(TradingStrategy)
+        .filter(TradingStrategy.id == o.trading_strategy_id)
+        .first()
+    )
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found.")
 
@@ -290,6 +310,7 @@ def cancel_order_endpoint(
 
 # ── Account Summary ──────────────────────────────────────────────────────────
 
+
 @router.get("/account")
 def get_account_endpoint(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Fetch live account summary from IBKR."""
@@ -297,6 +318,7 @@ def get_account_endpoint(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
 
 # ── Stats ────────────────────────────────────────────────────────────────────
+
 
 @router.get("/stats")
 def get_stats_endpoint(
@@ -309,11 +331,15 @@ def get_stats_endpoint(
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
+
 @router.get("/config")
 def get_trading_config(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Return current auto-trading system config values."""
     keys = ["AUTO_TRADING_ENABLED", "PAPER_ACCOUNT_SIZE"]
-    result: Dict[str, Any] = {"AUTO_TRADING_ENABLED": False, "PAPER_ACCOUNT_SIZE": 100000}
+    result: Dict[str, Any] = {
+        "AUTO_TRADING_ENABLED": False,
+        "PAPER_ACCOUNT_SIZE": 100000,
+    }
     configs = db.query(SystemConfig).filter(SystemConfig.key.in_(keys)).all()
     for c in configs:
         if c.key == "AUTO_TRADING_ENABLED":

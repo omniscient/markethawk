@@ -45,6 +45,17 @@ const fmtPrice = (val: number | null): string => {
   return `$${val.toFixed(2)}`;
 };
 
+const SortIcon: React.FC<{ field: SortField; sortBy: SortField; sortOrder: 'asc' | 'desc' }> = (
+  { field, sortBy, sortOrder },
+) => {
+  if (sortBy !== field) return null;
+  return sortOrder === 'desc' ? (
+    <ChevronDown className="h-3 w-3 inline ml-0.5" />
+  ) : (
+    <ChevronUp className="h-3 w-3 inline ml-0.5" />
+  );
+};
+
 const SignalTable: React.FC<SignalTableProps> = ({ scannerType, startDate, endDate, severity }) => {
   const [sortBy, setSortBy] = useState<SortField>('event_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -68,15 +79,6 @@ const SignalTable: React.FC<SignalTableProps> = ({ scannerType, startDate, endDa
       setSortOrder('desc');
     }
     setPage(0);
-  };
-
-  const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
-    if (sortBy !== field) return null;
-    return sortOrder === 'desc' ? (
-      <ChevronDown className="h-3 w-3 inline ml-0.5" />
-    ) : (
-      <ChevronUp className="h-3 w-3 inline ml-0.5" />
-    );
   };
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
@@ -143,13 +145,13 @@ const SignalTable: React.FC<SignalTableProps> = ({ scannerType, startDate, endDa
                 className="px-3 py-3 cursor-pointer hover:text-gray-300 transition-colors"
                 onClick={() => handleSort('event_date')}
               >
-                Date <SortIcon field="event_date" />
+                Date <SortIcon field="event_date" sortBy={sortBy} sortOrder={sortOrder} />
               </th>
               <th
                 className="px-3 py-3 cursor-pointer hover:text-gray-300 transition-colors"
                 onClick={() => handleSort('ticker')}
               >
-                Ticker <SortIcon field="ticker" />
+                Ticker <SortIcon field="ticker" sortBy={sortBy} sortOrder={sortOrder} />
               </th>
               <th className="px-3 py-3">Severity</th>
               <th className="px-3 py-3 text-right">Ref Price</th>
@@ -157,19 +159,19 @@ const SignalTable: React.FC<SignalTableProps> = ({ scannerType, startDate, endDa
                 className="px-3 py-3 text-right cursor-pointer hover:text-gray-300 transition-colors"
                 onClick={() => handleSort('mfe_pct')}
               >
-                MFE <SortIcon field="mfe_pct" />
+                MFE <SortIcon field="mfe_pct" sortBy={sortBy} sortOrder={sortOrder} />
               </th>
               <th
                 className="px-3 py-3 text-right cursor-pointer hover:text-gray-300 transition-colors"
                 onClick={() => handleSort('mae_pct')}
               >
-                MAE <SortIcon field="mae_pct" />
+                MAE <SortIcon field="mae_pct" sortBy={sortBy} sortOrder={sortOrder} />
               </th>
               <th
                 className="px-3 py-3 text-right cursor-pointer hover:text-gray-300 transition-colors"
                 onClick={() => handleSort('eod_pct_change')}
               >
-                EOD <SortIcon field="eod_pct_change" />
+                EOD <SortIcon field="eod_pct_change" sortBy={sortBy} sortOrder={sortOrder} />
               </th>
               <th className="px-3 py-3 text-right">MFE:MAE</th>
               <th className="px-3 py-3 text-center">FT</th>

@@ -29,15 +29,16 @@ Resumability
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text
 
 logger = logging.getLogger(__name__)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _parse_date(dt_str: Optional[str]) -> Optional[datetime]:
     """Parse an ISO datetime string (with or without fractional seconds)."""
@@ -57,13 +58,15 @@ def _to_date_str(dt: datetime) -> str:
 
 # ── low-level DB helpers ──────────────────────────────────────────────────────
 
+
 def _dedup_stock(db: Session, ticker: str, timespan: str, multiplier: int) -> int:
     """
     Remove duplicate timestamps for a stock ticker combo.
     Keeps the row with the lowest id (earliest inserted).
     Returns the number of rows deleted.
     """
-    result = db.execute(text("""
+    result = db.execute(
+        text("""
         DELETE FROM stock_aggregates
         WHERE id IN (
             SELECT id FROM (
@@ -79,14 +82,17 @@ def _dedup_stock(db: Session, ticker: str, timespan: str, multiplier: int) -> in
             ) sub
             WHERE rn > 1
         )
-    """), {"ticker": ticker, "timespan": timespan, "multiplier": multiplier})
+    """),
+        {"ticker": ticker, "timespan": timespan, "multiplier": multiplier},
+    )
     db.commit()
     return result.rowcount
 
 
 def _dedup_futures(db: Session, symbol: str, timespan: str, multiplier: int) -> int:
     """Remove duplicate timestamps for a futures symbol combo."""
-    result = db.execute(text("""
+    result = db.execute(
+        text("""
         DELETE FROM futures_aggregates
         WHERE id IN (
             SELECT id FROM (
@@ -102,30 +108,36 @@ def _dedup_futures(db: Session, symbol: str, timespan: str, multiplier: int) -> 
             ) sub
             WHERE rn > 1
         )
-    """), {"symbol": symbol, "timespan": timespan, "multiplier": multiplier})
+    """),
+        {"symbol": symbol, "timespan": timespan, "multiplier": multiplier},
+    )
     db.commit()
     return result.rowcount
 
 
-def _get_stock_provider(db: Session, ticker: str, timespan: str, multiplier: int) -> str:
+def _get_stock_provider(
+    db: Session, ticker: str, timespan: str, multiplier: int
+) -> str:
     """Return the provider used for this stock combo (defaults to 'polygon')."""
     from app.models.stock_aggregate import StockAggregate
+
     row = (
         db.query(StockAggregate.provider)
         .filter(
-            StockAggregate.ticker     == ticker,
-            StockAggregate.timespan   == timespan,
+            StockAggregate.ticker == ticker,
+            StockAggregate.timespan == timespan,
             StockAggregate.multiplier == multiplier,
-            StockAggregate.provider   != None,
+            StockAggregate.provider != None,
         )
         .first()
     )
-    return (row.provider if row and row.provider else "polygon")
+    return row.provider if row and row.provider else "polygon"
 
 
 def _get_futures_exchange(db: Session, symbol: str) -> str:
     """Return the exchange for a futures symbol."""
     from app.models.futures_aggregate import FuturesAggregate
+
     row = (
         db.query(FuturesAggregate.exchange)
         .filter(FuturesAggregate.symbol == symbol)
@@ -135,6 +147,7 @@ def _get_futures_exchange(db: Session, symbol: str) -> str:
 
 
 # ── sync helpers ──────────────────────────────────────────────────────────────
+
 
 async def _sync_stock_range(
     db: Session,
@@ -152,7 +165,9 @@ async def _sync_stock_range(
     from app.models.stock_aggregate import StockAggregate
     from app.services.stock_data import StockDataService
 
-    logger.info(f"  sync_stock_range {ticker} {timespan}×{multiplier} {from_date}→{to_date} via {provider}")
+    logger.info(
+        f"  sync_stock_range {ticker} {timespan}×{multiplier} {from_date}→{to_date} via {provider}"
+    )
 
     aggs = StockDataService.get_aggregates(
         ticker=ticker,
@@ -168,32 +183,41 @@ async def _sync_stock_range(
 
     # Delete-then-insert for the range to handle partial overlaps cleanly
     start_dt = datetime.strptime(from_date, "%Y-%m-%d")
-    end_dt   = datetime.strptime(to_date,   "%Y-%m-%d") + timedelta(days=1)
+    end_dt = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
 
     db.query(StockAggregate).filter(
-        StockAggregate.ticker     == ticker,
-        StockAggregate.timespan   == timespan,
+        StockAggregate.ticker == ticker,
+        StockAggregate.timespan == timespan,
         StockAggregate.multiplier == multiplier,
-        StockAggregate.timestamp  >= start_dt,
-        StockAggregate.timestamp  <  end_dt,
+        StockAggregate.timestamp >= start_dt,
+        StockAggregate.timestamp < end_dt,
     ).delete(synchronize_session=False)
 
     from app.utils.session import classify_session
+
     records = []
     for agg in aggs:
         ts_utc = agg["timestamp"]
         ts = ts_utc.replace(tzinfo=None)  # store naive UTC in DB
         is_pre, is_post = classify_session(ts_utc)
-        records.append(StockAggregate(
-            ticker=ticker, timestamp=ts,
-            multiplier=multiplier, timespan=timespan,
-            open=agg["open"], high=agg["high"],
-            low=agg["low"],   close=agg["close"],
-            volume=agg["volume"], vwap=agg.get("vwap"),
-            transactions=agg.get("transactions"),
-            is_pre_market=is_pre, is_after_market=is_post,
-            provider=provider,
-        ))
+        records.append(
+            StockAggregate(
+                ticker=ticker,
+                timestamp=ts,
+                multiplier=multiplier,
+                timespan=timespan,
+                open=agg["open"],
+                high=agg["high"],
+                low=agg["low"],
+                close=agg["close"],
+                volume=agg["volume"],
+                vwap=agg.get("vwap"),
+                transactions=agg.get("transactions"),
+                is_pre_market=is_pre,
+                is_after_market=is_post,
+                provider=provider,
+            )
+        )
 
     db.bulk_save_objects(records)
     db.commit()
@@ -224,21 +248,23 @@ async def _sync_futures_range(
     from app.models.futures_contract import FuturesContract
     from app.services.futures_data import FuturesDataService
 
-    logger.info(f"  sync_futures_range {symbol} {timespan}×{multiplier} {from_date}→{to_date}")
+    logger.info(
+        f"  sync_futures_range {symbol} {timespan}×{multiplier} {from_date}→{to_date}"
+    )
 
     from_dt = datetime.strptime(from_date, "%Y-%m-%d")
-    to_dt   = datetime.strptime(to_date,   "%Y-%m-%d")
+    to_dt = datetime.strptime(to_date, "%Y-%m-%d")
 
     # A contract that covers [from_date, to_date] must expire after
     # (from_date - 90 days) so the front-month at range start is included,
     # and before (to_date + 180 days) to exclude far-future contracts.
     min_expiry_str = _to_date_str(from_dt - timedelta(days=90))
-    max_expiry_str = _to_date_str(to_dt   + timedelta(days=180))
+    max_expiry_str = _to_date_str(to_dt + timedelta(days=180))
 
     contracts = (
         db.query(FuturesContract)
         .filter(
-            FuturesContract.symbol   == symbol,
+            FuturesContract.symbol == symbol,
             FuturesContract.exchange == exchange.upper(),
             FuturesContract.contract_month >= min_expiry_str.replace("-", ""),
             FuturesContract.contract_month <= max_expiry_str.replace("-", ""),
@@ -255,9 +281,14 @@ async def _sync_futures_range(
             "Falling back to full history download (will query IBKR catalog)."
         )
         result = await FuturesDataService._download_full_history(
-            db=db, symbol=symbol, exchange=exchange,
-            timespan=timespan, multiplier=multiplier,
-            force_refresh=False, from_date=from_date, to_date=to_date,
+            db=db,
+            symbol=symbol,
+            exchange=exchange,
+            timespan=timespan,
+            multiplier=multiplier,
+            force_refresh=False,
+            from_date=from_date,
+            to_date=to_date,
         )
         return result.get("added", 0) if isinstance(result, dict) else 0
 
@@ -290,6 +321,7 @@ async def _sync_futures_range(
 
 # ── fix planning ──────────────────────────────────────────────────────────────
 
+
 def _plan_fixes(ticker_result: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Given one QualityTickerResult dict from the report, return an ordered
@@ -309,34 +341,38 @@ def _plan_fixes(ticker_result: Dict[str, Any]) -> List[Dict[str, Any]]:
     # 1. Fill detected gaps
     for gap in ticker_result.get("gaps", []):
         from_dt = _parse_date(gap["from"])
-        to_dt   = _parse_date(gap["to"])
+        to_dt = _parse_date(gap["to"])
         if from_dt and to_dt:
             # Slightly widen the window by 1 day on each side to capture
             # bar boundary issues
-            fixes.append({
-                "type": "gap_fill",
-                "from": _to_date_str(from_dt - timedelta(days=1)),
-                "to":   _to_date_str(to_dt   + timedelta(days=1)),
-            })
+            fixes.append(
+                {
+                    "type": "gap_fill",
+                    "from": _to_date_str(from_dt - timedelta(days=1)),
+                    "to": _to_date_str(to_dt + timedelta(days=1)),
+                }
+            )
 
     # 2. Back-fill if last_bar is stale (more than 1 day behind today)
     last_bar = _parse_date(ticker_result.get("last_bar"))
     if last_bar:
         last_date = last_bar.date()
         if (today - last_date).days > 1:
-            fixes.append({
-                "type": "backfill",
-                "from": _to_date_str(last_bar),
-                "to":   _to_date_str(datetime.now(timezone.utc)),
-            })
+            fixes.append(
+                {
+                    "type": "backfill",
+                    "from": _to_date_str(last_bar),
+                    "to": _to_date_str(datetime.now(timezone.utc)),
+                }
+            )
 
     return fixes
 
 
 # ── main service ──────────────────────────────────────────────────────────────
 
-class NormalizationService:
 
+class NormalizationService:
     @staticmethod
     def run(
         db: Session,
@@ -358,7 +394,11 @@ class NormalizationService:
         try:
             return loop.run_until_complete(
                 NormalizationService._run_async(
-                    db, universe_id, quality_report, normalization_data or {}, target_tickers
+                    db,
+                    universe_id,
+                    quality_report,
+                    normalization_data or {},
+                    target_tickers,
                 )
             )
         finally:
@@ -376,8 +416,13 @@ class NormalizationService:
 
         # Skip combos with no data at all (grade F + no bars) — nothing to fill
         workload = [
-            t for t in tickers
-            if not (t.get("actual_bars", 0) == 0 and t.get("grade") == "F" and not t.get("gaps"))
+            t
+            for t in tickers
+            if not (
+                t.get("actual_bars", 0) == 0
+                and t.get("grade") == "F"
+                and not t.get("gaps")
+            )
         ]
 
         if target_tickers is not None:
@@ -386,30 +431,33 @@ class NormalizationService:
         processed: List[str] = checkpoint.get("processed_combos", [])
         processed_set = set(processed)
 
-        fixes_applied = checkpoint.get("fixes_applied", {
-            "deduped": 0,
-            "gaps_filled": 0,
-            "backfilled": 0,
-        })
+        fixes_applied = checkpoint.get(
+            "fixes_applied",
+            {
+                "deduped": 0,
+                "gaps_filled": 0,
+                "backfilled": 0,
+            },
+        )
         errors: List[Dict] = checkpoint.get("errors", [])
 
         total = len(workload)
 
         for idx, result in enumerate(workload):
-            ticker     = result["ticker"]
-            timespan   = result.get("timespan")
+            ticker = result["ticker"]
+            timespan = result.get("timespan")
             multiplier = result.get("multiplier")
             is_futures = result.get("asset_class") == "futures"
-            combo_key  = f"{ticker}|{timespan}|{multiplier}"
+            combo_key = f"{ticker}|{timespan}|{multiplier}"
 
             if combo_key in processed_set:
                 logger.info(f"[normalize] skip {combo_key} (already processed)")
                 continue
 
             logger.info(
-                f"[normalize] {idx+1}/{total}  {combo_key}"
-                f" grade={result.get('grade')} dups={result.get('duplicate_count',0)}"
-                f" gaps={result.get('gap_count',0)}"
+                f"[normalize] {idx + 1}/{total}  {combo_key}"
+                f" grade={result.get('grade')} dups={result.get('duplicate_count', 0)}"
+                f" gaps={result.get('gap_count', 0)}"
             )
 
             try:
@@ -430,21 +478,47 @@ class NormalizationService:
                             if is_futures:
                                 exchange = _get_futures_exchange(db, ticker)
                                 added = await _sync_futures_range(
-                                    db, ticker, exchange, timespan, multiplier,
-                                    fix["from"], fix["to"],
+                                    db,
+                                    ticker,
+                                    exchange,
+                                    timespan,
+                                    multiplier,
+                                    fix["from"],
+                                    fix["to"],
                                 )
                             else:
-                                provider = _get_stock_provider(db, ticker, timespan, multiplier)
-                                added = await _sync_stock_range(
-                                    db, ticker, timespan, multiplier,
-                                    fix["from"], fix["to"], provider,
+                                provider = _get_stock_provider(
+                                    db, ticker, timespan, multiplier
                                 )
-                            key = "backfilled" if fix["type"] == "backfill" else "gaps_filled"
+                                added = await _sync_stock_range(
+                                    db,
+                                    ticker,
+                                    timespan,
+                                    multiplier,
+                                    fix["from"],
+                                    fix["to"],
+                                    provider,
+                                )
+                            key = (
+                                "backfilled"
+                                if fix["type"] == "backfill"
+                                else "gaps_filled"
+                            )
                             fixes_applied[key] = fixes_applied.get(key, 0) + added
-                            logger.info(f"  {fix['type']} +{added} bars for {combo_key}")
+                            logger.info(
+                                f"  {fix['type']} +{added} bars for {combo_key}"
+                            )
                         except Exception as e:
-                            logger.error(f"  fix {fix['type']} failed for {combo_key}: {e}")
-                            errors.append({"combo": combo_key, "fix": fix["type"], "error": str(e)})
+                            logger.error(
+                                f"  fix {fix['type']} failed for {combo_key}: {e}"
+                            )
+                            errors.append(
+                                {
+                                    "combo": combo_key,
+                                    "fix": fix["type"],
+                                    "error": str(e),
+                                }
+                            )
 
             except Exception as e:
                 logger.error(f"[normalize] error on {combo_key}: {e}")
@@ -463,9 +537,12 @@ class NormalizationService:
             }
             # Persist checkpoint directly (caller has already set status=running)
             from app.models.universe_quality_report import UniverseQualityReport
-            report_row = db.query(UniverseQualityReport).filter(
-                UniverseQualityReport.universe_id == universe_id
-            ).first()
+
+            report_row = (
+                db.query(UniverseQualityReport)
+                .filter(UniverseQualityReport.universe_id == universe_id)
+                .first()
+            )
             if report_row:
                 report_row.normalization_data = checkpoint_data
                 db.commit()

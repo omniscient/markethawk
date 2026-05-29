@@ -1,11 +1,13 @@
-from pydantic import BaseModel, Field, ConfigDict, field_validator
-from typing import Optional, List, Dict, Any
-from datetime import datetime, date
+from datetime import date, datetime
+from typing import Any, Dict, List, Optional
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class ScannerRunRequest(BaseModel):
     """Schema for scanner run requests."""
+
     universe_id: Optional[int] = None
     tickers: Optional[List[str]] = None
     scanner_type: str = "pre_market_volume"
@@ -24,6 +26,7 @@ class ScannerRunRequest(BaseModel):
 
 class ScannerRunResponse(BaseModel):
     """Schema for scanner run responses."""
+
     scan_id: str
     status: str
     stocks_scanned: int
@@ -42,6 +45,7 @@ class ScannerRunResponse(BaseModel):
 
 class ScannerRunAsyncResponse(BaseModel):
     """Returned when a scan is queued; the result is delivered via WS / status endpoint."""
+
     scan_id: str
     task_id: str
     started_at: datetime
@@ -56,6 +60,7 @@ class ScannerRunAsyncResponse(BaseModel):
 
 class ScannerRunStatusResponse(BaseModel):
     """Snapshot of an in-flight or finished scan."""
+
     scan_id: str
     task_id: Optional[str] = None
     status: str  # queued | running | completed | failed | cancelled
@@ -76,6 +81,7 @@ class ScannerRunStatusResponse(BaseModel):
 
 class ScannerStatsResponse(BaseModel):
     """Schema for scanner statistics."""
+
     activeAlerts: int
     avgVolumeSpike: float
     totalEvents: int
@@ -86,6 +92,7 @@ class ScannerStatsResponse(BaseModel):
 
 class ScannerConfigResponse(BaseModel):
     """Schema for scanner configuration response."""
+
     id: int
     uuid: UUID
     name: str
@@ -103,6 +110,7 @@ class ScannerConfigResponse(BaseModel):
 
 class PreMarketMover(BaseModel):
     """Schema for a single pre-market mover."""
+
     ticker: str
     name: Optional[str] = None
     price: float
@@ -116,6 +124,7 @@ class PreMarketMover(BaseModel):
 
 class PreMarketMoversResponse(BaseModel):
     """Schema for the pre-market movers list response."""
+
     status: str
     movers: List[PreMarketMover]
     timestamp: datetime
@@ -154,15 +163,16 @@ class ClearEventsResponse(BaseModel):
 
 class ScannerRangeRequest(BaseModel):
     """Schema for a date-range scanner run against a single ticker."""
+
     ticker: str
     scanner_types: List[str]
     start_date: date
     end_date: date
     fetch_missing_data: bool = True
 
-    @field_validator('scanner_types')
+    @field_validator("scanner_types")
     @classmethod
     def scanner_types_not_empty(cls, v):
         if not v:
-            raise ValueError('At least one scanner type must be selected')
+            raise ValueError("At least one scanner type must be selected")
         return v

@@ -1,5 +1,5 @@
 """Unit tests for StatisticalDiscoveryService."""
-import pytest
+
 import numpy as np
 import pandas as pd
 from app.services.statistical_discovery import StatisticalDiscoveryService
@@ -16,14 +16,16 @@ def _make_df(n: int = 600, seed: int = 42) -> pd.DataFrame:
         for interval in ["1h", "eod"]:
             noise = rng.normal(0, 0.5)
             pct_change = 0.3 * gap_pct + 0.2 * rel_vol + noise
-            rows.append({
-                "event_id": i,
-                "interval_key": interval,
-                "gap_pct": gap_pct,
-                "relative_volume": rel_vol,
-                "fade_pct": fade_pct,
-                "pct_change": pct_change,
-            })
+            rows.append(
+                {
+                    "event_id": i,
+                    "interval_key": interval,
+                    "gap_pct": gap_pct,
+                    "relative_volume": rel_vol,
+                    "fade_pct": fade_pct,
+                    "pct_change": pct_change,
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -32,19 +34,22 @@ def _make_sparse_df() -> pd.DataFrame:
     rng = np.random.default_rng(0)
     rows = []
     for i in range(600):
-        rows.append({
-            "event_id": i,
-            "interval_key": "1h",
-            "gap_pct": rng.uniform(0.5, 5.0),
-            "sparse_feature": np.nan if i < 400 else rng.uniform(0, 1),
-            "pct_change": rng.normal(1.0, 0.5),
-        })
+        rows.append(
+            {
+                "event_id": i,
+                "interval_key": "1h",
+                "gap_pct": rng.uniform(0.5, 5.0),
+                "sparse_feature": np.nan if i < 400 else rng.uniform(0, 1),
+                "pct_change": rng.normal(1.0, 0.5),
+            }
+        )
     return pd.DataFrame(rows)
 
 
 # ---------------------------------------------------------------------------
 # build_feature_matrix
 # ---------------------------------------------------------------------------
+
 
 def test_build_feature_matrix_returns_dataframe():
     svc = StatisticalDiscoveryService()
@@ -73,6 +78,7 @@ def test_build_feature_matrix_retains_dense_columns():
 # compute_correlations
 # ---------------------------------------------------------------------------
 
+
 def test_compute_correlations_shape():
     svc = StatisticalDiscoveryService()
     df = svc.build_feature_matrix(_make_df())
@@ -99,6 +105,7 @@ def test_compute_correlations_values_in_range():
 # ---------------------------------------------------------------------------
 # compute_shap_weights
 # ---------------------------------------------------------------------------
+
 
 def test_compute_shap_weights_returns_list():
     svc = StatisticalDiscoveryService()
@@ -131,6 +138,7 @@ def test_compute_shap_weights_sorted_by_importance():
 # run_kmeans
 # ---------------------------------------------------------------------------
 
+
 def test_run_kmeans_returns_labels_and_centroids():
     svc = StatisticalDiscoveryService()
     df = svc.build_feature_matrix(_make_df())
@@ -151,6 +159,7 @@ def test_run_kmeans_cluster_indices_within_k():
 # compute_conditional_stats
 # ---------------------------------------------------------------------------
 
+
 def test_compute_conditional_stats_keys():
     svc = StatisticalDiscoveryService()
     df = svc.build_feature_matrix(_make_df())
@@ -161,12 +170,15 @@ def test_compute_conditional_stats_keys():
         assert isinstance(intervals, dict)
         for interval_key, metrics in intervals.items():
             for key in ("median_pct", "win_rate", "sharpe", "n"):
-                assert key in metrics, f"Missing {key} in cluster {cluster_idx} / {interval_key}"
+                assert key in metrics, (
+                    f"Missing {key} in cluster {cluster_idx} / {interval_key}"
+                )
 
 
 # ---------------------------------------------------------------------------
 # generate_label
 # ---------------------------------------------------------------------------
+
 
 def test_generate_label_returns_string():
     svc = StatisticalDiscoveryService()

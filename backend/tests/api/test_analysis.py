@@ -1,9 +1,9 @@
 """Integration tests for signal analysis endpoints."""
-import pytest
+
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.main import app
 from tests.fixtures.analysis import seed_completed_analysis_run
 
 client = TestClient(app)
@@ -12,6 +12,7 @@ client = TestClient(app)
 # ---------------------------------------------------------------------------
 # GET /api/outcomes/correlations
 # ---------------------------------------------------------------------------
+
 
 def test_correlations_returns_404_when_no_run(db: Session):
     response = client.get("/api/outcomes/correlations")
@@ -43,6 +44,7 @@ def test_correlations_filters_by_scanner_type(db: Session):
 # GET /api/outcomes/analysis/latest
 # ---------------------------------------------------------------------------
 
+
 def test_latest_returns_404_when_no_run(db: Session):
     response = client.get("/api/outcomes/analysis/latest")
     assert response.status_code == 404
@@ -72,8 +74,10 @@ def test_latest_returns_feature_weights_and_clusters(db: Session):
 # POST /api/outcomes/analyze
 # ---------------------------------------------------------------------------
 
+
 def test_trigger_analysis_returns_202(db: Session):
     from unittest.mock import patch
+
     mock_result = type("R", (), {"id": "test-task-123"})()
     with patch("app.tasks.analyze_signal_features") as mock_task:
         mock_task.delay.return_value = mock_result

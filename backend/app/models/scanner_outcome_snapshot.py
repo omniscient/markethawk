@@ -3,8 +3,17 @@ ScannerOutcomeSnapshot SQLAlchemy model.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, BigInteger, ForeignKey, UniqueConstraint
-from sqlalchemy.schema import Index
+
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 
 from app.core.database import Base
 
@@ -15,7 +24,9 @@ class ScannerOutcomeSnapshot(Base):
     __tablename__ = "scanner_outcome_snapshots"
 
     id = Column(Integer, primary_key=True, index=True)
-    scanner_event_id = Column(Integer, ForeignKey("scanner_events.id"), nullable=False, index=True)
+    scanner_event_id = Column(
+        Integer, ForeignKey("scanner_events.id"), nullable=False, index=True
+    )
     interval_key = Column(String(10), nullable=False)
     reference_price = Column(Numeric, nullable=False)
     snapshot_price = Column(Numeric, nullable=True)
@@ -26,8 +37,14 @@ class ScannerOutcomeSnapshot(Base):
     captured_at = Column(DateTime, nullable=True)
     status = Column(String(20), nullable=False, default="pending", index=True)
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
 
     __table_args__ = (
-        UniqueConstraint("scanner_event_id", "interval_key", name="uq_outcome_snapshot_event_interval"),
+        UniqueConstraint(
+            "scanner_event_id",
+            "interval_key",
+            name="uq_outcome_snapshot_event_interval",
+        ),
     )

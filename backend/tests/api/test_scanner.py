@@ -3,15 +3,19 @@ Integration tests for scanner API endpoints.
 Runs against a real Postgres DB (via testcontainers).
 """
 
-import pytest
 from datetime import timedelta
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from app.main import app
 from app.utils.session import get_market_today
-from tests.fixtures.core import seed_universes, seed_tickers, seed_scanner_configs, seed_monitored_stocks
-from tests.fixtures.scanner import seed_scanner_runs, seed_scanner_events
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from tests.fixtures.core import (
+    seed_monitored_stocks,
+    seed_scanner_configs,
+    seed_universes,
+)
+from tests.fixtures.scanner import seed_scanner_events, seed_scanner_runs
 
 client = TestClient(app)
 
@@ -109,7 +113,15 @@ def test_configs_response_shape(db: Session):
     response = client.get("/api/scanner/configs")
 
     cfg = response.json()[0]
-    for field in ("id", "uuid", "name", "scanner_type", "parameters", "criteria", "is_active"):
+    for field in (
+        "id",
+        "uuid",
+        "name",
+        "scanner_type",
+        "parameters",
+        "criteria",
+        "is_active",
+    ):
         assert field in cfg, f"Missing field: {field}"
 
 
@@ -129,7 +141,13 @@ def test_history_returns_runs_desc(db: Session):
 
     # Verify required fields present
     run = data[0]
-    for field in ("scan_id", "status", "scanner_type", "stocks_scanned", "events_detected"):
+    for field in (
+        "scan_id",
+        "status",
+        "scanner_type",
+        "stocks_scanned",
+        "events_detected",
+    ):
         assert field in run, f"Missing field: {field}"
 
 
@@ -157,7 +175,9 @@ def test_history_empty_when_no_runs(db: Session):
 def test_scan_status_block_without_universe(db: Session):
     seed_scanner_runs(db)
 
-    response = client.get("/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike")
+    response = client.get(
+        "/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -184,7 +204,9 @@ def test_scan_status_block_with_universe(db: Session):
 
 
 def test_scan_status_block_no_runs(db: Session):
-    response = client.get("/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike")
+    response = client.get(
+        "/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -196,7 +218,9 @@ def test_scan_status_block_no_runs(db: Session):
 def test_scan_status_block_sparkline(db: Session):
     seed_scanner_runs(db)
 
-    response = client.get("/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike")
+    response = client.get(
+        "/api/scanner/scan-status-block?scanner_type=pre_market_volume_spike"
+    )
 
     data = response.json()
     assert "sparkline" in data
@@ -279,7 +303,9 @@ def test_results_filter_by_date_range(db: Session):
     today = get_market_today()
     yesterday = str(today - timedelta(days=1))
 
-    response = client.get(f"/api/scanner/results?start_date={yesterday}&end_date={yesterday}")
+    response = client.get(
+        f"/api/scanner/results?start_date={yesterday}&end_date={yesterday}"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -293,9 +319,9 @@ def test_results_filter_by_date_range(db: Session):
 
 
 def test_list_scanner_types():
-    import app.services.pre_market_scan  # noqa: F401
-    import app.services.oversold_bounce_scan  # noqa: F401
     import app.services.liquidity_hunt  # noqa: F401
+    import app.services.oversold_bounce_scan  # noqa: F401
+    import app.services.pre_market_scan  # noqa: F401
 
     response = client.get("/api/scanner/types")
     assert response.status_code == 200
@@ -308,5 +334,7 @@ def test_list_scanner_types():
     assert "liquidity_hunt_pre" in keys
     assert "liquidity_hunt_post" in keys
     for item in data:
-        assert {"key", "display_name", "description", "supports_date_range"} == set(item)
+        assert {"key", "display_name", "description", "supports_date_range"} == set(
+            item
+        )
         assert isinstance(item["supports_date_range"], bool)

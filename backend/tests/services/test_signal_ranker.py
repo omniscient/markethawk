@@ -1,7 +1,7 @@
-import pytest
 from unittest.mock import MagicMock
-from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
 
+import pytest
+from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
 
 _DEFAULT_WEIGHTS = {
     "volume_spike_ratio": 0.35,
@@ -75,24 +75,24 @@ def test_score_zero_weight_feature_contributes_nothing():
 def test_load_ranker_config_enabled():
     db = MagicMock()
     rows = [
-        MagicMock(key='signal_ranker_enabled', value='true'),
-        MagicMock(key='signal_ranker_weights', value='{"volume_spike_ratio": 0.35}'),
-        MagicMock(key='signal_ranker_version', value='0.1.0-baseline'),
+        MagicMock(key="signal_ranker_enabled", value="true"),
+        MagicMock(key="signal_ranker_weights", value='{"volume_spike_ratio": 0.35}'),
+        MagicMock(key="signal_ranker_version", value="0.1.0-baseline"),
     ]
     db.query.return_value.filter.return_value.all.return_value = rows
     config = load_ranker_config(db)
-    assert config['enabled'] is True
-    assert config['weights'] == {"volume_spike_ratio": 0.35}
-    assert config['version'] == '0.1.0-baseline'
+    assert config["enabled"] is True
+    assert config["weights"] == {"volume_spike_ratio": 0.35}
+    assert config["version"] == "0.1.0-baseline"
 
 
 def test_load_ranker_config_disabled_returns_empty_weights():
     db = MagicMock()
     rows = [
-        MagicMock(key='signal_ranker_enabled', value='false'),
-        MagicMock(key='signal_ranker_weights', value='{"volume_spike_ratio": 0.35}'),
-        MagicMock(key='signal_ranker_version', value='0.1.0-baseline'),
+        MagicMock(key="signal_ranker_enabled", value="false"),
+        MagicMock(key="signal_ranker_weights", value='{"volume_spike_ratio": 0.35}'),
+        MagicMock(key="signal_ranker_version", value="0.1.0-baseline"),
     ]
     db.query.return_value.filter.return_value.all.return_value = rows
     config = load_ranker_config(db)
-    assert config['enabled'] is False
+    assert config["enabled"] is False

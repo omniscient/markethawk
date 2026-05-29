@@ -1,7 +1,7 @@
 import json
 import uuid as _uuid
 from dataclasses import dataclass
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Optional, Tuple
 
 import redis as _redis
@@ -46,7 +46,11 @@ async def run(
 
 def compute_next_run(scanner_type: str) -> Optional[datetime]:
     """Return next scheduled fire time, or None if scanner_type is not scheduled."""
-    if scanner_type not in {"liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"}:
+    if scanner_type not in {
+        "liquidity_hunt",
+        "liquidity_hunt_pre",
+        "liquidity_hunt_post",
+    }:
         return None
     now = datetime.now(timezone.utc)
     candidate = now.replace(minute=0, second=0, microsecond=0, hour=2)
@@ -85,9 +89,9 @@ def enqueue_scan(db: Any, request: Any) -> Tuple[Any, Any]:
     The concurrency guard (check_concurrency / 409) stays in the router because
     it raises HTTPException — a FastAPI concern not appropriate in the service layer.
     """
-    from app.tasks import run_universe_scan
     from app.models.scanner_run import ScannerRun
     from app.services.scanner import ScannerService
+    from app.tasks import run_universe_scan
 
     start_date, end_date = ScannerService.resolve_date_range(
         request.start_date, request.end_date

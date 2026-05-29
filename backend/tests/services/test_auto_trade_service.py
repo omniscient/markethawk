@@ -4,26 +4,41 @@ Tests for AutoTradeExecutor — guard checks, position sizing, and paper-mode or
 All tests use paper_mode=True strategies. Redis is replaced with fakeredis.
 Live IBKR paths are isolated with unittest.mock.patch.
 """
+
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import fakeredis
 import pytest
-from sqlalchemy.orm import Session
-
 from app.models.alert_rule import AlertRule
+from app.models.auto_trade_order import AutoTradeOrder
 from app.models.scanner_event import ScannerEvent
 from app.models.trading_strategy import TradingStrategy
-from app.models.auto_trade_order import AutoTradeOrder
-from app.services.auto_trade_service import AutoTradeExecutor, PositionCalc, approve_order, cancel_order, get_account, get_stats
-
+from app.services.auto_trade_service import (
+    AutoTradeExecutor,
+    approve_order,
+    cancel_order,
+    get_account,
+    get_stats,
+)
+from sqlalchemy.orm import Session
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
-def _strategy(db, paper_mode=True, requires_approval=False, direction="long_only",
-              max_trades_per_day=5, max_concurrent_positions=3,
-              stop_pct=Decimal("2.0"), risk_per_trade_pct=Decimal("1.0"),
-              risk_reward_ratio=Decimal("2.0"), max_position_usd=None):
+
+def _strategy(
+    db,
+    paper_mode=True,
+    requires_approval=False,
+    direction="long_only",
+    max_trades_per_day=5,
+    max_concurrent_positions=3,
+    stop_pct=Decimal("2.0"),
+    risk_per_trade_pct=Decimal("1.0"),
+    risk_reward_ratio=Decimal("2.0"),
+    max_position_usd=None,
+):
     s = TradingStrategy(
         name=f"Test Strategy {id(db)}",
         paper_mode=paper_mode,
@@ -60,8 +75,13 @@ def _rule(db, strategy, auto_trade=True):
     return r
 
 
-def _event(db, ticker="AAPL", scanner_type="pre_market_volume_spike",
-           opening_price=Decimal("50.00"), indicators=None):
+def _event(
+    db,
+    ticker="AAPL",
+    scanner_type="pre_market_volume_spike",
+    opening_price=Decimal("50.00"),
+    indicators=None,
+):
     ev = ScannerEvent(
         ticker=ticker,
         event_date=date.today(),
@@ -85,6 +105,7 @@ REDIS_PATCH = "app.services.auto_trade_service.redis.from_url"
 
 
 # ── _calculate_position (pure math, no DB/Redis) ───────────────────────────
+
 
 def _mock_strategy(**attrs):
     """Build a MagicMock with TradingStrategy-like attributes for pure-math tests."""
@@ -120,9 +141,10 @@ def _mock_event(**attrs):
 def test_calculate_position_long_basic():
     s = _mock_strategy()
     executor = AutoTradeExecutor()
-    calc = executor._calculate_position(s, trigger_price=100.0, side="long",
-                                        account_equity=10_000.0)
-    assert calc.quantity == 50          # 100 risk / (100*2%) = 50
+    calc = executor._calculate_position(
+        s, trigger_price=100.0, side="long", account_equity=10_000.0
+    )
+    assert calc.quantity == 50  # 100 risk / (100*2%) = 50
     assert calc.stop == pytest.approx(98.0, abs=0.01)
     assert calc.target == pytest.approx(104.0, abs=0.01)
 
@@ -130,8 +152,9 @@ def test_calculate_position_long_basic():
 def test_calculate_position_short_flips_stop_and_target():
     s = _mock_strategy()
     executor = AutoTradeExecutor()
-    calc = executor._calculate_position(s, trigger_price=100.0, side="short",
-                                        account_equity=10_000.0)
+    calc = executor._calculate_position(
+        s, trigger_price=100.0, side="short", account_equity=10_000.0
+    )
     assert calc.stop == pytest.approx(102.0, abs=0.01)
     assert calc.target == pytest.approx(96.0, abs=0.01)
 
@@ -139,12 +162,14 @@ def test_calculate_position_short_flips_stop_and_target():
 def test_calculate_position_zero_quantity_when_price_too_high():
     s = _mock_strategy(risk_per_trade_pct=Decimal("0.001"))
     executor = AutoTradeExecutor()
-    calc = executor._calculate_position(s, trigger_price=50000.0, side="long",
-                                        account_equity=100.0)
+    calc = executor._calculate_position(
+        s, trigger_price=50000.0, side="long", account_equity=100.0
+    )
     assert calc.quantity == 0
 
 
 # ── _determine_side ────────────────────────────────────────────────────────
+
 
 def test_determine_side_long_only_with_long_scanner():
     s = _mock_strategy(direction="long_only")
@@ -155,12 +180,15 @@ def test_determine_side_long_only_with_long_scanner():
 
 def test_determine_side_long_only_blocks_short():
     s = _mock_strategy(direction="long_only")
-    ev = _mock_event(scanner_type="live_price_move", indicators={"price_change_pct": -3.0})
+    ev = _mock_event(
+        scanner_type="live_price_move", indicators={"price_change_pct": -3.0}
+    )
     side = AutoTradeExecutor()._determine_side(ev, s)
     assert side is None
 
 
 # ── maybe_execute — guard checks ──────────────────────────────────────────
+
 
 def test_maybe_execute_skips_when_auto_trade_false(db: Session):
     strategy = _strategy(db)
@@ -183,8 +211,9 @@ def test_maybe_execute_skips_when_strategy_inactive(db: Session):
 
 
 def test_maybe_execute_paper_mode_creates_submitted_order(db: Session):
-    strategy = _strategy(db, paper_mode=True, max_concurrent_positions=10,
-                         max_trades_per_day=10)
+    strategy = _strategy(
+        db, paper_mode=True, max_concurrent_positions=10, max_trades_per_day=10
+    )
     rule = _rule(db, strategy)
     event = _event(db)
     with patch(REDIS_PATCH, return_value=_fake_redis()):
@@ -196,8 +225,13 @@ def test_maybe_execute_paper_mode_creates_submitted_order(db: Session):
 
 
 def test_maybe_execute_requires_approval_creates_pending_approval(db: Session):
-    strategy = _strategy(db, paper_mode=True, requires_approval=True,
-                         max_concurrent_positions=10, max_trades_per_day=10)
+    strategy = _strategy(
+        db,
+        paper_mode=True,
+        requires_approval=True,
+        max_concurrent_positions=10,
+        max_trades_per_day=10,
+    )
     rule = _rule(db, strategy)
     event = _event(db)
     with patch(REDIS_PATCH, return_value=_fake_redis()):
@@ -207,8 +241,9 @@ def test_maybe_execute_requires_approval_creates_pending_approval(db: Session):
 
 
 def test_maybe_execute_idempotent_second_call_returns_none(db: Session):
-    strategy = _strategy(db, paper_mode=True, max_concurrent_positions=10,
-                         max_trades_per_day=10)
+    strategy = _strategy(
+        db, paper_mode=True, max_concurrent_positions=10, max_trades_per_day=10
+    )
     rule = _rule(db, strategy)
     event = _event(db)
     fake_r = _fake_redis()
@@ -222,10 +257,16 @@ def test_maybe_execute_idempotent_second_call_returns_none(db: Session):
 def test_maybe_execute_live_mode_isolates_ibkr(db: Session):
     """Live (paper_mode=False) path: IBKROrderManager is patched per spec Req 7."""
     from app.models.system_config import SystemConfig
+
     db.add(SystemConfig(key="AUTO_TRADING_ENABLED", value="true"))
     db.flush()
-    strategy = _strategy(db, paper_mode=False, requires_approval=False,
-                         max_concurrent_positions=10, max_trades_per_day=10)
+    strategy = _strategy(
+        db,
+        paper_mode=False,
+        requires_approval=False,
+        max_concurrent_positions=10,
+        max_trades_per_day=10,
+    )
     rule = _rule(db, strategy)
     event = _event(db)
 
@@ -241,8 +282,10 @@ def test_maybe_execute_live_mode_isolates_ibkr(db: Session):
     mock_mgr.get_account_summary = AsyncMock(return_value=mock_summary)
     mock_mgr.place_bracket_order = AsyncMock(return_value=mock_result)
 
-    with patch(REDIS_PATCH, return_value=_fake_redis()), \
-         patch("app.providers.ibkr_orders.IBKROrderManager", return_value=mock_mgr):
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch("app.providers.ibkr_orders.IBKROrderManager", return_value=mock_mgr),
+    ):
         order = AutoTradeExecutor().maybe_execute(rule, event, db)
 
     assert order is not None
@@ -273,6 +316,7 @@ def _make_order(db, strategy, paper=True, status="pending_approval"):
 
 # ── approve_order ──────────────────────────────────────────────────────────
 
+
 def test_approve_order_paper_sets_submitted(db):
     s = _strategy(db, paper_mode=True)
     o = _make_order(db, s)
@@ -295,6 +339,7 @@ def test_approve_order_live_queues_celery(db):
 
 
 # ── cancel_order ───────────────────────────────────────────────────────────
+
 
 def test_cancel_order_paper_sets_cancelled(db):
     s = _strategy(db, paper_mode=True)
@@ -323,6 +368,7 @@ def test_cancel_order_live_calls_ibkr_cancel(db):
 
 # ── get_account ────────────────────────────────────────────────────────────
 
+
 def test_get_account_returns_disconnected_on_error():
     result = get_account()
     # In test env IBKR is not running — should return a graceful fallback
@@ -334,6 +380,7 @@ def test_get_account_returns_disconnected_on_error():
 
 
 # ── get_stats ──────────────────────────────────────────────────────────────
+
 
 def test_get_stats_returns_expected_shape(db):
     result = get_stats(db, days=30)

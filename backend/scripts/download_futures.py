@@ -6,19 +6,18 @@ Usage:
     python -m scripts.download_futures --symbol GC --exchange COMEX --timespan minute
 """
 
-import sys
-import os
 import argparse
 import asyncio
 import logging
+import os
+import sys
 
 # Add the project root to python path so we can import 'app'
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.core.database import SessionLocal
-from app.services.futures_data import FuturesDataService
 from app.providers import DataProviderFactory
-from app.core.config import settings
+from app.services.futures_data import FuturesDataService
 
 # Configure logging for script (console output)
 logging.basicConfig(
@@ -28,15 +27,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger("download_futures")
 
+
 async def main():
     parser = argparse.ArgumentParser(description="Download Futures History from IBKR")
-    parser.add_argument("--symbol", required=True, help="Contract root symbol (e.g., ES)")
+    parser.add_argument(
+        "--symbol", required=True, help="Contract root symbol (e.g., ES)"
+    )
     parser.add_argument("--exchange", required=True, help="Exchange (e.g., CME)")
-    parser.add_argument("--timespan", default="day", choices=["day", "hour", "minute"], help="Bar timespan")
+    parser.add_argument(
+        "--timespan",
+        default="day",
+        choices=["day", "hour", "minute"],
+        help="Bar timespan",
+    )
     parser.add_argument("--multiplier", type=int, default=1, help="Bar multiplier")
-    parser.add_argument("--contract", help="Specific contract month (YYYYMMDD). If provided, only downloads this contract.")
-    parser.add_argument("--force", action="store_true", help="Force re-download even if already downloaded")
-    
+    parser.add_argument(
+        "--contract",
+        help="Specific contract month (YYYYMMDD). If provided, only downloads this contract.",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-download even if already downloaded",
+    )
+
     args = parser.parse_args()
 
     # Check IBKR configuration
@@ -47,9 +61,9 @@ async def main():
             "contains IBKR_HOST and IBKR_PORT, and that you have installed ib_insync."
         )
         sys.exit(1)
-        
+
     db = SessionLocal()
-    
+
     try:
         if args.contract:
             logger.info(f"Downloading single contract: {args.symbol} {args.contract}")
@@ -60,16 +74,20 @@ async def main():
                 contract_month=args.contract,
                 timespan=args.timespan,
                 multiplier=args.multiplier,
-                force_refresh=args.force
+                force_refresh=args.force,
             )
             logger.info(f"Result: {res}")
-            
+
         else:
-            logger.info(f"Downloading full continuous history for: {args.symbol} / {args.exchange}")
-            
+            logger.info(
+                f"Downloading full continuous history for: {args.symbol} / {args.exchange}"
+            )
+
             def progress(contract_month, current, total):
-                logger.info(f"--> Progress: {current}/{total} (Just finished {contract_month})")
-                
+                logger.info(
+                    f"--> Progress: {current}/{total} (Just finished {contract_month})"
+                )
+
             res = await FuturesDataService.download_full_history(
                 db=db,
                 symbol=args.symbol,
@@ -77,14 +95,14 @@ async def main():
                 timespan=args.timespan,
                 multiplier=args.multiplier,
                 force_refresh=args.force,
-                progress_callback=progress
+                progress_callback=progress,
             )
             logger.info("\n=== DOWNLOAD COMPLETE ===")
             logger.info(f"Status: {res.get('status')}")
             logger.info(f"Contracts processed: {res.get('contracts_processed')}")
             logger.info(f"Bars added: {res.get('bars_added')}")
             logger.info(f"Rollovers detected: {res.get('rollovers_detected')}")
-            
+
     except Exception as e:
         logger.error(f"Fatal error during download: {e}", exc_info=True)
     finally:
@@ -93,9 +111,10 @@ async def main():
         if ibkr.is_available():
             ibkr.disconnect()
 
+
 if __name__ == "__main__":
     # Workaround for ProactorEventLoop issue on Windows shutting down asyncpg/ib_insync connections
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-        
+
     asyncio.run(main())

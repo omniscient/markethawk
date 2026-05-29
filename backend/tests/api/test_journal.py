@@ -3,13 +3,11 @@ Integration tests for journal API endpoints.
 Runs against a real Postgres DB (via testcontainers).
 """
 
-import pytest
-from datetime import datetime
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.main import app
-from tests.fixtures.journal import seed_trades, seed_tags, seed_journal_entries
+from tests.fixtures.journal import seed_journal_entries, seed_tags, seed_trades
 
 client = TestClient(app)
 
@@ -75,8 +73,18 @@ def test_list_trades_response_shape(db: Session):
 
     assert response.status_code == 200
     trade = response.json()[0]
-    for field in ("id", "symbol", "status", "side", "quantity", "avg_entry_price",
-                  "executions", "tags", "created_at", "updated_at"):
+    for field in (
+        "id",
+        "symbol",
+        "status",
+        "side",
+        "quantity",
+        "avg_entry_price",
+        "executions",
+        "tags",
+        "created_at",
+        "updated_at",
+    ):
         assert field in trade, f"Missing field: {field}"
 
 
@@ -148,7 +156,9 @@ def test_update_trade_status(db: Session):
     open_trade = next(t for t in trades if t.status == "open")
     trade_id = open_trade.id
 
-    response = client.patch(f"/api/journal/trades/{trade_id}", json={"status": "closed"})
+    response = client.patch(
+        f"/api/journal/trades/{trade_id}", json={"status": "closed"}
+    )
 
     assert response.status_code == 200
     assert response.json()["status"] == "closed"
@@ -186,8 +196,15 @@ def test_stats_returns_correct_shape(db: Session):
 
     assert response.status_code == 200
     data = response.json()
-    for field in ("total_trades", "winning_trades", "losing_trades", "win_rate",
-                  "total_pnl", "avg_profit", "profit_factor"):
+    for field in (
+        "total_trades",
+        "winning_trades",
+        "losing_trades",
+        "win_rate",
+        "total_pnl",
+        "avg_profit",
+        "profit_factor",
+    ):
         assert field in data, f"Missing field: {field}"
 
 
@@ -242,7 +259,14 @@ def test_list_entries_response_shape(db: Session):
 
     assert response.status_code == 200
     entry = response.json()[0]
-    for field in ("id", "entry_date", "content", "sentiment", "created_at", "updated_at"):
+    for field in (
+        "id",
+        "entry_date",
+        "content",
+        "sentiment",
+        "created_at",
+        "updated_at",
+    ):
         assert field in entry, f"Missing field: {field}"
 
 

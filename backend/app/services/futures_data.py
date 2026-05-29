@@ -20,21 +20,19 @@ Continuous series assembly (read path):
   4. Return a single sorted DataFrame labelled with the root symbol.
 """
 
-import asyncio
 import logging
-from datetime import datetime, date, timedelta, timezone
-from typing import Dict, Any, List, Optional, Tuple
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
-from sqlalchemy.orm import Session
 from sqlalchemy import func, text
+from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.database import SessionLocal
 from app.exceptions import ProviderError
 from app.models.futures_aggregate import FuturesAggregate
-from app.models.futures_rollover import FuturesRollover
 from app.models.futures_contract import FuturesContract
+from app.models.futures_rollover import FuturesRollover
 from app.providers import DataProviderFactory
 
 logger = logging.getLogger(__name__)
@@ -70,6 +68,7 @@ SYMBOL_EXCHANGE_MAP = {
 # Module-level helpers
 # ---------------------------------------------------------------------------
 
+
 def _resolve_exchange(symbol: str) -> str:
     """Return the exchange for a known futures symbol, raising ValueError if unknown."""
     exchange = SYMBOL_EXCHANGE_MAP.get(symbol.upper())
@@ -83,6 +82,7 @@ def _resolve_exchange(symbol: str) -> str:
 # ---------------------------------------------------------------------------
 # FuturesDataService
 # ---------------------------------------------------------------------------
+
 
 class FuturesDataService:
     """
@@ -118,7 +118,9 @@ class FuturesDataService:
                 is_retryable=True,
             )
 
-        logger.info(f"FuturesDataService: Syncing contract catalog for {symbol} ({exchange})...")
+        logger.info(
+            f"FuturesDataService: Syncing contract catalog for {symbol} ({exchange})..."
+        )
         contracts = await ibkr.get_futures_contracts(
             symbol=symbol,
             exchange=exchange,
@@ -254,7 +256,10 @@ class FuturesDataService:
         ibkr = DataProviderFactory.get("ibkr")
         available, reason = ibkr.is_available()
         if not available:
-            return {"status": "error", "message": f"IBKR provider unavailable: {reason}"}
+            return {
+                "status": "error",
+                "message": f"IBKR provider unavailable: {reason}",
+            }
 
         # Check if already downloaded (unless forced)
         catalog_entry = (
@@ -270,7 +275,12 @@ class FuturesDataService:
         # When a specific date range is requested we always re-fetch that window so
         # that incremental syncs pick up bars added since the last full download.
         targeted = bool(from_date or to_date)
-        if catalog_entry and catalog_entry.data_downloaded and not force_refresh and not targeted:
+        if (
+            catalog_entry
+            and catalog_entry.data_downloaded
+            and not force_refresh
+            and not targeted
+        ):
             return {
                 "status": "skipped",
                 "message": f"{symbol} {contract_month} already downloaded",
@@ -289,16 +299,18 @@ class FuturesDataService:
                 tzinfo=timezone.utc
             )
         except ValueError:
-            return {"status": "error", "message": f"Invalid contract_month: {contract_month}"}
+            return {
+                "status": "error",
+                "message": f"Invalid contract_month: {contract_month}",
+            }
 
         # Upper bound: caller override, capped at min(expiry, now).
         # Parse to_date as end-of-day so we don't cut off the requested day's bars.
         natural_to = min(expiry_dt, now)
         if to_date:
-            caller_to = (
-                datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                + timedelta(days=1, seconds=-1)
-            )
+            caller_to = datetime.strptime(to_date, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            ) + timedelta(days=1, seconds=-1)
             effective_to = min(caller_to, natural_to)
         else:
             effective_to = natural_to
@@ -306,7 +318,9 @@ class FuturesDataService:
 
         # Lower bound: caller override, or full lookback capped by IBKR's 2-year limit
         if from_date:
-            from_date = from_date  # use as-is; caller is responsible for reasonable range
+            from_date = (
+                from_date  # use as-is; caller is responsible for reasonable range
+            )
         else:
             from_dt = now - timedelta(days=MAX_HISTORY_YEARS * 365)
             if expiry_dt < now:
@@ -338,12 +352,14 @@ class FuturesDataService:
         # Load existing timestamps once for deduplication
         existing_ts = set(
             r[0]
-            for r in db.query(FuturesAggregate.timestamp).filter(
+            for r in db.query(FuturesAggregate.timestamp)
+            .filter(
                 FuturesAggregate.symbol == symbol,
                 FuturesAggregate.contract_month == contract_month,
                 FuturesAggregate.timespan == timespan,
                 FuturesAggregate.multiplier == multiplier,
-            ).all()
+            )
+            .all()
         )
 
         # Insert in batches of 5000 to preserve progress on large downloads
@@ -396,7 +412,10 @@ class FuturesDataService:
             catalog_entry.data_downloaded = True
             if total_added:
                 all_saved_ts = (
-                    db.query(func.min(FuturesAggregate.timestamp), func.max(FuturesAggregate.timestamp))
+                    db.query(
+                        func.min(FuturesAggregate.timestamp),
+                        func.max(FuturesAggregate.timestamp),
+                    )
                     .filter(
                         FuturesAggregate.symbol == symbol,
                         FuturesAggregate.contract_month == contract_month,
@@ -407,14 +426,16 @@ class FuturesDataService:
                     catalog_entry.first_bar_date = all_saved_ts[0]
                     catalog_entry.last_bar_date = all_saved_ts[1]
         else:
-            db.add(FuturesContract(
-                symbol=symbol,
-                exchange=exchange.upper(),
-                contract_month=contract_month,
-                expiry_date=expiry_dt.date(),
-                is_expired=(expiry_dt < now),
-                data_downloaded=True,
-            ))
+            db.add(
+                FuturesContract(
+                    symbol=symbol,
+                    exchange=exchange.upper(),
+                    contract_month=contract_month,
+                    expiry_date=expiry_dt.date(),
+                    is_expired=(expiry_dt < now),
+                    data_downloaded=True,
+                )
+            )
 
         db.commit()
 
@@ -488,21 +509,28 @@ class FuturesDataService:
         # front-month at the very beginning of the requested range.
         if from_date:
             now_utc = datetime.now(timezone.utc)
-            from_dt_filter = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            from_dt_filter = datetime.strptime(from_date, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
             to_dt_filter = (
                 datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                if to_date else now_utc
+                if to_date
+                else now_utc
             )
             min_expiry = from_dt_filter - timedelta(days=90)
             max_expiry = to_dt_filter + timedelta(days=180)
 
             contracts = [
-                c for c in contracts
+                c
+                for c in contracts
                 if (
-                    datetime.strptime(c.contract_month, "%Y%m%d").replace(tzinfo=timezone.utc)
+                    datetime.strptime(c.contract_month, "%Y%m%d").replace(
+                        tzinfo=timezone.utc
+                    )
                     >= min_expiry
-                    and
-                    datetime.strptime(c.contract_month, "%Y%m%d").replace(tzinfo=timezone.utc)
+                    and datetime.strptime(c.contract_month, "%Y%m%d").replace(
+                        tzinfo=timezone.utc
+                    )
                     <= max_expiry
                 )
             ]
@@ -523,7 +551,7 @@ class FuturesDataService:
         for idx, contract in enumerate(contracts):
             cm = contract.contract_month
             logger.info(
-                f"FuturesDataService: [{idx+1}/{total}] Downloading {symbol} {cm}..."
+                f"FuturesDataService: [{idx + 1}/{total}] Downloading {symbol} {cm}..."
             )
 
             result = await FuturesDataService._download_contract(
@@ -543,9 +571,7 @@ class FuturesDataService:
                 progress_callback(cm, idx + 1, total)
 
         # Step 3: Detect and store rollovers
-        logger.info(
-            f"FuturesDataService: Detecting rollovers for {symbol}..."
-        )
+        logger.info(f"FuturesDataService: Detecting rollovers for {symbol}...")
         rollover_count = await FuturesDataService._detect_rollovers(
             db=db,
             symbol=symbol,
@@ -566,7 +592,9 @@ class FuturesDataService:
             to_date=to_date,
         )
 
-        total_added = sum(r.get("added", 0) for r in results) + gap_result.get("bars_added", 0)
+        total_added = sum(r.get("added", 0) for r in results) + gap_result.get(
+            "bars_added", 0
+        )
         total_skipped = sum(1 for r in results if r.get("status") == "skipped")
         total_errors = sum(1 for r in results if r.get("status") == "error")
 
@@ -615,13 +643,12 @@ class FuturesDataService:
           NQ trades ~23 h/day Sun–Fri with a ~1 h maintenance break, so
           80 h (≈3.5 days) safely skips weekends without false positives.
         """
-        base_query = (
-            db.query(FuturesAggregate.timestamp, FuturesAggregate.contract_month)
-            .filter(
-                FuturesAggregate.symbol == symbol,
-                FuturesAggregate.timespan == timespan,
-                FuturesAggregate.multiplier == multiplier,
-            )
+        base_query = db.query(
+            FuturesAggregate.timestamp, FuturesAggregate.contract_month
+        ).filter(
+            FuturesAggregate.symbol == symbol,
+            FuturesAggregate.timespan == timespan,
+            FuturesAggregate.multiplier == multiplier,
         )
         if from_date:
             base_query = base_query.filter(
@@ -665,7 +692,7 @@ class FuturesDataService:
 
         for gap_start, gap_end in gaps:
             gap_start_str = gap_start.strftime("%Y-%m-%d")
-            gap_end_str   = gap_end.strftime("%Y-%m-%d")
+            gap_end_str = gap_end.strftime("%Y-%m-%d")
             logger.info(
                 f"FuturesDataService: Filling gap {gap_start_str} → {gap_end_str} "
                 f"({(gap_end - gap_start).days}d) for {symbol}..."
@@ -677,19 +704,25 @@ class FuturesDataService:
             #   • Followed by the contract that expired just before the gap
             #     (may still have late-life bars right up to its expiry)
             candidates = sorted(
-                [c for c in all_contracts
-                 if datetime.strptime(c.contract_month, "%Y%m%d") >= gap_start],
+                [
+                    c
+                    for c in all_contracts
+                    if datetime.strptime(c.contract_month, "%Y%m%d") >= gap_start
+                ],
                 key=lambda c: c.contract_month,
             )[:3]
 
             just_expired = sorted(
-                [c for c in all_contracts
-                 if datetime.strptime(c.contract_month, "%Y%m%d") < gap_start],
+                [
+                    c
+                    for c in all_contracts
+                    if datetime.strptime(c.contract_month, "%Y%m%d") < gap_start
+                ],
                 key=lambda c: c.contract_month,
                 reverse=True,
             )[:1]
 
-            for contract in (candidates + just_expired):
+            for contract in candidates + just_expired:
                 result = await FuturesDataService._download_contract(
                     db=db,
                     symbol=symbol,
@@ -874,7 +907,11 @@ class FuturesDataService:
         for slice_start, slice_end, contract_month in slices:
             # Build date bounds for this slice, merging global from/to filters
             ts_start = max(filter(None, [slice_start, from_dt]), default=None)
-            ts_end   = min(filter(None, [slice_end,   to_dt  ]), default=None) if (slice_end or to_dt) else None
+            ts_end = (
+                min(filter(None, [slice_end, to_dt]), default=None)
+                if (slice_end or to_dt)
+                else None
+            )
 
             params: dict = {
                 "symbol": symbol,
@@ -895,7 +932,7 @@ class FuturesDataService:
                 clauses.append("timestamp < :ts_end")
                 params["ts_end"] = ts_end
 
-            # Optimization: Use the newly created composite index. 
+            # Optimization: Use the newly created composite index.
             # We already know the contract_month, so we don't need to select it again for every row.
             sql = text(
                 f"SELECT timestamp, open, high, low, close, volume, vwap "
@@ -906,7 +943,10 @@ class FuturesDataService:
             if not rows:
                 continue
 
-            chunk = pd.DataFrame(rows, columns=["timestamp", "open", "high", "low", "close", "volume", "vwap"])
+            chunk = pd.DataFrame(
+                rows,
+                columns=["timestamp", "open", "high", "low", "close", "volume", "vwap"],
+            )
             # Add contract_month once for the whole chunk instead of fetching it N times from DB
             chunk["contract_month"] = contract_month
             frames.append(chunk)
@@ -917,19 +957,20 @@ class FuturesDataService:
         # Combine all slices. Since slices are chronological and queries are ORDER BY timestamp ASC,
         # the resulting DataFrame will be mostly sorted already.
         df = pd.concat(frames, ignore_index=True)
-        
+
         # Only perform expensive deduplication/sort if we have multiple frames (rollover points)
         if len(frames) > 1:
             df.sort_values("timestamp", inplace=True)
             df.drop_duplicates(subset=["timestamp"], keep="last", inplace=True)
             df.reset_index(drop=True, inplace=True)
-        
+
         return df
 
 
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
 
 def _detect_single_rollover(
     db: Session,
@@ -979,7 +1020,9 @@ def _detect_single_rollover(
     if curr_df.empty or next_df.empty:
         # Fall back to calendar rule
         if current_expiry:
-            roll_date = current_expiry - timedelta(days=CALENDAR_ROLL_DAYS_BEFORE_EXPIRY)
+            roll_date = current_expiry - timedelta(
+                days=CALENDAR_ROLL_DAYS_BEFORE_EXPIRY
+            )
             return roll_date, "calendar"
         return None
 
@@ -992,7 +1035,9 @@ def _detect_single_rollover(
     merged = pd.merge(curr_df, next_df, on="date", suffixes=("_curr", "_next"))
     if merged.empty:
         if current_expiry:
-            roll_date = current_expiry - timedelta(days=CALENDAR_ROLL_DAYS_BEFORE_EXPIRY)
+            roll_date = current_expiry - timedelta(
+                days=CALENDAR_ROLL_DAYS_BEFORE_EXPIRY
+            )
             return roll_date, "calendar"
         return None
 
@@ -1001,7 +1046,9 @@ def _detect_single_rollover(
     if crossover.empty:
         # No crossover found — use calendar rule
         if current_expiry:
-            roll_date = current_expiry - timedelta(days=CALENDAR_ROLL_DAYS_BEFORE_EXPIRY)
+            roll_date = current_expiry - timedelta(
+                days=CALENDAR_ROLL_DAYS_BEFORE_EXPIRY
+            )
             return roll_date, "calendar"
         return None
 

@@ -56,5 +56,7 @@ active_websocket_connections = Gauge(
 )
 
 db_pool_size = Gauge("db_pool_size", "SQLAlchemy connection pool configured size")
-db_pool_checked_out = Gauge("db_pool_checked_out", "Connections currently checked out from pool")
+db_pool_checked_out = Gauge(
+    "db_pool_checked_out", "Connections currently checked out from pool"
+)
 db_pool_overflow = Gauge("db_pool_overflow", "Overflow connections beyond pool_size")

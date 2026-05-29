@@ -23,7 +23,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from app.core.config import settings
@@ -34,7 +33,15 @@ logger = logging.getLogger(__name__)
 # Lazy import guard (same pattern as ibkr.py)
 # ---------------------------------------------------------------------------
 try:
-    from ib_insync import IB, Stock, MarketOrder, LimitOrder, StopOrder, util
+    from ib_insync import (  # noqa: F401
+        IB,
+        LimitOrder,
+        MarketOrder,
+        Stock,
+        StopOrder,
+        util,
+    )
+
     IB_INSYNC_AVAILABLE = True
 except ImportError:
     IB_INSYNC_AVAILABLE = False
@@ -47,6 +54,7 @@ except ImportError:
 # Data transfer objects
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AccountSummary:
     net_liquidation: float = 0.0
@@ -58,10 +66,10 @@ class AccountSummary:
 
 @dataclass
 class BracketOrderResult:
-    parent_id: int       # entry order permId
-    stop_id: int         # stop-loss child permId
-    target_id: int       # take-profit child permId
-    parent_order_id: int # orderId (used for cancel / status queries)
+    parent_id: int  # entry order permId
+    stop_id: int  # stop-loss child permId
+    target_id: int  # take-profit child permId
+    parent_order_id: int  # orderId (used for cancel / status queries)
     stop_order_id: int
     target_order_id: int
 
@@ -71,8 +79,8 @@ class OpenOrderInfo:
     order_id: int
     perm_id: int
     symbol: str
-    action: str          # "BUY" | "SELL"
-    order_type: str      # "MKT", "LMT", "STP"
+    action: str  # "BUY" | "SELL"
+    order_type: str  # "MKT", "LMT", "STP"
     total_qty: float
     status: str
     filled: float
@@ -82,6 +90,7 @@ class OpenOrderInfo:
 # ---------------------------------------------------------------------------
 # IBKROrderManager
 # ---------------------------------------------------------------------------
+
 
 class IBKROrderManager:
     """
@@ -196,12 +205,12 @@ class IBKROrderManager:
     async def place_bracket_order(
         self,
         symbol: str,
-        side: str,              # "long" | "short"
+        side: str,  # "long" | "short"
         quantity: int,
         entry_price: Optional[float],  # None = market order
         stop_price: float,
         target_price: float,
-        order_ref: str = "",    # auto_trade_order.id for traceability
+        order_ref: str = "",  # auto_trade_order.id for traceability
     ) -> BracketOrderResult:
         """
         Place a bracket order on IBKR: entry + stop-loss + take-profit.
@@ -230,14 +239,14 @@ class IBKROrderManager:
 
             # Build parent (entry) order
             if entry_price is None:
-                parent = MarketOrder(
+                parent = MarketOrder(  # noqa: F841
                     action=ibkr_action,
                     totalQuantity=quantity,
                     orderRef=order_ref,
                     transmit=False,  # don't transmit until all legs are ready
                 )
             else:
-                parent = LimitOrder(
+                parent = LimitOrder(  # noqa: F841
                     action=ibkr_action,
                     totalQuantity=quantity,
                     lmtPrice=round(entry_price, 2),
@@ -353,7 +362,9 @@ class IBKROrderManager:
                     await asyncio.sleep(0.5)
                     logger.info(f"IBKROrderManager: cancel sent for orderId={order_id}")
                     return True
-            logger.warning(f"IBKROrderManager: order {order_id} not found in open orders")
+            logger.warning(
+                f"IBKROrderManager: order {order_id} not found in open orders"
+            )
             return False
         finally:
             await self._disconnect(ib)

@@ -1,17 +1,18 @@
+import asyncio
 import logging
 import time as _time
-import asyncio
 from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
-from app.core.metrics import celery_tasks_total, celery_task_duration_seconds
+from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=1, name='app.tasks.execute_auto_trade')
+@celery_app.task(bind=True, max_retries=1, name="app.tasks.execute_auto_trade")
 def execute_auto_trade(self, rule_id: int, scanner_event_id: int):
     """
     Execute an automated trade for a matched alert rule.
@@ -32,13 +33,17 @@ def execute_auto_trade(self, rule_id: int, scanner_event_id: int):
     db: Session = SessionLocal()
     try:
         rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
-        event = db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
+        event = (
+            db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
+        )
 
         if not rule:
             logger.warning(f"execute_auto_trade: AlertRule id={rule_id} not found.")
             return
         if not event:
-            logger.warning(f"execute_auto_trade: ScannerEvent id={scanner_event_id} not found.")
+            logger.warning(
+                f"execute_auto_trade: ScannerEvent id={scanner_event_id} not found."
+            )
             return
 
         order = auto_trade_executor.maybe_execute(rule, event, db)
@@ -55,16 +60,20 @@ def execute_auto_trade(self, rule_id: int, scanner_event_id: int):
         celery_tasks_total.labels(task_name=_task_name, status="success").inc()
 
     except Exception as exc:
-        logger.error(f"❌ execute_auto_trade failed rule={rule_id} event={scanner_event_id}: {exc}")
+        logger.error(
+            f"❌ execute_auto_trade failed rule={rule_id} event={scanner_event_id}: {exc}"
+        )
         celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         db.rollback()
         raise self.retry(exc=exc, countdown=15)
     finally:
-        celery_task_duration_seconds.labels(task_name=_task_name).observe(_time.monotonic() - _start)
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=1, name='app.tasks.submit_approved_order')
+@celery_app.task(bind=True, max_retries=1, name="app.tasks.submit_approved_order")
 def submit_approved_order(self, order_id: int):
     """
     Submit a manually-approved AutoTradeOrder to IBKR.
@@ -103,11 +112,13 @@ def submit_approved_order(self, order_id: int):
         db.rollback()
         raise self.retry(exc=exc, countdown=15)
     finally:
-        celery_task_duration_seconds.labels(task_name=_task_name).observe(_time.monotonic() - _start)
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 
-@celery_app.task(bind=True, max_retries=0, name='app.tasks.poll_auto_trade_fills')
+@celery_app.task(bind=True, max_retries=0, name="app.tasks.poll_auto_trade_fills")
 def poll_auto_trade_fills(self):
     """
     Poll IBKR for fill updates on submitted/open AutoTradeOrders.
@@ -121,7 +132,6 @@ def poll_auto_trade_fills(self):
     Paper-mode orders simulate an instant fill at trigger_price.
     """
     from app.models.auto_trade_order import AutoTradeOrder
-    from app.models.trade import Trade, TradeExecution
 
     _task_name = "poll_auto_trade_fills"
     _start = _time.monotonic()
@@ -136,11 +146,13 @@ def poll_auto_trade_fills(self):
             celery_tasks_total.labels(task_name=_task_name, status="success").inc()
             return
 
-        logger.info(f"poll_auto_trade_fills: checking {len(pending_orders)} open order(s)")
+        logger.info(
+            f"poll_auto_trade_fills: checking {len(pending_orders)} open order(s)"
+        )
 
         # ── Paper mode: simulate fill at trigger price ───────────────────
         paper_orders = [o for o in pending_orders if o.is_paper]
-        live_orders  = [o for o in pending_orders if not o.is_paper]
+        live_orders = [o for o in pending_orders if not o.is_paper]
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -162,7 +174,9 @@ def poll_auto_trade_fills(self):
         celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         db.rollback()
     finally:
-        celery_task_duration_seconds.labels(task_name=_task_name).observe(_time.monotonic() - _start)
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
 
 
@@ -170,8 +184,9 @@ def poll_auto_trade_fills(self):
 # Fill helpers (called by poll_auto_trade_fills)
 # ---------------------------------------------------------------------------
 
+
 def _check_entry_slippage(
-    order: "AutoTradeOrder",
+    order: "AutoTradeOrder",  # noqa: F821
     fill_price: float,
     now: "datetime",
     db: "Session",
@@ -207,7 +222,7 @@ def _check_entry_slippage(
 
 
 def _record_entry_fill(
-    order: "AutoTradeOrder",
+    order: "AutoTradeOrder",  # noqa: F821
     fill_price: float,
     now: "datetime",
     db: "Session",
@@ -251,7 +266,7 @@ def _record_entry_fill(
 
 
 def _record_exit_fill(
-    order: "AutoTradeOrder",
+    order: "AutoTradeOrder",  # noqa: F821
     exit_price: float,
     exit_reason: str,
     now: "datetime",
@@ -295,7 +310,10 @@ def _record_exit_fill(
                 trade.net_pnl = round(pnl - float(trade.commissions or 0), 2)
                 if entry > 0:
                     trade.return_pct = round(
-                        (exit_price - entry) / entry * 100 * (1 if order.side == "long" else -1),
+                        (exit_price - entry)
+                        / entry
+                        * 100
+                        * (1 if order.side == "long" else -1),
                         2,
                     )
 
@@ -326,9 +344,13 @@ def _poll_live_orders(
 
         for order in orders:
             try:
-                parent_id = int(order.broker_order_id) if order.broker_order_id else None
-                stop_id   = int(order.broker_stop_id)   if order.broker_stop_id   else None
-                target_id = int(order.broker_target_id) if order.broker_target_id else None
+                parent_id = (
+                    int(order.broker_order_id) if order.broker_order_id else None
+                )
+                stop_id = int(order.broker_stop_id) if order.broker_stop_id else None
+                target_id = (
+                    int(order.broker_target_id) if order.broker_target_id else None
+                )
 
                 if order.status == "submitted":
                     # Check if entry order is filled (no longer in open orders)
@@ -343,7 +365,9 @@ def _poll_live_orders(
                         elif status is None:
                             # Order vanished — likely rejected
                             order.status = "rejected"
-                            order.rejection_reason = "Order not found in IBKR after submission"
+                            order.rejection_reason = (
+                                "Order not found in IBKR after submission"
+                            )
                             db.commit()
 
                 elif order.status == "open":
@@ -373,7 +397,7 @@ def _poll_live_orders(
 
 
 def _simulate_paper_exit(
-    order: "AutoTradeOrder",
+    order: "AutoTradeOrder",  # noqa: F821
     db: "Session",
     now: "datetime",
 ) -> None:
@@ -387,7 +411,7 @@ def _simulate_paper_exit(
     if price is None:
         return
 
-    stop   = float(order.calculated_stop)
+    stop = float(order.calculated_stop)
     target = float(order.calculated_target)
 
     if order.side == "long":

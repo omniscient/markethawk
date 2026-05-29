@@ -2,21 +2,21 @@
 Integration tests for /api/trading endpoints.
 DI override is handled by tests/api/conftest.py autouse fixture.
 """
+
 from datetime import date
 from decimal import Decimal
-
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from app.main import app
 from app.models.auto_trade_order import AutoTradeOrder
 from app.models.trading_strategy import TradingStrategy
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 client = TestClient(app)
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
+
 
 def _strategy(db, name="Test Strategy", paper_mode=True):
     s = TradingStrategy(
@@ -55,6 +55,7 @@ def _order(db, strategy, symbol="AAPL", status="submitted"):
 
 # ── GET /strategies ────────────────────────────────────────────────────────
 
+
 def test_list_strategies_returns_200(db: Session):
     response = client.get("/api/trading/strategies")
     assert response.status_code == 200
@@ -71,6 +72,7 @@ def test_list_strategies_contains_created(db: Session):
 
 # ── POST /strategies ───────────────────────────────────────────────────────
 
+
 def test_create_strategy_returns_201(db: Session):
     payload = {"name": "New Strategy", "stop_pct": 2.5, "direction": "long_only"}
     response = client.post("/api/trading/strategies", json=payload)
@@ -78,7 +80,7 @@ def test_create_strategy_returns_201(db: Session):
     data = response.json()
     assert data["name"] == "New Strategy"
     assert "id" in data
-    assert data["paper_mode"] is True   # safety default
+    assert data["paper_mode"] is True  # safety default
 
 
 def test_create_strategy_defaults_paper_mode(db: Session):
@@ -88,6 +90,7 @@ def test_create_strategy_defaults_paper_mode(db: Session):
 
 
 # ── GET /strategies/{id} ──────────────────────────────────────────────────
+
 
 def test_get_strategy_returns_200(db: Session):
     s = _strategy(db)
@@ -102,6 +105,7 @@ def test_get_strategy_not_found_returns_404(db: Session):
 
 
 # ── PATCH /strategies/{id} ────────────────────────────────────────────────
+
 
 def test_patch_strategy_updates_field(db: Session):
     s = _strategy(db)
@@ -119,6 +123,7 @@ def test_patch_strategy_not_found_returns_404(db: Session):
 
 
 # ── DELETE /strategies/{id} ───────────────────────────────────────────────
+
 
 def test_delete_strategy_returns_204(db: Session):
     s = _strategy(db)
@@ -147,6 +152,7 @@ def test_delete_strategy_not_found_returns_404(db: Session):
 
 # ── GET /orders ────────────────────────────────────────────────────────────
 
+
 def test_list_orders_returns_200(db: Session):
     response = client.get("/api/trading/orders")
     assert response.status_code == 200
@@ -163,6 +169,7 @@ def test_list_orders_contains_created(db: Session):
 
 # ── GET /orders/{id} ──────────────────────────────────────────────────────
 
+
 def test_get_order_returns_200(db: Session):
     s = _strategy(db)
     o = _order(db, s)
@@ -178,6 +185,7 @@ def test_get_order_not_found_returns_404(db: Session):
 
 # ── POST /orders/{id}/approve ─────────────────────────────────────────────
 
+
 def test_approve_pending_order_sets_submitted(db: Session):
     s = _strategy(db)
     o = _order(db, s, status="pending_approval")
@@ -187,6 +195,7 @@ def test_approve_pending_order_sets_submitted(db: Session):
 
 
 # ── POST /orders/{id}/reject ──────────────────────────────────────────────
+
 
 def test_reject_pending_order_sets_rejected(db: Session):
     s = _strategy(db)
@@ -200,6 +209,7 @@ def test_reject_pending_order_sets_rejected(db: Session):
 
 
 # ── POST /orders/{id}/cancel ──────────────────────────────────────────────
+
 
 def test_cancel_submitted_order_sets_cancelled(db: Session):
     s = _strategy(db)
@@ -218,6 +228,7 @@ def test_cancel_already_closed_order_returns_409(db: Session):
 
 # ── GET /stats ────────────────────────────────────────────────────────────
 
+
 def test_stats_returns_expected_shape(db: Session):
     response = client.get("/api/trading/stats")
     assert response.status_code == 200
@@ -229,6 +240,7 @@ def test_stats_returns_expected_shape(db: Session):
 
 
 # ── GET /config + PATCH /config ───────────────────────────────────────────
+
 
 def test_get_config_returns_200(db: Session):
     response = client.get("/api/trading/config")

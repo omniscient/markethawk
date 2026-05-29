@@ -1,14 +1,14 @@
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 from app.main import app
 from app.models import StockUniverse, StockUniverseTicker
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 client = TestClient(app)
 
 
-def _seed(db: Session, universe_name: str, ticker: str, is_active: bool = True) -> StockUniverse:
+def _seed(
+    db: Session, universe_name: str, ticker: str, is_active: bool = True
+) -> StockUniverse:
     universe = StockUniverse(
         name=universe_name,
         description=None,

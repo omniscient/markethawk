@@ -3,12 +3,11 @@ Integration tests for universe API endpoints.
 Runs against a real Postgres DB (via testcontainers).
 """
 
-import pytest
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.main import app
-from tests.fixtures.core import seed_universes, seed_tickers, seed_monitored_stocks
+from tests.fixtures.core import seed_monitored_stocks, seed_tickers, seed_universes
 
 client = TestClient(app)
 
@@ -46,7 +45,15 @@ def test_list_response_shape(db: Session):
 
     assert response.status_code == 200
     universe = response.json()[0]
-    for field in ("id", "uuid", "name", "description", "criteria", "created_at", "is_active"):
+    for field in (
+        "id",
+        "uuid",
+        "name",
+        "description",
+        "criteria",
+        "created_at",
+        "is_active",
+    ):
         assert field in universe, f"Missing field: {field}"
 
 

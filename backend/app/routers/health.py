@@ -3,6 +3,7 @@ Health check router.
 """
 
 from datetime import datetime, timezone
+
 from fastapi import APIRouter
 
 from app.core.config import settings

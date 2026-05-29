@@ -10,11 +10,11 @@ from typing import List
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from app.models.stock_split import StockSplit
-from app.models.stock_aggregate import StockAggregate
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.stock_aggregate import StockAggregate
+from app.models.stock_split import StockSplit
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,6 @@ BATCH_SIZE = 5000
 
 
 class SplitAdjustmentService:
-
     @staticmethod
     def get_unapplied_splits(db: Session) -> List[StockSplit]:
         return (
@@ -42,14 +41,17 @@ class SplitAdjustmentService:
         return Decimal(str(split.split_from)) / Decimal(str(split.split_to))
 
     @staticmethod
-    def adjust_stock_aggregates(db: Session, ticker: str, execution_date, factor: Decimal) -> int:
+    def adjust_stock_aggregates(
+        db: Session, ticker: str, execution_date, factor: Decimal
+    ) -> int:
         f = float(factor)
         vol_factor = 1.0 / f
         stmt = (
             update(StockAggregate)
             .where(
                 StockAggregate.ticker == ticker,
-                StockAggregate.timestamp < datetime.combine(execution_date, datetime.min.time()),
+                StockAggregate.timestamp
+                < datetime.combine(execution_date, datetime.min.time()),
             )
             .values(
                 open=StockAggregate.open * f,
@@ -64,7 +66,9 @@ class SplitAdjustmentService:
         return result.rowcount
 
     @staticmethod
-    def adjust_scanner_events(db: Session, ticker: str, execution_date, factor: Decimal) -> int:
+    def adjust_scanner_events(
+        db: Session, ticker: str, execution_date, factor: Decimal
+    ) -> int:
         f = float(factor)
         stmt = (
             update(ScannerEvent)
@@ -82,7 +86,9 @@ class SplitAdjustmentService:
         return result.rowcount
 
     @staticmethod
-    def adjust_outcome_snapshots(db: Session, ticker: str, execution_date, factor: Decimal) -> int:
+    def adjust_outcome_snapshots(
+        db: Session, ticker: str, execution_date, factor: Decimal
+    ) -> int:
         f = float(factor)
         event_ids = (
             db.query(ScannerEvent.id)
@@ -106,7 +112,9 @@ class SplitAdjustmentService:
         return result.rowcount
 
     @staticmethod
-    def adjust_outcome_summaries(db: Session, ticker: str, execution_date, factor: Decimal) -> int:
+    def adjust_outcome_summaries(
+        db: Session, ticker: str, execution_date, factor: Decimal
+    ) -> int:
         event_ids = (
             db.query(ScannerEvent.id)
             .filter(
@@ -133,23 +141,38 @@ class SplitAdjustmentService:
         ticker = split.ticker
         exec_date = split.execution_date
 
-        has_events = db.query(ScannerEvent.id).filter(
-            ScannerEvent.ticker == ticker,
-            ScannerEvent.event_date < exec_date,
-        ).first() is not None
+        has_events = (
+            db.query(ScannerEvent.id)
+            .filter(
+                ScannerEvent.ticker == ticker,
+                ScannerEvent.event_date < exec_date,
+            )
+            .first()
+            is not None
+        )
 
         if not has_events:
-            split.adjustments_applied_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            split.adjustments_applied_at = datetime.now(timezone.utc).replace(
+                tzinfo=None
+            )
             return {"skipped": True, "reason": "no scanner events for ticker"}
 
-        event_count = SplitAdjustmentService.adjust_scanner_events(db, ticker, exec_date, factor)
-        summary_count = SplitAdjustmentService.adjust_outcome_summaries(db, ticker, exec_date, factor)
+        event_count = SplitAdjustmentService.adjust_scanner_events(
+            db, ticker, exec_date, factor
+        )
+        summary_count = SplitAdjustmentService.adjust_outcome_summaries(
+            db, ticker, exec_date, factor
+        )
 
         split.adjustments_applied_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         logger.info(
             "Split adjustment applied: %s %s (factor=%.4f) — events=%d, summaries=%d",
-            ticker, exec_date, float(factor), event_count, summary_count,
+            ticker,
+            exec_date,
+            float(factor),
+            event_count,
+            summary_count,
         )
 
         return {

@@ -3,11 +3,10 @@ Stocks seed helpers.
 Each function inserts rows and flushes; the caller's transaction provides rollback.
 """
 
-from datetime import datetime, timezone, timedelta
-
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
 
 from app.models.stock_aggregate import StockAggregate
+from sqlalchemy.orm import Session
 
 
 def seed_stock_aggregates(

@@ -2,46 +2,57 @@
 Scanner router - endpoints for running and viewing scanner results.
 """
 
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
-import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from app.core.rate_limits import limiter, SCANNER_LIMIT
-from sqlalchemy.orm import Session, joinedload
 import sqlalchemy as sa
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from sqlalchemy.orm import Session, joinedload
 
-from app.utils.session import get_market_today
 from app.core.database import get_db
-from app.models import MonitoredStock, ScannerEvent, ScannerConfig, ScannerRun
+from app.core.rate_limits import SCANNER_LIMIT, limiter
+from app.models import MonitoredStock, ScannerConfig, ScannerEvent, ScannerRun
 from app.models.signal_review import SignalReview
-from app.schemas.signal_review import SignalReviewRequest, SignalReviewResponse, SignalReviewStatsResponse
-from app.models.system_config import SystemConfig
 from app.schemas import (
+    ClearEventsResponse,
+    PreMarketMoversResponse,
+    ScannerConfigResponse,
+    ScannerEventResponse,
+    ScannerRangeRequest,
+    ScannerRunAsyncResponse,
     ScannerRunRequest,
     ScannerRunResponse,
-    ScannerRunAsyncResponse,
     ScannerRunStatusResponse,
-    ScannerEventResponse,
-    ScannerEventSummary,
     ScannerStatsResponse,
-    ScannerConfigResponse,
-    PreMarketMoversResponse,
-    PreMarketMover,
-    ScannerRangeRequest,
     ScannerStatusBlockResponse,
-    ClearEventsResponse,
+)
+from app.schemas.signal_review import (
+    SignalReviewRequest,
+    SignalReviewResponse,
+    SignalReviewStatsResponse,
 )
 from app.services import StockDataService
-from app.services.scanner import ScannerService
 from app.services.scan_orchestrator import get_scan_progress, request_scan_cancel
+from app.services.scanner import ScannerService
 from app.services.scanner_query_service import ScannerQueryService
+from app.utils.session import get_market_today
 
 router = APIRouter(prefix="/api/scanner", tags=["scanner"])
+
 
 def _last_completed_weekday() -> "date":
     """Default scan date when none supplied — most recent completed weekday."""
     from datetime import timedelta as _td
+
     d = get_market_today() - _td(days=1)
     while d.weekday() >= 5:  # Saturday=5, Sunday=6
         d -= _td(days=1)
@@ -52,6 +63,7 @@ def _last_completed_weekday() -> "date":
 def list_scanner_types():
     """Return all registered scanner types for frontend scanner pickers."""
     from app.services.scan_orchestrator import get_all
+
     return [
         {
             "key": d.key,
@@ -178,7 +190,9 @@ def get_scan_status(scan_id: str, db: Session = Depends(get_db)):
 
     progress = None
     if run.status in ("queued", "running"):
-        progress = get_scan_progress(_settings.REDIS_URL, run.universe_id, run.scanner_type)
+        progress = get_scan_progress(
+            _settings.REDIS_URL, run.universe_id, run.scanner_type
+        )
 
     started_at = run.created_at
     if started_at and started_at.tzinfo is None:
@@ -220,7 +234,9 @@ def cancel_scan(scan_id: str, db: Session = Depends(get_db)):
     if run is None:
         raise HTTPException(status_code=404, detail="scan not found")
     if run.status not in ("queued", "running"):
-        raise HTTPException(status_code=409, detail=f"scan is {run.status}, not cancellable")
+        raise HTTPException(
+            status_code=409, detail=f"scan is {run.status}, not cancellable"
+        )
 
     request_scan_cancel(_settings.REDIS_URL, scan_id)
     return {"status": "cancel_requested", "scan_id": scan_id}
@@ -236,7 +252,9 @@ async def scan_run_websocket(websocket: WebSocket, task_id: str):
     pub/sub messages for the same channel until the task completes/fails.
     """
     import json
+
     from redis import asyncio as aioredis
+
     from app.core.config import settings as _settings
 
     await websocket.accept()
@@ -247,7 +265,9 @@ async def scan_run_websocket(websocket: WebSocket, task_id: str):
         #    locate it by scanning for any key whose stored task_id matches).
         cursor = 0
         while True:
-            cursor, keys = await redis_client.scan(cursor=cursor, match="universe:*:scan:*", count=100)
+            cursor, keys = await redis_client.scan(
+                cursor=cursor, match="universe:*:scan:*", count=100
+            )
             for key in keys:
                 raw = await redis_client.get(key)
                 if not raw:
@@ -311,12 +331,9 @@ def get_scanner_history(
 ):
     """Get recent scanner runs."""
     runs = (
-        db.query(ScannerRun)
-        .order_by(ScannerRun.created_at.desc())
-        .limit(limit)
-        .all()
+        db.query(ScannerRun).order_by(ScannerRun.created_at.desc()).limit(limit).all()
     )
-    
+
     # Map to schema
     return [
         ScannerRunResponse(
@@ -327,7 +344,7 @@ def get_scanner_history(
             events_detected=run.events_detected,
             execution_time_ms=run.execution_time_ms,
             error_message=run.error_message,
-            created_at=run.created_at
+            created_at=run.created_at,
         )
         for run in runs
     ]
@@ -337,7 +354,7 @@ def get_scanner_history(
 def get_scanner_results(
     ticker: Optional[str] = None,
     scanner_type: Optional[str] = None,
-    event_type: Optional[str] = None, # Alias for backward compat
+    event_type: Optional[str] = None,  # Alias for backward compat
     universe_id: Optional[int] = None,
     sort_by: Optional[str] = "signal_quality_score",
     sort_order: Optional[str] = "desc",
@@ -358,17 +375,19 @@ def get_scanner_results(
     if stype:
         # 'liquidity_hunt' is the umbrella type — include all three variants
         if stype == "liquidity_hunt":
-            query = query.filter(ScannerEvent.scanner_type.in_([
-                "liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"
-            ]))
+            query = query.filter(
+                ScannerEvent.scanner_type.in_(
+                    ["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]
+                )
+            )
         else:
             query = query.filter(ScannerEvent.scanner_type == stype)
 
     if universe_id:
         query = query.join(
             MonitoredStock,
-            (ScannerEvent.ticker == MonitoredStock.ticker) &
-            (MonitoredStock.universe_id == universe_id)
+            (ScannerEvent.ticker == MonitoredStock.ticker)
+            & (MonitoredStock.universe_id == universe_id),
         )
 
     if start_date:
@@ -386,13 +405,13 @@ def get_scanner_results(
                 order_expr = sort_attr.asc().nulls_last()
             query = query.order_by(order_expr)
         else:
-            query = query.order_by(ScannerEvent.signal_quality_score.desc().nulls_last())
+            query = query.order_by(
+                ScannerEvent.signal_quality_score.desc().nulls_last()
+            )
     except Exception:
         query = query.order_by(ScannerEvent.created_at.desc())
 
-    results = (
-        query.limit(limit).offset(offset).all()
-    )
+    results = query.limit(limit).offset(offset).all()
 
     return results
 
@@ -415,8 +434,9 @@ def get_scanner_stats(
     db: Session = Depends(get_db),
 ):
     """Get scanner statistics for the dashboard."""
+    from datetime import datetime
+
     from sqlalchemy import func
-    from datetime import datetime, timedelta
 
     # Total events
     total_events = db.query(func.count(ScannerEvent.id)).scalar() or 0
@@ -442,11 +462,23 @@ def get_scanner_stats(
     # Average volume spike ratio (specifically for volume scanners)
     # We use cast for JSON access in Postgres
     avg_spike = (
-        db.query(func.avg(sa.cast(ScannerEvent.indicators['volume_spike_ratio'].astext, sa.Numeric)))
-        .filter(ScannerEvent.scanner_type.in_([
-            'pre_market_volume_spike', 'liquidity_hunt',
-            'liquidity_hunt_pre', 'liquidity_hunt_post',
-        ]))
+        db.query(
+            func.avg(
+                sa.cast(
+                    ScannerEvent.indicators["volume_spike_ratio"].astext, sa.Numeric
+                )
+            )
+        )
+        .filter(
+            ScannerEvent.scanner_type.in_(
+                [
+                    "pre_market_volume_spike",
+                    "liquidity_hunt",
+                    "liquidity_hunt_pre",
+                    "liquidity_hunt_post",
+                ]
+            )
+        )
         .scalar()
     )
     if avg_spike is None:
@@ -469,7 +501,10 @@ def get_edge_stats(
 ):
     """Get aggregated statistical edge data."""
     from app.services.stats import StatsService
-    return StatsService.get_edge_stats(db, ticker=ticker, period=period, scanner_type=scanner_type)
+
+    return StatsService.get_edge_stats(
+        db, ticker=ticker, period=period, scanner_type=scanner_type
+    )
 
 
 @router.get("/edge-distribution")
@@ -480,7 +515,10 @@ def get_edge_distribution(
 ):
     """Get distribution data for scatter plots."""
     from app.services.stats import StatsService
-    return StatsService.get_distribution_data(db, ticker=ticker, scanner_type=scanner_type)
+
+    return StatsService.get_distribution_data(
+        db, ticker=ticker, scanner_type=scanner_type
+    )
 
 
 @router.get("/scan-status-block", response_model=ScannerStatusBlockResponse)
@@ -490,7 +528,9 @@ def get_scan_status_block(
     db: Session = Depends(get_db),
 ):
     """Rich status data for the Scan Status card."""
-    data = ScannerQueryService.get_scan_status_block(db, scanner_type, universe_id=universe_id)
+    data = ScannerQueryService.get_scan_status_block(
+        db, scanner_type, universe_id=universe_id
+    )
     return ScannerStatusBlockResponse(**data)
 
 
@@ -504,22 +544,18 @@ def get_scanner_configs(
 
 @router.get("/movers/pre-market", response_model=PreMarketMoversResponse)
 def get_pre_market_movers(
-    min_volume: int = 10000,
-    limit: int = 100,
-    db: Session = Depends(get_db)
+    min_volume: int = 10000, limit: int = 100, db: Session = Depends(get_db)
 ):
     """Get top pre-market movers."""
     movers = StockDataService.get_pre_market_movers(
-        db=db,
-        min_volume=min_volume,
-        limit=limit
+        db=db, min_volume=min_volume, limit=limit
     )
 
     # Map to schema if necessary, but the dicts should match
     return {
         "status": "success",
         "movers": movers,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -532,6 +568,7 @@ def run_scanner_range(
 ):
     """Enqueue a date-range scan for a single ticker as a background Celery task."""
     from app.tasks import run_range_scan
+
     task = run_range_scan.delay(
         ticker=body.ticker.upper(),
         scanner_types=body.scanner_types,
@@ -558,7 +595,9 @@ def clear_scanner_events(
     return ClearEventsResponse(ticker=ticker, deleted_count=deleted)
 
 
-@router.post("/events/{event_uuid}/review", response_model=SignalReviewResponse, status_code=201)
+@router.post(
+    "/events/{event_uuid}/review", response_model=SignalReviewResponse, status_code=201
+)
 def create_event_review(
     event_uuid: str,
     payload: SignalReviewRequest,
@@ -596,12 +635,18 @@ def list_event_reviews(
     db: Session = Depends(get_db),
 ):
     """List reviews with optional filters."""
-    query = (
-        db.query(SignalReview, ScannerEvent.ticker, ScannerEvent.event_date, ScannerEvent.scanner_type)
-        .join(ScannerEvent, SignalReview.scanner_event_id == ScannerEvent.id)
-    )
+    query = db.query(
+        SignalReview,
+        ScannerEvent.ticker,
+        ScannerEvent.event_date,
+        ScannerEvent.scanner_type,
+    ).join(ScannerEvent, SignalReview.scanner_event_id == ScannerEvent.id)
     if scanner_type == "liquidity_hunt":
-        query = query.filter(ScannerEvent.scanner_type.in_(["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]))
+        query = query.filter(
+            ScannerEvent.scanner_type.in_(
+                ["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]
+            )
+        )
     else:
         query = query.filter(ScannerEvent.scanner_type == scanner_type)
     if start_date:

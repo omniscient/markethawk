@@ -1,11 +1,12 @@
 """Tests for ScannerQueryService."""
-import pytest
+
 from datetime import date
 
-from app.models.scanner_run import ScannerRun
+import pytest
 from app.models.scanner_event import ScannerEvent
-from app.models.signal_review import SignalReview
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.scanner_run import ScannerRun
+from app.models.signal_review import SignalReview
 from app.models.stock_universe import StockUniverse
 from app.services.scanner_query_service import ScannerQueryService
 
@@ -70,8 +71,11 @@ def seeded_events(db):
 
 # ── get_scan_status_block ──────────────────────────────────────────────────
 
+
 def test_get_scan_status_block_returns_expected_keys(db, universe, seeded_runs):
-    result = ScannerQueryService.get_scan_status_block(db, "liquidity_hunt", universe_id=universe.id)
+    result = ScannerQueryService.get_scan_status_block(
+        db, "liquidity_hunt", universe_id=universe.id
+    )
     assert "last_run" in result
     assert "success_rate" in result
     assert "sparkline" in result
@@ -89,6 +93,7 @@ def test_get_scan_status_block_no_runs_returns_nones(db):
 
 # ── get_signal_quality_distribution ────────────────────────────────────────
 
+
 def test_get_signal_quality_distribution_returns_10_deciles(db, seeded_events):
     result = ScannerQueryService.get_signal_quality_distribution(db, scanner_type=None)
     assert len(result["deciles"]) == 10
@@ -104,6 +109,7 @@ def test_get_signal_quality_distribution_filters_by_type(db, seeded_events):
 
 
 # ── get_review_stats ───────────────────────────────────────────────────────
+
 
 def test_get_review_stats_returns_expected_shape(db, seeded_events):
     event = seeded_events[0]

@@ -5,16 +5,16 @@ TimesFM itself is never installed in the test environment, so all tests
 exercise the graceful-fallback and pure-math paths only.
 """
 
+from unittest.mock import MagicMock
+
 import numpy as np
-from unittest.mock import MagicMock, patch
-
 from app.services import timeseries_forecast as tf_module
-from app.services.timeseries_forecast import get_volume_forecast, compute_anomaly_score
-
+from app.services.timeseries_forecast import compute_anomaly_score, get_volume_forecast
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _reset_model_cache():
     """Reset the module-level lazy-load state between tests."""
@@ -29,6 +29,7 @@ def _make_forecast(mean=1_000_000.0, std=200_000.0, p50=950_000.0, p90=1_300_000
 # ---------------------------------------------------------------------------
 # get_volume_forecast — model unavailable (no timesfm installed)
 # ---------------------------------------------------------------------------
+
 
 def test_get_volume_forecast_returns_none_when_timesfm_missing():
     _reset_model_cache()
@@ -58,6 +59,7 @@ def test_get_volume_forecast_caches_unavailable_state():
 # get_volume_forecast — model available (mocked)
 # ---------------------------------------------------------------------------
 
+
 def test_get_volume_forecast_with_mocked_model():
     _reset_model_cache()
 
@@ -67,8 +69,8 @@ def test_get_volume_forecast_with_mocked_model():
 
     mock_model = MagicMock()
     mock_model.forecast.return_value = (
-        [[mean_log]],                          # point_forecast[0][0]
-        [[[0.0, p50_log, 0.0, p90_log]]],     # quantile_forecast[0][0][1,3]
+        [[mean_log]],  # point_forecast[0][0]
+        [[[0.0, p50_log, 0.0, p90_log]]],  # quantile_forecast[0][0][1,3]
     )
 
     tf_module._timesfm_model = mock_model
@@ -104,6 +106,7 @@ def test_get_volume_forecast_returns_none_on_model_exception():
 # ---------------------------------------------------------------------------
 # compute_anomaly_score
 # ---------------------------------------------------------------------------
+
 
 def test_compute_anomaly_score_positive():
     forecast = _make_forecast(mean=1_000_000, std=200_000)

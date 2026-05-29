@@ -5,22 +5,23 @@ Revises: 7ba47256a679
 Create Date: 2026-05-21 20:52:37.262430
 
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'e8f40cc8abf7'
-down_revision: Union[str, None] = '7ba47256a679'
+revision: str = "e8f40cc8abf7"
+down_revision: Union[str, None] = "7ba47256a679"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('scanner_events',
-        sa.Column('signal_quality_score', sa.Float(), nullable=True))
+    op.add_column(
+        "scanner_events", sa.Column("signal_quality_score", sa.Float(), nullable=True)
+    )
     # Raw SQL for DESC NULLS LAST — Alembic's postgresql_ops is for operator classes only
     op.execute(
         "CREATE INDEX idx_scanner_events_score ON scanner_events (signal_quality_score DESC NULLS LAST)"
@@ -36,6 +37,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM system_config WHERE key IN ('signal_ranker_enabled', 'signal_ranker_weights', 'signal_ranker_version')")
+    op.execute(
+        "DELETE FROM system_config WHERE key IN ('signal_ranker_enabled', 'signal_ranker_weights', 'signal_ranker_version')"
+    )
     op.execute("DROP INDEX IF EXISTS idx_scanner_events_score")
-    op.drop_column('scanner_events', 'signal_quality_score')
+    op.drop_column("scanner_events", "signal_quality_score")

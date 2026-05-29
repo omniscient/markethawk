@@ -4,6 +4,7 @@ import type { LiveAlert } from '../../hooks/useWatchlistLive';
 export function AlertBadge({ alert }: { alert: LiveAlert | null }) {
   if (!alert) return null;
 
+  // eslint-disable-next-line react-hooks/purity -- staleness check intentionally uses current time; component re-renders are infrequent
   const age = Date.now() - new Date(alert.timestamp).getTime();
   if (age > 3_600_000) return null; // hide alerts older than 1 hour
 

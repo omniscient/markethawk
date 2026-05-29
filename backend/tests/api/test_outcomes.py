@@ -4,12 +4,11 @@ Runs against a real Postgres DB (via testcontainers).
 """
 
 import pytest
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.main import app
 from tests.fixtures.outcomes import seed_outcomes
-from tests.fixtures.scanner import seed_scanner_events
 
 client = TestClient(app)
 
@@ -25,10 +24,20 @@ def test_scorecard_returns_correct_shape(db: Session):
     assert response.status_code == 200
     data = response.json()
     for field in (
-        "scanner_type", "period", "total_signals", "complete_signals",
-        "win_rate_pct", "avg_mfe_pct", "avg_mae_pct", "mfe_mae_ratio",
-        "avg_r_multiple", "expectancy", "profit_factor",
-        "follow_through_rate_pct", "edge_decay", "interval_breakdown",
+        "scanner_type",
+        "period",
+        "total_signals",
+        "complete_signals",
+        "win_rate_pct",
+        "avg_mfe_pct",
+        "avg_mae_pct",
+        "mfe_mae_ratio",
+        "avg_r_multiple",
+        "expectancy",
+        "profit_factor",
+        "follow_through_rate_pct",
+        "edge_decay",
+        "interval_breakdown",
     ):
         assert field in data, f"Missing field: {field}"
 
@@ -116,7 +125,9 @@ def test_intervals_empty_db_returns_empty_dict(db: Session):
 def test_intervals_filter_by_interval_key(db: Session):
     seed_outcomes(db)
 
-    response = client.get("/api/outcomes/intervals/pre_market_volume_spike?interval_key=5m")
+    response = client.get(
+        "/api/outcomes/intervals/pre_market_volume_spike?interval_key=5m"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -161,7 +172,9 @@ def test_distribution_empty_db_returns_empty_list(db: Session):
 def test_distribution_metric_param(db: Session):
     seed_outcomes(db)
 
-    response = client.get("/api/outcomes/distribution/pre_market_volume_spike?metric=mae_pct")
+    response = client.get(
+        "/api/outcomes/distribution/pre_market_volume_spike?metric=mae_pct"
+    )
 
     assert response.status_code == 200
     assert len(response.json()) == 3
@@ -231,8 +244,16 @@ def test_signals_item_shape(db: Session):
 
     signal = response.json()["signals"][0]
     for field in (
-        "id", "ticker", "event_date", "severity", "summary",
-        "mfe_pct", "mae_pct", "eod_pct_change", "follow_through", "is_complete",
+        "id",
+        "ticker",
+        "event_date",
+        "severity",
+        "summary",
+        "mfe_pct",
+        "mae_pct",
+        "eod_pct_change",
+        "follow_through",
+        "is_complete",
     ):
         assert field in signal, f"Missing field: {field}"
 
@@ -311,8 +332,14 @@ def test_event_outcome_summary_shape(db: Session):
 
     summary = response.json()["summary"]
     for field in (
-        "id", "scanner_event_id", "reference_price",
-        "mfe_pct", "mae_pct", "eod_pct_change", "follow_through", "is_complete",
+        "id",
+        "scanner_event_id",
+        "reference_price",
+        "mfe_pct",
+        "mae_pct",
+        "eod_pct_change",
+        "follow_through",
+        "is_complete",
     ):
         assert field in summary, f"Missing summary field: {field}"
 
@@ -325,8 +352,12 @@ def test_event_outcome_snapshot_shape(db: Session):
 
     snap = response.json()["snapshots"][0]
     for field in (
-        "id", "scanner_event_id", "interval_key",
-        "reference_price", "pct_change", "status",
+        "id",
+        "scanner_event_id",
+        "interval_key",
+        "reference_price",
+        "pct_change",
+        "status",
     ):
         assert field in snap, f"Missing snapshot field: {field}"
 
@@ -353,7 +384,9 @@ def test_readiness_missing_scanner_type_returns_400(db: Session):
 
 
 def test_readiness_returns_correct_shape(db: Session):
-    response = client.get("/api/outcomes/readiness/AAPL?scanner_type=pre_market_volume_spike")
+    response = client.get(
+        "/api/outcomes/readiness/AAPL?scanner_type=pre_market_volume_spike"
+    )
 
     assert response.status_code == 200
     data = response.json()

@@ -1,7 +1,6 @@
 """Tests for the MarketHawk exception hierarchy."""
 
-import pytest
-from app.exceptions import MarketHawkError, ScanError, DataFetchError, ProviderError
+from app.exceptions import DataFetchError, MarketHawkError, ProviderError, ScanError
 
 
 def test_markethawk_error_is_base():
@@ -23,7 +22,9 @@ def test_markethawk_error_retryable():
 
 
 def test_scan_error_is_markethawk_error():
-    exc = ScanError("scan failed", scanner_type="pre_market_volume_spike", ticker="AAPL")
+    exc = ScanError(
+        "scan failed", scanner_type="pre_market_volume_spike", ticker="AAPL"
+    )
     assert isinstance(exc, MarketHawkError)
     assert exc.scanner_type == "pre_market_volume_spike"
     assert exc.ticker == "AAPL"

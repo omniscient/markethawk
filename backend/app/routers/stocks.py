@@ -2,18 +2,18 @@
 Stocks router - historical data endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-import pandas as pd
 from datetime import datetime, timezone
+from typing import Optional
 
-from app.utils.session import get_market_today
+import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import ORJSONResponse
+from sqlalchemy.orm import Session
+
 from app.core.database import get_db
 from app.exceptions import DataFetchError
 from app.services import StockDataService
-from typing import Optional, Union
-from fastapi.responses import ORJSONResponse
-import orjson
+from app.utils.session import get_market_today
 
 router = APIRouter(prefix="/api/stocks", tags=["stocks"])
 
@@ -30,7 +30,9 @@ def get_historical_data(
     """Get historical stock data from DB."""
     ticker = ticker.upper()
     try:
-        data = StockDataService.get_historical_enriched(db, ticker, period, timespan, multiplier)
+        data = StockDataService.get_historical_enriched(
+            db, ticker, period, timespan, multiplier
+        )
 
         if data.empty:
             return {
@@ -48,13 +50,20 @@ def get_historical_data(
 
         # COMPACT FORMAT OPTIMIZATION:
         # 1. Convert Timestamps to Unix Epoch (seconds)
-        data["t"] = (pd.to_datetime(data[date_col], utc=True).astype('int64') // 10**9)
+        data["t"] = pd.to_datetime(data[date_col], utc=True).astype("int64") // 10**9
 
         # 2. Map other columns to short keys
         mapping = {
-            "Open": "o", "High": "h", "Low": "l", "Close": "c",
-            "Volume": "v", "vwap": "w", "transactions": "n",
-            "vwap_intraday": "wi", "marker_type": "mt", "contract_month": "cm"
+            "Open": "o",
+            "High": "h",
+            "Low": "l",
+            "Close": "c",
+            "Volume": "v",
+            "vwap": "w",
+            "transactions": "n",
+            "vwap_intraday": "wi",
+            "marker_type": "mt",
+            "contract_month": "cm",
         }
 
         compact_data = {}
@@ -63,25 +72,30 @@ def get_historical_data(
         for col, short in mapping.items():
             if col in data.columns:
                 if col == "marker_type":
-                    data[col] = data[col].where(data[col].notna() & (data[col] != ""), other=None)
+                    data[col] = data[col].where(
+                        data[col].notna() & (data[col] != ""), other=None
+                    )
                 compact_data[short] = data[col].tolist()
 
         # PERFORMANCE OPTIMIZATION:
         # Always return columnar format for this endpoint as it's significantly more efficient.
-        return ORJSONResponse({
-            "ticker": ticker,
-            "period": period,
-            "timespan": timespan,
-            "multiplier": multiplier,
-            "data_points": len(data),
-            "format": "columnar_compact",
-            "data": compact_data,
-        })
+        return ORJSONResponse(
+            {
+                "ticker": ticker,
+                "period": period,
+                "timespan": timespan,
+                "multiplier": multiplier,
+                "data_points": len(data),
+                "format": "columnar_compact",
+                "data": compact_data,
+            }
+        )
 
     except HTTPException:
         raise
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
 
@@ -99,7 +113,10 @@ def refresh_stock_data(
     try:
         ticker = ticker.upper()
         if StockDataService.is_futures_ticker(db, ticker):
-            return {"status": "skipped", "message": "Futures data is synced via IBKR, not Polygon."}
+            return {
+                "status": "skipped",
+                "message": "Futures data is synced via IBKR, not Polygon.",
+            }
         result = StockDataService.refresh_stock_data(
             db, ticker, timespan, multiplier, full_history, period
         )
@@ -111,7 +128,6 @@ def refresh_stock_data(
         raise HTTPException(status_code=500, detail=f"Error refreshing data: {str(e)}")
 
 
-
 @router.get("/details/{ticker}")
 def get_stock_detail_consolidated(
     ticker: str,
@@ -119,7 +135,9 @@ def get_stock_detail_consolidated(
 ):
     """Get consolidated stock detail for the frontend detail page."""
     import json
+
     import redis as redis_lib
+
     from app.core.config import settings
 
     ticker = ticker.upper()
@@ -138,9 +156,9 @@ def get_stock_detail_consolidated(
     try:
         if StockDataService.is_futures_ticker(db, ticker):
             # Return cached info from MonitoredStock — no Polygon calls for futures
+
             from app.models import MonitoredStock
             from app.models.futures_aggregate import FuturesAggregate
-            from sqlalchemy import func
 
             stock = (
                 db.query(MonitoredStock)
@@ -204,6 +222,7 @@ def get_stock_detail_consolidated(
             latest_price = minute_aggs[-1]["close"]
 
         from app.models.stock_split import StockSplit
+
         recent_splits_query = (
             db.query(StockSplit)
             .filter(StockSplit.ticker == ticker)
@@ -240,7 +259,10 @@ def get_stock_detail_consolidated(
             pass
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching stock details: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching stock details: {str(e)}"
+        )
+
 
 @router.post("/{ticker}/sync-missing")
 def sync_missing_stock_aggregates(
@@ -248,27 +270,29 @@ def sync_missing_stock_aggregates(
     db: Session = Depends(get_db),
 ):
     """
-    For a specific ticker, identify all (timespan, multiplier) combos already 
+    For a specific ticker, identify all (timespan, multiplier) combos already
     in the database and queue a sync from the last stored bar up to today.
     Uses the same pattern as Universe sync-missing, but for one instrument.
     """
     import json
-    import redis as redis_lib
     from datetime import timedelta
+
+    import redis as redis_lib
     from sqlalchemy import func
-    from app.tasks import sync_stock_aggregates, sync_futures_aggregates
-    from app.models.stock_aggregate import StockAggregate
-    from app.models.futures_aggregate import FuturesAggregate
-    from app.models import MonitoredStock
+
     from app.core.config import settings
+    from app.models import MonitoredStock
+    from app.models.futures_aggregate import FuturesAggregate
+    from app.models.stock_aggregate import StockAggregate
     from app.services.futures_data import SYMBOL_EXCHANGE_MAP
+    from app.tasks import sync_futures_aggregates, sync_stock_aggregates
 
     ticker = ticker.upper()
     is_futures = StockDataService.is_futures_ticker(db, ticker)
-    
+
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     today = now_utc.strftime("%Y-%m-%d")
-    
+
     task_ids: list = []
     summary: list = []
 
@@ -284,37 +308,48 @@ def sync_missing_stock_aggregates(
             .group_by(FuturesAggregate.timespan, FuturesAggregate.multiplier)
             .all()
         )
-        
+
         if not combos:
             # Default to standard sync for new futures
             from collections import namedtuple
-            Combo = namedtuple('Combo', ['timespan', 'multiplier', 'max_ts'])
-            combos = [
-                Combo('minute', 1, None),
-                Combo('day', 1, None)
-            ]
-            summary.append("Initial sync: no existing data found, defaulting to standard sets.")
+
+            Combo = namedtuple("Combo", ["timespan", "multiplier", "max_ts"])
+            combos = [Combo("minute", 1, None), Combo("day", 1, None)]
+            summary.append(
+                "Initial sync: no existing data found, defaulting to standard sets."
+            )
 
         # Find exchange for futures instrument
-        stock = db.query(MonitoredStock).filter(
-            MonitoredStock.ticker == ticker, 
-            MonitoredStock.asset_class == "futures",
-            MonitoredStock.is_active == True
-        ).first()
+        stock = (
+            db.query(MonitoredStock)
+            .filter(
+                MonitoredStock.ticker == ticker,
+                MonitoredStock.asset_class == "futures",
+                MonitoredStock.is_active == True,
+            )
+            .first()
+        )
         metadata = (stock.stock_metadata or {}) if stock else {}
         exchange = metadata.get("primary_exchange")
         if not exchange or exchange == "Unknown":
             exchange = SYMBOL_EXCHANGE_MAP.get(ticker)
-            
+
         if not exchange:
-            raise HTTPException(status_code=400, detail=f"Cannot determine exchange for futures symbol '{ticker}'")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot determine exchange for futures symbol '{ticker}'",
+            )
 
         for combo in combos:
-            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=30))
+            from_dt = (
+                (combo.max_ts + timedelta(seconds=1))
+                if combo.max_ts
+                else (now_utc - timedelta(days=30))
+            )
             if from_dt > now_utc:
                 summary.append(f"{combo.timespan}×{combo.multiplier}: up to date")
                 continue
-            
+
             from_date = from_dt.strftime("%Y-%m-%d")
             r = sync_futures_aggregates.delay(
                 symbol=ticker,
@@ -326,7 +361,7 @@ def sync_missing_stock_aggregates(
             )
             task_ids.append(r.id)
             summary.append(f"{combo.timespan}×{combo.multiplier}: from {from_date}")
-            
+
     else:
         # 2. Handle Stocks
         combos = (
@@ -339,23 +374,27 @@ def sync_missing_stock_aggregates(
             .group_by(StockAggregate.timespan, StockAggregate.multiplier)
             .all()
         )
-        
+
         if not combos:
             # Default to standard sync for new stocks
             from collections import namedtuple
-            Combo = namedtuple('Combo', ['timespan', 'multiplier', 'max_ts'])
-            combos = [
-                Combo('minute', 1, None),
-                Combo('day', 1, None)
-            ]
-            summary.append("Initial sync: no existing data found, defaulting to standard sets.")
+
+            Combo = namedtuple("Combo", ["timespan", "multiplier", "max_ts"])
+            combos = [Combo("minute", 1, None), Combo("day", 1, None)]
+            summary.append(
+                "Initial sync: no existing data found, defaulting to standard sets."
+            )
 
         for combo in combos:
-            from_dt = (combo.max_ts + timedelta(seconds=1)) if combo.max_ts else (now_utc - timedelta(days=30))
+            from_dt = (
+                (combo.max_ts + timedelta(seconds=1))
+                if combo.max_ts
+                else (now_utc - timedelta(days=30))
+            )
             if from_dt > now_utc:
                 summary.append(f"{combo.timespan}×{combo.multiplier}: up to date")
                 continue
-                
+
             from_date = from_dt.strftime("%Y-%m-%d")
             r = sync_stock_aggregates.delay(
                 ticker=ticker,
@@ -368,18 +407,28 @@ def sync_missing_stock_aggregates(
             summary.append(f"{combo.timespan}×{combo.multiplier}: from {from_date}")
 
     if not task_ids:
-         return {"status": "skipped", "message": "All timespans are already up to date.", "summary": summary}
-         
+        return {
+            "status": "skipped",
+            "message": "All timespans are already up to date.",
+            "summary": summary,
+        }
+
     # Store in Redis for sync-status polling (compatible with SystemActivityMonitor)
     try:
         r = redis_lib.from_url(settings.REDIS_URL)
         r.setex(
             f"ticker:{ticker}:sync",
             14400,
-            json.dumps({"task_ids": task_ids, "total": len(task_ids), "started_at": datetime.now(timezone.utc).isoformat()}),
+            json.dumps(
+                {
+                    "task_ids": task_ids,
+                    "total": len(task_ids),
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
         )
     except Exception as e:
-        # Log but don't fail the request 
+        # Log but don't fail the request
         print(f"REDIS ERROR: {e}")
 
     return {"status": "accepted", "queued": len(task_ids), "summary": summary}

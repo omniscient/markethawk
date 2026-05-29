@@ -1,15 +1,21 @@
-from sqlalchemy import Column, Integer, Float, Date, String, ForeignKey
+from sqlalchemy import Column, Date, Float, ForeignKey, String
 from sqlalchemy.orm import relationship
+
 from app.core.database import Base
+
 
 class StockMetric(Base):
     __tablename__ = "stock_metrics"
 
-    ticker = Column(String, ForeignKey("ticker_references.ticker"), primary_key=True, index=True)
+    ticker = Column(
+        String, ForeignKey("ticker_references.ticker"), primary_key=True, index=True
+    )
     date = Column(Date, primary_key=True, index=True)
-    
+
     close_price = Column(Float)
-    volume = Column(Float)  # Changed to Float to handle large numbers safely or match API types
+    volume = Column(
+        Float
+    )  # Changed to Float to handle large numbers safely or match API types
     avg_volume_30d = Column(Float)
     sma_50 = Column(Float)
     sma_200 = Column(Float)

@@ -1,28 +1,30 @@
 """Tests for SystemService."""
-import socket
+
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import fakeredis.aioredis
 import pytest
-
 from app.services.system_service import SystemService
-
 
 # ── get_market_status ──────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("hour,minute,weekday,expected", [
-    (3, 59, 0, "closed"),       # before pre-market on Monday
-    (4, 0, 0, "pre_market"),    # 04:00 ET Monday
-    (9, 29, 1, "pre_market"),   # 09:29 ET Tuesday
-    (9, 30, 2, "open"),         # 09:30 ET Wednesday
-    (15, 59, 3, "open"),        # 15:59 ET Thursday
-    (16, 0, 4, "post_market"),  # 16:00 ET Friday
-    (19, 59, 4, "post_market"), # 19:59 ET Friday
-    (20, 0, 4, "closed"),       # 20:00 ET Friday
-    (12, 0, 5, "closed"),       # Saturday
-    (12, 0, 6, "closed"),       # Sunday
-])
+
+@pytest.mark.parametrize(
+    "hour,minute,weekday,expected",
+    [
+        (3, 59, 0, "closed"),  # before pre-market on Monday
+        (4, 0, 0, "pre_market"),  # 04:00 ET Monday
+        (9, 29, 1, "pre_market"),  # 09:29 ET Tuesday
+        (9, 30, 2, "open"),  # 09:30 ET Wednesday
+        (15, 59, 3, "open"),  # 15:59 ET Thursday
+        (16, 0, 4, "post_market"),  # 16:00 ET Friday
+        (19, 59, 4, "post_market"),  # 19:59 ET Friday
+        (20, 0, 4, "closed"),  # 20:00 ET Friday
+        (12, 0, 5, "closed"),  # Saturday
+        (12, 0, 6, "closed"),  # Sunday
+    ],
+)
 def test_get_market_status(hour, minute, weekday, expected):
     fake_now = MagicMock()
     fake_now.weekday.return_value = weekday
@@ -34,6 +36,7 @@ def test_get_market_status(hour, minute, weekday, expected):
 
 
 # ── check_ibkr_reachable ──────────────────────────────────────────────────
+
 
 def test_check_ibkr_reachable_returns_true_on_success():
     mock_sock = MagicMock()
@@ -50,18 +53,23 @@ def test_check_ibkr_reachable_returns_false_on_oserror():
 
 # ── format_bytes ──────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("size,expected", [
-    (0, "0.0 B"),
-    (512, "512.0 B"),
-    (1024, "1.0 KB"),
-    (1024 * 1024, "1.0 MB"),
-    (1024 ** 3, "1.0 GB"),
-])
+
+@pytest.mark.parametrize(
+    "size,expected",
+    [
+        (0, "0.0 B"),
+        (512, "512.0 B"),
+        (1024, "1.0 KB"),
+        (1024 * 1024, "1.0 MB"),
+        (1024**3, "1.0 GB"),
+    ],
+)
 def test_format_bytes(size, expected):
     assert SystemService.format_bytes(size) == expected
 
 
 # ── get_storage_stats ─────────────────────────────────────────────────────
+
 
 def test_get_storage_stats_returns_dict(db):
     result = SystemService.get_storage_stats(db)
@@ -75,6 +83,7 @@ def test_get_storage_stats_returns_dict(db):
 
 # ── get_active_tasks ──────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_active_tasks_empty_on_no_keys(db):
     redis_client = fakeredis.aioredis.FakeRedis(decode_responses=True)
@@ -85,14 +94,19 @@ async def test_get_active_tasks_empty_on_no_keys(db):
 @pytest.mark.asyncio
 async def test_get_active_tasks_skips_stale_sync_key(db):
     import json
-    from datetime import timezone, timedelta
+    from datetime import timedelta, timezone
 
     redis_client = fakeredis.aioredis.FakeRedis(decode_responses=True)
     old_ts = (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
-    await redis_client.set("universe:1:sync", json.dumps({
-        "started_at": old_ts,
-        "task_ids": ["abc"],
-    }))
+    await redis_client.set(
+        "universe:1:sync",
+        json.dumps(
+            {
+                "started_at": old_ts,
+                "task_ids": ["abc"],
+            }
+        ),
+    )
     tasks = await SystemService.get_active_tasks(redis_client, db)
     assert tasks == []
     # Key must be deleted after stale detection

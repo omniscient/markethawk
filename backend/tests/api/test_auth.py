@@ -1,12 +1,13 @@
 import os
+
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests-only-32chars!")
 
 from app.core.config import get_settings
+
 get_settings.cache_clear()
 
-import pytest
-from fastapi.testclient import TestClient
 from app.main import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
@@ -58,8 +59,11 @@ def test_login_wrong_password_returns_401(db):
 
 def test_me_returns_current_user(db):
     from app.core.auth import create_access_token
+
     # Register and get the real user ID to create an authenticated token
-    reg = client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
+    reg = client.post(
+        "/api/auth/register", json={"username": "admin", "password": "hunter2"}
+    )
     user_id = reg.json()["id"]
     token = create_access_token(user_id)
     client.cookies.set("access_token", token)
@@ -70,8 +74,11 @@ def test_me_returns_current_user(db):
 
 def test_logout_clears_cookies(db):
     from app.core.auth import create_access_token
+
     # Register and set a valid token for the registered user
-    reg = client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
+    reg = client.post(
+        "/api/auth/register", json={"username": "admin", "password": "hunter2"}
+    )
     user_id = reg.json()["id"]
     token = create_access_token(user_id)
     client.cookies.set("access_token", token)

@@ -1,6 +1,8 @@
 """Tests for API rate limiting (SlowAPI, issue #87)."""
 
-import pytest
+from app.core.config import settings
+from app.core.rate_limits import GLOBAL_LIMIT, SCANNER_LIMIT, TRADING_LIMIT, limiter
+from app.main import app as main_app
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
@@ -9,12 +11,8 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIASGIMiddleware
 from slowapi.util import get_remote_address
 
-from app.core.rate_limits import GLOBAL_LIMIT, SCANNER_LIMIT, TRADING_LIMIT, limiter
-from app.core.config import settings
-from app.main import app as main_app
-
-
 # ── Task 1: constants and limiter instance ────────────────────────────────────
+
 
 def test_rate_limit_constants():
     assert GLOBAL_LIMIT == "100/minute"
@@ -31,6 +29,7 @@ def test_rate_limiting_enabled_setting_is_bool():
 
 
 # ── Task 2: middleware wiring ─────────────────────────────────────────────────
+
 
 def _make_test_app() -> FastAPI:
     """Minimal FastAPI app with rate limiting wired identically to main.py."""
@@ -50,7 +49,11 @@ def _make_test_app() -> FastAPI:
         return JSONResponse(
             status_code=429,
             headers={"Retry-After": str(retry_after)},
-            content={"message": "Rate limit exceeded", "error_id": None, "retry_after": retry_after},
+            content={
+                "message": "Rate limit exceeded",
+                "error_id": None,
+                "retry_after": retry_after,
+            },
         )
 
     @test_app.get("/test-limited")
@@ -108,41 +111,48 @@ def test_rate_limiting_disabled_is_noop():
 
 # ── Task 6: exemption structural checks ──────────────────────────────────────
 
+
 def test_health_check_is_exempt():
     from app.routers.health import health_check
+
     fn = health_check
     assert f"{fn.__module__}.{fn.__name__}" in limiter._exempt_routes
 
 
 def test_scanner_websocket_is_exempt():
     from app.routers.scanner import scan_run_websocket
+
     fn = scan_run_websocket
     assert f"{fn.__module__}.{fn.__name__}" in limiter._exempt_routes
 
 
 def test_live_data_websockets_are_exempt():
     from app.routers.live_data import (
+        scan_task_websocket,
         stock_live_websocket,
         watchlist_live_websocket,
-        scan_task_websocket,
     )
+
     for fn in (stock_live_websocket, watchlist_live_websocket, scan_task_websocket):
         assert f"{fn.__module__}.{fn.__name__}" in limiter._exempt_routes
 
 
 def test_system_websocket_is_exempt():
     from app.routers.system import system_tasks_websocket
+
     fn = system_tasks_websocket
     assert f"{fn.__module__}.{fn.__name__}" in limiter._exempt_routes
 
 
 def test_tweets_websocket_is_exempt():
     from app.routers.tweets import tweet_feed_websocket
+
     fn = tweet_feed_websocket
     assert f"{fn.__module__}.{fn.__name__}" in limiter._exempt_routes
 
 
 def test_news_websocket_is_exempt():
     from app.routers.news import news_websocket
+
     fn = news_websocket
     assert f"{fn.__module__}.{fn.__name__}" in limiter._exempt_routes

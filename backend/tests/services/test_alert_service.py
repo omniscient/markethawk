@@ -1,21 +1,26 @@
 """
 Tests for AlertRuleService — rule matching, cooldown logic, and delivery dispatch.
 """
-from datetime import date, datetime, timezone, timedelta
-from unittest.mock import patch, MagicMock
-import pytest
-from sqlalchemy.orm import Session
 
-from app.models.alert_rule import AlertRule
+from datetime import date, datetime, timedelta, timezone
+
 from app.models.alert_delivery_log import AlertDeliveryLog
+from app.models.alert_rule import AlertRule
 from app.models.scanner_event import ScannerEvent
 from app.services.alert_service import AlertRuleService
-
+from sqlalchemy.orm import Session
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
-def _rule(db, scanner_types=None, severity_filter="any", cooldown_minutes=0,
-          is_active=True, channels=None):
+
+def _rule(
+    db,
+    scanner_types=None,
+    severity_filter="any",
+    cooldown_minutes=0,
+    is_active=True,
+    channels=None,
+):
     r = AlertRule(
         name="Test Rule",
         is_active=is_active,
@@ -46,6 +51,7 @@ def _event(db, scanner_type="pre_market_volume_spike", severity="high"):
 
 
 # ── get_matching_rules ────────────────────────────────────────────────────
+
 
 def test_matches_rule_with_empty_scanner_types_filter(db: Session):
     rule = _rule(db, scanner_types=[])
@@ -91,6 +97,7 @@ def test_severity_filter_no_match(db: Session):
 
 # ── is_on_cooldown ────────────────────────────────────────────────────────
 
+
 def test_no_cooldown_returns_false(db: Session):
     rule = _rule(db, cooldown_minutes=0)
     assert AlertRuleService.is_on_cooldown(rule, "AAPL", db) is False
@@ -104,7 +111,8 @@ def test_cooldown_active_when_recent_delivery_exists(db: Session):
         scanner_type="pre_market_volume_spike",
         channel="browser_push",
         status="sent",
-        delivered_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=5),
+        delivered_at=datetime.now(timezone.utc).replace(tzinfo=None)
+        - timedelta(minutes=5),
     )
     db.add(log)
     db.flush()
@@ -119,7 +127,8 @@ def test_cooldown_expired_returns_false(db: Session):
         scanner_type="pre_market_volume_spike",
         channel="browser_push",
         status="sent",
-        delivered_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=2),
+        delivered_at=datetime.now(timezone.utc).replace(tzinfo=None)
+        - timedelta(hours=2),
     )
     db.add(log)
     db.flush()

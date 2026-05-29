@@ -58,6 +58,7 @@ const Scanner: React.FC = () => {
       if (prev && prev.scan_id !== 'historical') return prev;
       return { scan_id: 'historical', status: 'completed', stocks_scanned: 0, events_detected: existingResults.length, execution_time_ms: 0, events: existingResults };
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- adding state to deps causes infinite loop; state.setScanResults setter is the stable reference needed here
   }, [existingResults]);
 
   const scannerMutation = useMutation({

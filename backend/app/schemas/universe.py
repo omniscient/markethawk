@@ -2,14 +2,16 @@
 Stock Universe Pydantic schemas.
 """
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Dict, Any, List
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StockUniverseCreate(BaseModel):
     """Schema for creating a new stock universe."""
+
     name: str = Field(..., max_length=100)
     description: Optional[str] = None
     criteria: Dict[str, Any]
@@ -17,6 +19,7 @@ class StockUniverseCreate(BaseModel):
 
 class StockUniverseUpdate(BaseModel):
     """Schema for updating an existing stock universe."""
+
     name: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = None
     criteria: Optional[Dict[str, Any]] = None
@@ -25,6 +28,7 @@ class StockUniverseUpdate(BaseModel):
 
 class StockUniverseResponse(BaseModel):
     """Schema for stock universe API responses."""
+
     id: int
     uuid: uuid.UUID
     name: str
@@ -44,6 +48,7 @@ class StockUniverseResponse(BaseModel):
 
 class UniverseSummary(BaseModel):
     """Minimal universe info returned for ticker membership lookups."""
+
     id: int
     name: str
 

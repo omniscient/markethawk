@@ -25,10 +25,10 @@ from typing import Optional, Protocol
 
 import httpx
 
-
 # --------------------------------------------------------------------------- #
 # Protocol (interface)
 # --------------------------------------------------------------------------- #
+
 
 class ErrorTracker(Protocol):
     """Any error-tracking backend must implement this single method."""
@@ -46,10 +46,13 @@ class ErrorTracker(Protocol):
 # Implementations
 # --------------------------------------------------------------------------- #
 
+
 class StdoutErrorTracker:
     """Fallback tracker – logs to Python's stdlib logger only."""
 
-    def log_error(self, error_id: str, exc: Exception, tb_string: str, path: str) -> None:
+    def log_error(
+        self, error_id: str, exc: Exception, tb_string: str, path: str
+    ) -> None:
         logging.error(
             "Unhandled exception [%s] at %s: %s\n%s",
             error_id,
@@ -74,14 +77,18 @@ class SeqErrorTracker:
     def __init__(self, seq_url: str = "http://seq:5341") -> None:
         self.ingestion_endpoint = f"{seq_url.rstrip('/')}/api/events/raw"
 
-    def log_error(self, error_id: str, exc: Exception, tb_string: str, path: str) -> None:
+    def log_error(
+        self, error_id: str, exc: Exception, tb_string: str, path: str
+    ) -> None:
         # Always write locally first – guaranteed capture regardless of Seq state.
         logging.error("Unhandled exception [%s] at %s: %s", error_id, path, exc)
 
         payload = {
             "Events": [
                 {
-                    "Timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "Timestamp": datetime.datetime.now(
+                        datetime.timezone.utc
+                    ).isoformat(),
                     "Level": "Fatal",
                     "MessageTemplate": "Unhandled exception at {Path}. ErrorId: {ErrorId}",
                     "Properties": {
@@ -116,6 +123,7 @@ class SeqErrorTracker:
 # --------------------------------------------------------------------------- #
 # Factory
 # --------------------------------------------------------------------------- #
+
 
 class ErrorTrackerFactory:
     """

@@ -4,7 +4,8 @@ One row per browser/device that has granted push permission.
 """
 
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, DateTime, Text
+
+from sqlalchemy import Column, DateTime, Integer, String, Text
 
 from app.core.database import Base
 

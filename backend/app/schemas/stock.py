@@ -2,13 +2,15 @@
 Stock Pydantic schemas.
 """
 
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
 from datetime import date
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
 class MonitoredStockResponse(BaseModel):
     """Schema for monitored stock API responses."""
+
     id: int
     ticker: str
     company_name: Optional[str]

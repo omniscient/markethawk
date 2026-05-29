@@ -18,23 +18,27 @@ import type { TradingStrategy, AutoTradeOrder } from '../../api/trading';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant, intentionally co-located
 export const SESSION_OPTIONS = [
   { id: 'pre', label: 'Pre-Market' },
   { id: 'regular', label: 'Regular' },
   { id: 'post', label: 'After-Hours' },
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant, intentionally co-located
 export const DIRECTION_OPTIONS = [
   { id: 'long_only', label: 'Long Only' },
   { id: 'short_only', label: 'Short Only' },
   { id: 'both', label: 'Both' },
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant, intentionally co-located
 export const ENTRY_TYPES = [
   { id: 'market', label: 'Market' },
   { id: 'limit', label: 'Limit' },
 ];
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant, intentionally co-located
 export const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   pending_approval: { label: 'Needs Approval', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20', icon: Clock },
   pending:          { label: 'Pending',         color: 'text-blue-400 bg-blue-400/10 border-blue-400/20',     icon: Clock },
@@ -46,6 +50,7 @@ export const STATUS_CONFIG: Record<string, { label: string; color: string; icon:
   error:            { label: 'Error',            color: 'text-red-400 bg-red-400/10 border-red-400/20',        icon: AlertTriangle },
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant, intentionally co-located
 export const DEFAULT_STRATEGY: Partial<TradingStrategy> = {
   name: '',
   description: '',
@@ -67,12 +72,15 @@ export const DEFAULT_STRATEGY: Partial<TradingStrategy> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant, intentionally co-located
 export const fmt = (n: number | null | undefined, decimals = 2, prefix = '') =>
   n == null ? '—' : `${prefix}${n.toFixed(decimals)}`;
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant, intentionally co-located
 export const fmtUSD = (n: number | null | undefined) =>
   n == null ? '—' : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant, intentionally co-located
 export function pnlColor(n: number | null | undefined) {
   if (n == null) return 'text-gray-400';
   return n >= 0 ? 'text-green-400' : 'text-red-400';

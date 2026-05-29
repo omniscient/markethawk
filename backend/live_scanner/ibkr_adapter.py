@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 
 HISTORY_DURATION = "10 D"
 MAX_CONNECT_RETRIES = 10
-RECONNECT_BASE_DELAY = 5   # seconds; doubles per attempt, capped at 60 s
+RECONNECT_BASE_DELAY = 5  # seconds; doubles per attempt, capped at 60 s
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────
+
 
 def _valid_price(p) -> bool:
     """True if p is a usable price (not None / NaN / zero / negative)."""
@@ -99,13 +100,14 @@ async def _connect_ib(ib: IB, host: str, port: int, client_id: int) -> bool:
                 return True
 
             reason = (
-                f"error {_errors[-1]}" if _errors
+                f"error {_errors[-1]}"
+                if _errors
                 else "unknown (clientId may be in use)"
             )
             raise ConnectionError(f"Connection rejected — {reason}")
 
         except Exception as e:
-            delay = min(RECONNECT_BASE_DELAY * (2 ** attempt), 60)
+            delay = min(RECONNECT_BASE_DELAY * (2**attempt), 60)
             logger.warning(
                 f"Connection attempt {attempt + 1}/{MAX_CONNECT_RETRIES} failed: {e}. "
                 f"Retrying in {delay}s…"
@@ -117,6 +119,7 @@ async def _connect_ib(ib: IB, host: str, port: int, client_id: int) -> bool:
 
 
 # ── Public factory ─────────────────────────────────────────────────────────
+
 
 async def create_adapter(
     host: str, port: int, client_id: int
@@ -136,6 +139,7 @@ async def create_adapter(
 
 
 # ── Adapter ────────────────────────────────────────────────────────────────
+
 
 class IBKRLiveAdapter:
     """
@@ -166,7 +170,9 @@ class IBKRLiveAdapter:
         on_quote: QuoteCallback,
     ) -> None:
         if not self._ib.isConnected():
-            logger.warning(f"IBKRLiveAdapter: not connected — cannot subscribe {symbol}")
+            logger.warning(
+                f"IBKRLiveAdapter: not connected — cannot subscribe {symbol}"
+            )
             return
 
         contract = _build_contract(symbol, security_type, exchange)
@@ -199,12 +205,15 @@ class IBKRLiveAdapter:
             _last_price[0] = last
             asyncio.get_event_loop().call_soon_threadsafe(
                 asyncio.ensure_future,
-                on_quote(symbol, {
-                    "last": last,
-                    "bid":  ticker.bid if _valid_price(ticker.bid) else None,
-                    "ask":  ticker.ask if _valid_price(ticker.ask) else None,
-                    "time": int(datetime.now(timezone.utc).timestamp()),
-                }),
+                on_quote(
+                    symbol,
+                    {
+                        "last": last,
+                        "bid": ticker.bid if _valid_price(ticker.bid) else None,
+                        "ask": ticker.ask if _valid_price(ticker.ask) else None,
+                        "time": int(datetime.now(timezone.utc).timestamp()),
+                    },
+                ),
             )
 
         ticker = self._ib.reqMktData(
@@ -213,7 +222,9 @@ class IBKRLiveAdapter:
         ticker.updateEvent += _on_ticker
         self._mkt_subs[symbol] = ticker
 
-        logger.info(f"IBKRLiveAdapter: real-time bars + market data active for {symbol}")
+        logger.info(
+            f"IBKRLiveAdapter: real-time bars + market data active for {symbol}"
+        )
 
     async def unsubscribe(self, symbol: str) -> None:
         bar_list = self._bar_subs.pop(symbol, None)

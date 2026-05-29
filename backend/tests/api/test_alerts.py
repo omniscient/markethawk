@@ -4,11 +4,11 @@ Runs against a real Postgres DB (via testcontainers).
 """
 
 import pytest
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.main import app
-from tests.fixtures.alerts import seed_alert_rules, seed_alert_delivery_logs
+from tests.fixtures.alerts import seed_alert_delivery_logs, seed_alert_rules
 
 client = TestClient(app)
 
@@ -23,7 +23,13 @@ def test_stats_returns_correct_shape(db: Session):
 
     assert response.status_code == 200
     data = response.json()
-    for field in ("active_rules", "total_rules", "triggered_today", "delivery_rate", "push_subscriptions"):
+    for field in (
+        "active_rules",
+        "total_rules",
+        "triggered_today",
+        "delivery_rate",
+        "push_subscriptions",
+    ):
         assert field in data, f"Missing field: {field}"
 
 
@@ -88,8 +94,15 @@ def test_list_rules_response_shape(db: Session):
     assert response.status_code == 200
     rule = response.json()[0]
     for field in (
-        "id", "name", "is_active", "scanner_types", "severity_filter",
-        "cooldown_minutes", "channels", "channel_config", "auto_trade",
+        "id",
+        "name",
+        "is_active",
+        "scanner_types",
+        "severity_filter",
+        "cooldown_minutes",
+        "channels",
+        "channel_config",
+        "auto_trade",
         "created_at",
     ):
         assert field in rule, f"Missing field: {field}"
@@ -163,7 +176,9 @@ def test_update_rule_name(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id
 
-    response = client.patch(f"/api/alerts/rules/{rule_id}", json={"name": "Renamed Rule"})
+    response = client.patch(
+        f"/api/alerts/rules/{rule_id}", json={"name": "Renamed Rule"}
+    )
 
     assert response.status_code == 200
     assert response.json()["name"] == "Renamed Rule"
@@ -186,7 +201,10 @@ def test_update_rule_channels(db: Session):
 
     response = client.patch(
         f"/api/alerts/rules/{rule_id}",
-        json={"channels": ["webhook"], "channel_config": {"webhook_url": "https://example.com/hook"}},
+        json={
+            "channels": ["webhook"],
+            "channel_config": {"webhook_url": "https://example.com/hook"},
+        },
     )
 
     assert response.status_code == 200
@@ -263,7 +281,15 @@ def test_list_logs_response_shape(db: Session):
 
     assert response.status_code == 200
     log = response.json()[0]
-    for field in ("id", "rule_id", "ticker", "scanner_type", "channel", "status", "delivered_at"):
+    for field in (
+        "id",
+        "rule_id",
+        "ticker",
+        "scanner_type",
+        "channel",
+        "status",
+        "delivered_at",
+    ):
         assert field in log, f"Missing field: {field}"
 
 

@@ -1,14 +1,14 @@
 """Trading session classification utilities."""
 
-from datetime import datetime, date, timezone
+from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 
 _ET = ZoneInfo("America/New_York")
 
 _SESSIONS = [
-    ("pre",     4 * 60,       9 * 60 + 30),
-    ("regular", 9 * 60 + 30,  16 * 60),
-    ("post",    16 * 60,       20 * 60),
+    ("pre", 4 * 60, 9 * 60 + 30),
+    ("regular", 9 * 60 + 30, 16 * 60),
+    ("post", 16 * 60, 20 * 60),
 ]
 
 

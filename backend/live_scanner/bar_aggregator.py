@@ -10,14 +10,14 @@ from datetime import datetime, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from app.utils.session import session_for_ts, session_total_minutes
+from app.utils.session import session_for_ts, session_total_minutes  # noqa: F401
 
 ET = ZoneInfo("America/New_York")
 
 
 @dataclass
 class MinuteBar:
-    minute_ts: datetime       # start of the minute (UTC)
+    minute_ts: datetime  # start of the minute (UTC)
     symbol: str
     open: float
     high: float
@@ -25,10 +25,10 @@ class MinuteBar:
     close: float
     volume: int
     vwap: float
-    bar_count: int            # number of 5s bars aggregated into this minute
+    bar_count: int  # number of 5s bars aggregated into this minute
     session: str
-    session_volume: int       # cumulative volume since session start
-    minutes_elapsed: float    # minutes into the current session (≥ 1)
+    session_volume: int  # cumulative volume since session start
+    minutes_elapsed: float  # minutes into the current session (≥ 1)
     prior_close: float
     avg_daily_volume: float
 
@@ -50,7 +50,7 @@ class BarAggregator:
         self._current_session = "closed"
         self._open = self._high = self._low = self._close = 0.0
         self._volume = 0
-        self._vwap_sum = 0.0   # Σ(wap * volume) for computing bar VWAP
+        self._vwap_sum = 0.0  # Σ(wap * volume) for computing bar VWAP
         self._bar_count = 0
 
         self._session_volume = 0
@@ -126,16 +126,13 @@ class BarAggregator:
     def _emit_bar(self) -> MinuteBar:
         if self._session_start_minute and self._current_minute_ts:
             minutes_elapsed = (
-                (self._current_minute_ts - self._session_start_minute).total_seconds() / 60.0
+                (self._current_minute_ts - self._session_start_minute).total_seconds()
+                / 60.0
             ) + 1.0
         else:
             minutes_elapsed = 1.0
 
-        vwap = (
-            self._vwap_sum / self._volume
-            if self._volume > 0
-            else self._close
-        )
+        vwap = self._vwap_sum / self._volume if self._volume > 0 else self._close
 
         return MinuteBar(
             minute_ts=self._current_minute_ts,

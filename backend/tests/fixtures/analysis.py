@@ -1,11 +1,12 @@
 """
 Seed helpers for signal analysis tests.
 """
+
 from datetime import datetime, timezone
-from sqlalchemy.orm import Session
 
 from app.models.signal_analysis_run import SignalAnalysisRun
 from app.models.signal_cluster import SignalCluster
+from sqlalchemy.orm import Session
 
 
 def seed_completed_analysis_run(db: Session) -> SignalAnalysisRun:
@@ -20,8 +21,18 @@ def seed_completed_analysis_run(db: Session) -> SignalAnalysisRun:
             "spearman": [[0.14, 0.19], [0.24, 0.31]],
         },
         feature_weights=[
-            {"feature": "relative_volume", "interval": "1h", "shap_importance": 0.034, "rank": 1},
-            {"feature": "gap_pct", "interval": "eod", "shap_importance": 0.028, "rank": 2},
+            {
+                "feature": "relative_volume",
+                "interval": "1h",
+                "shap_importance": 0.034,
+                "rank": 1,
+            },
+            {
+                "feature": "gap_pct",
+                "interval": "eod",
+                "shap_importance": 0.028,
+                "rank": 2,
+            },
         ],
         completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )

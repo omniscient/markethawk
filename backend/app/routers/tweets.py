@@ -4,20 +4,20 @@ Tweets router — WebSocket feed + REST endpoint for TweetSignal data.
 WebSocket: /api/tweets/feed  — streams all new tweet signals from Redis pub/sub
 REST:      GET /api/tweets/recent  — returns recent tweet signals from DB
 """
+
 import asyncio
-import json
 import logging
 from typing import Optional
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
-from app.core.rate_limits import limiter
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.models.tweet_signal import TweetSignal
+from app.core.rate_limits import limiter
 from app.models.monitored_account import MonitoredAccount
+from app.models.tweet_signal import TweetSignal
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,9 @@ async def tweet_feed_websocket(websocket: WebSocket):
 
     try:
         while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=1.0
+            )
             if message:
                 await websocket.send_text(message["data"])
             await asyncio.sleep(0.01)

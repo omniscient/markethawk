@@ -1,11 +1,11 @@
 import asyncio
-import pytest
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-from app.services.scanner import ScannerService
+import pytest
 from app.models.stock_aggregate import StockAggregate
 from app.models.system_config import SystemConfig
+from app.services.scanner import ScannerService
 
 
 def _make_daily_bar(ticker, timestamp_utc, close, volume=1_000_000):
@@ -41,12 +41,25 @@ def _make_pm_bar(ticker, timestamp_utc, close=100.0):
 
 
 PHASE_2A_FEATURE_KEYS = [
-    "es_pct_from_prev_close", "nq_pct_from_prev_close", "market_context",
-    "sector", "sector_etf", "sector_etf_pct_change",
-    "minutes_since_premarket_open", "day_of_week", "is_monday", "is_friday",
-    "atr_percentile_rank", "volatility_regime",
-    "has_news_catalyst", "catalyst_tag_count", "catalyst_recency_hours",
-    "price_direction", "price_confidence", "price_forecast_4h", "price_forecast_1d",
+    "es_pct_from_prev_close",
+    "nq_pct_from_prev_close",
+    "market_context",
+    "sector",
+    "sector_etf",
+    "sector_etf_pct_change",
+    "minutes_since_premarket_open",
+    "day_of_week",
+    "is_monday",
+    "is_friday",
+    "atr_percentile_rank",
+    "volatility_regime",
+    "has_news_catalyst",
+    "catalyst_tag_count",
+    "catalyst_recency_hours",
+    "price_direction",
+    "price_confidence",
+    "price_forecast_4h",
+    "price_forecast_1d",
 ]
 
 
@@ -99,7 +112,22 @@ def test_run_pre_market_scan_indicators_contain_all_feature_keys():
         "nq_pct_from_prev_close": 0.2,
         "market_context": "risk_on",
     }
-    etf_pcts = {s: None for s in ["XLK", "XLF", "XLV", "XLY", "XLP", "XLE", "XLI", "XLB", "XLRE", "XLU", "XLC"]}
+    etf_pcts = {
+        s: None
+        for s in [
+            "XLK",
+            "XLF",
+            "XLV",
+            "XLY",
+            "XLP",
+            "XLE",
+            "XLI",
+            "XLB",
+            "XLRE",
+            "XLU",
+            "XLC",
+        ]
+    }
     etf_pcts["XLK"] = 0.4
 
     saved_indicators = {}
@@ -108,14 +136,28 @@ def test_run_pre_market_scan_indicators_contain_all_feature_keys():
         saved_indicators.update(kwargs.get("indicators", {}))
         return {"id": 1}
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data',
-                      return_value=(batch_enrichment, market_ctx, etf_pcts)), \
-         patch.object(ScannerService, 'calculate_day_metrics', return_value={
-             "closing_price": 106.0, "pre_market_close": 105.0,
-             "opening_price": 101.0, "regular_high": 107.0, "regular_low": 99.0,
-         }), \
-         patch.object(ScannerService, '_save_event', side_effect=capture_save):
-        asyncio.run(ScannerService.run_pre_market_scan([ticker], db, event_date=event_date))
+    with (
+        patch.object(
+            ScannerService,
+            "_get_batch_enrichment_data",
+            return_value=(batch_enrichment, market_ctx, etf_pcts),
+        ),
+        patch.object(
+            ScannerService,
+            "calculate_day_metrics",
+            return_value={
+                "closing_price": 106.0,
+                "pre_market_close": 105.0,
+                "opening_price": 101.0,
+                "regular_high": 107.0,
+                "regular_low": 99.0,
+            },
+        ),
+        patch.object(ScannerService, "_save_event", side_effect=capture_save),
+    ):
+        asyncio.run(
+            ScannerService.run_pre_market_scan([ticker], db, event_date=event_date)
+        )
 
     assert saved_indicators, "_save_event was never called — signal not detected"
 
@@ -128,10 +170,12 @@ def test_run_pre_market_scan_indicators_contain_all_feature_keys():
     assert saved_indicators["sector"] == "Technology"
     assert saved_indicators["sector_etf"] == "XLK"
     assert saved_indicators["sector_etf_pct_change"] == 0.4
-    assert saved_indicators["day_of_week"] == 3        # Thursday
+    assert saved_indicators["day_of_week"] == 3  # Thursday
     assert saved_indicators["is_monday"] is False
     assert saved_indicators["is_friday"] is False
-    assert saved_indicators["minutes_since_premarket_open"] == pytest.approx(30.0, abs=1.0)
+    assert saved_indicators["minutes_since_premarket_open"] == pytest.approx(
+        30.0, abs=1.0
+    )
     assert saved_indicators["has_news_catalyst"] is True
     assert saved_indicators["catalyst_tag_count"] == 1
     assert saved_indicators["price_direction"] is None
@@ -147,8 +191,7 @@ def test_run_pre_market_scan_features_null_when_no_pm_bar():
 
     base_utc = datetime(2026, 4, 1, 20, 0, 0)
     daily_bars = [
-        _make_daily_bar(ticker, base_utc + timedelta(days=i), 50.0)
-        for i in range(25)
+        _make_daily_bar(ticker, base_utc + timedelta(days=i), 50.0) for i in range(25)
     ]
 
     db = MagicMock()
@@ -173,9 +216,12 @@ def test_run_pre_market_scan_features_null_when_no_pm_bar():
 
     batch_enrichment = {
         "SPARSE": {
-            "market_cap": None, "outstanding_shares": None,
-            "recent_split_date": None, "catalyst_tags": [],
-            "catalyst_summary": None, "catalyst_latest_utc": None,
+            "market_cap": None,
+            "outstanding_shares": None,
+            "recent_split_date": None,
+            "catalyst_tags": [],
+            "catalyst_summary": None,
+            "catalyst_latest_utc": None,
             "sector": None,
         }
     }
@@ -186,14 +232,28 @@ def test_run_pre_market_scan_features_null_when_no_pm_bar():
         saved_indicators.update(kwargs.get("indicators", {}))
         return {"id": 2}
 
-    with patch.object(ScannerService, '_get_batch_enrichment_data',
-                      return_value=(batch_enrichment, {}, {})), \
-         patch.object(ScannerService, 'calculate_day_metrics', return_value={
-             "closing_price": 52.0, "pre_market_close": 51.0,
-             "opening_price": 51.0, "regular_high": 53.0, "regular_low": 49.0,
-         }), \
-         patch.object(ScannerService, '_save_event', side_effect=capture_save):
-        asyncio.run(ScannerService.run_pre_market_scan([ticker], db, event_date=event_date))
+    with (
+        patch.object(
+            ScannerService,
+            "_get_batch_enrichment_data",
+            return_value=(batch_enrichment, {}, {}),
+        ),
+        patch.object(
+            ScannerService,
+            "calculate_day_metrics",
+            return_value={
+                "closing_price": 52.0,
+                "pre_market_close": 51.0,
+                "opening_price": 51.0,
+                "regular_high": 53.0,
+                "regular_low": 49.0,
+            },
+        ),
+        patch.object(ScannerService, "_save_event", side_effect=capture_save),
+    ):
+        asyncio.run(
+            ScannerService.run_pre_market_scan([ticker], db, event_date=event_date)
+        )
 
     if saved_indicators:
         assert saved_indicators["minutes_since_premarket_open"] is None

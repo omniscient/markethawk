@@ -1,6 +1,7 @@
 # backend/tests/tasks/test_slippage.py
 from decimal import Decimal
 from unittest.mock import ANY, MagicMock, patch
+
 import app.tasks.trading as tasks_module
 
 
@@ -73,5 +74,3 @@ class TestCheckEntrySlippage:
         mock_fill, db, _ = self._run(order, 99.0)
         mock_fill.assert_not_called()
         assert order.status == "rejected"
-
-

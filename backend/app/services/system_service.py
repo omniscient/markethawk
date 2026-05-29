@@ -3,12 +3,12 @@
 import json
 import socket
 import zoneinfo
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import redis.asyncio as aioredis
-from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 logger = __import__("logging").getLogger(__name__)
 
@@ -21,18 +21,17 @@ def _now_et() -> datetime:
 
 
 class SystemService:
-
     @staticmethod
     def get_market_status() -> str:
         now_et = _now_et()
         if now_et.weekday() >= 5:
             return "closed"
         t = now_et.hour * 60 + now_et.minute
-        if 240 <= t < 570:    # 04:00–09:30
+        if 240 <= t < 570:  # 04:00–09:30
             return "pre_market"
-        if 570 <= t < 960:    # 09:30–16:00
+        if 570 <= t < 960:  # 09:30–16:00
             return "open"
-        if 960 <= t < 1200:   # 16:00–20:00
+        if 960 <= t < 1200:  # 16:00–20:00
             return "post_market"
         return "closed"
 
@@ -57,7 +56,12 @@ class SystemService:
     def get_storage_stats(db: Session) -> dict[str, Any]:
         table_groups = {
             "scanner": ["volume_events", "scanner_runs"],
-            "historical": ["stock_aggregates", "stock_metrics", "ticker_references", "news_articles"],
+            "historical": [
+                "stock_aggregates",
+                "stock_metrics",
+                "ticker_references",
+                "news_articles",
+            ],
             "settings": ["news_preferences", "scanner_configs"],
         }
         results: dict[str, Any] = {
@@ -83,19 +87,26 @@ class SystemService:
                 for group_name, tables in table_groups.items():
                     group_size = sum(table_sizes.get(t, 0) for t in tables)
                     results[group_name]["bytes"] = group_size
-                    results[group_name]["formatted"] = SystemService.format_bytes(group_size)
+                    results[group_name]["formatted"] = SystemService.format_bytes(
+                        group_size
+                    )
                     results["total"]["bytes"] += group_size
             elif dialect == "sqlite":
                 import os
+
                 db_url = str(db.bind.url)
                 db_path = db_url.replace("sqlite:///", "")
                 total_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
                 results["historical"]["bytes"] = total_size
-                results["historical"]["formatted"] = f"{SystemService.format_bytes(total_size)} (SQLite)"
+                results["historical"]["formatted"] = (
+                    f"{SystemService.format_bytes(total_size)} (SQLite)"
+                )
                 results["total"]["bytes"] = total_size
             else:
                 results["total"]["formatted"] = f"Unknown DB ({dialect})"
-            results["total"]["formatted"] = SystemService.format_bytes(results["total"]["bytes"])
+            results["total"]["formatted"] = SystemService.format_bytes(
+                results["total"]["bytes"]
+            )
         except Exception as exc:
             logger.error(f"Error fetching storage stats: {exc}", exc_info=True)
             return {
@@ -112,9 +123,10 @@ class SystemService:
         db: Session,
     ) -> list[dict]:
         from celery.result import AsyncResult
+
         from app.core.celery_app import celery_app
-        from app.models.universe_quality_report import UniverseQualityReport
         from app.models.stock_universe import StockUniverse
+        from app.models.universe_quality_report import UniverseQualityReport
 
         active_tasks: list[dict] = []
 
@@ -122,7 +134,9 @@ class SystemService:
             keys: list[str] = []
             cursor = "0"
             while True:
-                cursor, batch = await redis_client.scan(cursor=cursor, match=pattern, count=100)
+                cursor, batch = await redis_client.scan(
+                    cursor=cursor, match=pattern, count=100
+                )
                 keys.extend(batch)
                 if str(cursor) == "0":
                     break
@@ -141,7 +155,8 @@ class SystemService:
         def _has_pending_tasks(data: dict) -> bool:
             tids = data.get("task_ids") or []
             return any(
-                AsyncResult(tid, app=celery_app).state in ("PENDING", "STARTED", "RETRY")
+                AsyncResult(tid, app=celery_app).state
+                in ("PENDING", "STARTED", "RETRY")
                 for tid in tids
             )
 
@@ -163,12 +178,14 @@ class SystemService:
                 continue
             universe = db.query(StockUniverse).filter(StockUniverse.id == uid).first()
             name = universe.name if universe else f"Universe {uid}"
-            active_tasks.append({
-                "id": f"sync_{uid}",
-                "type": "sync",
-                "title": f"Syncing Data: {name}",
-                "status": "running",
-            })
+            active_tasks.append(
+                {
+                    "id": f"sync_{uid}",
+                    "type": "sync",
+                    "title": f"Syncing Data: {name}",
+                    "status": "running",
+                }
+            )
 
         # ticker:*:sync
         for key in await _scan_pattern("ticker:*:sync"):
@@ -186,12 +203,14 @@ class SystemService:
             if not _has_pending_tasks(data):
                 await redis_client.delete(key)
                 continue
-            active_tasks.append({
-                "id": f"sync_ticker_{ticker}",
-                "type": "sync",
-                "title": f"Syncing Data: {ticker}",
-                "status": "running",
-            })
+            active_tasks.append(
+                {
+                    "id": f"sync_ticker_{ticker}",
+                    "type": "sync",
+                    "title": f"Syncing Data: {ticker}",
+                    "status": "running",
+                }
+            )
 
         # scan:*:range
         for key in await _scan_pattern("scan:*:range"):
@@ -207,12 +226,14 @@ class SystemService:
             if not _has_pending_tasks(data):
                 await redis_client.delete(key)
                 continue
-            active_tasks.append({
-                "id": f"scan_{ticker_name}",
-                "type": "scan",
-                "title": f"Range Scan: {ticker_name}",
-                "status": "running",
-            })
+            active_tasks.append(
+                {
+                    "id": f"scan_{ticker_name}",
+                    "type": "scan",
+                    "title": f"Range Scan: {ticker_name}",
+                    "status": "running",
+                }
+            )
 
         # universe:*:scan:*
         for key in await _scan_pattern("universe:*:scan:*"):
@@ -235,24 +256,34 @@ class SystemService:
             universe_name = universe.name if universe else f"Universe {uid}"
             day_idx = data.get("day_index", 0) if isinstance(data, dict) else 0
             total_days = data.get("total_days", 0) if isinstance(data, dict) else 0
-            active_tasks.append({
-                "id": f"scan_{uid}_{scanner_type}",
-                "type": "scan",
-                "title": (
-                    f"Scanning {universe_name}: {scanner_type.replace('_', ' ')}"
-                    + (f" — day {day_idx}/{total_days}" if total_days else "")
-                ),
-                "status": "running",
-            })
+            active_tasks.append(
+                {
+                    "id": f"scan_{uid}_{scanner_type}",
+                    "type": "scan",
+                    "title": (
+                        f"Scanning {universe_name}: {scanner_type.replace('_', ' ')}"
+                        + (f" — day {day_idx}/{total_days}" if total_days else "")
+                    ),
+                    "status": "running",
+                }
+            )
 
         # DB: quality + normalization tasks
-        stale_cutoff = (
-            datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=4)
+        stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+            hours=4
         )
-        quality_reports = db.query(UniverseQualityReport).filter(
-            (UniverseQualityReport.status.in_(["pending", "running"])) |
-            (UniverseQualityReport.normalization_status.in_(["pending", "running"]))
-        ).all()
+        quality_reports = (
+            db.query(UniverseQualityReport)
+            .filter(
+                (UniverseQualityReport.status.in_(["pending", "running"]))
+                | (
+                    UniverseQualityReport.normalization_status.in_(
+                        ["pending", "running"]
+                    )
+                )
+            )
+            .all()
+        )
 
         for report in quality_reports:
             is_stale = report.started_at and report.started_at < stale_cutoff
@@ -264,23 +295,29 @@ class SystemService:
                 db.add(report)
                 db.commit()
                 continue
-            universe = db.query(StockUniverse).filter(
-                StockUniverse.id == report.universe_id
-            ).first()
+            universe = (
+                db.query(StockUniverse)
+                .filter(StockUniverse.id == report.universe_id)
+                .first()
+            )
             name = universe.name if universe else f"Universe {report.universe_id}"
             if report.status in ("pending", "running"):
-                active_tasks.append({
-                    "id": f"qa_{report.universe_id}",
-                    "type": "analysis",
-                    "title": f"Quality Analysis: {name}",
-                    "status": report.status,
-                })
+                active_tasks.append(
+                    {
+                        "id": f"qa_{report.universe_id}",
+                        "type": "analysis",
+                        "title": f"Quality Analysis: {name}",
+                        "status": report.status,
+                    }
+                )
             if report.normalization_status in ("pending", "running"):
-                active_tasks.append({
-                    "id": f"norm_{report.universe_id}",
-                    "type": "normalization",
-                    "title": f"Normalizing Data: {name}",
-                    "status": report.normalization_status,
-                })
+                active_tasks.append(
+                    {
+                        "id": f"norm_{report.universe_id}",
+                        "type": "normalization",
+                        "title": f"Normalizing Data: {name}",
+                        "status": report.normalization_status,
+                    }
+                )
 
         return active_tasks

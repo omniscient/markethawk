@@ -27,6 +27,7 @@ export const useScanTask = (
   const [state, setState] = useState<ScanTaskState>(INITIAL_STATE);
   const wsRef = useRef<WebSocket | null>(null);
   const onCompleteRef = useRef(onComplete);
+  // eslint-disable-next-line react-hooks/refs -- writing to ref outside of effect is intentional ref sync pattern
   onCompleteRef.current = onComplete;
 
   useEffect(() => {

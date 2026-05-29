@@ -4,10 +4,10 @@ from datetime import timezone
 from typing import Any, Optional
 
 import sqlalchemy as sa
+from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
-from sqlalchemy import func, distinct
 
-from app.models import ScannerEvent, ScannerRun, MonitoredStock
+from app.models import MonitoredStock, ScannerEvent, ScannerRun
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.signal_review import SignalReview
 from app.models.system_config import SystemConfig
@@ -15,7 +15,6 @@ from app.services.scan_orchestrator import compute_next_run
 
 
 class ScannerQueryService:
-
     @staticmethod
     def get_scan_status_block(
         db: Session,
@@ -26,9 +25,9 @@ class ScannerQueryService:
         if universe_id is not None:
             base_q = base_q.filter(ScannerRun.universe_id == universe_id)
 
-        last_run_record: Optional[ScannerRun] = (
-            base_q.order_by(ScannerRun.created_at.desc()).first()
-        )
+        last_run_record: Optional[ScannerRun] = base_q.order_by(
+            ScannerRun.created_at.desc()
+        ).first()
         last_run_info = None
         if last_run_record is not None:
             ts = last_run_record.created_at
@@ -58,7 +57,9 @@ class ScannerQueryService:
                 "created_at": (
                     r.created_at.replace(tzinfo=timezone.utc).isoformat()
                     if r.created_at and r.created_at.tzinfo is None
-                    else r.created_at.isoformat() if r.created_at else None
+                    else r.created_at.isoformat()
+                    if r.created_at
+                    else None
                 ),
                 "events_detected": r.events_detected or 0,
                 "status": r.status,
@@ -68,7 +69,11 @@ class ScannerQueryService:
 
         type_variants = [scanner_type]
         if scanner_type == "liquidity_hunt":
-            type_variants = ["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]
+            type_variants = [
+                "liquidity_hunt",
+                "liquidity_hunt_pre",
+                "liquidity_hunt_post",
+            ]
 
         event_q = db.query(func.count(ScannerEvent.id)).filter(
             ScannerEvent.scanner_type.in_(type_variants)
@@ -102,9 +107,11 @@ class ScannerQueryService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
     ) -> dict[str, Any]:
-        ranker_version_row = db.query(SystemConfig).filter(
-            SystemConfig.key == "signal_ranker_version"
-        ).first()
+        ranker_version_row = (
+            db.query(SystemConfig)
+            .filter(SystemConfig.key == "signal_ranker_version")
+            .first()
+        )
         version = ranker_version_row.value if ranker_version_row else "unknown"
 
         query = (
@@ -113,7 +120,10 @@ class ScannerQueryService:
                 ScannerOutcomeSummary.eod_pct_change,
                 ScannerOutcomeSummary.follow_through,
             )
-            .join(ScannerOutcomeSummary, ScannerOutcomeSummary.scanner_event_id == ScannerEvent.id)
+            .join(
+                ScannerOutcomeSummary,
+                ScannerOutcomeSummary.scanner_event_id == ScannerEvent.id,
+            )
             .filter(ScannerEvent.signal_quality_score.isnot(None))
         )
         if scanner_type:
@@ -125,14 +135,18 @@ class ScannerQueryService:
 
         rows = query.all()
         buckets: dict[str, dict] = {
-            f"{i/10:.1f}-{(i+1)/10:.1f}": {
-                "count": 0, "eod_sum": 0.0, "ft_sum": 0, "eod_count": 0, "ft_count": 0
+            f"{i / 10:.1f}-{(i + 1) / 10:.1f}": {
+                "count": 0,
+                "eod_sum": 0.0,
+                "ft_sum": 0,
+                "eod_count": 0,
+                "ft_count": 0,
             }
             for i in range(10)
         }
         for score, eod_pct, follow_through in rows:
             idx = min(int(float(score) * 10), 9)
-            label = f"{idx/10:.1f}-{(idx+1)/10:.1f}"
+            label = f"{idx / 10:.1f}-{(idx + 1) / 10:.1f}"
             b = buckets[label]
             b["count"] += 1
             if eod_pct is not None:
@@ -146,8 +160,12 @@ class ScannerQueryService:
             {
                 "decile": label,
                 "count": b["count"],
-                "avg_eod_pct": round(b["eod_sum"] / b["eod_count"], 3) if b["eod_count"] > 0 else None,
-                "follow_through_rate": round(b["ft_sum"] / b["ft_count"], 3) if b["ft_count"] > 0 else None,
+                "avg_eod_pct": round(b["eod_sum"] / b["eod_count"], 3)
+                if b["eod_count"] > 0
+                else None,
+                "follow_through_rate": round(b["ft_sum"] / b["ft_count"], 3)
+                if b["ft_count"] > 0
+                else None,
             }
             for label, b in buckets.items()
         ]
@@ -167,7 +185,11 @@ class ScannerQueryService:
 
         if scanner_type:
             if scanner_type == "liquidity_hunt":
-                variants = ["liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"]
+                variants = [
+                    "liquidity_hunt",
+                    "liquidity_hunt_pre",
+                    "liquidity_hunt_post",
+                ]
                 event_q = event_q.filter(ScannerEvent.scanner_type.in_(variants))
                 review_q = review_q.filter(ScannerEvent.scanner_type.in_(variants))
             else:
@@ -182,13 +204,18 @@ class ScannerQueryService:
 
         total_events = event_q.scalar() or 0
         reviewed_count = (
-            review_q.with_entities(func.count(distinct(SignalReview.scanner_event_id))).scalar() or 0
+            review_q.with_entities(
+                func.count(distinct(SignalReview.scanner_event_id))
+            ).scalar()
+            or 0
         )
 
         confirmed_count = review_q.filter(SignalReview.verdict == "confirmed").count()
         rejected_count = review_q.filter(SignalReview.verdict == "rejected").count()
         denominator = confirmed_count + rejected_count
-        acceptance_rate = round(confirmed_count / denominator, 3) if denominator > 0 else 0.0
+        acceptance_rate = (
+            round(confirmed_count / denominator, 3) if denominator > 0 else 0.0
+        )
 
         by_type_rows = (
             review_q.with_entities(
@@ -203,8 +230,12 @@ class ScannerQueryService:
         for stype, v, cnt in by_type_rows:
             if stype not in type_map:
                 type_map[stype] = {
-                    "scanner_type": stype, "total": 0,
-                    "confirmed": 0, "rejected": 0, "uncertain": 0, "enhanced": 0,
+                    "scanner_type": stype,
+                    "total": 0,
+                    "confirmed": 0,
+                    "rejected": 0,
+                    "uncertain": 0,
+                    "enhanced": 0,
                 }
             type_map[stype]["total"] += cnt
             if v in type_map[stype]:
@@ -224,5 +255,7 @@ class ScannerQueryService:
             "reviewed_count": reviewed_count,
             "acceptance_rate": acceptance_rate,
             "by_scanner_type": list(type_map.values()),
-            "top_rejection_reasons": [{"reason": r, "count": c} for r, c in reason_rows],
+            "top_rejection_reasons": [
+                {"reason": r, "count": c} for r, c in reason_rows
+            ],
         }

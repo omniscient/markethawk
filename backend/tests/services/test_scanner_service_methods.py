@@ -3,24 +3,29 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.services.scanner import ScannerService
 
 
 class TestDefaultScanDate:
     def test_returns_friday_when_today_is_saturday(self):
-        with patch("app.services.scanner.get_market_today", return_value=date(2026, 5, 23)):
+        with patch(
+            "app.services.scanner.get_market_today", return_value=date(2026, 5, 23)
+        ):
             result = ScannerService.default_scan_date()
         assert result == date(2026, 5, 22)
 
     def test_returns_friday_when_today_is_monday(self):
         # Monday — must skip Sunday AND Saturday
-        with patch("app.services.scanner.get_market_today", return_value=date(2026, 5, 25)):
+        with patch(
+            "app.services.scanner.get_market_today", return_value=date(2026, 5, 25)
+        ):
             result = ScannerService.default_scan_date()
         assert result == date(2026, 5, 22)
 
     def test_returns_yesterday_when_today_is_tuesday(self):
-        with patch("app.services.scanner.get_market_today", return_value=date(2026, 5, 26)):
+        with patch(
+            "app.services.scanner.get_market_today", return_value=date(2026, 5, 26)
+        ):
             result = ScannerService.default_scan_date()
         assert result == date(2026, 5, 25)
 
@@ -36,7 +41,11 @@ class TestCheckConcurrency:
         assert result is None
 
     def test_returns_dict_when_key_exists(self):
-        payload = {"scan_id": "abc", "task_ids": ["t1"], "started_at": "2026-05-23T10:00:00Z"}
+        payload = {
+            "scan_id": "abc",
+            "task_ids": ["t1"],
+            "started_at": "2026-05-23T10:00:00Z",
+        }
         mock_r = MagicMock()
         mock_r.get.return_value = json.dumps(payload)
         with patch("redis.Redis.from_url", return_value=mock_r):
@@ -58,7 +67,9 @@ class TestCheckConcurrency:
 
 class TestResolveDateRange:
     def test_defaults_both_to_last_weekday_when_none(self):
-        with patch("app.services.scanner.get_market_today", return_value=date(2026, 5, 26)):
+        with patch(
+            "app.services.scanner.get_market_today", return_value=date(2026, 5, 26)
+        ):
             start, end = ScannerService.resolve_date_range(None, None)
         assert start == date(2026, 5, 25)
         assert end == date(2026, 5, 25)
@@ -69,7 +80,9 @@ class TestResolveDateRange:
         assert end == date(2026, 5, 20)
 
     def test_passthrough_explicit_range(self):
-        start, end = ScannerService.resolve_date_range(date(2026, 5, 20), date(2026, 5, 22))
+        start, end = ScannerService.resolve_date_range(
+            date(2026, 5, 20), date(2026, 5, 22)
+        )
         assert start == date(2026, 5, 20)
         assert end == date(2026, 5, 22)
 

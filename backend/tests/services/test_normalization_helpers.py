@@ -1,14 +1,13 @@
 """
 Tests for normalization module pure helper functions — no DB required.
 """
-from datetime import datetime
 
-import pytest
+from datetime import datetime
 
 from app.services.normalization import _parse_date, _to_date_str
 
-
 # ── _parse_date ───────────────────────────────────────────────────────────────
+
 
 def test_parse_datetime_with_fractional_seconds():
     result = _parse_date("2024-01-15T09:30:00.000000")
@@ -38,6 +37,7 @@ def test_parse_invalid_format_returns_none():
 
 
 # ── _to_date_str ──────────────────────────────────────────────────────────────
+
 
 def test_to_date_str_formats_correctly():
     dt = datetime(2024, 1, 15, 9, 30, 0)

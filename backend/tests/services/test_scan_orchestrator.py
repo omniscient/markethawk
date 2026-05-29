@@ -2,10 +2,9 @@ import asyncio
 from datetime import date
 from unittest.mock import AsyncMock
 
-import pytest
-
 import app.services.scan_orchestrator as orchestrator
-from app.services.scan_orchestrator import ScannerDescriptor, register, get_all, run
+import pytest
+from app.services.scan_orchestrator import ScannerDescriptor, get_all, register, run
 
 
 @pytest.fixture(autouse=True)
@@ -33,7 +32,9 @@ def test_get_all_includes_registered():
 def test_run_dispatches_to_registered_fn():
     expected = [{"ticker": "AAPL", "score": 90}]
     fn = AsyncMock(return_value=expected)
-    register(ScannerDescriptor(key="mock_scan", display_name="Mock", description="m", run=fn))
+    register(
+        ScannerDescriptor(key="mock_scan", display_name="Mock", description="m", run=fn)
+    )
     today = date(2026, 5, 23)
     result = asyncio.run(run("mock_scan", ["AAPL"], db=None, event_date=today))
     assert result == expected
@@ -61,6 +62,7 @@ def test_register_returns_descriptor():
 
 def test_pre_market_scanner_registered():
     import app.services.pre_market_scan  # noqa: F401
+
     assert "pre_market_volume_spike" in orchestrator._REGISTRY
     desc = orchestrator._REGISTRY["pre_market_volume_spike"]
     assert desc.display_name == "Pre-Market Volume Spike"
@@ -69,6 +71,7 @@ def test_pre_market_scanner_registered():
 
 def test_oversold_bounce_scanner_registered():
     import app.services.oversold_bounce_scan  # noqa: F401
+
     assert "oversold_bounce" in orchestrator._REGISTRY
     desc = orchestrator._REGISTRY["oversold_bounce"]
     assert desc.display_name == "Oversold Bounce"
@@ -77,15 +80,16 @@ def test_oversold_bounce_scanner_registered():
 
 def test_liquidity_hunt_variants_registered():
     import app.services.liquidity_hunt  # noqa: F401
+
     for key in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
         assert key in orchestrator._REGISTRY, f"Expected {key!r} in registry"
 
 
 # ── New orchestration functions ────────────────────────────────────────────
 
-import fakeredis
 from unittest.mock import patch
 
+import fakeredis
 from app.services.scan_orchestrator import (
     compute_next_run,
     get_scan_progress,
@@ -99,6 +103,7 @@ def test_compute_next_run_returns_none_for_non_scheduled():
 
 def test_compute_next_run_returns_future_weekday_for_liquidity_hunt():
     from datetime import datetime, timezone
+
     result = compute_next_run("liquidity_hunt")
     assert result is not None
     assert result > datetime.now(timezone.utc)
@@ -117,13 +122,19 @@ def test_compute_next_run_returns_value_for_post_variant():
 
 def test_get_scan_progress_returns_none_when_no_key():
     server = fakeredis.FakeRedis(decode_responses=True)
-    with patch("app.services.scan_orchestrator._redis.Redis.from_url", return_value=server):
-        result = get_scan_progress("redis://localhost", universe_id=1, scanner_type="liquidity_hunt")
+    with patch(
+        "app.services.scan_orchestrator._redis.Redis.from_url", return_value=server
+    ):
+        result = get_scan_progress(
+            "redis://localhost", universe_id=1, scanner_type="liquidity_hunt"
+        )
     assert result is None
 
 
 def test_request_scan_cancel_sets_redis_key():
     server = fakeredis.FakeRedis(decode_responses=True)
-    with patch("app.services.scan_orchestrator._redis.Redis.from_url", return_value=server):
+    with patch(
+        "app.services.scan_orchestrator._redis.Redis.from_url", return_value=server
+    ):
         request_scan_cancel("redis://localhost", "test-scan-uuid")
         assert server.get("scan_cancel:test-scan-uuid") == "1"

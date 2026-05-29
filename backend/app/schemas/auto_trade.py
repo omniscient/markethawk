@@ -1,7 +1,6 @@
 """Pydantic response models for auto-trading, replacing ad-hoc serialiser dicts."""
 
-from datetime import datetime, date
-from decimal import Decimal
+from datetime import date, datetime
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -39,15 +38,25 @@ class TradingStrategyResponse(BaseModel):
             is_active=s.is_active,
             paper_mode=s.paper_mode,
             requires_approval=s.requires_approval,
-            risk_per_trade_pct=float(s.risk_per_trade_pct) if s.risk_per_trade_pct is not None else None,
-            max_position_usd=float(s.max_position_usd) if s.max_position_usd is not None else None,
+            risk_per_trade_pct=float(s.risk_per_trade_pct)
+            if s.risk_per_trade_pct is not None
+            else None,
+            max_position_usd=float(s.max_position_usd)
+            if s.max_position_usd is not None
+            else None,
             max_trades_per_day=s.max_trades_per_day,
             max_concurrent_positions=s.max_concurrent_positions,
             entry_type=s.entry_type,
-            limit_offset_pct=float(s.limit_offset_pct) if s.limit_offset_pct is not None else 0.0,
+            limit_offset_pct=float(s.limit_offset_pct)
+            if s.limit_offset_pct is not None
+            else 0.0,
             stop_pct=float(s.stop_pct) if s.stop_pct is not None else None,
-            risk_reward_ratio=float(s.risk_reward_ratio) if s.risk_reward_ratio is not None else None,
-            max_slippage_pct=float(s.max_slippage_pct) if s.max_slippage_pct is not None else None,
+            risk_reward_ratio=float(s.risk_reward_ratio)
+            if s.risk_reward_ratio is not None
+            else None,
+            max_slippage_pct=float(s.max_slippage_pct)
+            if s.max_slippage_pct is not None
+            else None,
             allowed_sessions=s.allowed_sessions or ["regular"],
             direction=s.direction,
             created_at=s.created_at,
@@ -98,12 +107,22 @@ class AutoTradeOrderResponse(BaseModel):
             event_date=o.event_date,
             status=o.status,
             rejection_reason=o.rejection_reason,
-            trigger_price=float(o.trigger_price) if o.trigger_price is not None else None,
-            entry_price_target=float(o.entry_price_target) if o.entry_price_target is not None else None,
-            calculated_stop=float(o.calculated_stop) if o.calculated_stop is not None else None,
-            calculated_target=float(o.calculated_target) if o.calculated_target is not None else None,
+            trigger_price=float(o.trigger_price)
+            if o.trigger_price is not None
+            else None,
+            entry_price_target=float(o.entry_price_target)
+            if o.entry_price_target is not None
+            else None,
+            calculated_stop=float(o.calculated_stop)
+            if o.calculated_stop is not None
+            else None,
+            calculated_target=float(o.calculated_target)
+            if o.calculated_target is not None
+            else None,
             quantity=o.quantity,
-            risk_amount_usd=float(o.risk_amount_usd) if o.risk_amount_usd is not None else None,
+            risk_amount_usd=float(o.risk_amount_usd)
+            if o.risk_amount_usd is not None
+            else None,
             is_paper=o.is_paper,
             broker_order_id=o.broker_order_id,
             broker_stop_id=o.broker_stop_id,

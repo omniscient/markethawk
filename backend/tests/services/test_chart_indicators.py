@@ -2,8 +2,9 @@
 Tests for ChartIndicatorsService.add_indicators — pure DataFrame transformation,
 no DB or external calls required.
 """
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import pytest
 from app.services.chart_indicators import ChartIndicatorsService
 
@@ -44,7 +45,9 @@ def test_vwap_first_bar_equals_close_times_volume_over_volume():
     df = _make_df(30)
     result = ChartIndicatorsService.add_indicators(df)
     # First bar VWAP = Close[0] * Volume[0] / Volume[0] = Close[0]
-    assert pytest.approx(result["vwap_intraday"].iloc[0], rel=1e-4) == df["Close"].iloc[0]
+    assert (
+        pytest.approx(result["vwap_intraday"].iloc[0], rel=1e-4) == df["Close"].iloc[0]
+    )
 
 
 def test_marker_type_column_present():
@@ -65,8 +68,13 @@ def test_intermediate_columns_dropped():
     df = _make_df(30)
     result = ChartIndicatorsService.add_indicators(df)
     dropped = [
-        "cum_C_V", "TodayVolume", "Vol_MA_5", "fastVolumeAverage",
-        "ATR_1", "swipe", "flush",
+        "cum_C_V",
+        "TodayVolume",
+        "Vol_MA_5",
+        "fastVolumeAverage",
+        "ATR_1",
+        "swipe",
+        "flush",
     ]
     for col in dropped:
         assert col not in result.columns, f"Column {col!r} should have been dropped"

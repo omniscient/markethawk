@@ -4,9 +4,14 @@ from typing import Any, Optional
 from app.services.scan_orchestrator import ScannerDescriptor, register
 
 
-async def _run(tickers: list[str], db: Any, event_date: date, scanner_run: Optional[Any] = None) -> list[dict]:
+async def _run(
+    tickers: list[str], db: Any, event_date: date, scanner_run: Optional[Any] = None
+) -> list[dict]:
     from app.services.scanner import ScannerService
-    return await ScannerService.run_oversold_bounce_scan(tickers, db, event_date=event_date, scanner_run=scanner_run)
+
+    return await ScannerService.run_oversold_bounce_scan(
+        tickers, db, event_date=event_date, scanner_run=scanner_run
+    )
 
 
 register(

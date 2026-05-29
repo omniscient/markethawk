@@ -1,14 +1,18 @@
-import asyncio
-from sqlalchemy.orm import Session
+import uuid
+
 from app.core.database import SessionLocal
 from app.models.scanner_config import ScannerConfig
-import uuid
+
 
 def add_config():
     db = SessionLocal()
     try:
         # Check if exists
-        existing = db.query(ScannerConfig).filter(ScannerConfig.scanner_type == "oversold_bounce").first()
+        existing = (
+            db.query(ScannerConfig)
+            .filter(ScannerConfig.scanner_type == "oversold_bounce")
+            .first()
+        )
         if existing:
             print("Config already exists.")
             return
@@ -24,19 +28,34 @@ def add_config():
                 "rsi_period_long": 5,
                 "long_rsi_trigger": 27,
                 "min_avg_volume_3d": 500000,
-                "min_prev_close": 5.0
+                "min_prev_close": 5.0,
             },
             criteria=[
-                {"name": "Volume Filter", "description": "3-day moving average of volume >= 500k"},
-                {"name": "Price Filter", "description": "Previous day's close >= $5.00"},
-                {"name": "Short RSI (2) Cross", "description": "RSI(2) was < 15 yesterday and is >= 15 today"},
-                {"name": "Long RSI (5) Cross", "description": "RSI(5) was < 27 yesterday and is >= 27 today"},
-                {"name": "No Gap Down", "description": "Today's open is >= yesterday's low"}
+                {
+                    "name": "Volume Filter",
+                    "description": "3-day moving average of volume >= 500k",
+                },
+                {
+                    "name": "Price Filter",
+                    "description": "Previous day's close >= $5.00",
+                },
+                {
+                    "name": "Short RSI (2) Cross",
+                    "description": "RSI(2) was < 15 yesterday and is >= 15 today",
+                },
+                {
+                    "name": "Long RSI (5) Cross",
+                    "description": "RSI(5) was < 27 yesterday and is >= 27 today",
+                },
+                {
+                    "name": "No Gap Down",
+                    "description": "Today's open is >= yesterday's low",
+                },
             ],
             is_active=True,
-            run_frequency="daily"
+            run_frequency="daily",
         )
-        
+
         db.add(config)
         db.commit()
         print("Successfully added oversold_bounce config.")
@@ -45,6 +64,7 @@ def add_config():
         db.rollback()
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     add_config()

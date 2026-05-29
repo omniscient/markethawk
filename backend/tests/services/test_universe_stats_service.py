@@ -17,17 +17,24 @@ def _make_empty_db():
 class TestUniverseStatsServiceExists:
     def test_module_importable(self):
         from app.services.universe_stats import UniverseStatsService
+
         assert callable(UniverseStatsService.compute)
 
     def test_compute_returns_expected_keys(self):
         from app.services.universe_stats import UniverseStatsService
+
         result = UniverseStatsService.compute(universe_id=1, db=_make_empty_db())
         assert set(result.keys()) == {
-            "ticker_count", "aggregate_count", "min_date", "max_date", "timespans"
+            "ticker_count",
+            "aggregate_count",
+            "min_date",
+            "max_date",
+            "timespans",
         }
 
     def test_compute_empty_universe_returns_zeros(self):
         from app.services.universe_stats import UniverseStatsService
+
         result = UniverseStatsService.compute(universe_id=1, db=_make_empty_db())
         assert result["ticker_count"] == 0
         assert result["aggregate_count"] == 0

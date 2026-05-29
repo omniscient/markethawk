@@ -1,29 +1,37 @@
 """
 News Preference schemas for API requests and responses.
 """
-from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict
+
 
 class NewsPreferenceBase(BaseModel):
     tracked_tickers: List[str] = []
     tracked_universes: List[int] = []
     refresh_interval_minutes: Optional[int] = 5
 
+
 class NewsPreferenceCreate(NewsPreferenceBase):
     pass
 
+
 class NewsPreferenceUpdate(NewsPreferenceBase):
     pass
+
 
 class NewsPreferenceResponse(NewsPreferenceBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
 
-from typing import Optional
+
+from typing import Optional  # noqa: E402
+
 
 class NewsArticleResponse(BaseModel):
     id: int

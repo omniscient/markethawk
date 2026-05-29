@@ -2,8 +2,8 @@
 Active Watchlist Pydantic schemas.
 """
 
-from typing import Literal, Optional
 from datetime import datetime
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 

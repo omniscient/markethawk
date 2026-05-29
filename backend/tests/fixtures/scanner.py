@@ -4,14 +4,13 @@ Each function inserts rows and flushes; the caller's transaction provides rollba
 """
 
 from datetime import timedelta
-from sqlalchemy.orm import Session
-from app.models import ScannerRun, ScannerEvent
+
+from app.models import ScannerEvent, ScannerRun
 from app.utils.session import get_market_today
+from sqlalchemy.orm import Session
 
 
-def seed_scanner_runs(
-    db: Session, universe_id: int | None = None
-) -> list[ScannerRun]:
+def seed_scanner_runs(db: Session, universe_id: int | None = None) -> list[ScannerRun]:
     specs = [
         ("pre_market_volume_spike", "completed", 12, 4),
         ("liquidity_hunt", "completed", 10, 6),
@@ -69,7 +68,10 @@ def seed_scanner_events(
             scanner_type=scanner_type,
             summary=f"{ticker} triggered {scanner_type}",
             severity="medium",
-            indicators={"volume_spike_ratio": 5.0 + i * 0.5, "pre_market_volume": 400000 + i * 10000},
+            indicators={
+                "volume_spike_ratio": 5.0 + i * 0.5,
+                "pre_market_volume": 400000 + i * 10000,
+            },
             criteria_met={"volume_threshold": True, "price_gap": i % 2 == 0},
             metadata_={},
         )
