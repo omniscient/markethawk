@@ -42,6 +42,7 @@ from app.routers import (
     watchlist_router,
 )
 from app.routers.tweets import router as tweets_router
+from app.core.tracing import OtelTraceIdFilter, instrument_fastapi, setup_otel
 from app.services.websocket_manager import websocket_manager
 
 # Celery Configuration
@@ -146,6 +147,7 @@ def create_app() -> FastAPI:
         level=getattr(logging, settings.LOG_LEVEL),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
+    logging.getLogger().addFilter(OtelTraceIdFilter())
 
     # Centralized SQL Logging
     # Centralized SQL Logging
@@ -218,6 +220,13 @@ def create_app() -> FastAPI:
         version=settings.APP_VERSION,
         lifespan=lifespan,
     )
+
+    setup_otel(
+        endpoint=settings.OTEL_EXPORTER_OTLP_ENDPOINT,
+        service_name=settings.OTEL_SERVICE_NAME,
+        engine=engine,
+    )
+    instrument_fastapi(app)
 
     EXEMPT_PREFIXES = (
         "/api/auth/",
