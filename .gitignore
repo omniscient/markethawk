@@ -45,6 +45,7 @@ logs/
 
 # Project Specific
 frontend/build.log
+frontend/stats.html
 backend/celerybeat-schedule
 
 # Git worktrees

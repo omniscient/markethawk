@@ -1,25 +1,27 @@
-import { ReactNode } from 'react';
+import { lazy, Suspense, ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Scanner from './pages/Scanner';
-import Universes from './pages/Universes';
-import Alerts from './pages/Alerts';
-import Settings from './pages/Settings';
-import StockDetailPage from './pages/StockDetailPage';
-import Journal from './pages/Journal';
-import EdgeExplorer from './pages/EdgeExplorer';
-import PreMarketMovers from './pages/PreMarketMovers';
-import ActiveWatchlist from './pages/ActiveWatchlist';
-import AutoTrading from './pages/AutoTrading';
-import ScorecardOverview from './pages/ScorecardOverview';
-import ScorecardDetail from './pages/ScorecardDetail';
 import Login from './pages/Login';
+import { PageLoader } from './components/ui/PageLoader';
 import { GlobalErrorToast } from './components/ui/GlobalErrorToast';
 import { apiClient } from './api/client';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Scanner = lazy(() => import('./pages/Scanner'));
+const Universes = lazy(() => import('./pages/Universes'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const Settings = lazy(() => import('./pages/Settings'));
+const StockDetailPage = lazy(() => import('./pages/StockDetailPage'));
+const Journal = lazy(() => import('./pages/Journal'));
+const EdgeExplorer = lazy(() => import('./pages/EdgeExplorer'));
+const PreMarketMovers = lazy(() => import('./pages/PreMarketMovers'));
+const ActiveWatchlist = lazy(() => import('./pages/ActiveWatchlist'));
+const AutoTrading = lazy(() => import('./pages/AutoTrading'));
+const ScorecardOverview = lazy(() => import('./pages/ScorecardOverview'));
+const ScorecardDetail = lazy(() => import('./pages/ScorecardDetail'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,21 +55,23 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/scanner" element={<Scanner />} />
-                      <Route path="/universes" element={<Universes />} />
-                      <Route path="/alerts" element={<Alerts />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="/journal" element={<Journal />} />
-                      <Route path="/edge-explorer" element={<EdgeExplorer />} />
-                      <Route path="/scorecard" element={<ScorecardOverview />} />
-                      <Route path="/scorecard/:scannerType" element={<ScorecardDetail />} />
-                      <Route path="/movers/pre-market" element={<PreMarketMovers />} />
-                      <Route path="/watchlist" element={<ActiveWatchlist />} />
-                      <Route path="/trading" element={<AutoTrading />} />
-                      <Route path="/stock/:ticker" element={<StockDetailPage />} />
-                    </Routes>
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/scanner" element={<Scanner />} />
+                        <Route path="/universes" element={<Universes />} />
+                        <Route path="/alerts" element={<Alerts />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="/journal" element={<Journal />} />
+                        <Route path="/edge-explorer" element={<EdgeExplorer />} />
+                        <Route path="/scorecard" element={<ScorecardOverview />} />
+                        <Route path="/scorecard/:scannerType" element={<ScorecardDetail />} />
+                        <Route path="/movers/pre-market" element={<PreMarketMovers />} />
+                        <Route path="/watchlist" element={<ActiveWatchlist />} />
+                        <Route path="/trading" element={<AutoTrading />} />
+                        <Route path="/stock/:ticker" element={<StockDetailPage />} />
+                      </Routes>
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
