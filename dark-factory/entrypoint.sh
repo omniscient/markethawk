@@ -50,8 +50,8 @@ INTENT=${INTENT:-fix}
 MY_ID=$(cat /proc/self/cgroup 2>/dev/null | grep -oP '[a-f0-9]{64}' | head -1 || hostname)
 RUNNING=$(docker ps --format '{{.ID}} {{.Names}}' 2>/dev/null \
   | grep 'markethawk-dark-factory-run-' \
-  | grep -v "${MY_ID:0:12}" \
-  | wc -l || echo "0")
+  | grep -vc "${MY_ID:0:12}" || true)
+RUNNING=${RUNNING:-0}
 if [ "$RUNNING" -gt 0 ]; then
   echo "ERROR: Another dark factory container is already running. Only one allowed at a time (Claude Max rate limit)." >&2
   echo "       Use 'docker ps --filter name=dark-factory' to see it." >&2
@@ -132,7 +132,7 @@ post_cost_report() {
     local EXISTING_BODY
     EXISTING_BODY=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments/${COMMENT_ID}" \
       --jq '.body' 2>/dev/null || true)
-    PRIOR_RUNS=$(echo "$EXISTING_BODY" | sed -n '/^### Run /,/^---$/p' | head -n -1 || true)
+    PRIOR_RUNS=$(echo "$EXISTING_BODY" | sed -n '/^### Run:/,/^---$/p' | head -n -1 || true)
     # Extract previous grand total from hidden data marker
     PREV_COST=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=\K[0-9.]+' || echo "0")
     PREV_IN=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=[0-9.]+ in=\K[0-9]+' || echo "0")
@@ -145,8 +145,10 @@ post_cost_report() {
   CUM_IN=$(( PREV_IN + TOTAL_IN ))
   CUM_OUT=$(( PREV_OUT + TOTAL_OUT ))
   local RUN_COUNT
-  RUN_COUNT=$(echo "$PRIOR_RUNS" | grep -c '^### Run ' || echo "0")
-  RUN_COUNT=$(( RUN_COUNT + 1 ))
+  # grep -c already prints the count (incl. "0"); the old `|| echo "0"` appended a
+  # SECOND "0" on no-match (grep exits 1), making RUN_COUNT="0\n0" → arithmetic syntax error.
+  RUN_COUNT=$(echo "$PRIOR_RUNS" | grep -c '^### Run:' || true)
+  RUN_COUNT=$(( ${RUN_COUNT:-0} + 1 ))
 
   # Format token counts for display
   fmt_tokens() {
