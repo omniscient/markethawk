@@ -5,6 +5,7 @@ from app.core.config import settings
 
 # Import your models here
 from app.core.database import Base
+import app.models  # noqa: F401 — registers all models with Base.metadata for autogenerate
 from sqlalchemy import engine_from_config, pool
 
 # this is the Alembic Config object, which provides
