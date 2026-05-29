@@ -153,6 +153,28 @@ set_board_status() {
   fi
 }
 
+# --- PR lookup: open PR number for an issue's feature branch ("" if none) ---
+# Matches the branch convention used throughout the workflow: feat/issue-<N>-<slug>.
+# Trailing `|| true` keeps a gh failure from aborting the loop under `set -e` (callers
+# assign the result with $(...), which would otherwise propagate gh's non-zero exit).
+get_pr_for_issue() {
+  gh pr list --search "head:feat/issue-${1}-" --json number --jq '.[0].number // empty' 2>/dev/null || true
+}
+
+# --- CI status: JSON array of definitively-failing checks (bucket == "fail") for a PR ---
+# Robust to gh's non-zero exit on failing/pending checks and to "no checks reported"
+# (gh then prints EMPTY stdout): capture stdout (kept even on non-zero exit), require it
+# to be a real JSON array via `jq -e` (empty/invalid input -> exit 4/2 -> fall back to []),
+# then filter. `jq empty` is NOT enough — it succeeds on empty input (zero JSON values).
+# Do NOT use $(cmd || echo '[]') — on a non-zero exit that appends [] after real JSON.
+failing_checks_for_pr() {
+  local pr_num="$1"
+  local checks
+  checks=$(gh pr checks "$pr_num" --json name,bucket,link 2>/dev/null) || true
+  echo "$checks" | jq -e 'type == "array"' >/dev/null 2>&1 || checks='[]'
+  echo "$checks" | jq -c '[.[] | select(.bucket == "fail")]'
+}
+
 # --- Board state ---
 fetch_board_items() {
   local raw
@@ -399,11 +421,46 @@ This issue was left in **In progress** with no running factory container — the
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
   done < <(echo "$IN_PROGRESS" | jq -c '.[]')
 
+  # --- Priority 0: In Review items with failing CI (gate red PRs out of review) ---
+  # A PR with red CI must not sit in review (a human could approve/merge it). Move it
+  # to Blocked + comment; the branch-aware Blocked retry below then continues the
+  # existing PR branch and re-runs validate (pytest) to fix the failures. Blocking is
+  # cheap (status + comment), so we gate every red ticket this cycle — no DISPATCHED/break.
+  CI_BLOCKED=""   # space-padded list of issues gated this cycle (Priority 1 skips them)
+  while IFS= read -r item; do
+    ISSUE=$(get_issue_number "$item")
+    if has_skip_label "$item"; then continue; fi
+
+    PR_NUM=$(get_pr_for_issue "$ISSUE")
+    [ -z "$PR_NUM" ] && continue
+
+    FAILED=$(failing_checks_for_pr "$PR_NUM")
+    FAIL_COUNT=$(echo "$FAILED" | jq 'length')
+    [ "$FAIL_COUNT" -eq 0 ] && continue
+
+    echo "[$(date -u +%FT%TZ)] ci_gate issue=#${ISSUE} pr=#${PR_NUM} failing=${FAIL_COUNT} action=move_to_blocked"
+    set_board_status "$ISSUE" "$STATUS_BLOCKED"
+
+    FAIL_LIST=$(echo "$FAILED" | jq -r '.[] | "- [\(.name)](\(.link))"')
+    gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "## Dark Factory — CI Failing, Moved to Blocked
+
+PR #${PR_NUM} has failing CI checks, so this ticket has been moved out of **In review** to **Blocked**. The factory will retry automatically, continue the existing PR branch, and attempt to fix the failures.
+
+**Failing checks:**
+${FAIL_LIST}
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+
+    CI_BLOCKED="${CI_BLOCKED} ${ISSUE} "
+  done < <(echo "$IN_REVIEW" | jq -c '.[]')
+
   # --- Priority 1: In Review items with new comments (unblock existing work) ---
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
+    case "$CI_BLOCKED" in *" $ISSUE "*) continue ;; esac   # gated to Blocked this cycle
 
     NEW_COMMENTS=$(get_new_comments "$ISSUE")
     COMMENT_COUNT=$(echo "$NEW_COMMENTS" | jq 'length')
@@ -453,8 +510,16 @@ This issue was left in **In progress** with no running factory container — the
     if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then continue; fi
 
     increment_retry "$ISSUE"
-    dispatch "Fix issue #${ISSUE}"
-    DISPATCHED="Fix issue #${ISSUE}"
+    # Branch-aware: a blocked item that already has a PR (e.g. red CI gated above, or a
+    # continue run that failed mid-way) must be CONTINUED to reuse the existing branch.
+    # Dispatching "Fix" would start a fresh branch that collides with the PR on push.
+    if [ -n "$(get_pr_for_issue "$ISSUE")" ]; then
+      dispatch "Continue issue #${ISSUE}"
+      DISPATCHED="Continue issue #${ISSUE}"
+    else
+      dispatch "Fix issue #${ISSUE}"
+      DISPATCHED="Fix issue #${ISSUE}"
+    fi
   done < <(echo "$BLOCKED" | jq -c '.[]')
 
   # --- Priority 4: Refined items (plan generation — advance refined work before pulling new backlog) ---
