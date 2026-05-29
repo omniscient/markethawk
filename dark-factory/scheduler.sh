@@ -155,10 +155,13 @@ set_board_status() {
 
 # --- PR lookup: open PR number for an issue's feature branch ("" if none) ---
 # Matches the branch convention used throughout the workflow: feat/issue-<N>-<slug>.
-# Trailing `|| true` keeps a gh failure from aborting the loop under `set -e` (callers
-# assign the result with $(...), which would otherwise propagate gh's non-zero exit).
+# `--repo` is REQUIRED: the scheduler runs at /workspace (not a git checkout — the repo
+# is mounted read-only at /workspace/project), so gh cannot infer the repo and a bare
+# `gh pr list` fails with "not a git repository". Trailing `|| true` keeps a gh failure
+# from aborting the loop under `set -e` (callers assign the result with $(...), which
+# would otherwise propagate gh's non-zero exit).
 get_pr_for_issue() {
-  gh pr list --search "head:feat/issue-${1}-" --json number --jq '.[0].number // empty' 2>/dev/null || true
+  gh pr list --repo "${OWNER}/markethawk" --search "head:feat/issue-${1}-" --json number --jq '.[0].number // empty' 2>/dev/null || true
 }
 
 # --- CI status: JSON array of definitively-failing checks (bucket == "fail") for a PR ---
@@ -170,7 +173,8 @@ get_pr_for_issue() {
 failing_checks_for_pr() {
   local pr_num="$1"
   local checks
-  checks=$(gh pr checks "$pr_num" --json name,bucket,link 2>/dev/null) || true
+  # --repo required for the same reason as get_pr_for_issue (scheduler runs outside a checkout).
+  checks=$(gh pr checks "$pr_num" --repo "${OWNER}/markethawk" --json name,bucket,link 2>/dev/null) || true
   echo "$checks" | jq -e 'type == "array"' >/dev/null 2>&1 || checks='[]'
   echo "$checks" | jq -c '[.[] | select(.bucket == "fail")]'
 }
