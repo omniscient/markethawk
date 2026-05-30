@@ -168,7 +168,6 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
-      PADDED=$(printf "%02d" $((ISSUE % 100)))  # slot 00-99 keeps preview ports <= 65535 (3-digit issues would overflow, e.g. #100 -> 110033)
 
       echo "Tearing down mh-preview-${ISSUE}..."
       docker compose -p "mh-preview-${ISSUE}" down -v 2>/dev/null || echo "No preview stack found"
@@ -291,10 +290,34 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       # Preview ports follow 1{SLOT}{suffix} (e.g. slot 03 -> frontend 10333, backend 10380).
-      # SLOT must stay 2 digits or the port exceeds 65535 (issue #100 produced 110033 -> "invalid hostPort").
-      # Map the issue number into a 2-digit slot via modulo. Caveat: two previews whose issue numbers are
-      # congruent mod 100 collide on ports; acceptable given the single-factory guard + teardown on close.
-      PADDED=$(printf "%02d" $((ISSUE % 100)))  # slot 00-99 keeps preview ports <= 65535 (3-digit issues would overflow, e.g. #100 -> 110033)
+      # Collision-free allocation: recover the slot from the already-running preview stack (Continue runs),
+      # or scan docker ps for occupied 1PP33->3333 frontend ports and pick the lowest free 2-digit slot.
+      PADDED=""
+      EXISTING_PORT=$(docker ps \
+        --filter "label=com.docker.compose.project=mh-preview-${ISSUE}" \
+        --format '{{.Ports}}' 2>/dev/null \
+        | grep -oP '(?<=:)1\d{4}(?=->3333)' | head -1 || true)
+      if [ -n "$EXISTING_PORT" ]; then
+        PADDED=$(printf "%02d" $(( (EXISTING_PORT - 10000) / 100 )))
+        echo "INFO: Recovered slot ${PADDED} from existing preview for issue #${ISSUE}" >&2
+      else
+        USED_SLOTS=$(docker ps --format '{{.Ports}}' 2>/dev/null \
+          | grep -oP '(?<=:)1\d{4}(?=->3333)' \
+          | while read -r PORT; do printf "%02d\n" $(( (PORT - 10000) / 100 )); done \
+          | sort -u || true)
+        for i in $(seq 0 99); do
+          SLOT=$(printf "%02d" $i)
+          if ! echo "$USED_SLOTS" | grep -qx "$SLOT"; then
+            PADDED="$SLOT"
+            break
+          fi
+        done
+        if [ -z "$PADDED" ]; then
+          echo "ERROR: No free preview slot in range 00-99. Run 'Close issue #N' on a stale preview to free a slot." >&2
+          exit 1
+        fi
+        echo "INFO: Allocated slot ${PADDED} for issue #${ISSUE}" >&2
+      fi
       export ISSUE_NUM_PADDED="$PADDED"
       export POLYGON_API_KEY="${POLYGON_API_KEY:-}"
 
@@ -336,6 +359,7 @@ nodes:
         if docker compose -p "mh-preview-${ISSUE}" -f dark-factory/docker-compose.preview.yml exec -T backend python -c 'import urllib.request; urllib.request.urlopen("http://localhost:8000/api/health")' 2>/dev/null; then
           PREVIEW_SECS=$(( $(date +%s) - PREVIEW_START ))
           echo "Backend healthy!"
+          echo "PREVIEW_SLOT=${PADDED}"
           echo "PREVIEW_FRONTEND=http://localhost:1${PADDED}33"
           echo "PREVIEW_BACKEND=http://localhost:1${PADDED}80"
           echo "PREVIEW_MOUNT_SECS=${PREVIEW_SECS}"
@@ -362,7 +386,8 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
-      PADDED=$(printf "%02d" $((ISSUE % 100)))  # slot 00-99 keeps preview ports <= 65535 (3-digit issues would overflow, e.g. #100 -> 110033)
+      PREVIEW_FRONTEND=$(echo $preview-up.output | grep '^PREVIEW_FRONTEND=' | cut -d= -f2-)
+      PREVIEW_BACKEND=$(echo $preview-up.output | grep '^PREVIEW_BACKEND=' | cut -d= -f2-)
       BRANCH=$(git branch --show-current)
       echo "Pushing branch and creating/updating PR for issue #${ISSUE}..."
 
@@ -395,8 +420,8 @@ nodes:
       Automated implementation for issue #${ISSUE}.${EPIC_LINE}
 
       ## Preview
-      - Frontend: http://localhost:1${PADDED}33
-      - Backend API: http://localhost:1${PADDED}80/docs
+      - Frontend: ${PREVIEW_FRONTEND}
+      - Backend API: ${PREVIEW_BACKEND}/docs
 
       ## Commands
       \`\`\`bash
@@ -446,7 +471,9 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
-      PADDED=$(printf "%02d" $((ISSUE % 100)))  # slot 00-99 keeps preview ports <= 65535 (3-digit issues would overflow, e.g. #100 -> 110033)
+      PREVIEW_SLOT=$(echo $preview-up.output | grep '^PREVIEW_SLOT=' | cut -d= -f2-)
+      PREVIEW_FRONTEND=$(echo $preview-up.output | grep '^PREVIEW_FRONTEND=' | cut -d= -f2-)
+      PREVIEW_BACKEND=$(echo $preview-up.output | grep '^PREVIEW_BACKEND=' | cut -d= -f2-)
       INTENT=$parse-intent.output.intent
       BRANCH=$(git branch --show-current)
       echo "Posting summary to issue #${ISSUE}..."
@@ -480,11 +507,11 @@ nodes:
 
       | Service | URL |
       |---------|-----|
-      | Frontend | http://localhost:1${PADDED}33 |
-      | Backend API | http://localhost:1${PADDED}80 |
-      | API Docs | http://localhost:1${PADDED}80/docs |
-      | PostgreSQL | \`localhost:1${PADDED}54\` |
-      | Redis | \`localhost:1${PADDED}63\` |
+      | Frontend | ${PREVIEW_FRONTEND} |
+      | Backend API | ${PREVIEW_BACKEND} |
+      | API Docs | ${PREVIEW_BACKEND}/docs |
+      | PostgreSQL | \`localhost:1${PREVIEW_SLOT}54\` |
+      | Redis | \`localhost:1${PREVIEW_SLOT}63\` |
 
       ### Commands
       \`\`\`bash
