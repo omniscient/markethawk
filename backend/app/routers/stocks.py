@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import ORJSONResponse
 from sqlalchemy.orm import Session
 
+from app.core.cache import get_cached
 from app.core.database import get_db
 from app.exceptions import DataFetchError
 from app.services import StockDataService
@@ -134,29 +135,10 @@ def get_stock_detail_consolidated(
     db: Session = Depends(get_db),
 ):
     """Get consolidated stock detail for the frontend detail page."""
-    import json
-
-    import redis as redis_lib
-
-    from app.core.config import settings
-
     ticker = ticker.upper()
 
-    # Cache in Redis for 60s — avoids 3 consecutive Polygon calls on every page visit.
-    _redis = None
-    cache_key = f"stock_detail:{ticker}"
-    try:
-        _redis = redis_lib.from_url(settings.REDIS_URL)
-        cached = _redis.get(cache_key)
-        if cached:
-            return json.loads(cached)
-    except Exception:
-        pass  # Redis unavailable — fall through to live fetch
-
-    try:
+    def _fetch():
         if StockDataService.is_futures_ticker(db, ticker):
-            # Return cached info from MonitoredStock — no Polygon calls for futures
-
             from app.models import MonitoredStock
             from app.models.futures_aggregate import FuturesAggregate
 
@@ -178,7 +160,7 @@ def get_stock_detail_consolidated(
                 .scalar()
             )
 
-            result = {
+            return {
                 "ticker": ticker,
                 "info": {
                     "longName": (stock.company_name if stock else None) or ticker,
@@ -197,21 +179,10 @@ def get_stock_detail_consolidated(
                 "latest_price": float(latest_close) if latest_close else None,
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             }
-            try:
-                if _redis:
-                    _redis.setex(cache_key, 60, json.dumps(result))
-            except Exception:
-                pass
-            return result
 
-        # 1. Fundamental Info
         info = StockDataService.get_stock_info(ticker)
-
-        # 2. Pre-market / Extended Hours data
         pre_market = StockDataService.get_pre_market_data(ticker)
 
-        # 3. Latest aggregates for summary (e.g. today's close if available)
-        # Fetching last 1 day minute data to get a accurate "current" or "close" price
         today = get_market_today().strftime("%Y-%m-%d")
         minute_aggs = StockDataService.get_aggregates(
             ticker, 1, "minute", today, today, limit=1
@@ -243,7 +214,7 @@ def get_stock_detail_consolidated(
             s.adjustments_applied_at is None for s in recent_splits_query
         )
 
-        result = {
+        return {
             "ticker": ticker,
             "info": info,
             "pre_market": pre_market,
@@ -252,12 +223,9 @@ def get_stock_detail_consolidated(
             "recent_splits": recent_splits,
             "split_adjustment_pending": split_adjustment_pending,
         }
-        try:
-            if _redis:
-                _redis.setex(cache_key, 60, json.dumps(result))
-        except Exception:
-            pass
-        return result
+
+    try:
+        return get_cached(f"mh:stocks:details:{ticker}", 60, _fetch)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error fetching stock details: {str(e)}"

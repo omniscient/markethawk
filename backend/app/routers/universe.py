@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.cache import invalidate, get_cached
 from app.core.database import get_db
 from app.core.rate_limits import SCANNER_LIMIT, limiter
 from app.exceptions import UniverseNotFoundError, UniverseValidationError
@@ -58,6 +59,7 @@ def create_stock_universe(
     db.add(db_universe)
     db.commit()
     db.refresh(db_universe)
+    invalidate("mh:universe:list")
     return db_universe
 
 
@@ -100,6 +102,7 @@ def update_stock_universe(
 
     db.commit()
     db.refresh(db_universe)
+    invalidate("mh:universe:list")
     return db_universe
 
 
@@ -115,6 +118,7 @@ def delete_stock_universe(
 
     universe.is_active = False
     db.commit()
+    invalidate("mh:universe:list")
     return {"message": "Universe deleted successfully"}
 
 
@@ -124,28 +128,34 @@ def list_stock_universes(
     db: Session = Depends(get_db),
 ):
     """List all active stock universes. include_stats=false skips aggregate stats (for dropdowns)."""
-    universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
-
-    results = []
-    for universe in universes:
-        universe_data = StockUniverseResponse.from_orm(universe)
-
-        if include_stats:
+    def _fetch():
+        universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+        results = []
+        for universe in universes:
+            universe_data = StockUniverseResponse.from_orm(universe)
             universe_data.ticker_count = universe.cached_ticker_count or 0
             universe_data.aggregate_count = universe.cached_aggregate_count or 0
             universe_data.min_aggregate_date = universe.cached_min_date
             universe_data.max_aggregate_date = universe.cached_max_date
             universe_data.available_timespans = universe.cached_timespans or []
             universe_data.stats_refreshed_at = universe.stats_refreshed_at
-        else:
-            universe_data.ticker_count = 0
-            universe_data.aggregate_count = 0
-            universe_data.min_aggregate_date = None
-            universe_data.max_aggregate_date = None
-            universe_data.available_timespans = []
+            results.append(universe_data)
+        return [r.model_dump(mode="json") for r in results]
 
+    if include_stats:
+        return get_cached("mh:universe:list", 60, _fetch)
+
+    # include_stats=False is lightweight (reads pre-computed fields) — bypass cache
+    universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+    results = []
+    for universe in universes:
+        universe_data = StockUniverseResponse.from_orm(universe)
+        universe_data.ticker_count = 0
+        universe_data.aggregate_count = 0
+        universe_data.min_aggregate_date = None
+        universe_data.max_aggregate_date = None
+        universe_data.available_timespans = []
         results.append(universe_data)
-
     return results
 
 
@@ -177,6 +187,7 @@ def refresh_universe_stats(
     universe_data.max_aggregate_date = universe.cached_max_date
     universe_data.available_timespans = universe.cached_timespans or []
     universe_data.stats_refreshed_at = universe.stats_refreshed_at
+    invalidate("mh:universe:list")
     return universe_data
 
 

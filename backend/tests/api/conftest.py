@@ -36,6 +36,22 @@ def fake_redis():
 
 
 @pytest.fixture(autouse=True)
+def flush_app_cache():
+    """Flush all mh: cache keys before each test to prevent cross-test contamination."""
+    import app.core.cache as cache_mod
+
+    r = cache_mod.get_redis()
+    if r is not None:
+        try:
+            keys = list(r.scan_iter("mh:*"))
+            if keys:
+                r.delete(*keys)
+        except Exception:
+            pass
+    yield
+
+
+@pytest.fixture(autouse=True)
 def inject_auth_into_module_client(request):
     """Inject a valid JWT cookie into any module-level TestClient.
 
