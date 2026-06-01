@@ -276,6 +276,11 @@ services:
     container_name: stockscanner-flower
     command: celery -A app.core.celery_app:celery_app flower --port=5555
     environment:
+      # flower imports app.core.celery_app, which instantiates Settings() at import
+      # time; DATABASE_URL and POLYGON_API_KEY are now required fields, so flower
+      # needs them too (mirrors celery-worker) or it crashes on startup.
+      DATABASE_URL: ${DATABASE_URL}
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH}
