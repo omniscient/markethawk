@@ -32,7 +32,7 @@ The issue asks for the process to "self improve" — capturing what the subagent
 5. **Memory format** — Each entry is a short, actionable bullet:
    - Category header (e.g., `## Backend: Models`)
    - Bullet per lesson: `- [PATTERN|AVOID|FIX] <concise, actionable sentence>`
-   - Source tag: `<!-- issue:#N date:YYYY-MM-DD -->` (machine-readable, for deduplication)
+   - Source tag: `<!-- issue:#N date:YYYY-MM-DD expires:YYYY-MM-DD source:implement|refine -->` (machine-readable, for deduplication and expiry)
 
 6. **Deduplication** — Before appending, the agent checks whether a semantically equivalent lesson already exists (simple string match on the core sentence). No duplicates are added.
 
@@ -44,6 +44,12 @@ The issue asks for the process to "self improve" — capturing what the subagent
 
 10. **No external dependencies** — Memory is plain markdown files committed to the repo. No vector database, no embedding model, no additional services. Fully readable by humans and agents alike.
 
+11. **Refine pipeline writes memory** — After committing the spec (Phase 5 of `dark-factory-refine.md`), the refine agent appends memory entries for: (a) architectural decisions from Q&A where a trade-off was explicitly weighed — written as PATTERN/AVOID pairs to `.archon/memory/architecture.md`; (b) codebase conventions discovered during Phase 3 context assembly that are absent from CLAUDE.md or ARCHITECTURE.md — written as PATTERN entries to the relevant area file. Raw codebase patterns that are already documented must not be duplicated. Entries are tagged `source:refine` to distinguish design-time observations from runtime-proven ones. Memory is committed before Phase 6 (publish) so it is persisted even if label commands fail.
+
+12. **Memory expiry** — Every memory entry carries an `expires` field in its source tag. The default TTL is 6 months from the date of writing. Before appending any new entries in Phase 5 (both implement and refine), the agent reads the target memory file, drops all entries whose `expires` date is in the past, then appends new entries with a freshly computed `expires` date. A per-entry `ttl:Nd` override (e.g., `ttl:30d`) is supported for highly volatile patterns. Expiry is enforced by date comparison only — no git log queries, no path resolution, no semantic reasoning.
+
+13. **Architect receives selective memory** — When the plan agent spawns the architect subagent, it conditionally appends one or two memory files whose area matches the files touched by the issue (determined from the spec's components list). It does not pass all memory files — unrelated area files add noise. The architect prompt gains a fifth check section ("Memory Patterns") instructing it to flag any plan step that violates an AVOID entry from the provided memory files. Backend-only issues receive `backend-patterns.md`; frontend-only issues receive `frontend-patterns.md`; cross-cutting issues receive both. `dark-factory-ops.md` is included when Docker or infrastructure files are touched.
+
 ## Architecture
 
 ### Memory Store Layout
@@ -51,6 +57,7 @@ The issue asks for the process to "self improve" — capturing what the subagent
 ```
 .archon/memory/
 ├── codebase-patterns.md       # Global lessons applicable to any change
+├── architecture.md            # Architectural decisions from Q&A (written by refine)
 ├── backend-patterns.md        # Backend-specific (SQLAlchemy, FastAPI, Alembic, Celery)
 ├── frontend-patterns.md       # Frontend-specific (React Query, TypeScript, Tailwind)
 └── dark-factory-ops.md        # Dark factory infrastructure (Docker, seed, preview, CI)
@@ -63,11 +70,11 @@ Each file starts with a header explaining the format, followed by categorized se
 ```markdown
 ## Backend: Models
 
-- [PATTERN] When adding a new SQLAlchemy model: create the file in `backend/app/models/`, import it in `backend/app/models/__init__.py`, then run `alembic revision --autogenerate`. Missing the `__init__.py` import causes `Base.metadata.create_all` to skip the table silently. <!-- issue:#42 date:2026-05-15 -->
+- [PATTERN] When adding a new SQLAlchemy model: create the file in `backend/app/models/`, import it in `backend/app/models/__init__.py`, then run `alembic revision --autogenerate`. Missing the `__init__.py` import causes `Base.metadata.create_all` to skip the table silently. <!-- issue:#42 date:2026-05-15 expires:2026-11-15 source:implement -->
 
-- [AVOID] Do not use `relationship()` without `lazy="selectin"` on models read via async sessions — sync lazy-loading raises `MissingGreenlet` in asyncpg. <!-- issue:#67 date:2026-05-22 -->
+- [AVOID] Do not use `relationship()` without `lazy="selectin"` on models read via async sessions — sync lazy-loading raises `MissingGreenlet` in asyncpg. <!-- issue:#67 date:2026-05-22 expires:2026-11-22 source:implement -->
 
-- [FIX] If `alembic revision --autogenerate` produces an empty migration, verify the model is imported in `__init__.py` and that `Base` is the same `DeclarativeBase` instance as in `database.py`. <!-- issue:#78 date:2026-05-28 -->
+- [FIX] If `alembic revision --autogenerate` produces an empty migration, verify the model is imported in `__init__.py` and that `Base` is the same `DeclarativeBase` instance as in `database.py`. <!-- issue:#78 date:2026-05-28 expires:2026-11-28 source:implement -->
 ```
 
 ### Agent Integration Points
@@ -79,9 +86,10 @@ Each file starts with a header explaining the format, followed by categorized se
 
 After reading CLAUDE.md and ARCHITECTURE.md:
 5. Read `.archon/memory/codebase-patterns.md` — global lessons from past runs
-6. If the issue touches backend code: read `.archon/memory/backend-patterns.md`
-7. If the issue touches frontend code: read `.archon/memory/frontend-patterns.md`
-8. If the issue touches Docker/infrastructure: read `.archon/memory/dark-factory-ops.md`
+6. Read `.archon/memory/architecture.md` — prior architectural decisions (if it exists)
+7. If the issue touches backend code: read `.archon/memory/backend-patterns.md`
+8. If the issue touches frontend code: read `.archon/memory/frontend-patterns.md`
+9. If the issue touches Docker/infrastructure: read `.archon/memory/dark-factory-ops.md`
 
 Apply these lessons as strong hints throughout implementation. If a lesson conflicts
 with CLAUDE.md or ARCHITECTURE.md, follow those documents instead and note the conflict.
@@ -102,8 +110,11 @@ After writing the implementation summary to `$ARTIFACTS_DIR/implementation.md`:
    b. Determine the type: PATTERN (something that consistently works), AVOID (something
       that consistently fails), or FIX (a corrective action for a known failure mode)
    c. Write a concise, actionable one-sentence bullet with the source tag
-      `<!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) -->`
-   d. Append it under the appropriate category section in the correct memory file
+      `<!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:<date+6mo> source:implement -->`
+      (For volatile patterns add `ttl:Nd` to shorten the window, e.g. `ttl:30d`)
+   d. Before appending, run expiry cleanup: remove any existing entry in the file whose
+      `expires` date is past today (see Memory Expiry Mechanism for pseudocode)
+   e. Append the new entry under the appropriate category section in the correct memory file
 3. If you added any memory entries, commit the updated memory files:
    `git commit -m "memory: lessons from issue #$ISSUE_NUM"`
 4. If no new insights were gained (everything was already in memory), skip this phase.
@@ -120,8 +131,49 @@ Memory quality rules:
 ```markdown
 After reading CLAUDE.md and ARCHITECTURE.md:
 5. Read `.archon/memory/codebase-patterns.md` — global lessons
-6. Read area-specific memory files relevant to the issue's domain
+6. Read `.archon/memory/architecture.md` — prior architectural decisions (written by refine)
+7. Read area-specific memory files relevant to the issue's domain
 ```
+
+**Architect subagent invocation (in `dark-factory-plan.md`):**
+
+The plan agent already reads the spec's `Component` field to know which codebase areas are touched. Before spawning the architect subagent, it selects the relevant memory files:
+
+```markdown
+## Architect Memory Context (conditional)
+
+Before spawning the architect subagent, build $MEMORY_CONTEXT:
+- Always include: .archon/memory/architecture.md (if it exists)
+- If spec touches backend (models/, routers/, services/, tasks/): include backend-patterns.md
+- If spec touches frontend (frontend/src/): include frontend-patterns.md
+- If spec touches Docker/infra (docker-compose, Dockerfile, dark-factory/): include dark-factory-ops.md
+
+Pass $MEMORY_CONTEXT files as additional context in the architect subagent prompt:
+
+  prompt: |
+    <architect-prompt-content>
+
+    ## Memory: Accumulated Patterns
+    <contents of each selected memory file>
+
+    ---
+    <spec and plan content>
+```
+
+The architect subagent prompt gains a fifth check:
+
+```markdown
+### Section 5: Memory Patterns
+
+For each AVOID or FIX entry in the provided memory files:
+- Scan every plan step for actions that would trigger the anti-pattern
+- If found: flag it as [MEMORY-VIOLATION] with the relevant memory entry quoted
+- If no violations: note "No memory violations found"
+
+This check runs after Section 4 (Codebase Conventions) and before the verdict.
+```
+
+**Why the architect gets selective (not all) memory files:** passing all files to a backend-only issue would include irrelevant frontend patterns, adding noise to the architect's context with no benefit. The plan agent already has the spec's component list and can resolve which files are relevant in O(1) — the complexity cost of selectivity is negligible.
 
 ### Memory Bootstrapping
 
@@ -136,20 +188,79 @@ This file is maintained automatically by the dark factory. Do not edit manually.
 
 ## Backend: Models
 
-- [PATTERN] Every new SQLAlchemy model must be imported in `backend/app/models/__init__.py` or it will not be included in `Base.metadata` and alembic will not generate a migration for it. <!-- bootstrap date:2026-06-01 -->
+- [PATTERN] Every new SQLAlchemy model must be imported in `backend/app/models/__init__.py` or it will not be included in `Base.metadata` and alembic will not generate a migration for it. <!-- bootstrap date:2026-06-01 expires:2026-12-01 source:implement -->
 
-- [AVOID] Never use synchronous SQLAlchemy patterns (`session.query()`, sync `relationship()` lazy loads) — the app uses `AsyncSession` throughout. All queries use `select()` + `await session.execute()`. <!-- bootstrap date:2026-06-01 -->
+- [AVOID] Never use synchronous SQLAlchemy patterns (`session.query()`, sync `relationship()` lazy loads) — the app uses `AsyncSession` throughout. All queries use `select()` + `await session.execute()`. <!-- bootstrap date:2026-06-01 expires:2026-12-01 source:implement -->
 
 ## Backend: API Routes
 
-- [PATTERN] New routers must be registered in `backend/app/main.py` via `app.include_router(router, prefix="/api/v1/<resource>")`. The router file itself should not set a prefix — it lives in the `include_router` call. <!-- bootstrap date:2026-06-01 -->
+- [PATTERN] New routers must be registered in `backend/app/main.py` via `app.include_router(router, prefix="/api/v1/<resource>")`. The router file itself should not set a prefix — it lives in the `include_router` call. <!-- bootstrap date:2026-06-01 expires:2026-12-01 source:implement -->
 
-- [PATTERN] The SlowAPI `limiter` instance is in `app/core/rate_limits.py`, not `app/main.py`. Import from `core.rate_limits` to avoid the circular import that would arise if the limiter were in `main.py`. <!-- bootstrap date:2026-06-01 -->
+- [PATTERN] The SlowAPI `limiter` instance is in `app/core/rate_limits.py`, not `app/main.py`. Import from `core.rate_limits` to avoid the circular import that would arise if the limiter were in `main.py`. <!-- bootstrap date:2026-06-01 expires:2026-12-01 source:implement -->
 
 ## Backend: Migrations
 
-- [PATTERN] After any model change: `cd backend && python -m alembic revision --autogenerate -m "description" && python -m alembic upgrade head`. Never skip the `upgrade head` step — the preview stack applies migrations at startup, but the local test suite does not. <!-- bootstrap date:2026-06-01 -->
+- [PATTERN] After any model change: `cd backend && python -m alembic revision --autogenerate -m "description" && python -m alembic upgrade head`. Never skip the `upgrade head` step — the preview stack applies migrations at startup, but the local test suite does not. <!-- bootstrap date:2026-06-01 expires:2026-12-01 source:implement -->
 ```
+
+### Memory Expiry Mechanism
+
+Entries expire by date. Each source tag includes an `expires` field set to the write date plus the TTL. The default TTL is **6 months**. For volatile patterns (e.g., a third-party API quirk likely to change soon), a per-entry `ttl:Nd` override shortens the window.
+
+**Updated entry format:**
+
+```markdown
+- [PATTERN] <actionable sentence> <!-- issue:#N date:YYYY-MM-DD expires:YYYY-MM-DD source:implement|refine [ttl:Nd] -->
+```
+
+**Cleanup pseudocode (runs at the start of Phase 5 before any appends):**
+
+```python
+today = date.today()
+lines = memory_file.read_lines()
+kept = []
+for line in lines:
+    match = re.search(r'expires:(\d{4}-\d{2}-\d{2})', line)
+    if match and date.fromisoformat(match.group(1)) < today:
+        continue  # drop expired entry
+    kept.append(line)
+memory_file.write_lines(kept)
+```
+
+This runs in both the implement and refine agents — expired entries are removed before new ones are appended. Because refine always runs before a new implement cycle on the same repo state, readers (refine, plan, architect) never encounter expired entries.
+
+**Why not other approaches:**
+- Path-based TTL (invalidate when a referenced file changes): brittle — files get moved or renamed, causing false-positive removals.
+- Semantic self-review loop: non-deterministic, expensive, prone to false-stale markings.
+- Git history-based: requires `git log` queries against file paths that may not be stable.
+
+### Refinement Pipeline Memory Write
+
+The refine agent writes memory **after the spec is committed (Phase 5 step 5) and before Phase 6 (publish)**. By this point all Q&A answers are settled and the chosen approach is locked. Writing at Phase 6 adds no new information and risks being skipped if the label command fails.
+
+**What refine writes and where:**
+
+| Source | Content | Target file |
+|--------|---------|-------------|
+| Q&A architectural decisions | Trade-offs explicitly weighed (why approach X over Y) | `.archon/memory/architecture.md` |
+| Phase 3 context assembly | Codebase conventions not already in CLAUDE.md or ARCHITECTURE.md | Area-specific file (e.g., `backend-patterns.md`) |
+
+Refine does NOT write to `lessons-learned.md` (belongs to implement post-execution) or `avoid.md` (belongs to runtime mistakes, not design-time decisions).
+
+**Concrete Phase 5 addition for `dark-factory-refine.md`** (after spec commit, before Phase 6):
+
+```markdown
+6. Append memory entries to .archon/memory/:
+   a. Run expiry cleanup on each target file (see Memory Expiry Mechanism).
+   b. For each architectural decision made in Q&A: append to architecture.md
+      - [PATTERN] <decision> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:<+6mo> source:refine -->
+      - [AVOID] <rejected approach and why> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:<+6mo> source:refine -->
+   c. For any codebase convention discovered in Phase 3 not already in CLAUDE.md or ARCHITECTURE.md:
+      append to the relevant area file as a PATTERN entry with source:refine.
+   d. Commit: git commit -m "memory: lessons from refine #$ISSUE_NUM"
+```
+
+The `source:refine` tag signals to future agents that these entries carry design-time weight, not empirical/runtime proof. Implement agents may treat `source:implement` entries as higher-confidence than `source:refine` entries when the two conflict.
 
 ## Alternatives Considered
 
@@ -185,3 +296,7 @@ Append lessons directly to `CLAUDE.md` under a new `## Lessons Learned` section.
 - The `.archon/memory/` path does not conflict with existing Archon internals. Archon's own internal state lives in the Archon database, not in the project repo.
 - Bootstrap entries are accurate enough to be immediately useful. They are derived from CLAUDE.md and the existing codebase patterns, so they should be.
 - The agent is capable of reliably detecting whether an insight is already in memory via simple string matching. False negatives (duplicate entries added) are tolerated and can be cleaned up in a human review pass.
+- A 6-month TTL is a reasonable half-life for scanner heuristics and implementation patterns. Domain rules that remain valid will be re-learned and re-written with a fresh expiry when a related issue runs through the pipeline. Highly volatile patterns can opt into a shorter TTL via the `ttl:Nd` override.
+- The refine agent's `source:refine` entries carry design-time (not empirical) weight. Implement agents encountering a conflict between a `source:refine` entry and their runtime observations should prefer the runtime observation and update the entry.
+- The plan agent can reliably identify which codebase areas an issue touches by reading the spec's `Component` field. This is sufficient for selecting which memory files to pass to the architect subagent.
+- The architect subagent prompt at `/opt/refinement-skills/architect-prompt.md` can be extended with a fifth "Memory Patterns" check section without disrupting existing checks — the check is additive and runs after Section 4.
