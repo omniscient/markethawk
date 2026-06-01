@@ -378,11 +378,11 @@ nodes:
           # Write env file so the validate command can source it reliably without
           # having to parse raw step output or guess the URL.
           mkdir -p "$ARTIFACTS_DIR"
-          cat > "$ARTIFACTS_DIR/preview_env.sh" <<EOF
-export PREVIEW_FRONTEND="http://localhost:1${PADDED}33"
-export PREVIEW_BACKEND="${BACKEND_INTERNAL}"
-export PREVIEW_NET="${PREVIEW_NET}"
-EOF
+          {
+            echo "export PREVIEW_FRONTEND=\"http://localhost:1${PADDED}33\""
+            echo "export PREVIEW_BACKEND=\"${BACKEND_INTERNAL}\""
+            echo "export PREVIEW_NET=\"${PREVIEW_NET}\""
+          } > "$ARTIFACTS_DIR/preview_env.sh"
           exit 0
         fi
         sleep 3
