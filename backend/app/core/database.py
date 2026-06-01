@@ -17,7 +17,10 @@ engine = create_engine(
     pool_pre_ping=settings.DB_POOL_PRE_PING,
     pool_recycle=settings.DB_POOL_RECYCLE,
     pool_timeout=settings.DB_POOL_TIMEOUT,
-    echo=(settings.ENVIRONMENT == "development"),
+    # Echo every SQL statement only when explicitly debugging. Gating on
+    # ENVIRONMENT == "development" flooded normal dev logs with every query
+    # (twice, via the duplicate handler). LOG_LEVEL=DEBUG re-enables it.
+    echo=(settings.LOG_LEVEL == "DEBUG"),
 )
 
 # Session factory
