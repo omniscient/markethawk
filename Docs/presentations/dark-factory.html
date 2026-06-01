@@ -17,7 +17,8 @@
     --grad:linear-gradient(135deg,var(--amber-hot),var(--amber-soft));
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
+  html{height:100%; font-size:clamp(16.5px, 1.12vw, 21px)}
+  body{height:100%}
   body{
     background:var(--bg); color:var(--ink); font-family:var(--sans);
     overflow:hidden; -webkit-font-smoothing:antialiased; line-height:1.5;
@@ -27,7 +28,7 @@
   #deck{position:fixed; inset:0}
   .slide{
     position:absolute; inset:0; display:flex; flex-direction:column;
-    justify-content:center; padding:5.2vh 6.5vw 7vh;
+    justify-content:center; padding:4.5vh 4vw 5vh;
     opacity:0; visibility:hidden; transform:translateY(14px) scale(.995);
     transition:opacity .55s ease, transform .55s cubic-bezier(.2,.7,.2,1);
     pointer-events:none; overflow:hidden;
@@ -59,13 +60,13 @@
 
   /* ---------- typography ---------- */
   .kicker{
-    font-family:var(--mono); font-size:.78rem; letter-spacing:.32em; text-transform:uppercase;
+    font-family:var(--mono); font-size:.9rem; letter-spacing:.32em; text-transform:uppercase;
     color:var(--amber); display:inline-flex; align-items:center; gap:.6em; margin-bottom:1.4rem;
   }
   .kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 12px var(--amber-hot)}
-  h1{font-size:clamp(2.2rem,5.4vw,4.6rem); font-weight:800; letter-spacing:-.02em; line-height:1.02}
-  h2{font-size:clamp(1.7rem,3.6vw,2.9rem); font-weight:750; letter-spacing:-.015em; line-height:1.08; margin-bottom:.5rem}
-  .lead{font-size:clamp(1rem,1.55vw,1.32rem); color:var(--mut); max-width:60ch; line-height:1.55}
+  h1{font-size:clamp(2.6rem,6.4vw,6rem); font-weight:800; letter-spacing:-.02em; line-height:1.02}
+  h2{font-size:clamp(2rem,4.4vw,3.6rem); font-weight:750; letter-spacing:-.015em; line-height:1.08; margin-bottom:.5rem}
+  .lead{font-size:clamp(1.15rem,1.95vw,1.62rem); color:var(--mut); max-width:62ch; line-height:1.55}
   .em{color:var(--ink)} .am{color:var(--amber)} .cy{color:var(--cyan)} .gr{color:var(--green)} .rd{color:var(--red)} .vi{color:var(--violet)}
   b,strong{font-weight:700;color:var(--ink)}
   .mono{font-family:var(--mono)}
@@ -267,7 +268,7 @@
   .flex{display:flex; gap:.6rem; flex-wrap:wrap; align-items:center}
   .mt{margin-top:1.2rem} .mt2{margin-top:1.8rem}
   .center{text-align:center}
-  .max{max-width:1180px; margin:0 auto; width:100%}
+  .max{max-width:1600px; margin:0 auto; width:100%}
 
   /* title slide flourish */
   .title-wrap{position:relative}
