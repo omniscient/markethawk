@@ -129,7 +129,62 @@ If the change requires a new SQLAlchemy model:
 - [ ] All matched doc sections updated
 - [ ] `docs:` commit created (or phase explicitly skipped — no matches)
 
-## Phase 5: REPORT
+## Phase 5: MEMORY UPDATE
+
+After Phase 4 DOCUMENT completes. Note on execution order: `$ARTIFACTS_DIR/implementation.md` is written during the Phase 3 IMPLEMENT checkpoint; Phase 4 DOCUMENT reads it; Phase 6 REPORT finalizes it. Phase 5 MEMORY UPDATE runs after Phase 4 and does not depend on Phase 6.
+
+1. Review the run: what patterns did you discover, what mistakes did you fix, what gotchas did you encounter that are not already in the memory files?
+
+2. Before appending any new entries, run expiry cleanup on the target memory file:
+   - Read the file line by line.
+   - For each line matching `expires:(\d{4}-\d{2}-\d{2})`, parse the date.
+   - If the parsed date is strictly before today (`date +%Y-%m-%d`), drop the line.
+   - Write the remaining lines back to the file.
+   This runs with a simple shell loop — no Python required:
+   ```bash
+   TODAY=$(date +%Y-%m-%d)
+   TARGET=".archon/memory/backend-patterns.md"  # replace with the actual target file
+   awk -v today="$TODAY" '
+     /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
+       match($0, /expires:([0-9]{4}-[0-9]{2}-[0-9]{2})/, arr)
+       if (arr[1] < today) next
+     }
+     { print }
+   ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
+   ```
+
+3. For each insight that is not already in the memory files (check with `grep -F "<core sentence>" .archon/memory/*.md`):
+   a. Determine the appropriate memory file:
+      - Global workflow or checklist lesson → `.archon/memory/codebase-patterns.md`
+      - SQLAlchemy, Alembic, FastAPI, Celery → `.archon/memory/backend-patterns.md`
+      - React Query, TypeScript, components, Tailwind → `.archon/memory/frontend-patterns.md`
+      - Docker, preview stack, seed data, env vars → `.archon/memory/dark-factory-ops.md`
+   b. Determine the entry type:
+      - `[PATTERN]` — something that consistently works and should be repeated
+      - `[AVOID]` — something that consistently fails or causes bugs
+      - `[FIX]` — a corrective action for a known failure mode
+   c. Write a concise, actionable one-sentence bullet under the appropriate category section:
+      ```
+      - [PATTERN|AVOID|FIX] <concise actionable sentence referencing specific paths, commands, or names where relevant> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:implement -->
+      ```
+      For volatile patterns (e.g., a third-party API quirk expected to change soon), shorten the window by appending `ttl:30d` before the closing `-->`.
+
+4. If you added any memory entries, commit the updated memory files:
+   ```bash
+   git add .archon/memory/
+   git commit -m "memory: lessons from issue #$ISSUE_NUM"
+   ```
+
+5. If no new insights were gained (everything was already in memory or the run produced no novel observations), skip the commit — do not create an empty commit.
+
+**Memory quality rules:**
+- Entries must be concrete and actionable, not generic advice ("always write good code" is not an entry).
+- Reference specific file paths, function names, or CLI commands where relevant.
+- Prefer short, dense entries over long explanations — one sentence per bullet.
+- Do NOT add observations already covered by `CLAUDE.md` or `ARCHITECTURE.md`.
+- Do NOT add entries to `architecture.md` from the implement agent — that file is written by the refine agent only.
+
+## Phase 6: REPORT
 
 Write a summary of what was implemented to `$ARTIFACTS_DIR/implementation.md`:
 - Files created/modified
