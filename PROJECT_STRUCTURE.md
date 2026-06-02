@@ -75,6 +75,7 @@ MarketHawk/
 │   │   │   ├── auto_trade_service.py   # AutoTradeExecutor (lifecycle); approve_order, cancel_order, get_account, get_stats
 │   │   │   ├── pre_market_scan.py      # Self-registers "pre_market_volume_spike" in orchestrator
 │   │   │   ├── oversold_bounce_scan.py # Self-registers "oversold_bounce" in orchestrator
+│   │   │   ├── pocket_pivot.py         # Self-registers "pocket_pivot"; Morales/Kacher up-day volume signal; daily bars; nightly beat
 │   │   │   ├── scanner.py              # ScannerService; calculate_day_metrics; _save_event delegates to alert_service.save_event; OTel spans: scanner.batch_enrichment, scanner.evaluate_ticker
 │   │   │   ├── discovery_service.py    # Bulk ticker sync from Polygon; rate-limit-aware paging
 │   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis; returns latest_article_utc for recency enrichment
