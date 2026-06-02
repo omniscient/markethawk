@@ -23,6 +23,8 @@ docker-compose exec backend bash            # Shell into backend
 docker-compose restart backend              # Restart one service
 ```
 
+> **Dev vs. live stack isolation:** `docker-compose up -d` auto-applies `docker-compose.override.yml` when present (local dev checkout), restoring bind-mounts and hot-reload. To run the baked-image stack without the override: `docker-compose -f docker-compose.yml up -d`.
+
 ### Backend (manual)
 ```bash
 cd backend
@@ -214,7 +216,7 @@ You're ready. Pick an issue from the [backlog](https://github.com/omniscient/mar
 
 ## Dark Factory (Autonomous Docker Development)
 
-An isolated Docker container that autonomously develops features from GitHub issues. Runs Claude Code inside a sandboxed environment with no host access.
+An isolated Docker container that autonomously develops features from GitHub issues. Runs Claude Code inside a sandboxed environment with no host access. Preview stacks and the dark-factory container deliberately omit `docker-compose.override.yml` and always run baked images — do not rely on bind-mount behavior in autonomous workflows.
 
 ### Quick Start
 
