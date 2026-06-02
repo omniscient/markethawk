@@ -64,11 +64,12 @@ RUN git clone -b feat/workflow-cost-tracking https://github.com/omniscient/Archo
 # Workspace directory
 RUN mkdir -p /workspace
 
-# Copy entrypoint, scheduler, preview template, and seed data
+# Copy entrypoint, scheduler, preview template, seed data, and base compose file
 COPY dark-factory/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY dark-factory/scheduler.sh /opt/dark-factory/scheduler.sh
 COPY dark-factory/docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
 COPY dark-factory/seed/ /opt/dark-factory/seed/
+COPY docker-compose.yml /opt/dark-factory/docker-compose.yml
 COPY .claude/skills/refinement/ /opt/refinement-skills/
 RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
 
