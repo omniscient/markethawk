@@ -50,6 +50,7 @@ def compute_next_run(scanner_type: str) -> Optional[datetime]:
         "liquidity_hunt",
         "liquidity_hunt_pre",
         "liquidity_hunt_post",
+        "pocket_pivot",
     }:
         return None
     now = datetime.now(timezone.utc)

@@ -34,6 +34,11 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.run_liquidity_hunt_scheduled",
         "schedule": crontab(minute="0", hour="2", day_of_week="1-5"),
     },
+    # Pocket pivot scan: runs at 02:00 UTC Mon–Fri (same post-close slot as liquidity hunt)
+    "run-pocket-pivot-scan-evening": {
+        "task": "app.tasks.run_pocket_pivot_scheduled",
+        "schedule": crontab(minute="0", hour="2", day_of_week="1-5"),
+    },
     "analyze-signal-features-nightly": {
         "task": "app.tasks.analyze_signal_features",
         "schedule": crontab(minute="0", hour="11", day_of_week="1-5"),
