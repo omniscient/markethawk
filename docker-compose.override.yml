@@ -1,0 +1,50 @@
+# docker-compose.override.yml — local development overrides
+#
+# Docker Compose automatically merges this file with docker-compose.yml when
+# both are present (i.e. in a local dev checkout). It restores source bind-mounts
+# and hot-reload commands for the six source-serving services so that
+# "docker-compose up -d" behaves exactly as before the dev/live split.
+#
+# To run the stable baked-image stack without this file (live/CI mode):
+#   docker-compose -f docker-compose.yml up -d
+
+name: markethawk
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app:ro
+      - prometheus_multiproc:/tmp/prometheus_multiproc
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery-worker:
+    volumes:
+      - ./backend:/app:ro
+      - prometheus_multiproc:/tmp/prometheus_multiproc
+    command: python -m watchfiles --filter python 'celery -A app.core.celery_app:celery_app worker --loglevel=info' /app/app
+
+  celery-beat:
+    volumes:
+      - ./backend:/app:ro
+
+  live-scanner:
+    volumes:
+      - ./backend:/app:ro
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+
+  backlog-scheduler:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/workspace/project:ro
+
+# Named volumes used in service overrides above must be declared here.
+# Docker Compose requires named volumes referenced in an override file to
+# appear in its own top-level volumes: block (even as an empty stub), otherwise
+# "docker-compose up -d" fails with "refers to undefined volume" errors.
+volumes:
+  prometheus_multiproc: {}

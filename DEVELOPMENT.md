@@ -104,6 +104,32 @@ docker-compose exec postgres psql -U postgres -d stockscanner
 docker-compose exec redis redis-cli
 ```
 
+## Dev vs. live stack isolation
+
+The base `docker-compose.yml` runs **baked images** — source bind-mounts are absent so that editing files on the host or switching git branches cannot change the behavior of a running stack. This is the mode used by CI, preview environments, and the live trading stack.
+
+`docker-compose.override.yml` is committed to the repo and is **automatically merged** by Docker Compose whenever both files are present (the standard Docker Compose behavior). In a local dev checkout this means `docker-compose up -d` restores bind-mounts and hot-reload commands as if the split never happened.
+
+**Services covered by the override (the six that lose their bind-mount in the base file):**
+- `backend` — restores `./backend:/app:ro` and adds `--reload` to uvicorn
+- `celery-worker` — restores `./backend:/app:ro` and the watchfiles hot-reload command
+- `celery-beat` — restores `./backend:/app:ro`
+- `live-scanner` — restores `./backend:/app:ro`
+- `frontend` — restores `./frontend:/app` and `/app/node_modules`, switches command back to `npm run dev`
+- `backlog-scheduler` — restores `.:/workspace/project:ro`
+
+Services with no source bind-mount (`flower`, `forecast-worker`, and all infrastructure services) are unchanged in both files.
+
+**Run the stable baked-image stack without the override (live/CI mode):**
+```bash
+docker-compose -f docker-compose.yml up -d
+```
+
+**Force a full rebuild before starting (e.g. after dependency changes):**
+```bash
+docker-compose -f docker-compose.yml up -d --build
+```
+
 ## Manual Setup (without Docker)
 
 Use this if you need to run backend or frontend outside Docker, for example to attach a debugger.
