@@ -61,6 +61,56 @@ Docker Compose does not include a TLS termination layer. For HTTPS, place a reve
 
 ---
 
+## Deploying from GHCR
+
+Images are published to GitHub Container Registry on every merge to `main`.  
+Three images are maintained: `markethawk-backend`, `markethawk-frontend`, `markethawk-dark-factory`.
+
+Each push produces two tags:
+- `sha-{SHORT_SHA}` — permanent, points to that exact commit
+- `latest` — moves forward with every merge
+
+All `docker-compose.yml` services honour the `IMAGE_TAG` env var (default: `latest`).
+To deploy a specific tag, set `IMAGE_TAG` before running Compose commands:
+
+```bash
+# Deploy a specific SHA tag
+export IMAGE_TAG=sha-abc1234
+docker compose pull backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
+docker compose up -d backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
+
+# Run migrations after deploying
+docker compose exec -T backend python -m alembic upgrade head
+```
+
+The `deploy.yml` GitHub Actions workflow automates this via **Actions → Deploy → Run workflow**.
+
+---
+
+## Rollback Procedure
+
+To roll back to a prior release, pin `IMAGE_TAG` to any previous SHA tag before re-deploying:
+
+```bash
+# 1. Find the SHA tag to roll back to
+#    Browse: https://github.com/omniscient/markethawk/pkgs/container/markethawk-backend
+#    Or: gh api /orgs/omniscient/packages/container/markethawk-backend/versions --jq '.[].metadata.container.tags[]' | grep sha-
+
+# 2. Pin IMAGE_TAG and restart services
+export IMAGE_TAG=sha-abc1234
+docker compose pull backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
+docker compose up -d backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
+```
+
+If the rollback target is behind a database migration, roll back the schema first:
+
+```bash
+# Find the revision to revert to from alembic/versions/ history
+docker compose exec -T backend python -m alembic downgrade <revision>
+```
+
+---
+
 ## Upgrading
 
 ```bash
