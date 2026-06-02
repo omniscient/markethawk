@@ -16,6 +16,14 @@ argument-hint: (no arguments - reads issue context from workflow)
 3. Read `/opt/refinement-skills/architect-prompt.md` — you will pass this to the review subagent
 4. Find the spec file: look in `Docs/superpowers/specs/` for a file matching this issue's topic, or check the issue comments for a "Refinement Pipeline — Spec Generated" report that names the spec path
 5. Read the spec file
+6. Read `.archon/memory/codebase-patterns.md` — global lessons applicable to any change.
+7. Read `.archon/memory/architecture.md` — prior architectural decisions (if the file exists). If a memory entry marks an approach as AVOID, do not plan steps that use that approach.
+8. Read area-specific memory files based on the spec's `Component` field:
+   - Component touches `backend/app/models/`, `routers/`, `services/`, or `tasks/` → read `.archon/memory/backend-patterns.md`
+   - Component touches `frontend/src/` → read `.archon/memory/frontend-patterns.md`
+   - Component touches `docker-compose`, `Dockerfile`, or `dark-factory/` → read `.archon/memory/dark-factory-ops.md`
+
+  Bake relevant memory lessons directly into the plan task steps — do not leave them as a separate advisory section. For example, if `backend-patterns.md` contains a `[PATTERN]` about the `__init__.py` import requirement, the plan's "add model" task must explicitly include an `__init__.py` import step.
 
 ## Phase 2: PLAN WRITING
 
