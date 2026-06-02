@@ -6,6 +6,7 @@ from app.tasks.quality import (
 from app.tasks.scanning import (
     evaluate_scanner_alerts,
     run_liquidity_hunt_scheduled,
+    run_pocket_pivot_scheduled,
     run_range_scan,
     run_universe_scan,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "evaluate_scanner_alerts",
     "run_range_scan",
     "run_liquidity_hunt_scheduled",
+    "run_pocket_pivot_scheduled",
     "run_universe_scan",
     # trading
     "execute_auto_trade",

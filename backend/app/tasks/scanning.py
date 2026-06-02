@@ -108,6 +108,7 @@ def run_range_scan(
 
     from app.exceptions import DataFetchError, ProviderError
     from app.services.liquidity_hunt import run_liquidity_hunt_scan_for_date as _lh_scan
+    from app.services.pocket_pivot import run_pocket_pivot_scan_for_date as _pp_scan
     from app.services.scanner import ScannerService
     from app.services.stock_data import StockDataService
 
@@ -168,6 +169,7 @@ def run_range_scan(
             "liquidity_hunt_pre": _lh_scan,
             "liquidity_hunt_post": _lh_scan,
             "oversold_bounce": ScannerService.run_oversold_bounce_scan_for_date,
+            "pocket_pivot": _pp_scan,
         }
 
         async def _scan_day(day):
@@ -328,6 +330,7 @@ def run_universe_scan(
     import app.services.liquidity_hunt  # noqa: F401
     import app.services.oversold_bounce_scan  # noqa: F401
     import app.services.pre_market_scan  # noqa: F401 — triggers self-registration
+    import app.services.pocket_pivot  # noqa: F401 — triggers self-registration
     import app.services.scan_orchestrator as _orchestrator
     from app.models.scanner_run import ScannerRun
 
@@ -567,3 +570,72 @@ def run_universe_scan(
         db.close()
         _root_span.end()
         _otel_context.detach(_root_token)
+
+
+@celery_app.task(
+    bind=True, max_retries=1, name="app.tasks.run_pocket_pivot_scheduled"
+)
+def run_pocket_pivot_scheduled(self):
+    """
+    Nightly 02:00 UTC task: run pocket_pivot for today's date over all active
+    ScannerConfig universes of type 'pocket_pivot'.
+    """
+    from app.models.scanner_config import ScannerConfig
+    from app.services.pocket_pivot import run_pocket_pivot_scan
+    from app.utils.session import get_market_today
+
+    _task_name = "run_pocket_pivot_scheduled"
+    _start = _time.monotonic()
+    db: Session = SessionLocal()
+    try:
+        event_date = get_market_today()
+        configs = (
+            db.query(ScannerConfig)
+            .filter(
+                ScannerConfig.scanner_type == "pocket_pivot",
+                ScannerConfig.is_active.is_(True),
+            )
+            .all()
+        )
+
+        for cfg in configs:
+            universe_id = cfg.parameters.get("universe_id")
+            if not universe_id:
+                logger.warning(
+                    "pocket_pivot ScannerConfig %s has no universe_id", cfg.id
+                )
+                continue
+
+            tickers = [
+                ms.ticker
+                for ms in db.query(MonitoredStock)
+                .filter(
+                    MonitoredStock.universe_id == universe_id,
+                    MonitoredStock.is_active.is_(True),
+                )
+                .all()
+            ]
+            if not tickers:
+                continue
+
+            results = asyncio.run(
+                run_pocket_pivot_scan(
+                    tickers, db, start_date=event_date, end_date=event_date
+                )
+            )
+            logger.info(
+                "pocket_pivot scheduled scan for universe %s on %s: %d events",
+                universe_id,
+                event_date,
+                len(results),
+            )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
+    except Exception as exc:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
+        logger.exception("run_pocket_pivot_scheduled failed: %s", exc)
+        raise self.retry(exc=exc)
+    finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
+        db.close()
