@@ -83,6 +83,26 @@ fi
 
 # --- Helper: post or update cost report on issue ---
 COST_MARKER="<!-- dark-factory-cost-report -->"
+REFINE_FAILURE_MARKER="<!-- df-refine-failure -->"
+FACTORY_FAILURE_MARKER="<!-- df-factory-failure -->"
+
+post_or_update_comment() {
+  local marker="$1"
+  local body="$2"
+  local COMMENT_ID
+  COMMENT_ID=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments" \
+    --jq "[.[] | select(.body | contains(\"$marker\"))] | last | .id // empty" 2>/dev/null || true)
+  local TMPFILE
+  TMPFILE=$(mktemp /tmp/failure-comment-XXXXXX.md)
+  echo "$body" > "$TMPFILE"
+  if [ -n "$COMMENT_ID" ]; then
+    gh api "repos/omniscient/markethawk/issues/comments/${COMMENT_ID}" \
+      --method PATCH -F "body=@${TMPFILE}" >/dev/null 2>&1 || true
+  else
+    gh issue comment "$ISSUE_NUM" --body-file "$TMPFILE" 2>/dev/null || true
+  fi
+  rm -f "$TMPFILE"
+}
 
 post_cost_report() {
   if [ -z "${ISSUE_NUM:-}" ]; then return; fi
@@ -209,7 +229,9 @@ on_failure() {
   if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
     if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ]; then
       echo "Refinement pipeline failed (exit $EXIT_CODE) for issue #$ISSUE_NUM"
-      gh issue comment "$ISSUE_NUM" --body "## Refinement Pipeline — Failed
+      post_or_update_comment "$REFINE_FAILURE_MARKER" \
+        "${REFINE_FAILURE_MARKER}
+## Refinement Pipeline — Failed
 
 The refinement pipeline encountered an error (exit code $EXIT_CODE) and could not complete.
 
@@ -219,11 +241,13 @@ docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
 \`\`\`
 
 ---
-*Posted by MarketHawk Refinement Pipeline*" 2>/dev/null || true
+*Posted by MarketHawk Refinement Pipeline*"
     else
       echo "Dark factory failed (exit $EXIT_CODE). Moving issue #$ISSUE_NUM back to Ready..."
       set_board_status "$STATUS_BLOCKED" 2>/dev/null || true
-      gh issue comment "$ISSUE_NUM" --body "## Dark Factory Run — Failed
+      post_or_update_comment "$FACTORY_FAILURE_MARKER" \
+        "${FACTORY_FAILURE_MARKER}
+## Dark Factory Run — Failed
 
 The dark factory encountered an error (exit code $EXIT_CODE) and could not complete.
 Issue has been moved to **Blocked**.
@@ -234,7 +258,7 @@ docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
 \`\`\`
 
 ---
-*Posted by MarketHawk Dark Factory*" 2>/dev/null || true
+*Posted by MarketHawk Dark Factory*"
     fi
   fi
   # Cost report runs LAST and is non-fatal: a failure here (missing dependency,
