@@ -547,6 +547,29 @@ This issue was left in **In progress** with no running factory container — the
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
+    RETRIES=$(get_retry_count "${ISSUE}:plan")
+    if [ "$RETRIES" -ge "$REFINE_MAX_RETRIES" ]; then
+      gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --add-label needs-discussion 2>/dev/null || true
+      gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "## Refinement Pipeline — Retries Exhausted
+
+The scheduler has attempted plan generation **${RETRIES} time(s)** and cannot recover automatically. The issue has been labelled \`needs-discussion\` to pause automation.
+
+**To resume automation:**
+1. Investigate the failure comments above.
+2. Fix the root cause (update the issue body, fix a dependency, or resolve the blocking error).
+3. Remove the \`needs-discussion\` label — the scheduler will resume automatically.
+
+\`\`\`bash
+# Or retry manually:
+docker compose --profile factory run --rm dark-factory \"Plan issue #${ISSUE}\"
+\`\`\`
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+      continue
+    fi
+
+    increment_retry "${ISSUE}:plan"
     gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "📋 **Refinement Pipeline** — Starting plan generation and architect validation.
 
 ---
