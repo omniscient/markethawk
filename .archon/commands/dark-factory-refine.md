@@ -77,6 +77,43 @@ Follow the process in `orchestrator-prompt.md`:
 4. Self-review: placeholder scan, consistency check, scope check, ambiguity check. Fix inline.
 5. Commit the spec
 
+6. Append memory entries to `.archon/memory/`:
+
+   **Expiry cleanup (run before appending to any file):**
+   For each target memory file you are about to write, remove expired entries first:
+   ```bash
+   TODAY=$(date +%Y-%m-%d)
+   TARGET=".archon/memory/architecture.md"  # replace with actual target file
+   awk -v today="$TODAY" '
+     /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
+       match($0, /expires:([0-9]{4}-[0-9]{2}-[0-9]{2})/, arr)
+       if (arr[1] < today) next
+     }
+     { print }
+   ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
+   ```
+
+   **What to write and where:**
+
+   a. For each architectural decision made during Phase 4 Q&A where a trade-off was explicitly weighed (why approach X over approach Y): append a PATTERN+AVOID pair to `.archon/memory/architecture.md`:
+      ```
+      - [PATTERN] <the chosen approach and why it is correct> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
+      - [AVOID] <the rejected approach and the concrete reason it was rejected> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
+      ```
+
+   b. For any codebase convention discovered during Phase 3 context assembly that is absent from `CLAUDE.md` and absent from `ARCHITECTURE.md`: append a `[PATTERN]` entry to the relevant area file (`backend-patterns.md`, `frontend-patterns.md`, or `dark-factory-ops.md`) with `source:refine`.
+
+   c. Before appending any entry, check for duplicates: `grep -F "<core sentence of the new entry>" .archon/memory/architecture.md`. If a matching line exists, skip that entry.
+
+   d. Do NOT write to `codebase-patterns.md` from the refine agent — that file is maintained by the implement agent for runtime-proven lessons only.
+
+   e. If any entries were added, commit:
+      ```bash
+      git add .archon/memory/
+      git commit -m "memory: architectural decisions from refine #$ISSUE_NUM"
+      ```
+      If no entries were added (Q&A produced no novel trade-offs and Phase 3 found nothing new), skip the commit.
+
 ## Phase 6: PUBLISH
 
 1. Determine the current branch name: `BRANCH=$(git branch --show-current)`
