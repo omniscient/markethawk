@@ -88,6 +88,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: stockscanner-api
+    # Bind-mount (./backend:/app:ro) and --reload are restored in docker-compose.override.yml for local dev.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
@@ -122,7 +124,6 @@ services:
       ib-gateway:
         condition: service_started
     volumes:
-      - ./backend:/app:ro
       - prometheus_multiproc:/tmp/prometheus_multiproc
     networks:
       - stockscanner-network
@@ -139,14 +140,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: stockscanner-frontend
+    # Bind-mounts (./frontend:/app, /app/node_modules) and npm run dev are restored in docker-compose.override.yml for local dev.
+    command: npx vite preview --host --port 3333
     ports:
       - "3333:3333"
     environment:
       REACT_APP_API_URL: http://localhost:8000
       VITE_API_TARGET: http://backend:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -157,7 +157,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: stockscanner-celery
-    command: python -m watchfiles --filter python 'celery -A app.core.celery_app:celery_app worker --loglevel=info' /app/app
+    # Bind-mount (./backend:/app:ro) and watchfiles hot-reload are restored in docker-compose.override.yml for local dev.
+    command: celery -A app.core.celery_app:celery_app worker --loglevel=info
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
@@ -190,7 +191,6 @@ services:
       ib-gateway:
         condition: service_started
     volumes:
-      - ./backend:/app:ro
       - prometheus_multiproc:/tmp/prometheus_multiproc
     networks:
       - stockscanner-network
@@ -226,8 +226,8 @@ services:
         condition: service_healthy
       ib-gateway:
         condition: service_started
-    volumes:
-      - ./backend:/app:ro
+    # Bind-mount (./backend:/app:ro) is restored in docker-compose.override.yml for local dev.
+    volumes: []
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -258,8 +258,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app:ro
+    # Bind-mount (./backend:/app:ro) is restored in docker-compose.override.yml for local dev.
+    volumes: []
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -427,9 +427,9 @@ services:
     env_file:
       - path: .archon/.env
         required: true
+    # Bind-mount (.:/workspace/project:ro) is restored in docker-compose.override.yml for local dev.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - .:/workspace/project:ro
     networks:
       - factory-network
       - stockscanner-network
