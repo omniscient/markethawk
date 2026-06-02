@@ -22,9 +22,17 @@ sub-issues, ignore them. Focus exclusively on the single resolved issue you were
 ## Phase 1: LOAD
 
 Read the project rules:
-- Read `CLAUDE.md` for all development rules, architecture, and validation requirements.
-- The issue context has been fetched by the workflow. It is available in the conversation.
-- **Check the `intent` field** in the issue context: `"new"` or `"continue"`.
+1. Read `CLAUDE.md` for all development rules, architecture, and validation requirements.
+2. Read `ARCHITECTURE.md` for service topology and module map.
+3. The issue context has been fetched by the workflow. It is available in the conversation.
+4. **Check the `intent` field** in the issue context: `"new"` or `"continue"`.
+5. Read `.archon/memory/codebase-patterns.md` — global lessons from past runs.
+6. Read `.archon/memory/architecture.md` — prior architectural decisions (if the file exists).
+7. If the issue touches backend code (`backend/app/models/`, `routers/`, `services/`, `tasks/`): read `.archon/memory/backend-patterns.md`.
+8. If the issue touches frontend code (`frontend/src/`): read `.archon/memory/frontend-patterns.md`.
+9. If the issue touches Docker or infrastructure files (`docker-compose`, `Dockerfile`, `dark-factory/`): read `.archon/memory/dark-factory-ops.md`.
+
+Apply these lessons as strong hints throughout implementation. If a lesson conflicts with `CLAUDE.md` or `ARCHITECTURE.md`, follow those documents instead and note the conflict in `$ARTIFACTS_DIR/implementation.md`.
 
 ### If intent is "continue"
 
