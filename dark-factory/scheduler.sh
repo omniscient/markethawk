@@ -590,6 +590,7 @@ docker compose --profile factory run --rm dark-factory \"Plan issue #${ISSUE}\"
       if ! is_issue_running "$ISSUE" && [ "$REFINE_RUNNING" -lt "$REFINE_WIP_LIMIT" ]; then
         HAS_NEW=$(has_new_comment_after_report "$ISSUE" "Posted by MarketHawk Refinement Pipeline")
         if [ "$HAS_NEW" = "yes" ]; then
+          reset_retry "${ISSUE}:refine"
           gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --remove-label "spec-pending-review" 2>/dev/null || true
           gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "🔄 **Refinement Pipeline** — Re-running with new feedback.
 
@@ -607,6 +608,29 @@ docker compose --profile factory run --rm dark-factory \"Plan issue #${ISSUE}\"
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
+    RETRIES=$(get_retry_count "${ISSUE}:refine")
+    if [ "$RETRIES" -ge "$REFINE_MAX_RETRIES" ]; then
+      gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --add-label needs-discussion 2>/dev/null || true
+      gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "## Refinement Pipeline — Retries Exhausted
+
+The scheduler has attempted refinement **${RETRIES} time(s)** and cannot recover automatically. The issue has been labelled \`needs-discussion\` to pause automation.
+
+**To resume automation:**
+1. Investigate the failure comments above.
+2. Fix the root cause (update the issue body, fix a dependency, or resolve the blocking error).
+3. Remove the \`needs-discussion\` label — the scheduler will resume automatically.
+
+\`\`\`bash
+# Or retry manually:
+docker compose --profile factory run --rm dark-factory \"Refine issue #${ISSUE}\"
+\`\`\`
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+      continue
+    fi
+
+    increment_retry "${ISSUE}:refine"
     gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "🧠 **Refinement Pipeline** — Starting brainstorming and spec generation.
 
 ---
