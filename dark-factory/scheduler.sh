@@ -24,6 +24,7 @@ STATUS_REFINED="0c79ebe5"
 # Refinement pipeline configuration
 REFINE_WIP_LIMIT="${REFINE_WIP_LIMIT:-2}"
 REFINE_SKIP_LABELS="needs-discussion,epic,spec-pending-review,plan-pending-review"
+REFINE_MAX_RETRIES="${REFINE_MAX_RETRIES:-3}"
 
 # --- Validate required environment ---
 if [ -z "${GH_TOKEN:-}" ]; then
