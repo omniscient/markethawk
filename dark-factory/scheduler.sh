@@ -137,7 +137,7 @@ has_new_comment_after_report() {
 dispatch() {
   local command="$1"
   echo "Dispatching: $command"
-  docker compose -f /workspace/project/docker-compose.yml --profile factory run -d --rm dark-factory "$command"
+  docker compose -f /opt/dark-factory/docker-compose.yml --profile factory run -d --rm dark-factory "$command"
 }
 
 # --- Move an issue to a board status (used by the orphaned-in-progress sweep) ---
