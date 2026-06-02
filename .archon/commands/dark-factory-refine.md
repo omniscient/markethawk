@@ -24,6 +24,11 @@ If the issue has any of these labels, STOP immediately and exit with code 0 (not
 4. Read `/opt/refinement-skills/orchestrator-prompt.md` for your process instructions
 5. Read `/opt/refinement-skills/product-owner-prompt.md` — you will pass this to subagents
 6. Read `/opt/refinement-skills/config.yaml` for pipeline configuration
+7. Read `.archon/memory/codebase-patterns.md` — global lessons from past runs.
+8. Read `.archon/memory/architecture.md` — prior architectural decisions written by previous refine runs (if the file exists).
+9. Read area-specific memory files relevant to the issue's domain: if the issue touches backend code read `.archon/memory/backend-patterns.md`; if it touches frontend code read `.archon/memory/frontend-patterns.md`; if it touches Docker or infrastructure read `.archon/memory/dark-factory-ops.md`.
+
+`AVOID` entries are especially relevant to spec decisions — if a memory entry marks an approach as AVOID, do not specify that approach in the spec without an explicit justification.
 
 ### If this is a re-run (feedback present in issue comments after a previous refinement report)
 
