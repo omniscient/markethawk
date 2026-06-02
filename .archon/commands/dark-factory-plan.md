@@ -16,6 +16,14 @@ argument-hint: (no arguments - reads issue context from workflow)
 3. Read `/opt/refinement-skills/architect-prompt.md` — you will pass this to the review subagent
 4. Find the spec file: look in `Docs/superpowers/specs/` for a file matching this issue's topic, or check the issue comments for a "Refinement Pipeline — Spec Generated" report that names the spec path
 5. Read the spec file
+6. Read `.archon/memory/codebase-patterns.md` — global lessons applicable to any change.
+7. Read `.archon/memory/architecture.md` — prior architectural decisions (if the file exists). If a memory entry marks an approach as AVOID, do not plan steps that use that approach.
+8. Read area-specific memory files based on the spec's `Component` field:
+   - Component touches `backend/app/models/`, `routers/`, `services/`, or `tasks/` → read `.archon/memory/backend-patterns.md`
+   - Component touches `frontend/src/` → read `.archon/memory/frontend-patterns.md`
+   - Component touches `docker-compose`, `Dockerfile`, or `dark-factory/` → read `.archon/memory/dark-factory-ops.md`
+
+  Bake relevant memory lessons directly into the plan task steps — do not leave them as a separate advisory section. For example, if `backend-patterns.md` contains a `[PATTERN]` about the `__init__.py` import requirement, the plan's "add model" task must explicitly include an `__init__.py` import step.
 
 ## Phase 2: PLAN WRITING
 
@@ -30,9 +38,46 @@ Write a full implementation plan following these conventions:
 
 ## Phase 3: ARCHITECT REVIEW
 
+Before spawning the architect subagent, build `$MEMORY_CONTEXT` by selecting the memory files whose area matches the spec's `Component` field:
+
+```bash
+MEMORY_CONTEXT=""
+
+# architecture.md is always included if it exists
+if [ -f ".archon/memory/architecture.md" ]; then
+  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/architecture.md\n$(cat .archon/memory/architecture.md)"
+fi
+
+# Backend area — extract the Component field from the spec file header
+SPEC_COMPONENT=$(grep -m1 '^\*\*Component' "$SPEC_FILE" | sed 's/.*: //')
+if echo "$SPEC_COMPONENT" | grep -qE "models/|routers/|services/|tasks/"; then
+  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/backend-patterns.md\n$(cat .archon/memory/backend-patterns.md)"
+fi
+
+# Frontend area
+if echo "$SPEC_COMPONENT" | grep -q "frontend/src/"; then
+  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/frontend-patterns.md\n$(cat .archon/memory/frontend-patterns.md)"
+fi
+
+# Docker / infrastructure area
+if echo "$SPEC_COMPONENT" | grep -qE "docker-compose|Dockerfile|dark-factory/"; then
+  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/dark-factory-ops.md\n$(cat .archon/memory/dark-factory-ops.md)"
+fi
+```
+
+Prepend `$MEMORY_CONTEXT` to the architect prompt as a "## Memory: Accumulated Patterns" section immediately before the Spec and Plan content. If `$MEMORY_CONTEXT` is empty (no relevant files exist yet), omit the section entirely.
+
 Spawn an architect subagent using the Agent tool:
 - `description`: "Architect review: validate plan against spec"
-- `prompt`: Content of `architect-prompt.md` with $SPEC_CONTENT and $PLAN_CONTENT replaced with the actual file contents
+- `prompt`: Content of `architect-prompt.md` with `$SPEC_CONTENT` and `$PLAN_CONTENT` replaced with the actual file contents, and with `$MEMORY_CONTEXT` prepended as shown:
+
+  ```
+  ## Memory: Accumulated Patterns
+  $MEMORY_CONTEXT
+
+  ---
+  [architect-prompt.md content with $SPEC_CONTENT and $PLAN_CONTENT filled in]
+  ```
 
 ### If architect returns "Issues Found":
 1. Fix each issue in the plan

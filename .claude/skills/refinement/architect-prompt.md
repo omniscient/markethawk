@@ -29,7 +29,19 @@ Verify the plan follows patterns from the existing codebase:
 - Frontend: React components, React Query hooks, Axios API layer
 - Testing: pytest for backend, tsc for frontend
 
-### 5. No Placeholders
+### 5. Memory Patterns
+
+If the context provided to you contains a section titled `## Memory: Accumulated Patterns`, run this check:
+
+For each `[AVOID]` or `[FIX]` entry in that section:
+- Read the core anti-pattern described in the entry.
+- Scan every task step and every code block in the plan for actions that would trigger that anti-pattern.
+- If a violation is found: flag it as `[MEMORY-VIOLATION]` and quote the relevant memory entry in full.
+- If no violations are found for a given entry: note "No memory violations found for: `<first 8 words of the entry>`".
+
+If no `## Memory: Accumulated Patterns` section was provided in the context, skip this section entirely and note "No memory context provided".
+
+### 6. No Placeholders
 Flag any: "TBD", "TODO", "implement later", "add appropriate error handling", "similar to Task N", or steps without code blocks.
 
 ## Output Format
