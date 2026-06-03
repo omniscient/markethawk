@@ -528,19 +528,13 @@ nodes:
             CONFORMANCE_CYCLES=$(grep '^CYCLES:' "$ARTIFACTS_DIR/conformance.md" | cut -d' ' -f2)
             NO_SPEC=$(grep '^NO_SPEC:' "$ARTIFACTS_DIR/conformance.md" | cut -d' ' -f2)
             ATTESTATION=$(sed -n '/^---$/,$ p' "$ARTIFACTS_DIR/conformance.md" | tail -n +2)
-            CONFORMANCE_SECTION="### Spec Conformance
-
-${ATTESTATION}"
+            CONFORMANCE_SECTION=$(printf "### Spec Conformance\n\n%s" "${ATTESTATION}")
             if [ "${NO_SPEC}" = "true" ]; then
-              CONFORMANCE_SECTION="${CONFORMANCE_SECTION}
-
-_Advisory-only: no spec found; reviewed against issue body._"
+              CONFORMANCE_SECTION=$(printf "%s\n\n_Advisory-only: no spec found; reviewed against issue body._" "${CONFORMANCE_SECTION}")
             fi
             ;;
           SKIPPED)
-            CONFORMANCE_SECTION="### Spec Conformance
-
-_Conformance check disabled (conformance.enabled=false)._"
+            CONFORMANCE_SECTION=$(printf "### Spec Conformance\n\n_Conformance check disabled (conformance.enabled=false)._")
             ;;
           *)
             CONFORMANCE_SECTION=""
