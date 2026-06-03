@@ -37,6 +37,20 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; the
   exit 1
 fi
 
+# --- Provision the dispatch env file ---
+# The dispatch runs `docker compose -f /opt/dark-factory/docker-compose.yml run dark-factory`,
+# whose service declares `env_file: .archon/.env (required: true)` — which the compose CLI
+# resolves to /opt/dark-factory/.archon/.env relative to the baked compose file. Secrets are
+# never baked into the image, so materialize that file at startup from the bind-mounted repo.
+# (Regressed by #104/#155 when docker-compose.yml moved to the required env_file format.)
+if [ -f /workspace/project/.archon/.env ]; then
+  mkdir -p /opt/dark-factory/.archon
+  cp /workspace/project/.archon/.env /opt/dark-factory/.archon/.env
+  echo "Provisioned dispatch env file at /opt/dark-factory/.archon/.env from bind mount"
+else
+  echo "WARNING: /workspace/project/.archon/.env not found — dispatched runs will fail env_file resolution" >&2
+fi
+
 # Create state directory (named volume creates the mountpoint but not subdirectories).
 mkdir -p "$SCHEDULER_STATE_DIR"
 
