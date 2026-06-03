@@ -150,16 +150,18 @@ class TestRunLiquidityHuntScheduledFixed:
             else _make_query_mock(tickers)
         )
 
-        mock_self = MagicMock()
-        mock_self.retry.side_effect = lambda exc, **kw: (_ for _ in ()).throw(exc)
+        def _retry_reraises(exc, **kw):
+            raise exc
 
         with (
             patch("app.tasks.scanning.SessionLocal", return_value=mock_db),
-            patch("app.tasks.scanning.get_market_today", return_value="2026-06-03"),
+            patch("app.utils.session.get_market_today", return_value="2026-06-03"),
             patch("app.tasks.scanning.asyncio.run", return_value=[]),
             patch("app.services.liquidity_hunt.run_liquidity_hunt_scan", return_value=[]),
+            patch.object(scanning_module.run_liquidity_hunt_scheduled, "retry", side_effect=_retry_reraises),
         ):
-            scanning_module.run_liquidity_hunt_scheduled.run(mock_self)
+            # For bind=True tasks .run() already has self bound to the task instance.
+            scanning_module.run_liquidity_hunt_scheduled.run()
 
     def test_does_not_call_parameters_get(self):
         """Fixed task must read cfg.universe_id, never cfg.parameters.get."""
@@ -209,16 +211,17 @@ class TestRunPocketPivotScheduledFixed:
             else _make_query_mock(tickers)
         )
 
-        mock_self = MagicMock()
-        mock_self.retry.side_effect = lambda exc, **kw: (_ for _ in ()).throw(exc)
+        def _retry_reraises(exc, **kw):
+            raise exc
 
         with (
             patch("app.tasks.scanning.SessionLocal", return_value=mock_db),
-            patch("app.tasks.scanning.get_market_today", return_value="2026-06-03"),
+            patch("app.utils.session.get_market_today", return_value="2026-06-03"),
             patch("app.tasks.scanning.asyncio.run", return_value=[]),
             patch("app.services.pocket_pivot.run_pocket_pivot_scan", return_value=[]),
+            patch.object(scanning_module.run_pocket_pivot_scheduled, "retry", side_effect=_retry_reraises),
         ):
-            scanning_module.run_pocket_pivot_scheduled.run(mock_self)
+            scanning_module.run_pocket_pivot_scheduled.run()
 
     def test_does_not_call_parameters_get(self):
         """Fixed task must read cfg.universe_id, never cfg.parameters.get."""

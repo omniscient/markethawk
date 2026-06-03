@@ -254,24 +254,42 @@ def run_liquidity_hunt_scheduled(self):
             .all()
         )
 
+        if not configs:
+            logger.error(
+                "run_liquidity_hunt_scheduled: no active liquidity_hunt ScannerConfig "
+                "rows found — add a row to scanner_configs with scanner_type='liquidity_hunt', "
+                "is_active=true, and a valid universe_id FK."
+            )
+            raise RuntimeError("no active liquidity_hunt scanner configs")
+
         for cfg in configs:
-            universe_id = cfg.parameters.get("universe_id")
-            if not universe_id:
-                logger.warning(
-                    "liquidity_hunt ScannerConfig %s has no universe_id", cfg.id
+            if cfg.universe_id is None:
+                logger.error(
+                    "run_liquidity_hunt_scheduled: ScannerConfig id=%s has universe_id=NULL "
+                    "— this is a data integrity violation; run the migration "
+                    "c7d8e9f0a1b2_add_universe_id_to_scanner_configs to backfill.",
+                    cfg.id,
                 )
-                continue
+                raise RuntimeError(
+                    f"ScannerConfig id={cfg.id} has universe_id=NULL"
+                )
 
             tickers = [
                 ms.ticker
                 for ms in db.query(MonitoredStock)
                 .filter(
-                    MonitoredStock.universe_id == universe_id,
+                    MonitoredStock.universe_id == cfg.universe_id,
                     MonitoredStock.is_active.is_(True),
                 )
                 .all()
             ]
             if not tickers:
+                logger.warning(
+                    "run_liquidity_hunt_scheduled: universe_id=%s has no active tickers, "
+                    "skipping ScannerConfig id=%s",
+                    cfg.universe_id,
+                    cfg.id,
+                )
                 continue
 
             results = asyncio.run(
@@ -281,7 +299,7 @@ def run_liquidity_hunt_scheduled(self):
             )
             logger.info(
                 "liquidity_hunt scheduled scan for universe %s on %s: %d events",
-                universe_id,
+                cfg.universe_id,
                 event_date,
                 len(results),
             )
@@ -598,24 +616,42 @@ def run_pocket_pivot_scheduled(self):
             .all()
         )
 
+        if not configs:
+            logger.error(
+                "run_pocket_pivot_scheduled: no active pocket_pivot ScannerConfig "
+                "rows found — add a row to scanner_configs with scanner_type='pocket_pivot', "
+                "is_active=true, and a valid universe_id FK."
+            )
+            raise RuntimeError("no active pocket_pivot scanner configs")
+
         for cfg in configs:
-            universe_id = cfg.parameters.get("universe_id")
-            if not universe_id:
-                logger.warning(
-                    "pocket_pivot ScannerConfig %s has no universe_id", cfg.id
+            if cfg.universe_id is None:
+                logger.error(
+                    "run_pocket_pivot_scheduled: ScannerConfig id=%s has universe_id=NULL "
+                    "— this is a data integrity violation; run the migration "
+                    "c7d8e9f0a1b2_add_universe_id_to_scanner_configs to backfill.",
+                    cfg.id,
                 )
-                continue
+                raise RuntimeError(
+                    f"ScannerConfig id={cfg.id} has universe_id=NULL"
+                )
 
             tickers = [
                 ms.ticker
                 for ms in db.query(MonitoredStock)
                 .filter(
-                    MonitoredStock.universe_id == universe_id,
+                    MonitoredStock.universe_id == cfg.universe_id,
                     MonitoredStock.is_active.is_(True),
                 )
                 .all()
             ]
             if not tickers:
+                logger.warning(
+                    "run_pocket_pivot_scheduled: universe_id=%s has no active tickers, "
+                    "skipping ScannerConfig id=%s",
+                    cfg.universe_id,
+                    cfg.id,
+                )
                 continue
 
             results = asyncio.run(
@@ -625,7 +661,7 @@ def run_pocket_pivot_scheduled(self):
             )
             logger.info(
                 "pocket_pivot scheduled scan for universe %s on %s: %d events",
-                universe_id,
+                cfg.universe_id,
                 event_date,
                 len(results),
             )
