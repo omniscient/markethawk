@@ -1,0 +1,50 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (e.g. latest or sha-abc1234)'
+        required: true
+        default: latest
+      run_migrations:
+        description: 'Run database migrations after pulling images'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        # Requires secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
+        # These are scaffolded here — add them in GitHub repository settings
+        # once a deployment server is provisioned.
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            export IMAGE_TAG="${{ inputs.image_tag }}"
+
+            # Pull updated images for all deployed services
+            docker compose pull \
+              backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
+
+            # Pull dark-factory image (profile-gated — updated via pull, not auto-restarted)
+            docker compose --profile factory pull dark-factory
+
+            # Restart services with updated images
+            docker compose up -d \
+              backend celery-worker celery-beat live-scanner flower frontend
+
+            # Restart backlog-scheduler if deployed with the scheduler profile
+            docker compose --profile scheduler up -d backlog-scheduler
+
+            # Optionally run migrations
+            if [ "${{ inputs.run_migrations }}" = "true" ]; then
+              docker compose exec -T backend python -m alembic upgrade head
+            fi

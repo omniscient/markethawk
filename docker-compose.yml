@@ -84,6 +84,7 @@ services:
 
   # Backend API
   backend:
+    image: ghcr.io/omniscient/markethawk-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -136,6 +137,7 @@ services:
 
   # Frontend
   frontend:
+    image: ghcr.io/omniscient/markethawk-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -153,6 +155,7 @@ services:
 
   # Celery for background tasks
   celery-worker:
+    image: ghcr.io/omniscient/markethawk-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -203,6 +206,7 @@ services:
 
   # Live Scanner — streams real-time IBKR bars for watchlist symbols
   live-scanner:
+    image: ghcr.io/omniscient/markethawk-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -238,6 +242,7 @@ services:
 
   # Celery Beat for reliable scheduling
   celery-beat:
+    image: ghcr.io/omniscient/markethawk-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -270,6 +275,7 @@ services:
 
   # Flower for Celery monitoring
   flower:
+    image: ghcr.io/omniscient/markethawk-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -396,6 +402,7 @@ services:
 
   # Dark Factory — autonomous development agent (run on demand)
   dark-factory:
+    image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: dark-factory/Dockerfile
@@ -418,6 +425,7 @@ services:
 
   # Backlog Scheduler — polls GitHub board and dispatches dark factory runs
   backlog-scheduler:
+    image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: dark-factory/Dockerfile
