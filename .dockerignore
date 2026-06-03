@@ -2,3 +2,4 @@
 *
 !dark-factory/
 !.claude/skills/refinement/
+!docker-compose.yml
