@@ -22,6 +22,9 @@ export GH_TOKEN="${GH_TOKEN:-stub-token}"
 export CLAUDE_CODE_OAUTH_TOKEN="${CLAUDE_CODE_OAUTH_TOKEN:-stub-token}"
 SCHEDULER_SOURCE_ONLY=1 source "$SCHED"
 
+# Re-stub set_board_status — scheduler.sh defines its own, overriding the export above
+set_board_status() { echo "set_board_status $*" >> "$STUB_LOG"; return 0; }
+
 # ---- Runner ----
 PASSED=0; FAILED=0
 assert_eq() {

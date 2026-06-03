@@ -167,6 +167,68 @@ set_board_status() {
   fi
 }
 
+# --- Universal circuit-breaker ---
+# Moves an issue to Blocked, adds needs-discussion (filters it from all dispatch loops via
+# SKIP_LABELS), posts an explanatory comment, and resets the retry counter so a later
+# manual re-trigger starts clean.
+# Usage: trip_to_blocked <issue_num> <phase: implement|plan|refine> <reason>
+trip_to_blocked() {
+  local issue_num="$1"
+  local phase="$2"
+  local reason="${3:-repeated dispatch failure}"
+
+  # implement uses bare issue number; plan/refine use ':phase' suffix
+  local key
+  case "$phase" in
+    implement) key="$issue_num" ;;
+    *)         key="${issue_num}:${phase}" ;;
+  esac
+  local attempts
+  attempts=$(get_retry_count "$key")
+
+  echo "[$(date -u +%FT%TZ)] circuit_breaker=trip issue=#${issue_num} phase=${phase} attempts=${attempts}"
+
+  # 1. Board → Blocked (no-op if already Blocked)
+  set_board_status "$issue_num" "$STATUS_BLOCKED" || true
+
+  # 2. needs-discussion is in SKIP_LABELS — filters this issue from every dispatch loop
+  gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+    --add-label needs-discussion 2>/dev/null || true
+
+  # 3. Manual retry command varies by phase
+  local retry_cmd
+  case "$phase" in
+    refine) retry_cmd="Refine issue #${issue_num}" ;;
+    plan)   retry_cmd="Plan issue #${issue_num}" ;;
+    *)      retry_cmd="Fix issue #${issue_num}" ;;
+  esac
+
+  # 4. Explanatory comment
+  gh issue comment "$issue_num" --repo "${OWNER}/markethawk" --body \
+"## Scheduler — Circuit-Breaker Tripped (\`${phase}\`)
+
+The scheduler attempted **${phase}** **${attempts} time(s)** without success and cannot recover automatically.
+
+**Reason:** ${reason}
+
+This ticket has been moved to **Blocked** and labelled \`needs-discussion\` to pause automation.
+
+**To resume:**
+1. Investigate the failure comments above and fix the root cause.
+2. Remove the \`needs-discussion\` label — the scheduler resumes on its next poll.
+
+\`\`\`bash
+# Or re-run manually:
+docker compose --profile factory run --rm dark-factory \"${retry_cmd}\"
+\`\`\`
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+
+  # 5. Reset counter so a future manual retry starts clean
+  reset_retry "$key"
+}
+
 # --- PR lookup: open PR number for an issue's feature branch ("" if none) ---
 # Matches the branch convention used throughout the workflow: feat/issue-<N>-<slug>.
 # `--repo` is REQUIRED: the scheduler runs at /workspace (not a git checkout — the repo
