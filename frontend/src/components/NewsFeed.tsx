@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Newspaper, ExternalLink, Clock, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fetchRecentNews, NewsArticle, triggerNewsRefresh } from '../api/news';
+import { wsUrl } from '../api/client';
 
 // Normalize a published_utc string to ensure consistent UTC parsing.
 // The REST API may return "2026-03-23T15:30:00" (no Z) while WebSocket
@@ -47,9 +48,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ ticker, limit = 50 }) => {
             .catch(err => console.error("Failed to fetch initial news history:", err));
 
         // Establish WebSocket Connection
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
-        const WS_URL = import.meta.env.VITE_WS_URL || `${protocol}//${host}/api/v1/news/ws`;
+        const WS_URL = wsUrl('/news/ws');
         
         let reconnectTimer: number | undefined;
         let isMounted = true;
