@@ -5,7 +5,8 @@ set -euo pipefail
 POLL_INTERVAL="${POLL_INTERVAL:-60}"
 SKIP_LABELS="needs-discussion,epic"
 MAX_RETRIES="${MAX_RETRIES:-3}"
-STATE_FILE="/tmp/scheduler-state.json"
+SCHEDULER_STATE_DIR="${SCHEDULER_STATE_DIR:-/var/lib/dark-factory}"
+STATE_FILE="${SCHEDULER_STATE_DIR}/scheduler-state.json"
 RATE_LIMIT_FLOOR="${RATE_LIMIT_FLOOR:-200}"
 
 # Board constants
@@ -35,6 +36,9 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ]; the
   echo "ERROR: Set CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY in .archon/.env" >&2
   exit 1
 fi
+
+# Create state directory (named volume creates the mountpoint but not subdirectories).
+mkdir -p "$SCHEDULER_STATE_DIR"
 
 # Initialize retry state
 if [ ! -f "$STATE_FILE" ]; then
