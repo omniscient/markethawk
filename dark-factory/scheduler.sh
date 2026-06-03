@@ -471,6 +471,28 @@ MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
 MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
 echo "WIP limits: in_progress=${MAX_IN_PROGRESS} in_review=${MAX_IN_REVIEW}"
 
+# --- Startup probe: verify factory image is available locally ---
+# dispatch() uses --no-build so a missing image causes every dispatch to fail immediately
+# (no inline build). Exit here with actionable instructions rather than entering a loop
+# where every dispatch fails and the circuit-breaker trips in N cycles.
+FACTORY_IMAGE="${FACTORY_IMAGE:-ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}}"
+echo "[$(date -u +%FT%TZ)] probe=image_check image=${FACTORY_IMAGE}"
+if ! docker image inspect "$FACTORY_IMAGE" >/dev/null 2>&1; then
+  echo "[$(date -u +%FT%TZ)] probe=image_missing — attempting docker pull"
+  if ! docker pull "$FACTORY_IMAGE"; then
+    echo "[$(date -u +%FT%TZ)] FATAL: image unavailable and pull failed." >&2
+    echo "  Fix GHCR auth (docker login ghcr.io) or build the image locally:" >&2
+    echo "  docker compose --profile factory build dark-factory" >&2
+    echo "  Then restart the scheduler." >&2
+    # Sleep before exit to throttle restart-unless-stopped restart loops
+    sleep 60
+    exit 1
+  fi
+  echo "[$(date -u +%FT%TZ)] probe=image_pulled image=${FACTORY_IMAGE}"
+else
+  echo "[$(date -u +%FT%TZ)] probe=image_ok image=${FACTORY_IMAGE}"
+fi
+
 # --- Main loop ---
 echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
 
