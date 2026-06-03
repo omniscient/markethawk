@@ -13,3 +13,8 @@ plan:
     - needs-discussion
     - epic
     - plan-pending-review
+
+conformance:
+  enabled: true
+  max_reconcile_cycles: 3
+  block_on_material: true
