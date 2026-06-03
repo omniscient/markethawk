@@ -49,7 +49,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ ticker, limit = 50 }) => {
         // Establish WebSocket Connection
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
-        const WS_URL = import.meta.env.VITE_WS_URL || `${protocol}//${host}/api/news/ws`;
+        const WS_URL = import.meta.env.VITE_WS_URL || `${protocol}//${host}/api/v1/news/ws`;
         
         let reconnectTimer: number | undefined;
         let isMounted = true;

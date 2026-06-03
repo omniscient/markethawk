@@ -27,7 +27,7 @@ const TweetFeed: React.FC<TweetFeedProps> = ({ limit = 50 }) => {
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
-    const WS_URL = `${protocol}//${host}/api/tweets/feed`;
+    const WS_URL = `${protocol}//${host}/api/v1/tweets/feed`;
 
     let reconnectTimer: number | undefined;
     let isMounted = true;
