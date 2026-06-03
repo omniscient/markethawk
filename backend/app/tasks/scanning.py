@@ -675,3 +675,74 @@ def run_pocket_pivot_scheduled(self):
             _time.monotonic() - _start
         )
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# Startup validation — wired to worker_ready signal in celery_app.py
+# ---------------------------------------------------------------------------
+
+_BEAT_SCHEDULED_SCANNER_TYPES = ["liquidity_hunt", "pocket_pivot"]
+
+
+def validate_scheduled_scanner_configs() -> None:
+    """Check that every beat-scheduled scanner type has at least one active
+    ScannerConfig with a non-null universe_id. Logs errors but never raises —
+    a crash here would kill the entire worker process rather than surfacing a
+    clear, actionable message.
+
+    Called once at Celery worker/beat startup via the worker_ready signal.
+    """
+    from app.models.scanner_config import ScannerConfig
+
+    try:
+        db = SessionLocal()
+    except Exception as exc:
+        logger.error(
+            "validate_scheduled_scanner_configs: could not open DB session — %s. "
+            "Beat tasks may still fail at runtime.",
+            exc,
+        )
+        return
+
+    try:
+        for scanner_type in _BEAT_SCHEDULED_SCANNER_TYPES:
+            configs = (
+                db.query(ScannerConfig)
+                .filter(
+                    ScannerConfig.scanner_type == scanner_type,
+                    ScannerConfig.is_active.is_(True),
+                )
+                .all()
+            )
+
+            if not configs:
+                logger.error(
+                    "STARTUP VALIDATION FAILED: no active ScannerConfig rows for "
+                    "scanner_type='%s'. The '%s' beat task will fail at 02:00 UTC. "
+                    "Add a row to scanner_configs with scanner_type='%s', is_active=true, "
+                    "and a valid universe_id FK referencing stock_universes(id).",
+                    scanner_type,
+                    scanner_type,
+                    scanner_type,
+                )
+                continue
+
+            for cfg in configs:
+                if cfg.universe_id is None:
+                    logger.error(
+                        "STARTUP VALIDATION FAILED: ScannerConfig id=%s "
+                        "(scanner_type='%s') has universe_id=NULL. "
+                        "Run migration c7d8e9f0a1b2_add_universe_id_to_scanner_configs "
+                        "to backfill existing rows.",
+                        cfg.id,
+                        scanner_type,
+                    )
+
+    except Exception as exc:
+        logger.error(
+            "validate_scheduled_scanner_configs: unexpected error during startup "
+            "validation — %s. Beat tasks may still fail at runtime.",
+            exc,
+        )
+    finally:
+        db.close()

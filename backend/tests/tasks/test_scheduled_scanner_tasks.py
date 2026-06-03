@@ -254,25 +254,26 @@ class TestValidateScheduledScannerConfigs:
     """Tests for the validate_scheduled_scanner_configs() startup check."""
 
     def _run_validation(self, liquidity_hunt_configs, pocket_pivot_configs):
-        """Invoke validate_scheduled_scanner_configs with mocked DB results."""
+        """Invoke validate_scheduled_scanner_configs with mocked DB results.
+
+        The validation function iterates _BEAT_SCHEDULED_SCANNER_TYPES in order:
+        ["liquidity_hunt", "pocket_pivot"]. We return configs by call index.
+        """
         import app.tasks.scanning as scanning_module
 
+        call_count = [0]
+        results_by_index = [liquidity_hunt_configs, pocket_pivot_configs]
+
+        def _make_filter_chain():
+            idx = call_count[0]
+            call_count[0] += 1
+            rows = results_by_index[idx] if idx < len(results_by_index) else []
+            f = MagicMock()
+            f.all.return_value = rows
+            return f
+
         mock_db = MagicMock()
-
-        def _query_side_effect(model):
-            q = MagicMock()
-            def _filter(*args, **kwargs):
-                f = MagicMock()
-                filter_str = str(args)
-                if "liquidity_hunt" in filter_str:
-                    f.all.return_value = liquidity_hunt_configs
-                else:
-                    f.all.return_value = pocket_pivot_configs
-                return f
-            q.filter.side_effect = _filter
-            return q
-
-        mock_db.query.side_effect = _query_side_effect
+        mock_db.query.return_value.filter.side_effect = lambda *a, **kw: _make_filter_chain()
 
         with patch("app.tasks.scanning.SessionLocal", return_value=mock_db):
             scanning_module.validate_scheduled_scanner_configs()

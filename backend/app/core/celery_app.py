@@ -1,5 +1,6 @@
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import worker_ready
 
 from app.core.config import settings
 
@@ -9,6 +10,15 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=["app.tasks"],
 )
+
+
+@worker_ready.connect
+def _on_worker_ready(sender, **kwargs):
+    """Run startup validation when the Celery worker finishes booting."""
+    from app.tasks.scanning import validate_scheduled_scanner_configs
+
+    validate_scheduled_scanner_configs()
+
 
 # News polling runs weekdays only (Mon-Fri).
 # The task itself enforces the precise 2 AM – 8 PM ET window.
