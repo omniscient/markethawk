@@ -501,14 +501,16 @@ This issue was left in **In progress** with no running factory container — the
 
     case "$VERDICT" in
       MERGE)
-        dispatch "Close issue #${ISSUE}"
-        DISPATCHED="Close issue #${ISSUE}"
+        if dispatch "Close issue #${ISSUE}"; then
+          DISPATCHED="Close issue #${ISSUE}"
+        fi
         ;;
       CONTINUE)
         if ! is_issue_running "$ISSUE"; then
-          dispatch "Continue issue #${ISSUE}"
-          DISPATCHED="Continue issue #${ISSUE}"
-          reset_retry "$ISSUE"
+          if dispatch "Continue issue #${ISSUE}"; then
+            DISPATCHED="Continue issue #${ISSUE}"
+            reset_retry "$ISSUE"
+          fi
         fi
         ;;
       SKIP) ;;
@@ -525,8 +527,9 @@ This issue was left in **In progress** with no running factory container — the
     if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
 
-    dispatch "Fix issue #${ISSUE}"
-    DISPATCHED="Fix issue #${ISSUE}"
+    if dispatch "Fix issue #${ISSUE}"; then
+      DISPATCHED="Fix issue #${ISSUE}"
+    fi
   done < <(echo "$READY" | jq -c '.[]')
 
   # --- Priority 3: Blocked items (retry stuck work) ---
@@ -544,11 +547,13 @@ This issue was left in **In progress** with no running factory container — the
     # continue run that failed mid-way) must be CONTINUED to reuse the existing branch.
     # Dispatching "Fix" would start a fresh branch that collides with the PR on push.
     if [ -n "$(get_pr_for_issue "$ISSUE")" ]; then
-      dispatch "Continue issue #${ISSUE}"
-      DISPATCHED="Continue issue #${ISSUE}"
+      if dispatch "Continue issue #${ISSUE}"; then
+        DISPATCHED="Continue issue #${ISSUE}"
+      fi
     else
-      dispatch "Fix issue #${ISSUE}"
-      DISPATCHED="Fix issue #${ISSUE}"
+      if dispatch "Fix issue #${ISSUE}"; then
+        DISPATCHED="Fix issue #${ISSUE}"
+      fi
     fi
   done < <(echo "$BLOCKED" | jq -c '.[]')
 
@@ -587,9 +592,10 @@ docker compose --profile factory run --rm dark-factory \"Plan issue #${ISSUE}\"
 
 ---
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-    dispatch "Plan issue #${ISSUE}"
-    DISPATCHED="Plan issue #${ISSUE}"
-    REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    if dispatch "Plan issue #${ISSUE}"; then
+      DISPATCHED="Plan issue #${ISSUE}"
+      REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    fi
   done < <(echo "$REFINED" | jq -c '.[]')
 
   # --- Priority 5: Backlog items (refinement — prepare future work) ---
@@ -609,9 +615,10 @@ docker compose --profile factory run --rm dark-factory \"Plan issue #${ISSUE}\"
 
 ---
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-          dispatch "Refine issue #${ISSUE}"
-          DISPATCHED="Refine issue #${ISSUE}"
-          REFINE_RUNNING=$((REFINE_RUNNING + 1))
+          if dispatch "Refine issue #${ISSUE}"; then
+            DISPATCHED="Refine issue #${ISSUE}"
+            REFINE_RUNNING=$((REFINE_RUNNING + 1))
+          fi
         fi
       fi
       continue
@@ -648,9 +655,10 @@ docker compose --profile factory run --rm dark-factory \"Refine issue #${ISSUE}\
 
 ---
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-    dispatch "Refine issue #${ISSUE}"
-    DISPATCHED="Refine issue #${ISSUE}"
-    REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    if dispatch "Refine issue #${ISSUE}"; then
+      DISPATCHED="Refine issue #${ISSUE}"
+      REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    fi
   done < <(echo "$BACKLOG" | jq -c '.[]')
 
   # --- Log cycle summary ---
