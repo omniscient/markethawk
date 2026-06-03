@@ -37,6 +37,7 @@ import {
 
 // API functions
 import { fetchScannerConfigs, getSignalQualityDistribution } from '../api/scanner';
+import { apiClient } from '../api/client';
 import CorrelationHeatmap from '../components/CorrelationHeatmap';
 import { fetchCorrelations, triggerAnalysis } from '../api/analysis';
 
@@ -59,9 +60,8 @@ const EdgeExplorer: React.FC = () => {
       if (ticker) params.append('ticker', ticker);
       if (scannerType) params.append('scanner_type', scannerType);
       
-      const response = await fetch(`/api/v1/scanner/edge-stats?${params.toString()}`);
-      if (!response.ok) return [];
-      return response.json();
+      const response = await apiClient.get(`/scanner/edge-stats?${params.toString()}`);
+      return response.data;
     }
   });
 
@@ -73,9 +73,8 @@ const EdgeExplorer: React.FC = () => {
       if (ticker) params.append('ticker', ticker);
       if (scannerType) params.append('scanner_type', scannerType);
       
-      const response = await fetch(`/api/v1/scanner/edge-distribution?${params.toString()}`);
-      if (!response.ok) return { events: [] };
-      return response.json();
+      const response = await apiClient.get(`/scanner/edge-distribution?${params.toString()}`);
+      return response.data;
     }
   });
 
