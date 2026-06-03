@@ -29,6 +29,27 @@ def upgrade() -> None:
         ),
     )
 
+    # Step 1b: Ensure the default universe (id=1) exists so the FK backfill
+    # succeeds on fresh databases (e.g. CI) where seed SQL has not been applied.
+    # ON CONFLICT (id) DO NOTHING makes this a no-op on production databases
+    # that already have the row.
+    op.execute(
+        sa.text(
+            """
+            INSERT INTO stock_universes (id, uuid, name, description, criteria, is_active)
+            VALUES (
+                1,
+                gen_random_uuid(),
+                'Default Universe',
+                'Placeholder universe created by migration c7d8e9f0a1b2',
+                '{}',
+                true
+            )
+            ON CONFLICT (id) DO NOTHING
+            """
+        )
+    )
+
     # Step 2: Backfill all existing rows with universe_id = 1 (the system
     # default universe, confirmed by the scanner.default_universe = 1 seed).
     op.execute(
