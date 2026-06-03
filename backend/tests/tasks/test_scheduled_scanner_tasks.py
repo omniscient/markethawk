@@ -79,7 +79,7 @@ def test_seed_liquidity_hunt_has_universe_id():
     import os
     seed_path = os.path.abspath(os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "..", "..", "dark-factory", "seed", "seed",
+        "..", "..", "..", "dark-factory", "seed", "seed",
         "01_scanner_configs.sql",
     ))
     with open(seed_path) as f:
@@ -94,7 +94,7 @@ def test_seed_pocket_pivot_row_exists():
     import os
     seed_path = os.path.abspath(os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "..", "..", "dark-factory", "seed", "seed",
+        "..", "..", "..", "dark-factory", "seed", "seed",
         "01_scanner_configs.sql",
     ))
     with open(seed_path) as f:
