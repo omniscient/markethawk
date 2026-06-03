@@ -139,10 +139,19 @@ has_new_comment_after_report() {
 }
 
 # --- Dispatch ---
+# Returns the docker compose exit code. Callers MUST use `if dispatch ...; then` —
+# a bare call under set -e exits the daemon on non-zero.
+# --no-build prevents inline image builds; the startup probe ensures the image exists.
 dispatch() {
   local command="$1"
-  echo "Dispatching: $command"
-  docker compose -f /opt/dark-factory/docker-compose.yml --profile factory run -d --rm dark-factory "$command"
+  local exit_code=0
+  echo "[$(date -u +%FT%TZ)] dispatch command=\"${command}\""
+  docker compose -f /opt/dark-factory/docker-compose.yml --profile factory run \
+    -d --rm --no-build dark-factory "$command" || exit_code=$?
+  if [ "$exit_code" -ne 0 ]; then
+    echo "[$(date -u +%FT%TZ)] dispatch_error command=\"${command}\" exit=${exit_code}" >&2
+  fi
+  return "$exit_code"
 }
 
 # --- Move an issue to a board status (used by the orphaned-in-progress sweep) ---
