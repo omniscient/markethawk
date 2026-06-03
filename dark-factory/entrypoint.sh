@@ -292,6 +292,22 @@ echo "Installing frontend dependencies..."
 cd "$CLONE_DIR/frontend" && npm install --silent
 cd "$CLONE_DIR"
 
+# --- Register codeindex MCP server for the implement-step agent ---
+# Uses the absolute path (required — Claude Code does not inherit shell PATH).
+# Written to .claude/settings.local.json which is gitignored and never committed.
+CODEINDEX_BIN=$(which codeindex 2>/dev/null || true)
+if [ -n "$CODEINDEX_BIN" ]; then
+  mkdir -p "$CLONE_DIR/.claude"
+  printf '{\n  "mcpServers": {\n    "codeindex": { "command": "%s", "args": ["serve", "--mcp"] }\n  }\n}\n' \
+    "$CODEINDEX_BIN" > "$CLONE_DIR/.claude/settings.local.json"
+  echo "codeindex MCP registered at $CODEINDEX_BIN"
+else
+  echo "WARNING: codeindex not found; MCP server will not be registered"
+fi
+
+# --- Install pre-commit hooks so codeindex-blast warn hook fires in the run log ---
+pre-commit install --allow-missing-config 2>/dev/null || true
+
 # --- Run via Archon workflow ---
 export CLAUDE_BIN_PATH=/usr/bin/claude
 export IS_SANDBOX=1

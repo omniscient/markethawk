@@ -304,6 +304,22 @@ Requires a `.env` file in the project root (Docker Compose reads it automaticall
 
 Key variables: `POLYGON_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `SECRET_KEY`, `SEQ_ADMIN_PASSWORD_HASH`, `PGADMIN_DEFAULT_EMAIL/PASSWORD`, `REDIS_URL`, `IBKR_HOST/PORT/CLIENT_ID`.
 
+## Codeindex
+
+Symbol index `symbolindex.json` + dependency graph `codeindex.json` are maintained in-repo (committed artifacts).
+Use the `lookup_symbol` MCP tool before grepping for any function or class.
+Use `get_impact` before modifying a high-blast file (see `docs/codeindex-hotspots.md` for the current list).
+
+### Local visualization
+
+```bash
+# One-time install (developer machines only — never add to backend/requirements.txt)
+pip install "git+https://github.com/scheidydude/codeindex.git"
+
+# Launch interactive viz on http://localhost:8080
+bash scripts/codeindex.sh
+```
+
 ## Further Reading
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — service topology, scan execution flow, module map, Celery tasks
@@ -313,6 +329,7 @@ Key variables: `POLYGON_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `SECRET_K
 - [ENV_VARIABLES.md](ENV_VARIABLES.md) — all env vars with defaults and descriptions
 - [POLYGON_RATE_LIMITS.md](POLYGON_RATE_LIMITS.md) — API plan tiers, rate limits, key endpoints
 - [deployment-guide.md](deployment-guide.md) — production hardening, backup, upgrade
+- [docs/codeindex-hotspots.md](docs/codeindex-hotspots.md) — high-blast hotspots (auto-updated by the factory)
 
 ## Agent Skills
 
