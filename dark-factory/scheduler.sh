@@ -114,6 +114,13 @@ has_refine_skip_label() {
   return 1
 }
 
+has_opt_in_refine_label() {
+  local item="$1"
+  local labels
+  labels=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
+  echo "$labels" | grep -qi "ready-for-agent"
+}
+
 has_new_comment_after_report() {
   local issue_num="$1"
   local report_marker="$2"
@@ -685,6 +692,9 @@ This issue was left in **In progress** with no running factory container — the
     fi
 
     if has_refine_skip_label "$item"; then continue; fi
+    # Opt-in gate: only auto-refine Backlog items labelled ready-for-agent.
+    # Unlabelled items are left for triage — humans add the label when the issue is ready.
+    if ! has_opt_in_refine_label "$item"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 

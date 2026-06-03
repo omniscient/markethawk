@@ -21,3 +21,11 @@ Archon uses separate labels for its execution pipeline (`spec-pending-review`, `
 3. Archon picks it up → `spec-pending-review` → `spec-approved` → `plan-pending-review` → done
 
 Do not conflate the two label sets.
+
+## Opt-in refinement gate
+
+The backlog scheduler auto-refines Backlog issues **only when they carry the `ready-for-agent` label**. Unlabelled Backlog items are left for triage and are never automatically dispatched to the refinement pipeline.
+
+This prevents new issues from being auto-refined during the labelling window (the root cause of the #159 dispatch loop). Apply `ready-for-agent` to a Backlog issue once it is triaged and fully specified for agent work.
+
+The `spec-pending-review` re-refine-on-feedback path is unaffected — it handles feedback on an already-refined issue and does not require an opt-in label.
