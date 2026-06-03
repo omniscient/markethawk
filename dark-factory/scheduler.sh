@@ -447,6 +447,17 @@ if [ "${SCHEDULER_SOURCE_ONLY:-0}" = "1" ]; then
   return 0
 fi
 
+# --- ERR trap: log unhandled exits for post-mortem diagnosis ---
+# dispatch() callers are all guarded with `if dispatch ...; then`; this backstop
+# identifies any command that slips through. The scheduler exits on unhandled ERR
+# (set -e); durable retry state on the named volume ensures circuit-breakers
+# accumulate correctly across the restart-unless-stopped restart cycle.
+_sched_err_trap() {
+  local code=$? line=${BASH_LINENO[0]}
+  echo "[$(date -u +%FT%TZ)] SCHED_UNHANDLED_ERR line=${line} exit=${code}" >&2
+}
+trap '_sched_err_trap' ERR
+
 # --- Fetch WIP limits once at startup (cached until restart) ---
 WIP_DATA=$(fetch_wip_limits)
 MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
