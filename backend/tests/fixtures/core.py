@@ -82,7 +82,18 @@ def seed_monitored_stocks(
     return stocks
 
 
-def seed_scanner_configs(db: Session) -> list[ScannerConfig]:
+def seed_scanner_configs(db: Session, universe_id: int | None = None) -> list[ScannerConfig]:
+    if universe_id is None:
+        u = StockUniverse(
+            name="Test Universe",
+            description="Seed universe for scanner config tests",
+            criteria={},
+            is_active=True,
+        )
+        db.add(u)
+        db.flush()
+        universe_id = u.id
+
     configs = [
         ScannerConfig(
             name="Pre-Market Volume Spike",
@@ -90,6 +101,7 @@ def seed_scanner_configs(db: Session) -> list[ScannerConfig]:
             parameters={"min_volume": 100000, "spike_ratio": 4.0},
             criteria=[{"field": "volume_ratio", "op": ">=", "value": 4.0}],
             is_active=True,
+            universe_id=universe_id,
         ),
         ScannerConfig(
             name="Liquidity Hunt",
@@ -97,6 +109,7 @@ def seed_scanner_configs(db: Session) -> list[ScannerConfig]:
             parameters={"threshold": 1000},
             criteria=[{"field": "liquidity_score", "op": ">=", "value": 1000}],
             is_active=True,
+            universe_id=universe_id,
         ),
         ScannerConfig(
             name="Inactive Config",
@@ -104,6 +117,7 @@ def seed_scanner_configs(db: Session) -> list[ScannerConfig]:
             parameters={},
             criteria=[],
             is_active=False,
+            universe_id=universe_id,
         ),
     ]
     for c in configs:
