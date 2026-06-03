@@ -89,7 +89,49 @@ Spawn an architect subagent using the Agent tool:
    - Exit cleanly
 
 ### If architect returns "Approved":
-Proceed to publish.
+Proceed to Phase 3.5.
+
+## Phase 3.5: CONFORMANCE REVIEW
+
+Read the `conformance` block from `.claude/skills/refinement/config.yaml`.
+
+If `conformance.enabled` is `false`, skip this phase entirely and proceed to Phase 4. Record `CONFORMANCE_SKIPPED=true` for Phase 4.
+
+1. Read `/opt/refinement-skills/conformance-reviewer-prompt.md`
+2. Determine `MAX_CYCLES` from `conformance.max_reconcile_cycles` (default: 3)
+3. Set `CONFORMANCE_DIALOGUE=""` and `CONFORMANCE_CYCLE=0`
+4. Build the artifact content: the plan document text is `$PLAN_CONTENT`
+5. Spawn a conformance reviewer subagent using the Agent tool:
+   - `description`: "Conformance review: plan vs spec (cycle N)"
+   - `prompt`: Content of `conformance-reviewer-prompt.md` with:
+     - `$ARTIFACT_KIND` replaced with `PLAN`
+     - `$SPEC_CONTENT` replaced with the spec file contents
+     - `$ARTIFACT_CONTENT` replaced with `$PLAN_CONTENT`
+6. Append the subagent's output to `CONFORMANCE_DIALOGUE`
+7. Parse the **Verdict** line from the output:
+   - `✅ Conforms` or `⚠️ Minor deviations` → record `CONFORMANCE_VERDICT` and proceed to Phase 4
+   - `⛔ Material divergence` → go to step 8
+8. **Reconcile loop** (only if MATERIAL):
+   a. Increment `CONFORMANCE_CYCLE`
+   b. If `CONFORMANCE_CYCLE > MAX_CYCLES`:
+      - Post the conformance dialogue as an issue comment:
+        ```
+        ## Spec Conformance — Blocked (Plan)
+
+        The plan has material divergences from the spec that could not be resolved in $MAX_CYCLES reconcile cycle(s).
+
+        $CONFORMANCE_DIALOGUE
+
+        ---
+        *Posted by MarketHawk Refinement Pipeline*
+        ```
+      - Add `needs-discussion` label: `gh issue edit $ISSUE_NUM --add-label needs-discussion`
+      - Exit cleanly (do not abort — this is a known state)
+   c. Read the MATERIAL deviation descriptions from the conformance reviewer output
+   d. Revise the plan to address each MATERIAL deviation (update the plan file, re-read it)
+   e. Re-spawn the conformance reviewer subagent (same prompt format, updated `$PLAN_CONTENT`)
+   f. Append the new output to `CONFORMANCE_DIALOGUE` with a `---` separator and `Cycle N:` header
+   g. Parse verdict again → loop back to step 7
 
 ## Phase 4: PUBLISH
 
@@ -119,6 +161,12 @@ Proceed to publish.
    > **Changes made:** <what you fixed, if any>
 
    This lets the reviewer see what the architect flagged and how it was resolved.
+
+   ## Spec Conformance
+
+   (If Phase 3.5 was skipped because `conformance.enabled: false`, write: _Conformance check disabled._)
+
+   (Otherwise, include the full conformance reviewer output from Phase 3.5 — the final attestation table and verdict. If a reconcile loop ran, include the full dialogue with cycle headers.)
 
    ### Next Steps
 

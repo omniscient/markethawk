@@ -8,8 +8,8 @@ Validate that the implementation plan is complete, consistent, and follows codeb
 
 ## What to Check
 
-### 1. Spec Coverage
-Read the spec (provided below). For each requirement, verify there is a corresponding task in the plan. List any requirements that have no task.
+### 1. Spec Coverage (mechanical traceability only)
+Read the spec (provided below). For each requirement, verify there is a corresponding task in the plan that addresses it — i.e., a task exists. Do NOT judge whether the plan uses the spec's chosen approach or honors its constraints; that is the conformance reviewer's job (a separate subagent that runs after you). Your only question here: "Is there a task for this requirement, or is it missing entirely?" List any requirements that have no task at all.
 
 ### 2. File Path Consistency
 Check that file paths, function names, and interfaces used in later tasks match what was defined in earlier tasks. Flag any mismatches.
