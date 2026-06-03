@@ -435,9 +435,12 @@ services:
     env_file:
       - path: .archon/.env
         required: true
+    environment:
+      FACTORY_IMAGE: "ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}"
     # Bind-mount (.:/workspace/project:ro) is restored in docker-compose.override.yml for local dev.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - scheduler_state:/var/lib/dark-factory
     networks:
       - factory-network
       - stockscanner-network
@@ -536,6 +539,7 @@ volumes:
   ib_gateway_settings:
     external: true
     name: markethawk_ib_gateway_settings
+  scheduler_state:
   timesfm_cache:
   prometheus_multiproc:
     driver: local

@@ -129,6 +129,16 @@ curl http://localhost:8000/health
 
 ---
 
+## Dark Factory / Backlog Scheduler
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SCHEDULER_STATE_DIR` | `/var/lib/dark-factory` | Directory for durable scheduler retry state. Mounted from the `scheduler_state` named Docker volume in the `backlog-scheduler` service. |
+| `FACTORY_IMAGE` | `ghcr.io/omniscient/markethawk-dark-factory:latest` | Docker image the scheduler probes at startup and dispatches with `--no-build`. Override to use a locally-built tag. |
+| `IMAGE_TAG` | `latest` | Tag suffix for `FACTORY_IMAGE`. Used when `FACTORY_IMAGE` is not set explicitly. |
+
+---
+
 ## Adding a New Variable
 
 1. Add it to `.env.example` with a placeholder value and a comment.

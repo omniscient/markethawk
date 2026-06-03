@@ -31,6 +31,20 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Every memory entry must carry an `expires:YYYY-MM-DD` inline comment with a 6-month TTL from the date it was written. Format: `<!-- issue:#NNN date:YYYY-MM-DD expires:YYYY-MM-DD source:implement -->`. The expiry date is used by the awk cleanup one-liner to prune stale lessons automatically. <!-- issue:#149 date:2026-06-02 expires:2026-12-02 source:implement -->
 
+## Scheduler Testing
+
+- [PATTERN] When writing tests for `dark-factory/scheduler.sh` with `SCHEDULER_SOURCE_ONLY=1`, set stub credentials (`GH_TOKEN=stub CLAUDE_CODE_OAUTH_TOKEN=stub`) before sourcing — the credential validation block runs before the `SCHEDULER_SOURCE_ONLY` guard and will abort otherwise. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+- [FIX] Functions defined in `scheduler.sh` (e.g. `set_board_status`, `is_issue_running`) override `export -f` stubs when the scheduler is sourced. Re-define stubs AFTER the `source` call to win the override race — do not rely on exported functions surviving the source. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+- [AVOID] `grep -c "keyword"` against a stub log that includes multi-line command bodies (e.g. `gh issue comment ... --body "..."`) can over-count if the keyword appears in the body text. Use a more specific pattern like `grep -c -- '--add-label keyword'` to target the command argument, not the body content. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+## Scheduler Architecture
+
+- [PATTERN] The `backlog-scheduler` uses a named Docker volume `scheduler_state` mounted at `/var/lib/dark-factory` for durable retry counters. `STATE_FILE` is `${SCHEDULER_STATE_DIR}/scheduler-state.json`. Running `docker compose down -v` would destroy the volume — use `docker compose down` (without `-v`) for normal restarts. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+- [PATTERN] All `dispatch()` call sites in `scheduler.sh` must use `if dispatch ...; then ... fi` guards. A bare `dispatch "..."` under `set -e` exits the daemon on non-zero return, which triggers `restart: unless-stopped` and wipes the (old `/tmp`) retry counter — the root cause of the #159 loop. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
+
 ## Environment and Credentials
 
 - [PATTERN] Every new environment variable introduced by a feature must be documented in `ENV_VARIABLES.md` with its default value and a one-line description. CLAUDE.md references ENV_VARIABLES.md as the authoritative env var reference. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->

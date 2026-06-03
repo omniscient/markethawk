@@ -5,7 +5,8 @@ set -euo pipefail
 POLL_INTERVAL="${POLL_INTERVAL:-60}"
 SKIP_LABELS="needs-discussion,epic"
 MAX_RETRIES="${MAX_RETRIES:-3}"
-STATE_FILE="/tmp/scheduler-state.json"
+SCHEDULER_STATE_DIR="${SCHEDULER_STATE_DIR:-/var/lib/dark-factory}"
+STATE_FILE="${SCHEDULER_STATE_DIR}/scheduler-state.json"
 RATE_LIMIT_FLOOR="${RATE_LIMIT_FLOOR:-200}"
 
 # Board constants
@@ -49,6 +50,9 @@ if [ -f /workspace/project/.archon/.env ]; then
 else
   echo "WARNING: /workspace/project/.archon/.env not found — dispatched runs will fail env_file resolution" >&2
 fi
+
+# Create state directory (named volume creates the mountpoint but not subdirectories).
+mkdir -p "$SCHEDULER_STATE_DIR"
 
 # Initialize retry state
 if [ ! -f "$STATE_FILE" ]; then
@@ -124,6 +128,13 @@ has_refine_skip_label() {
   return 1
 }
 
+has_opt_in_refine_label() {
+  local item="$1"
+  local labels
+  labels=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
+  echo "$labels" | grep -qi "ready-for-agent"
+}
+
 has_new_comment_after_report() {
   local issue_num="$1"
   local report_marker="$2"
@@ -149,10 +160,19 @@ has_new_comment_after_report() {
 }
 
 # --- Dispatch ---
+# Returns the docker compose exit code. Callers MUST use `if dispatch ...; then` —
+# a bare call under set -e exits the daemon on non-zero.
+# --no-build prevents inline image builds; the startup probe ensures the image exists.
 dispatch() {
   local command="$1"
-  echo "Dispatching: $command"
-  docker compose -f /opt/dark-factory/docker-compose.yml --profile factory run -d --rm dark-factory "$command"
+  local exit_code=0
+  echo "[$(date -u +%FT%TZ)] dispatch command=\"${command}\""
+  docker compose -f /opt/dark-factory/docker-compose.yml --profile factory run \
+    -d --rm --no-build dark-factory "$command" || exit_code=$?
+  if [ "$exit_code" -ne 0 ]; then
+    echo "[$(date -u +%FT%TZ)] dispatch_error command=\"${command}\" exit=${exit_code}" >&2
+  fi
+  return "$exit_code"
 }
 
 # --- Move an issue to a board status (used by the orphaned-in-progress sweep) ---
@@ -166,6 +186,68 @@ set_board_status() {
     gh project item-edit --project-id "$PROJECT_ID" --id "$item_id" \
       --field-id "$STATUS_FIELD" --single-select-option-id "$option_id" >/dev/null 2>&1 || true
   fi
+}
+
+# --- Universal circuit-breaker ---
+# Moves an issue to Blocked, adds needs-discussion (filters it from all dispatch loops via
+# SKIP_LABELS), posts an explanatory comment, and resets the retry counter so a later
+# manual re-trigger starts clean.
+# Usage: trip_to_blocked <issue_num> <phase: implement|plan|refine> <reason>
+trip_to_blocked() {
+  local issue_num="$1"
+  local phase="$2"
+  local reason="${3:-repeated dispatch failure}"
+
+  # implement uses bare issue number; plan/refine use ':phase' suffix
+  local key
+  case "$phase" in
+    implement) key="$issue_num" ;;
+    *)         key="${issue_num}:${phase}" ;;
+  esac
+  local attempts
+  attempts=$(get_retry_count "$key")
+
+  echo "[$(date -u +%FT%TZ)] circuit_breaker=trip issue=#${issue_num} phase=${phase} attempts=${attempts}"
+
+  # 1. Board → Blocked (no-op if already Blocked)
+  set_board_status "$issue_num" "$STATUS_BLOCKED" || true
+
+  # 2. needs-discussion is in SKIP_LABELS — filters this issue from every dispatch loop
+  gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+    --add-label needs-discussion 2>/dev/null || true
+
+  # 3. Manual retry command varies by phase
+  local retry_cmd
+  case "$phase" in
+    refine) retry_cmd="Refine issue #${issue_num}" ;;
+    plan)   retry_cmd="Plan issue #${issue_num}" ;;
+    *)      retry_cmd="Fix issue #${issue_num}" ;;
+  esac
+
+  # 4. Explanatory comment
+  gh issue comment "$issue_num" --repo "${OWNER}/markethawk" --body \
+"## Scheduler — Circuit-Breaker Tripped (\`${phase}\`)
+
+The scheduler attempted **${phase}** **${attempts} time(s)** without success and cannot recover automatically.
+
+**Reason:** ${reason}
+
+This ticket has been moved to **Blocked** and labelled \`needs-discussion\` to pause automation.
+
+**To resume:**
+1. Investigate the failure comments above and fix the root cause.
+2. Remove the \`needs-discussion\` label — the scheduler resumes on its next poll.
+
+\`\`\`bash
+# Or re-run manually:
+docker compose --profile factory run --rm dark-factory \"${retry_cmd}\"
+\`\`\`
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+
+  # 5. Reset counter so a future manual retry starts clean
+  reset_retry "$key"
 }
 
 # --- PR lookup: open PR number for an issue's feature branch ("" if none) ---
@@ -386,11 +468,44 @@ if [ "${SCHEDULER_SOURCE_ONLY:-0}" = "1" ]; then
   return 0
 fi
 
+# --- ERR trap: log unhandled exits for post-mortem diagnosis ---
+# dispatch() callers are all guarded with `if dispatch ...; then`; this backstop
+# identifies any command that slips through. The scheduler exits on unhandled ERR
+# (set -e); durable retry state on the named volume ensures circuit-breakers
+# accumulate correctly across the restart-unless-stopped restart cycle.
+_sched_err_trap() {
+  local code=$? line=${BASH_LINENO[0]}
+  echo "[$(date -u +%FT%TZ)] SCHED_UNHANDLED_ERR line=${line} exit=${code}" >&2
+}
+trap '_sched_err_trap' ERR
+
 # --- Fetch WIP limits once at startup (cached until restart) ---
 WIP_DATA=$(fetch_wip_limits)
 MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
 MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
 echo "WIP limits: in_progress=${MAX_IN_PROGRESS} in_review=${MAX_IN_REVIEW}"
+
+# --- Startup probe: verify factory image is available locally ---
+# dispatch() uses --no-build so a missing image causes every dispatch to fail immediately
+# (no inline build). Exit here with actionable instructions rather than entering a loop
+# where every dispatch fails and the circuit-breaker trips in N cycles.
+FACTORY_IMAGE="${FACTORY_IMAGE:-ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}}"
+echo "[$(date -u +%FT%TZ)] probe=image_check image=${FACTORY_IMAGE}"
+if ! docker image inspect "$FACTORY_IMAGE" >/dev/null 2>&1; then
+  echo "[$(date -u +%FT%TZ)] probe=image_missing — attempting docker pull"
+  if ! docker pull "$FACTORY_IMAGE"; then
+    echo "[$(date -u +%FT%TZ)] FATAL: image unavailable and pull failed." >&2
+    echo "  Fix GHCR auth (docker login ghcr.io) or build the image locally:" >&2
+    echo "  docker compose --profile factory build dark-factory" >&2
+    echo "  Then restart the scheduler." >&2
+    # Sleep before exit to throttle restart-unless-stopped restart loops
+    sleep 60
+    exit 1
+  fi
+  echo "[$(date -u +%FT%TZ)] probe=image_pulled image=${FACTORY_IMAGE}"
+else
+  echo "[$(date -u +%FT%TZ)] probe=image_ok image=${FACTORY_IMAGE}"
+fi
 
 # --- Main loop ---
 echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
@@ -502,14 +617,16 @@ This issue was left in **In progress** with no running factory container — the
 
     case "$VERDICT" in
       MERGE)
-        dispatch "Close issue #${ISSUE}"
-        DISPATCHED="Close issue #${ISSUE}"
+        if dispatch "Close issue #${ISSUE}"; then
+          DISPATCHED="Close issue #${ISSUE}"
+        fi
         ;;
       CONTINUE)
         if ! is_issue_running "$ISSUE"; then
-          dispatch "Continue issue #${ISSUE}"
-          DISPATCHED="Continue issue #${ISSUE}"
-          reset_retry "$ISSUE"
+          if dispatch "Continue issue #${ISSUE}"; then
+            DISPATCHED="Continue issue #${ISSUE}"
+            reset_retry "$ISSUE"
+          fi
         fi
         ;;
       SKIP) ;;
@@ -526,8 +643,9 @@ This issue was left in **In progress** with no running factory container — the
     if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
 
-    dispatch "Fix issue #${ISSUE}"
-    DISPATCHED="Fix issue #${ISSUE}"
+    if dispatch "Fix issue #${ISSUE}"; then
+      DISPATCHED="Fix issue #${ISSUE}"
+    fi
   done < <(echo "$READY" | jq -c '.[]')
 
   # --- Priority 3: Blocked items (retry stuck work) ---
@@ -538,18 +656,23 @@ This issue was left in **In progress** with no running factory container — the
     if is_issue_running "$ISSUE"; then continue; fi
 
     RETRIES=$(get_retry_count "$ISSUE")
-    if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then continue; fi
+    if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+      trip_to_blocked "$ISSUE" "implement" "retry limit of ${MAX_RETRIES} reached"
+      continue
+    fi
 
     increment_retry "$ISSUE"
     # Branch-aware: a blocked item that already has a PR (e.g. red CI gated above, or a
     # continue run that failed mid-way) must be CONTINUED to reuse the existing branch.
     # Dispatching "Fix" would start a fresh branch that collides with the PR on push.
     if [ -n "$(get_pr_for_issue "$ISSUE")" ]; then
-      dispatch "Continue issue #${ISSUE}"
-      DISPATCHED="Continue issue #${ISSUE}"
+      if dispatch "Continue issue #${ISSUE}"; then
+        DISPATCHED="Continue issue #${ISSUE}"
+      fi
     else
-      dispatch "Fix issue #${ISSUE}"
-      DISPATCHED="Fix issue #${ISSUE}"
+      if dispatch "Fix issue #${ISSUE}"; then
+        DISPATCHED="Fix issue #${ISSUE}"
+      fi
     fi
   done < <(echo "$BLOCKED" | jq -c '.[]')
 
@@ -563,23 +686,7 @@ This issue was left in **In progress** with no running factory container — the
 
     RETRIES=$(get_retry_count "${ISSUE}:plan")
     if [ "$RETRIES" -ge "$REFINE_MAX_RETRIES" ]; then
-      gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --add-label needs-discussion 2>/dev/null || true
-      gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "## Refinement Pipeline — Retries Exhausted
-
-The scheduler has attempted plan generation **${RETRIES} time(s)** and cannot recover automatically. The issue has been labelled \`needs-discussion\` to pause automation.
-
-**To resume automation:**
-1. Investigate the failure comments above.
-2. Fix the root cause (update the issue body, fix a dependency, or resolve the blocking error).
-3. Remove the \`needs-discussion\` label — the scheduler will resume automatically.
-
-\`\`\`bash
-# Or retry manually:
-docker compose --profile factory run --rm dark-factory \"Plan issue #${ISSUE}\"
-\`\`\`
-
----
-*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+      trip_to_blocked "$ISSUE" "plan" "retry limit of ${REFINE_MAX_RETRIES} reached"
       continue
     fi
 
@@ -588,9 +695,10 @@ docker compose --profile factory run --rm dark-factory \"Plan issue #${ISSUE}\"
 
 ---
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-    dispatch "Plan issue #${ISSUE}"
-    DISPATCHED="Plan issue #${ISSUE}"
-    REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    if dispatch "Plan issue #${ISSUE}"; then
+      DISPATCHED="Plan issue #${ISSUE}"
+      REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    fi
   done < <(echo "$REFINED" | jq -c '.[]')
 
   # --- Priority 5: Backlog items (refinement — prepare future work) ---
@@ -610,37 +718,25 @@ docker compose --profile factory run --rm dark-factory \"Plan issue #${ISSUE}\"
 
 ---
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-          dispatch "Refine issue #${ISSUE}"
-          DISPATCHED="Refine issue #${ISSUE}"
-          REFINE_RUNNING=$((REFINE_RUNNING + 1))
+          if dispatch "Refine issue #${ISSUE}"; then
+            DISPATCHED="Refine issue #${ISSUE}"
+            REFINE_RUNNING=$((REFINE_RUNNING + 1))
+          fi
         fi
       fi
       continue
     fi
 
     if has_refine_skip_label "$item"; then continue; fi
+    # Opt-in gate: only auto-refine Backlog items labelled ready-for-agent.
+    # Unlabelled items are left for triage — humans add the label when the issue is ready.
+    if ! has_opt_in_refine_label "$item"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
     RETRIES=$(get_retry_count "${ISSUE}:refine")
     if [ "$RETRIES" -ge "$REFINE_MAX_RETRIES" ]; then
-      gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --add-label needs-discussion 2>/dev/null || true
-      gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "## Refinement Pipeline — Retries Exhausted
-
-The scheduler has attempted refinement **${RETRIES} time(s)** and cannot recover automatically. The issue has been labelled \`needs-discussion\` to pause automation.
-
-**To resume automation:**
-1. Investigate the failure comments above.
-2. Fix the root cause (update the issue body, fix a dependency, or resolve the blocking error).
-3. Remove the \`needs-discussion\` label — the scheduler will resume automatically.
-
-\`\`\`bash
-# Or retry manually:
-docker compose --profile factory run --rm dark-factory \"Refine issue #${ISSUE}\"
-\`\`\`
-
----
-*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+      trip_to_blocked "$ISSUE" "refine" "retry limit of ${REFINE_MAX_RETRIES} reached"
       continue
     fi
 
@@ -649,9 +745,10 @@ docker compose --profile factory run --rm dark-factory \"Refine issue #${ISSUE}\
 
 ---
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-    dispatch "Refine issue #${ISSUE}"
-    DISPATCHED="Refine issue #${ISSUE}"
-    REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    if dispatch "Refine issue #${ISSUE}"; then
+      DISPATCHED="Refine issue #${ISSUE}"
+      REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    fi
   done < <(echo "$BACKLOG" | jq -c '.[]')
 
   # --- Log cycle summary ---
