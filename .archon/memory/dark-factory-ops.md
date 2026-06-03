@@ -45,6 +45,16 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] All `dispatch()` call sites in `scheduler.sh` must use `if dispatch ...; then ... fi` guards. A bare `dispatch "..."` under `set -e` exits the daemon on non-zero return, which triggers `restart: unless-stopped` and wipes the (old `/tmp`) retry counter — the root cause of the #159 loop. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
 
+## Codeindex / MCP Integration
+
+- [AVOID] `pip install codeindex` installs an unrelated PyPI package (`cr0hn/the-opensource-context`). Always use `pip install "git+https://github.com/scheidydude/codeindex.git"` — no alternative install path exists. <!-- issue:#159 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+- [PATTERN] Register a project-scoped MCP server in `entrypoint.sh` by writing the cloned repo's `.claude/settings.local.json` (gitignored) with the tool's absolute path: `$(which codeindex)`. Never rely on `"command": "codeindex"` — Claude Code does not inherit the shell PATH and will fail to launch the server. <!-- issue:#159 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+- [PATTERN] For two-pass index regeneration (startup + post-implement), add two workflow nodes: `update-codeindex` (depends on `setup-branch`, before `implement`) and `regen-codeindex` (depends on `implement`, before `preview-up`). `preview-up` should depend on `regen-codeindex`, not `implement`, so the committed artifact always matches the final code in the PR. <!-- issue:#159 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+- [PATTERN] Pre-commit hooks that invoke advisory/optional tools (e.g. `codeindex-blast`) must always exit 0 — use `|| true` or `; exit 0`. A non-zero exit from a pre-commit hook blocks the commit and will abort an autonomous factory run. <!-- issue:#159 date:2026-06-03 expires:2026-12-03 source:implement -->
+
 ## Environment and Credentials
 
 - [PATTERN] Every new environment variable introduced by a feature must be documented in `ENV_VARIABLES.md` with its default value and a one-line description. CLAUDE.md references ENV_VARIABLES.md as the authoritative env var reference. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
