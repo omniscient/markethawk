@@ -55,4 +55,27 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
+
+  // Regression guard: ban raw /api/ strings outside the api/ layer.
+  // All WS and HTTP URLs must go through wsUrl() or apiClient so a single
+  // env-var change propagates everywhere.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/api/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "Literal[value=/^\\/api\\//]",
+          message:
+            "Raw /api/ string detected outside src/api/**. Use wsUrl() or apiClient instead.",
+        },
+        {
+          selector: "TemplateLiteral > TemplateElement[value.raw=/^\\/api\\//]",
+          message:
+            "Raw /api/ in template literal outside src/api/**. Use wsUrl() or apiClient instead.",
+        },
+      ],
+    },
+  },
 ]

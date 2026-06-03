@@ -2,6 +2,19 @@ import axios from 'axios';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 
+/**
+ * Build a WebSocket URL for the given API path, deriving the base from the
+ * same source as apiClient (VITE_API_BASE_URL ?? '/api/v1'). A single env-var
+ * change propagates to every WebSocket connection automatically.
+ */
+export function wsUrl(path: string): string {
+  if (API_BASE.startsWith('http')) {
+    return API_BASE.replace(/^http/, 'ws') + path;
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}${API_BASE}${path}`;
+}
+
 export const apiClient = axios.create({
   baseURL: API_BASE,
   withCredentials: true,

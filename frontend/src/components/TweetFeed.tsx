@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Bird, ExternalLink, TrendingUp, TrendingDown, Zap } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fetchRecentTweets, TweetSignal } from '../api/tweets';
+import { wsUrl } from '../api/client';
 
 const CLASSIFICATION_COLORS: Record<string, string> = {
   CALLOUT: 'bg-financial-blue/20 text-financial-blue',
@@ -25,9 +26,7 @@ const TweetFeed: React.FC<TweetFeedProps> = ({ limit = 50 }) => {
       .then(data => setSignals(data))
       .catch(err => console.error('Failed to fetch tweet signals:', err));
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const WS_URL = `${protocol}//${host}/api/v1/tweets/feed`;
+    const WS_URL = wsUrl('/tweets/feed');
 
     let reconnectTimer: number | undefined;
     let isMounted = true;

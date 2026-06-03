@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { wsUrl } from '../api/client';
 
 export interface LiveTick {
   type: 'tick';
@@ -71,8 +72,7 @@ export function useWatchlistLive() {
     function connect() {
       if (destroyed) return;
 
-      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const ws = new WebSocket(`${protocol}://${window.location.host}/api/v1/live/ws/watchlist`);
+      const ws = new WebSocket(wsUrl('/live/ws/watchlist'));
       wsRef.current = ws;
 
       ws.onopen = () => {

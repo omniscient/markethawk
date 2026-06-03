@@ -21,6 +21,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Styling is Tailwind CSS utility classes only — no custom CSS files, no inline `style` objects. If a design requires a custom class, add it to `tailwind.config.js` as a theme extension. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+## Frontend: WebSocket URLs
+
+- [PATTERN] Use `wsUrl(path)` from `frontend/src/api/client.ts` for all WebSocket connections — it derives the base from the same `VITE_API_BASE_URL` as `apiClient`, so one env-var change propagates everywhere. Never inline `window.location.protocol`/`host`/`/api/v1/` manually. <!-- issue:#158 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+- [AVOID] Do not call `fetch('/api/v1/...')` directly in pages or components — it bypasses `apiClient`'s auth interceptor and hardcodes the base path. Use `apiClient.get('/path')` instead, which is relative to `API_BASE`. <!-- issue:#158 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+- [FIX] ESLint `no-restricted-syntax` selector `Literal[value=/\\/api\\//]` matches import paths like `'../api/client'` as false positives. Use the start-anchored form `Literal[value=/^\\/api\\//]` to only flag string literals that actually begin with `/api/`. <!-- issue:#158 date:2026-06-03 expires:2026-12-03 source:implement -->
+
 ## Frontend: Routing
 
 - [PATTERN] New routes are registered in `frontend/src/App.tsx` using React Router `<Route>` elements. Match the existing pattern of lazy-loaded page components (`React.lazy` + `Suspense`). <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->

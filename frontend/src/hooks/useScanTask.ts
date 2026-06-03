@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { wsUrl } from '../api/client';
 
 export type ScanTaskStatus = 'idle' | 'connecting' | 'running' | 'completed' | 'failed';
 
@@ -38,12 +39,9 @@ export const useScanTask = (
 
     setState({ ...INITIAL_STATE, status: 'connecting' });
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/live/ws/scan-task/${taskId}`;
-
     let isMounted = true;
 
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(wsUrl(`/live/ws/scan-task/${taskId}`));
     wsRef.current = ws;
 
     ws.onopen = () => {

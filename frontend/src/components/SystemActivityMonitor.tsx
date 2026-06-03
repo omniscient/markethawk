@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { wsUrl } from '../api/client';
 import { RefreshCw, Loader2, Wand2, Activity, Zap } from 'lucide-react';
 
 interface SystemTask {
@@ -21,10 +22,7 @@ export const SystemActivityMonitor: React.FC = () => {
 
     const connect = () => {
       if (!isMounted) return;
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      
-      ws = new WebSocket(`${protocol}//${host}/api/v1/system/ws/tasks`);
+      ws = new WebSocket(wsUrl('/system/ws/tasks'));
 
       ws.onopen = () => {
         if (!isMounted) {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { wsUrl } from '../api/client';
 
 export interface LiveStockData {
   ev: string;
@@ -21,13 +22,9 @@ export const useLiveStockData = (symbol: string | undefined, resolution: 'minute
   useEffect(() => {
     if (!symbol) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    
-    // Updated to include resolution in the path
-    const wsUrl = `${protocol}//${host}/api/v1/live/ws/${symbol.toUpperCase()}/${resolution}`;
+    const wsEndpoint = wsUrl(`/live/ws/${symbol.toUpperCase()}/${resolution}`);
 
-    console.log(`Connecting to live updates: ${wsUrl}`);
+    console.log(`Connecting to live updates: ${wsEndpoint}`);
     
     let reconnectTimer: number | undefined;
     let isMounted = true;
@@ -39,7 +36,7 @@ export const useLiveStockData = (symbol: string | undefined, resolution: 'minute
         wsRef.current.close();
       }
 
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(wsEndpoint);
       wsRef.current = ws;
 
       ws.onopen = () => {
