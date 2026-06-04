@@ -254,26 +254,35 @@ nodes:
     when: "$parse-intent.output.intent == 'plan'"
     idle_timeout: 600000
 
-  # Push refine branch after spec generation
+  # Push refine branch after spec generation, then gate the issue for spec review.
+  # The spec-pending-review label is what the scheduler's spec_advance_check keys on
+  # (grace window + direct-to-pr auto-advance). Without it, refined items are re-dispatched
+  # for refinement every poll. Labels are guaranteed to exist in the repo.
   - id: refine-push
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       BRANCH=$(git branch --show-current)
 
       git push -u origin "$BRANCH"
-      echo "Pushed $BRANCH for issue #$ISSUE"
+      gh issue edit "$ISSUE" --repo omniscient/markethawk --add-label spec-pending-review
+      echo "Pushed $BRANCH for issue #$ISSUE (spec-pending-review gate applied)"
     depends_on: [refine]
     when: "$parse-intent.output.intent == 'refine'"
     timeout: 30000
 
-  # Push plan branch (no longer auto-advances to Ready — plan-pending-review gate)
+  # Push plan branch (no longer auto-advances to Ready — plan-pending-review gate).
+  # Applying the plan-pending-review label is the gate: the scheduler's plan_advance_check
+  # keys on it (grace window + direct-to-pr auto-advance to Ready). Without it, planned items
+  # are re-dispatched for planning every poll until the circuit-breaker trips (see #214).
+  # Labels are guaranteed to exist in the repo.
   - id: plan-push-and-advance
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       BRANCH=$(git branch --show-current)
 
       git push -u origin "$BRANCH"
-      echo "Pushed $BRANCH for issue #$ISSUE (plan-pending-review gate — not advancing to Ready)"
+      gh issue edit "$ISSUE" --repo omniscient/markethawk --add-label plan-pending-review
+      echo "Pushed $BRANCH for issue #$ISSUE (plan-pending-review gate applied)"
     depends_on: [plan]
     when: "$parse-intent.output.intent == 'plan'"
     timeout: 30000
