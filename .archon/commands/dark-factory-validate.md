@@ -15,13 +15,14 @@ Read the implementation context:
 - Read `$ARTIFACTS_DIR/implementation.md` for what was implemented
 - Read `CLAUDE.md` for validation rules
 
-## Phase 1.5: RESOLVE PREVIEW_BACKEND
+## Phase 1.5: RESOLVE PREVIEW STATE
 
-The `preview-up` step wrote the preview URLs to `$ARTIFACTS_DIR/preview_env.sh`.
-Source that file to get the authoritative `PREVIEW_BACKEND` URL:
+The `preview-up` step wrote the preview URLs (and skip marker) to `$ARTIFACTS_DIR/preview_env.sh`.
+Source that file to get all preview state variables:
 
 ```bash
 source "$ARTIFACTS_DIR/preview_env.sh"
+echo "PREVIEW_SKIPPED=$PREVIEW_SKIPPED"
 echo "PREVIEW_BACKEND=$PREVIEW_BACKEND"
 ```
 
@@ -32,24 +33,34 @@ container is kept connected to the preview network from the `preview-up` step.
 Do NOT compute the URL manually or use `localhost:<port>` — the host-exposed port
 is not reachable from inside the dark-factory container.
 
+When `PREVIEW_SKIPPED=true` the preview stack was not built. In that case:
+- Run pytest and tsc (they run inside the factory container and need no stack).
+- **Skip** endpoint curl tests — there is no backend to hit.
+- **Skip** the network disconnect cleanup — no network was connected.
+- Record the skip reason in `$ARTIFACTS_DIR/validation.md`.
+
 ## Phase 2: VALIDATE
 
-Run the full validation suite against the preview stack:
-
-### Backend validation
+### Backend validation (always run)
 ```bash
 cd backend && python -m pytest --no-cov -v
 ```
 
-### Frontend validation (if frontend was modified)
+### Frontend validation (if frontend was modified — always run)
 ```bash
 cd frontend && npx tsc --noEmit
 ```
 
-### Endpoint validation against preview
+### Endpoint validation against preview (skip when PREVIEW_SKIPPED=true)
 
-For each new or changed endpoint identified in the implementation, use `$PREVIEW_BACKEND`
-(sourced from `$ARTIFACTS_DIR/preview_env.sh` above) as the base URL:
+If `PREVIEW_SKIPPED=true`, record this in `validation.md`:
+```
+Endpoint tests skipped — no preview environment (<PREVIEW_SKIP_REASON>).
+```
+and proceed to Phase 4 without running any curl tests or network disconnect.
+
+Otherwise, for each new or changed endpoint identified in the implementation, use
+`$PREVIEW_BACKEND` (sourced from `$ARTIFACTS_DIR/preview_env.sh` above) as the base URL:
 
 ```bash
 # Example — replace with actual endpoints from implementation.md
@@ -68,7 +79,7 @@ Record all results — passes and failures.
 ### PHASE_2_CHECKPOINT
 - [ ] pytest results recorded
 - [ ] tsc results recorded (if applicable)
-- [ ] Endpoint curl tests recorded
+- [ ] Endpoint curl tests recorded (or skip reason noted if PREVIEW_SKIPPED=true)
 - [ ] All results written to `$ARTIFACTS_DIR/validation.md`
 
 ## Phase 3: FIX (if needed)
@@ -83,15 +94,19 @@ Repeat until all validations pass.
 
 ## Phase 4: CLEANUP AND REPORT
 
-Disconnect the dark-factory container from the preview network (the preview-up step
-left it connected so we could run endpoint tests):
+**Only when `PREVIEW_SKIPPED` is not `true`:** disconnect the dark-factory container
+from the preview network (the preview-up step left it connected so we could run endpoint
+tests):
 
 ```bash
 source "$ARTIFACTS_DIR/preview_env.sh"
-docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
+if [ "$PREVIEW_SKIPPED" != "true" ]; then
+  docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
+fi
 ```
 
 Write validation results to `$ARTIFACTS_DIR/validation.md`:
 - Pass/fail status for each check
 - Specific error details for any failures
+- If preview was skipped: note `Endpoint tests skipped — no preview environment (<reason>).`
 - Final status: PASS or FAIL
