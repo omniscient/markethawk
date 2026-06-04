@@ -292,17 +292,22 @@ echo "Installing frontend dependencies..."
 cd "$CLONE_DIR/frontend" && npm install --silent
 cd "$CLONE_DIR"
 
-# --- Register codeindex MCP server for the implement-step agent ---
-# Uses the absolute path (required — Claude Code does not inherit shell PATH).
-# Written to .claude/settings.local.json which is gitignored and never committed.
+# --- Write factory-scoped Claude settings (gitignored, never committed) ---
+# Uses the absolute codeindex path (required — Claude Code does not inherit shell PATH).
+# disableWorkflows: the factory never uses Claude Code's Workflow tool — Archon owns
+# orchestration and refine/plan spawn subagents via the Agent tool — so dropping that
+# tool's (large) schema from each request trims input tokens at no functional cost.
+# Kept here, NOT in the committed .claude/settings.json, so local dev sessions are
+# unaffected and keep the Workflow tool.
 CODEINDEX_BIN=$(which codeindex 2>/dev/null || true)
+mkdir -p "$CLONE_DIR/.claude"
 if [ -n "$CODEINDEX_BIN" ]; then
-  mkdir -p "$CLONE_DIR/.claude"
-  printf '{\n  "mcpServers": {\n    "codeindex": { "command": "%s", "args": ["serve", "--mcp"] }\n  }\n}\n' \
+  printf '{\n  "disableWorkflows": true,\n  "mcpServers": {\n    "codeindex": { "command": "%s", "args": ["serve", "--mcp"] }\n  }\n}\n' \
     "$CODEINDEX_BIN" > "$CLONE_DIR/.claude/settings.local.json"
-  echo "codeindex MCP registered at $CODEINDEX_BIN"
+  echo "codeindex MCP registered at $CODEINDEX_BIN; Workflow tool disabled"
 else
-  echo "WARNING: codeindex not found; MCP server will not be registered"
+  printf '{\n  "disableWorkflows": true\n}\n' > "$CLONE_DIR/.claude/settings.local.json"
+  echo "WARNING: codeindex not found; MCP server will not be registered (Workflow tool disabled)"
 fi
 
 # --- Install pre-commit hooks so codeindex-blast warn hook fires in the run log ---
