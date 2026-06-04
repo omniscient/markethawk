@@ -8,7 +8,7 @@ All services run as Docker containers on the `stockscanner-network` bridge netwo
                          ┌─────────────────────────────────────────┐
                          │          stockscanner-network            │
                          │                                          │
-  Browser ──HTTP:3000──> │ frontend ──HTTP──> backend:8000          │
+  Browser ──HTTP:3333──> │ frontend ──HTTP──> backend:8000          │
                          │   │ WS:3000/api/v1/live/ws/*             │
                          │                       │                  │
                          │                  asyncpg ──> postgres:5432
