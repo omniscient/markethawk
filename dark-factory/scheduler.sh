@@ -8,6 +8,10 @@ MAX_RETRIES="${MAX_RETRIES:-3}"
 SCHEDULER_STATE_DIR="${SCHEDULER_STATE_DIR:-/var/lib/dark-factory}"
 STATE_FILE="${SCHEDULER_STATE_DIR}/scheduler-state.json"
 RATE_LIMIT_FLOOR="${RATE_LIMIT_FLOOR:-200}"
+DIRECT_TO_PR_LABEL="${DIRECT_TO_PR_LABEL:-direct-to-pr}"
+SPEC_GRACE_MINUTES="${SPEC_GRACE_MINUTES:-30}"
+PLAN_GRACE_MINUTES="${PLAN_GRACE_MINUTES:-30}"
+CONFLICT_RESOLUTION_ENABLED="${CONFLICT_RESOLUTION_ENABLED:-true}"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -135,6 +139,134 @@ has_opt_in_refine_label() {
   echo "$labels" | grep -qi "ready-for-agent"
 }
 
+has_direct_to_pr_label() {
+  local item="$1"
+  echo "$item" | jq -r '.labels[]?' 2>/dev/null | grep -qi "$DIRECT_TO_PR_LABEL"
+}
+
+# Returns minutes elapsed since the last comment matching $marker_re on the given issue.
+# Returns "" if no matching comment exists or if the timestamp cannot be parsed.
+elapsed_minutes_since_marker() {
+  local issue_num="$1"
+  local marker_re="$2"
+  local comments
+  comments=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" \
+    --json comments -q '.comments' 2>/dev/null) || { echo ""; return; }
+  local created_at
+  created_at=$(echo "$comments" | jq -r --arg m "$marker_re" \
+    '[.[] | select(.body | test($m))] | last | .createdAt // ""')
+  [ -z "$created_at" ] && { echo ""; return; }
+  local marker_epoch now_epoch
+  marker_epoch=$(date -u -d "$created_at" +%s 2>/dev/null) || { echo ""; return; }
+  now_epoch=$(date -u +%s)
+  echo $(( (now_epoch - marker_epoch) / 60 ))
+}
+
+spec_advance_check() {
+  local issue_num="$1"
+  local item="$2"
+  has_skip_label "$item" && return 0
+  local has_new
+  has_new=$(has_new_comment_after_report "$issue_num" "Posted by MarketHawk Refinement Pipeline")
+  if [ "$has_new" = "yes" ]; then
+    reset_retry "${issue_num}:refine"
+    gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+      --remove-label "spec-pending-review" 2>/dev/null || true
+    gh issue comment "$issue_num" --repo "${OWNER}/markethawk" --body \
+"🔄 **Refinement Pipeline** — Re-running with new feedback.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+    if dispatch "Refine issue #${issue_num}"; then
+      DISPATCHED="Refine issue #${issue_num}"
+      REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    fi
+    return 0
+  fi
+  if has_direct_to_pr_label "$item"; then
+    local elapsed
+    elapsed=$(elapsed_minutes_since_marker "$issue_num" "Posted by MarketHawk Refinement Pipeline")
+    if [ -n "$elapsed" ] && [ "$elapsed" -ge "$SPEC_GRACE_MINUTES" ]; then
+      echo "[$(date -u +%FT%TZ)] spec_auto_advance issue=#${issue_num} elapsed=${elapsed}m grace=${SPEC_GRACE_MINUTES}m action=advance_to_refined"
+      gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+        --remove-label "spec-pending-review" 2>/dev/null || true
+      set_board_status "$issue_num" "$STATUS_REFINED" || true
+    else
+      echo "[$(date -u +%FT%TZ)] spec_grace_window issue=#${issue_num} elapsed=${elapsed:-unknown}m grace=${SPEC_GRACE_MINUTES}m action=waiting"
+    fi
+  fi
+}
+
+plan_advance_check() {
+  local issue_num="$1"
+  local item="$2"
+  has_skip_label "$item" && return 0
+  local has_new
+  has_new=$(has_new_comment_after_report "$issue_num" "Posted by MarketHawk Refinement Pipeline")
+  if [ "$has_new" = "yes" ]; then
+    reset_retry "${issue_num}:plan"
+    gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+      --remove-label "plan-pending-review" 2>/dev/null || true
+    gh issue comment "$issue_num" --repo "${OWNER}/markethawk" --body \
+"🔄 **Refinement Pipeline** — Re-running plan with new feedback.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+    if dispatch "Plan issue #${issue_num}"; then
+      DISPATCHED="Plan issue #${issue_num}"
+      REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    fi
+    return 0
+  fi
+  if has_direct_to_pr_label "$item"; then
+    local elapsed
+    elapsed=$(elapsed_minutes_since_marker "$issue_num" "Posted by MarketHawk Refinement Pipeline")
+    if [ -n "$elapsed" ] && [ "$elapsed" -ge "$PLAN_GRACE_MINUTES" ]; then
+      echo "[$(date -u +%FT%TZ)] plan_auto_advance issue=#${issue_num} elapsed=${elapsed}m grace=${PLAN_GRACE_MINUTES}m action=advance_to_ready"
+      gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+        --remove-label "plan-pending-review" 2>/dev/null || true
+      set_board_status "$issue_num" "$STATUS_READY" || true
+    else
+      echo "[$(date -u +%FT%TZ)] plan_grace_window issue=#${issue_num} elapsed=${elapsed:-unknown}m grace=${PLAN_GRACE_MINUTES}m action=waiting"
+    fi
+  fi
+}
+
+end_gate_check() {
+  local issue_num="$1"
+  local item="$2"
+  has_direct_to_pr_label "$item" || return 1
+  local pr_num
+  pr_num=$(get_pr_for_issue "$issue_num")
+  [ -z "$pr_num" ] && return 1
+  local review_state
+  review_state=$(gh pr view "$pr_num" --repo "${OWNER}/markethawk" --json reviews \
+    --jq '[.reviews[] | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")] | last | .state // ""' \
+    2>/dev/null) || review_state=""
+  case "$review_state" in
+    APPROVED)
+      echo "[$(date -u +%FT%TZ)] end_gate issue=#${issue_num} pr=#${pr_num} state=APPROVED action=Close"
+      if dispatch "Close issue #${issue_num}"; then
+        DISPATCHED="Close issue #${issue_num}"
+      fi
+      return 0
+      ;;
+    CHANGES_REQUESTED)
+      echo "[$(date -u +%FT%TZ)] end_gate issue=#${issue_num} pr=#${pr_num} state=CHANGES_REQUESTED action=Continue"
+      if ! is_issue_running "$issue_num"; then
+        if dispatch "Continue issue #${issue_num}"; then
+          DISPATCHED="Continue issue #${issue_num}"
+          reset_retry "$issue_num"
+        fi
+      fi
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 has_new_comment_after_report() {
   local issue_num="$1"
   local report_marker="$2"
@@ -162,13 +294,15 @@ has_new_comment_after_report() {
 # --- Dispatch ---
 # Returns the docker compose exit code. Callers MUST use `if dispatch ...; then` —
 # a bare call under set -e exits the daemon on non-zero.
-# --no-build prevents inline image builds; the startup probe ensures the image exists.
+# `docker compose run` never builds inline (it has no --build by default); the startup
+# probe ensures the image exists. Note: --no-build is NOT a valid flag for `run` (it is
+# `up`/`create`-only) and passing it makes every dispatch fail with "unknown flag".
 dispatch() {
   local command="$1"
   local exit_code=0
   echo "[$(date -u +%FT%TZ)] dispatch command=\"${command}\""
   docker compose -f /opt/dark-factory/docker-compose.yml --profile factory run \
-    -d --rm --no-build dark-factory "$command" || exit_code=$?
+    -d --rm dark-factory "$command" || exit_code=$?
   if [ "$exit_code" -ne 0 ]; then
     echo "[$(date -u +%FT%TZ)] dispatch_error command=\"${command}\" exit=${exit_code}" >&2
   fi
@@ -219,9 +353,10 @@ trip_to_blocked() {
   # 3. Manual retry command varies by phase
   local retry_cmd
   case "$phase" in
-    refine) retry_cmd="Refine issue #${issue_num}" ;;
-    plan)   retry_cmd="Plan issue #${issue_num}" ;;
-    *)      retry_cmd="Fix issue #${issue_num}" ;;
+    refine)  retry_cmd="Refine issue #${issue_num}" ;;
+    plan)    retry_cmd="Plan issue #${issue_num}" ;;
+    resolve) retry_cmd="Deconflict issue #${issue_num}" ;;
+    *)       retry_cmd="Fix issue #${issue_num}" ;;
   esac
 
   # 4. Explanatory comment
@@ -248,6 +383,17 @@ docker compose --profile factory run --rm dark-factory \"${retry_cmd}\"
 
   # 5. Reset counter so a future manual retry starts clean
   reset_retry "$key"
+}
+
+# --- Mergeable status for a PR: CONFLICTING, MERGEABLE, or UNKNOWN ---
+# UNKNOWN means GitHub hasn't finished computing mergeability — callers must skip.
+# --repo is required because the scheduler runs outside a git checkout.
+check_pr_mergeable() {
+  local pr_num="$1"
+  local result
+  result=$(gh pr view "$pr_num" --repo "${OWNER}/markethawk" --json mergeable \
+    --jq '.mergeable' 2>/dev/null) || true
+  echo "${result:-UNKNOWN}"
 }
 
 # --- PR lookup: open PR number for an issue's feature branch ("" if none) ---
@@ -486,8 +632,8 @@ MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
 echo "WIP limits: in_progress=${MAX_IN_PROGRESS} in_review=${MAX_IN_REVIEW}"
 
 # --- Startup probe: verify factory image is available locally ---
-# dispatch() uses --no-build so a missing image causes every dispatch to fail immediately
-# (no inline build). Exit here with actionable instructions rather than entering a loop
+# `docker compose run` does not build inline by default, so a missing image causes every
+# dispatch to fail immediately. Exit here with actionable instructions rather than entering a loop
 # where every dispatch fails and the circuit-breaker trips in N cycles.
 FACTORY_IMAGE="${FACTORY_IMAGE:-ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}}"
 echo "[$(date -u +%FT%TZ)] probe=image_check image=${FACTORY_IMAGE}"
@@ -601,12 +747,52 @@ This issue was left in **In progress** with no running factory container — the
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
   done < <(echo "$IN_PROGRESS" | jq -c '.[]')
 
+  # --- Priority 1.5: In Review items with merge conflicts (proactive auto-resolve) ---
+  # Runs every cycle after the factory guard. Scans in-review PRs for GitHub's
+  # CONFLICTING mergeability state and dispatches a deconflict run before any
+  # human comments are processed. Honors SKIP_LABELS, CI_BLOCKED, and is_issue_running.
+  # UNKNOWN is skipped — GitHub hasn't computed mergeability yet.
+  if [ "${CONFLICT_RESOLUTION_ENABLED:-true}" = "true" ]; then
+    while IFS= read -r item; do
+      [ -n "$DISPATCHED" ] && break
+      ISSUE=$(get_issue_number "$item")
+      if has_skip_label "$item"; then continue; fi
+      case "$CI_BLOCKED" in *" $ISSUE "*) continue ;; esac
+      if is_issue_running "$ISSUE"; then continue; fi
+
+      RETRIES=$(get_retry_count "${ISSUE}:resolve")
+      if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+        trip_to_blocked "$ISSUE" "resolve" "retry limit of ${MAX_RETRIES} reached for conflict resolution"
+        continue
+      fi
+
+      PR_NUM=$(get_pr_for_issue "$ISSUE")
+      [ -z "$PR_NUM" ] && continue
+
+      MERGEABLE=$(check_pr_mergeable "$PR_NUM")
+      case "$MERGEABLE" in
+        CONFLICTING)
+          echo "[$(date -u +%FT%TZ)] conflict_gate issue=#${ISSUE} pr=#${PR_NUM} mergeable=CONFLICTING action=dispatch_deconflict"
+          increment_retry "${ISSUE}:resolve" || true
+          if dispatch "Deconflict issue #${ISSUE}"; then
+            DISPATCHED="Deconflict issue #${ISSUE}"
+          fi
+          ;;
+        UNKNOWN)
+          echo "[$(date -u +%FT%TZ)] conflict_gate issue=#${ISSUE} pr=#${PR_NUM} mergeable=UNKNOWN action=skip"
+          ;;
+      esac
+    done < <(echo "$IN_REVIEW" | jq -c '.[]')
+  fi
+
   # --- Priority 1: In Review items with new comments (unblock existing work) ---
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
     case "$CI_BLOCKED" in *" $ISSUE "*) continue ;; esac   # gated to Blocked this cycle
+
+    if end_gate_check "$ISSUE" "$item"; then continue; fi
 
     NEW_COMMENTS=$(get_new_comments "$ISSUE")
     COMMENT_COUNT=$(echo "$NEW_COMMENTS" | jq 'length')
@@ -680,6 +866,16 @@ This issue was left in **In progress** with no running factory container — the
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
+
+    # Direct-to-PR plan auto-advance: handle before refine_skip_label blocks plan-pending-review
+    if echo "$item" | jq -r '.labels[]?' 2>/dev/null | grep -qi "plan-pending-review" \
+       && has_direct_to_pr_label "$item"; then
+      if ! is_issue_running "$ISSUE" && [ "$REFINE_RUNNING" -lt "$REFINE_WIP_LIMIT" ]; then
+        plan_advance_check "$ISSUE" "$item"
+      fi
+      continue
+    fi
+
     if has_refine_skip_label "$item"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
@@ -710,19 +906,7 @@ This issue was left in **In progress** with no running factory container — the
     ITEM_LABELS=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
     if echo "$ITEM_LABELS" | grep -qi "spec-pending-review"; then
       if ! is_issue_running "$ISSUE" && [ "$REFINE_RUNNING" -lt "$REFINE_WIP_LIMIT" ]; then
-        HAS_NEW=$(has_new_comment_after_report "$ISSUE" "Posted by MarketHawk Refinement Pipeline")
-        if [ "$HAS_NEW" = "yes" ]; then
-          reset_retry "${ISSUE}:refine"
-          gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --remove-label "spec-pending-review" 2>/dev/null || true
-          gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "🔄 **Refinement Pipeline** — Re-running with new feedback.
-
----
-*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-          if dispatch "Refine issue #${ISSUE}"; then
-            DISPATCHED="Refine issue #${ISSUE}"
-            REFINE_RUNNING=$((REFINE_RUNNING + 1))
-          fi
-        fi
+        spec_advance_check "$ISSUE" "$item"
       fi
       continue
     fi
@@ -730,7 +914,7 @@ This issue was left in **In progress** with no running factory container — the
     if has_refine_skip_label "$item"; then continue; fi
     # Opt-in gate: only auto-refine Backlog items labelled ready-for-agent.
     # Unlabelled items are left for triage — humans add the label when the issue is ready.
-    if ! has_opt_in_refine_label "$item"; then continue; fi
+    if ! has_opt_in_refine_label "$item" && ! has_direct_to_pr_label "$item"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 

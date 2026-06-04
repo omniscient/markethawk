@@ -8,17 +8,28 @@ refine:
   min_issue_body_length: 20
 
 plan:
-  auto_advance_to_ready: false
   skip_labels:
     - needs-discussion
     - epic
     - plan-pending-review
 
+direct_to_pr:
+  label: direct-to-pr          # mirror of $DIRECT_TO_PR_LABEL (set in .archon/.env to override)
+  spec_grace_minutes: 30       # mirror of $SPEC_GRACE_MINUTES — 0 = advance on next poll
+  plan_grace_minutes: 30       # mirror of $PLAN_GRACE_MINUTES — 0 = advance on next poll
+
 conformance:
   enabled: true
   max_reconcile_cycles: 3
   block_on_material: true
+  scope_enforcement: true    # detect & remediate out-of-scope changes at the conformance gate
+  excise_out_of_scope: true  # revert out-of-scope changes from the branch (false = file backlog ticket only)
+  backlog_label: scope-spillover  # label applied to auto-created spillover tickets
 
 preview:
   enabled: true   # false = always build the preview (pre-differentiator behavior) — kill-switch
   model: haiku
+
+conflict_resolution:
+  enabled: true       # false = disable the P1.5 conflict scanner entirely (env CONFLICT_RESOLUTION_ENABLED overrides)
+  ai_tier: true       # false = only Tier 1 (mechanical) resolution; never invoke Claude for conflict markers

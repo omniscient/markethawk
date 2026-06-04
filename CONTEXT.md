@@ -107,3 +107,7 @@ _Avoid_: Data source (too generic), feed (that's real-time only)
 > **Dev**: "We confirmed about 70%, rejected the rest — mostly too-late or noise. The enrichment showed a few had news catalysts. We still need to compute outcomes so we can check the scorecard."
 >
 > **Domain expert**: "Good. If the edge holds, let's set up an alert rule to push notifications on high-severity signals and add the hits to the watchlist for live monitoring."
+
+## Architecture Decisions
+
+Past decisions that shape the codebase live in [`docs/adr/`](docs/adr/). The [`docs/adr/README.md`](docs/adr/README.md) is the decision-log index — scan it to find what has been decided before diving into individual records.

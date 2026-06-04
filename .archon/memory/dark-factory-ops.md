@@ -15,9 +15,19 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Seed Files
 
-- [PATTERN] Seed files in `dark-factory/seed/seed/` are named with a two-digit prefix (`00_`, `01_`, ...) so they apply in deterministic order. The next available slot for a new baseline module is determined by `ls dark-factory/seed/seed/ | sort | tail -1`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
+- [PATTERN] Seed files in `dark-factory/seed/` are named with a two-digit prefix (`00_`, `01_`, ...) so they apply in deterministic order. `docker-compose.preview.yml` mounts `./seed:/seed:ro` and runs `for f in /seed/*.sql` — only files at the root of `dark-factory/seed/` are executed; subdirectory files (e.g. `dark-factory/seed/seed/`) are NOT run. The next available slot is `ls dark-factory/seed/*.sql | sort | tail -1`. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [AVOID] Seed SQL that INSERTs into `scanner_configs` must always include `universe_id` in the column list (value `1` for the default universe). The column is NOT NULL with no server default (migration c7d8e9f0a1b2 removed nullable after backfill); omitting it causes a NOT NULL violation on fresh preview stacks. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 - [AVOID] Do not embed data directly in Alembic migration files — migrations are schema-only. Feature-specific seed data goes in `dark-factory/seed/99_feature.sql` (idempotent, `ON CONFLICT DO NOTHING`). Data needed across multiple features goes in a new numbered baseline module. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
+
+- [AVOID] Never edit existing numbered seed modules (e.g. `01_scanner_configs.sql`) to fix pre-existing defects while implementing an unrelated ticket — this is an out-of-scope change. Record the defect in `$ARTIFACTS_DIR/out-of-scope.md` instead; the conformance gate will create a backlog ticket. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Scope Enforcement
+
+- [PATTERN] When an out-of-scope defect is noticed during implementation, write it to `$ARTIFACTS_DIR/out-of-scope.md` with `- <file>: <one-sentence description>` and leave the defect unfixed. The conformance gate reads this file and converts each entry into a `scope-spillover`-labelled backlog ticket automatically. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] The conformance reviewer's `## Out-of-Scope Changes` section is always present in its output. Downstream steps parse `[OOS]` bullets to drive scope remediation (excision + backlog ticket creation) independent of the CONFORMS/MINOR/MATERIAL verdict. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 ## YAML Block Scalar / Bash Multiline Strings
 
@@ -69,6 +79,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] AI credentials (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `GH_TOKEN` belong in `.archon/.env`, not in `.env`. The `.archon/.env` file is gitignored to keep secrets out of the repo. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+## Refine-Branch Pre-Implementation
+
+- [PATTERN] When the architect subagent implements plan tasks during validation (indicated by "Verdict: Approved (implemented directly...)" in the issue comment), cherry-pick those commits from `origin/refine/issue-NNN-...` onto the feat branch rather than reimplementing from scratch: `git log --oneline main..origin/refine/<branch>` to find the commits, then `git cherry-pick <hashes>` in chronological order. <!-- issue:#173 date:2026-06-04 expires:2026-12-04 source:implement -->
+
 ## Plan Drift
 
 - [PATTERN] When a refinement plan specifies exact line numbers or file counts for reference fixes, always re-grep the actual files (`grep -rn "Docs/" ...`) rather than trusting the plan's enumeration — commits landing between plan creation and implementation can shift line numbers and add/remove references (e.g. PR #179 slimmed CLAUDE.md, changing a stated 1-ref count to 3 actual refs). <!-- issue:#171 date:2026-06-04 expires:2026-12-04 source:implement -->
@@ -78,3 +92,35 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] When feedback is "remove commit X from this PR and move to a separate branch": (1) create the new branch from the commit just before X, (2) cherry-pick X onto the new branch, (3) push the new branch, (4) create a GitHub issue + add to project in Blocked column (`gh project item-add` + GraphQL mutation on `PVTSSF_lAHOAAFds84BWh4wzhR1VaA` with option id `93d87b2f`), (5) on the original branch run `git reset --hard <parent-of-X>`, (6) force-push. Use `git reset --hard` (not `git revert`) when removing a tip commit — revert adds noise; reset keeps history clean. <!-- issue:#174 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 - [PATTERN] The MarketHawk Kanban has no `blocked` label. To place an issue in the Blocked column, use `needs-discussion` label + set project status via GraphQL (`updateProjectV2ItemFieldValue` with field `PVTSSF_lAHOAAFds84BWh4wzhR1VaA`, option `93d87b2f`). <!-- issue:#174 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Third-party CLI Tools (repowise, codeindex)
+
+- [AVOID] The repowise `analyze` subcommand does not exist in v0.16.0 — the correct command is `repowise init --index-only .` to rebuild the dependency graph, git signals, dead-code, and health index without LLM page generation. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] The repowise MCP subcommand is `mcp` (not `serve-mcp` or `mcp-server`); launch with `repowise mcp /path/to/repo --transport stdio`. Generated index files land in `.repowise/` (not `.repowise/index/`) — gitignore pattern is `.repowise/*` + `!.repowise/config.yaml`. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] When `repowise init --index-only --dry-run` is run without `--dry-run` sanity, it still runs the full index pipeline and writes `.repowise/wiki.db`, `knowledge-graph.json`, `state.json`, and `.mcp.json` at the repo root. Add `.mcp.json` and `.claude/CLAUDE.md` to `.gitignore` to prevent accidentally committing repowise-generated editor files. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [AVOID] After sourcing `scheduler.sh` with `SCHEDULER_SOURCE_ONLY=1`, the test shell inherits `set -euo pipefail` from the scheduler header. Any standalone function call that can return non-zero (e.g. `end_gate_check` in the fall-through case) will abort the test script — guard these calls with `|| true` in tests. <!-- issue:#183 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] In bash with `set -e`, a function ending with `if cmd; then ...; fi` (no `else`) where `cmd` returns non-zero (body not entered) exits the function with code 0 — the `if` statement itself returns 0. This differs from a bare `grep ... || true` pattern; use an explicit `return 0` if the function must guarantee 0 in all paths. <!-- issue:#183 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [FIX] When `poppler-utils` is unavailable (no `pdftotext` command), use `pip install pdfminer.six` to extract PDF text in Python: `from pdfminer.high_level import extract_text; text = extract_text('/path/to/file.pdf')`. This works in the factory container even when system packages cannot be installed. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [AVOID] `grep -c "pattern" file` exits with code 1 when the pattern is not found (count = 0), breaking `&&` chains even when 0 matches is the expected/desired outcome. Capture the count with `COUNT=$(grep -c ... || true)` or use `[ "$COUNT" -eq 0 ]` after the assignment rather than relying on `&&` chaining. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Conflict Resolution (Priority 1.5 / deconflict intent)
+
+- [PATTERN] `check_pr_mergeable()` calls `gh pr view --json mergeable --jq '.mergeable'`; GitHub returns the string "CONFLICTING", "MERGEABLE", or "UNKNOWN". Always skip UNKNOWN — GitHub hasn't computed mergeability yet and will compute it on the next poll. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] Bash `case` patterns match `*` across `/` (unlike filename globbing), so `backend/alembic/versions/*.py)` in a `case` statement correctly matches any migration file path. Use this for Tier 1 allowlist pattern matching. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] Inline Python in bash functions: `python3 - "$arg" << '_PYEOF'` passes the script via stdin and `"$arg"` as `sys.argv[1]`. Single-quoting the heredoc delimiter (`'_PYEOF'`) prevents shell variable expansion inside the Python body. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] After `git merge` returns non-zero, `git diff --name-only --diff-filter=U` lists files with unresolved conflict markers. Once resolved and `git add`-ed, the file disappears from this list. Add a hard `find . -exec grep -l '^<<<<<<' {}` safety grep AFTER all resolutions as a final marker check before committing. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] The shared de-conflict step for `continue` runs in `entrypoint.sh` BEFORE the archon call: checkout the feature branch, merge origin/main, apply Tier 1/2/3. Archon then runs on the already-synced branch. The implement agent sees the merge commit in `git log` and understands the sync already happened. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Analysis and Documentation Outputs
+
+- [PATTERN] Analysis/comparison documents (e.g. `docs/dark-factory-agyn-comparison.html`) must be delivered as self-contained HTML, not Markdown — HTML is preferred for portability and supports visual elements (colored tables, badges, cards) impossible in MD. Use inline CSS with no external dependencies so the file is portable as a single asset. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->
