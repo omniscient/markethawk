@@ -4,6 +4,24 @@ Stock scanning platform that detects pre-market and after-hours trading anomalie
 
 ## Language
 
+```mermaid
+erDiagram
+    UNIVERSE ||--|{ TICKER : contains
+    UNIVERSE ||--o{ SCAN : "is scanned by"
+    SCANNER ||--o{ SCAN : executes
+    SCAN ||--o{ SIGNAL : produces
+    SIGNAL ||--o| REVIEW : "reviewed as"
+    SIGNAL ||--o{ OUTCOME : "measured at"
+    SIGNAL ||--o| ENRICHMENT : "enriched with"
+    SIGNAL }o--o{ SIGNAL_CLUSTER : "grouped into"
+    SCANNER ||--o| SCORECARD : "scored by"
+    SCORECARD }|--|| EDGE : reveals
+    SIGNAL }o--o{ ALERT : triggers
+    ALERT_RULE ||--o{ ALERT : generates
+    ALERT_RULE }o--o| TRADING_STRATEGY : "linked to"
+    WATCHLIST }o--o{ TICKER : monitors
+```
+
 **Signal**:
 A detected trading anomaly for a specific ticker on a specific date that met a scanner's criteria. One signal per scanner type per ticker per day. Stored as `ScannerEvent` in the database.
 _Avoid_: Event (overloaded — alert delivery also produces events)
