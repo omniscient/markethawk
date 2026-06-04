@@ -8,11 +8,15 @@ refine:
   min_issue_body_length: 20
 
 plan:
-  auto_advance_to_ready: false
   skip_labels:
     - needs-discussion
     - epic
     - plan-pending-review
+
+direct_to_pr:
+  label: direct-to-pr          # mirror of $DIRECT_TO_PR_LABEL (set in .archon/.env to override)
+  spec_grace_minutes: 30       # mirror of $SPEC_GRACE_MINUTES — 0 = advance on next poll
+  plan_grace_minutes: 30       # mirror of $PLAN_GRACE_MINUTES — 0 = advance on next poll
 
 conformance:
   enabled: true
