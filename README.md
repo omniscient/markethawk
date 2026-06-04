@@ -64,7 +64,7 @@ services/       — Business logic (scanner, stock_data, discovery_service,
                   futures_data, chart_indicators, catalyst_parser,
                   journal_service, websocket_manager, data_quality …)
 providers/      — External data integrations (Polygon, IBKR, base interface, bulk ops)
-tasks.py        — Celery background/scheduled tasks
+tasks/          — Celery task package (sync.py, scanning.py, trading.py, quality.py)
 ```
 
 ### Frontend (`frontend/src/`)
@@ -110,7 +110,7 @@ IB Gateway takes ~60 seconds on first startup while IBC authenticates. The backe
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost:3000 |
+| Frontend | http://localhost:3333 |
 | Backend API | http://localhost:8000 |
 | API Docs (Swagger) | http://localhost:8000/docs |
 | pgAdmin | http://localhost:5050 |
