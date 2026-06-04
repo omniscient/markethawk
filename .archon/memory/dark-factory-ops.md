@@ -60,3 +60,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] Every new environment variable introduced by a feature must be documented in `ENV_VARIABLES.md` with its default value and a one-line description. CLAUDE.md references ENV_VARIABLES.md as the authoritative env var reference. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 - [PATTERN] AI credentials (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `GH_TOKEN` belong in `.archon/.env`, not in `.env`. The `.archon/.env` file is gitignored to keep secrets out of the repo. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
+
+## Plan Drift
+
+- [PATTERN] When a refinement plan specifies exact line numbers or file counts for reference fixes, always re-grep the actual files (`grep -rn "Docs/" ...`) rather than trusting the plan's enumeration — commits landing between plan creation and implementation can shift line numbers and add/remove references (e.g. PR #179 slimmed CLAUDE.md, changing a stated 1-ref count to 3 actual refs). <!-- issue:#171 date:2026-06-04 expires:2026-12-04 source:implement -->
