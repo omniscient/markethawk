@@ -25,28 +25,7 @@ docker-compose restart backend              # Restart one service
 
 > **Dev vs. live stack isolation:** `docker-compose up -d` auto-applies `docker-compose.override.yml` when present (local dev checkout), restoring bind-mounts and hot-reload. To run the baked-image stack without the override: `docker-compose -f docker-compose.yml up -d`.
 
-### Backend (manual)
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload               # Dev server
-python -m pytest                            # All tests
-python -m pytest tests/api -v              # API tests only
-python -m pytest --cov                      # With coverage
-python -m alembic upgrade head              # Apply migrations
-python -m alembic revision --autogenerate -m "description"  # New migration
-celery -A app.core.celery_app:celery_app worker --loglevel=info  # Run worker
-celery -A app.core.celery_app:celery_app beat                    # Run scheduler
-```
-
-### Frontend (manual)
-```bash
-cd frontend
-npm install
-npm run dev       # Dev server at http://localhost:3000
-npm run build     # Production build
-npm run lint      # ESLint
-```
+> For manual (non-Docker) backend and frontend setup, migration commands, test commands, and pre-commit hook setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Service Ports
 
