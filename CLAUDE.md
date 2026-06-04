@@ -15,7 +15,6 @@ Full-stack stock scanning platform that identifies pre-market volume spikes and 
 
 ## Commands
 
-### Docker (recommended for full stack)
 ```bash
 docker-compose up -d                        # Start all services
 docker-compose logs -f backend              # Stream backend logs
@@ -23,25 +22,9 @@ docker-compose exec backend bash            # Shell into backend
 docker-compose restart backend              # Restart one service
 ```
 
-> **Dev vs. live stack isolation:** `docker-compose up -d` auto-applies `docker-compose.override.yml` when present (local dev checkout), restoring bind-mounts and hot-reload. To run the baked-image stack without the override: `docker-compose -f docker-compose.yml up -d`.
+> **Dev vs. live stack isolation:** `docker-compose up -d` auto-applies `docker-compose.override.yml` when present (local dev checkout), restoring bind-mounts and hot-reload. To run the baked-image stack without the override: `docker-compose -f docker-compose.yml up -d`. Full per-service breakdown, manual (non-Docker) setup, ports, tests, and pre-commit hooks: [DEVELOPMENT.md](DEVELOPMENT.md).
 
-> For manual (non-Docker) backend and frontend setup, migration commands, test commands, and pre-commit hook setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
-
-## Service Ports
-
-| Service      | URL                          |
-|-------------|------------------------------|
-| Frontend    | http://localhost:3333         |
-| Backend API | http://localhost:8000         |
-| API Docs    | http://localhost:8000/docs    |
-| Metrics     | http://localhost:8000/metrics |
-| pgAdmin     | http://localhost:5050         |
-| Flower      | http://localhost:5555         |
-| Seq Logs    | http://localhost:5380         |
-| Seq GELF    | udp://localhost:12201         |
-| Prometheus  | http://localhost:9090         |
-| Grafana     | http://localhost:3001         |
-| Jaeger UI   | http://localhost:16686        |
+**Ports** (full table in [DEVELOPMENT.md](DEVELOPMENT.md#service-urls)): Frontend `:3333`, Backend `:8000`, API docs `:8000/docs`.
 
 ## Architecture
 
@@ -78,168 +61,13 @@ hooks/        — Custom React hooks
 
 ## AI-Assisted Development
 
-This repo uses two complementary systems for structured, agent-driven development. Both are pre-configured — see [Setup for AI Development](#setup-for-ai-development) to get ready.
+Three systems, all pre-configured. See [Docs/ai-development.md](Docs/ai-development.md) for setup and full detail.
 
-### Superpowers (interactive, in-session)
+- **Superpowers** (interactive, in-session) — brainstorming, planning, implementation, and review via the `Skill` tool (`superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:verification-before-completion`, etc.).
+- **Archon** (autonomous, isolated worktrees) — fire-and-forget workflows that produce PRs: `archon workflow run <name> "description"` or *"Use archon to fix issue #3"*. Run `archon workflow list` for the catalog.
+- **Dark Factory** (autonomous Docker) — sandboxed container that builds features from GitHub issues with per-issue preview stacks. Always runs baked images (omits `docker-compose.override.yml`).
 
-The [superpowers plugin](https://github.com/claude-plugins-official/superpowers) drives brainstorming, planning, implementation, and review **inside your Claude Code session**. Use it when you want collaborative control over each phase.
-
-Key skills (invoke with the `Skill` tool):
-- `superpowers:brainstorming` — explore requirements before building anything
-- `superpowers:writing-plans` — create step-by-step implementation plans
-- `superpowers:executing-plans` / `superpowers:subagent-driven-development` — implement from a plan
-- `superpowers:verification-before-completion` — verify before claiming done
-- `superpowers:requesting-code-review` — review completed work
-
-### Archon (autonomous, isolated)
-
-[Archon](https://github.com/coleam00/Archon) runs workflows in isolated git worktrees — fire-and-forget pipelines that produce PRs. Use it for well-scoped work you trust to run autonomously.
-
-Run workflows with: `archon workflow run <name> "description"` or ask Claude Code: *"Use archon to fix issue #3"*
-
-Key workflows:
-- `archon-fix-github-issue` — investigate + fix + PR + review
-- `archon-idea-to-pr` — feature idea to reviewed PR
-- `archon-smart-pr-review` — adaptive complexity PR review
-- `archon-piv-loop` — guided plan-implement-validate with human-in-the-loop
-
-Run `archon workflow list` for the full catalog.
-
-### When to Use Which
-
-| Scenario | Tool |
-|----------|------|
-| You want to shape the design interactively | Superpowers |
-| Well-defined issue or feature, hands-off | Archon |
-| Bug investigation needing your input | Superpowers |
-| PR review | Archon (`archon-smart-pr-review`) |
-| Multi-step feature with checkpoints | Superpowers or Archon PIV loop |
-
-### Backlog
-
-Work items are tracked as [GitHub Issues](https://github.com/omniscient/markethawk/issues) with priority labels (`priority: must-have`, `priority: should-have`) and size labels (`size: S/M/L`).
-
-## Setup for AI Development
-
-These steps get a fresh clone ready for both human and AI-driven development. Claude Code agents can follow these instructions directly — if someone says "set everything up", run through this list.
-
-### Prerequisites
-
-Verify these are installed (the system won't work without them):
-
-```bash
-docker --version          # Docker Desktop (includes Compose)
-git --version             # Git
-gh --version              # GitHub CLI — required for Archon issue/PR automation
-bun --version             # Bun runtime — required for Archon CLI
-claude --version          # Claude Code CLI
-pre-commit --version      # Pre-commit hook framework
-```
-
-**Install anything missing:**
-- Docker Desktop: https://www.docker.com/products/docker-desktop
-- GitHub CLI: `winget install GitHub.cli` (Windows) / `brew install gh` (macOS)
-- Bun: `irm bun.sh/install.ps1 | iex` (Windows) / `curl -fsSL https://bun.sh/install | bash` (macOS/Linux)
-- Claude Code: `npm install -g @anthropic-ai/claude-code`
-- pre-commit: `pip install pre-commit` (macOS/Linux/Windows)
-
-### Step 1 — Authenticate GitHub CLI
-
-```bash
-gh auth login              # Follow the prompts — needs repo scope at minimum
-gh auth status             # Confirm: "Logged in to github.com"
-```
-
-### Step 2 — Environment and services
-
-```bash
-cp .env.example .env       # Then fill in API keys — see ENV_VARIABLES.md
-docker-compose up -d       # Start all services
-docker-compose exec backend python -m alembic upgrade head  # Apply migrations
-```
-
-### Step 2.5 — Install pre-commit hooks
-
-```bash
-pre-commit install    # registers hooks in .git/hooks/pre-commit
-```
-
-### Step 3 — Verify Archon
-
-Archon is pre-configured in this repo (`.archon/config.yaml` + `.claude/skills/archon/`).
-
-```bash
-archon version             # Should show version + database type
-archon workflow list       # Should list 20+ workflows
-```
-
-If `archon` is not found, install and link from the Archon source repo:
-```bash
-cd <archon-repo> && bun install && cd packages/cli && bun link
-```
-
-### Step 4 — Verify Claude Code plugins
-
-Open Claude Code in this repo. The project settings (`.claude/settings.json`) enable the superpowers and frontend-design plugins automatically. Verify skills are available:
-- The skill list in the system prompt should include `superpowers:brainstorming`, `superpowers:writing-plans`, etc.
-- The `archon` skill should appear for workflow delegation
-
-### Step 5 — Validate the stack
-
-```bash
-curl -s http://localhost:8000/api/health | python -m json.tool   # Backend healthy
-docker-compose ps                                                 # All containers Up
-```
-
-You're ready. Pick an issue from the [backlog](https://github.com/omniscient/markethawk/issues) and start building.
-
-## Dark Factory (Autonomous Docker Development)
-
-An isolated Docker container that autonomously develops features from GitHub issues. Runs Claude Code inside a sandboxed environment with no host access. Preview stacks and the dark-factory container deliberately omit `docker-compose.override.yml` and always run baked images — do not rely on bind-mount behavior in autonomous workflows.
-
-### Quick Start
-
-```bash
-# Build the dark factory image (first time only)
-docker compose --profile factory build dark-factory
-
-# Start a new feature from a GitHub issue
-docker compose --profile factory run --rm dark-factory "Fix issue #3"
-
-# Iterate after reviewing the preview and leaving feedback
-docker compose --profile factory run --rm dark-factory "Continue issue #3"
-
-# Tear down preview and merge when satisfied
-docker compose --profile factory run --rm dark-factory "Close issue #3"
-```
-
-### Prerequisites
-
-Add to `.archon/.env` (not `.env` — keep AI credentials separate):
-```
-# Option A: Use your Claude Max subscription (recommended — no per-token cost)
-# Generate with: claude setup-token
-CLAUDE_CODE_OAUTH_TOKEN=<token-from-setup-token>
-
-# Option B: Use Anthropic API key (pay-per-token)
-# ANTHROPIC_API_KEY=sk-ant-...
-
-GH_TOKEN=ghp_...
-```
-
-The `GH_TOKEN` should be a fine-grained PAT scoped to `omniscient/markethawk` with `repo` permissions.
-
-### Preview Environments
-
-Each issue gets its own preview stack on deterministic ports:
-- Frontend: `http://localhost:1{NN}33` (e.g. `:10333` for issue #3)
-- Backend: `http://localhost:1{NN}80` (e.g. `:10380` for issue #3)
-
-Preview URLs are included in the PR body. The preview persists after the factory exits so you can browse and test.
-
-### Architecture
-
-See [dark factory design spec](docs/superpowers/specs/2026-05-02-dark-factory-design.md) for the full architecture, security model, and container topology.
+Work is tracked as [GitHub Issues](https://github.com/omniscient/markethawk/issues) with `priority:` (`must-have`/`should-have`) and `size:` (`S/M/L`) labels.
 
 ## Development Rules
 
@@ -288,22 +116,14 @@ Key variables: `POLYGON_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, `SECRET_K
 Symbol index `symbolindex.json` + dependency graph `codeindex.json` are maintained in-repo (committed artifacts).
 Use the `lookup_symbol` MCP tool before grepping for any function or class.
 Use `get_impact` before modifying a high-blast file (see `docs/codeindex-hotspots.md` for the current list).
-
-### Local visualization
-
-```bash
-# One-time install (developer machines only — never add to backend/requirements.txt)
-pip install "git+https://github.com/scheidydude/codeindex.git"
-
-# Launch interactive viz on http://localhost:8080
-bash scripts/codeindex.sh
-```
+Local interactive visualization: see [DEVELOPMENT.md](DEVELOPMENT.md#codeindex-local-visualization).
 
 ## Further Reading
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — service topology, scan execution flow, module map, Celery tasks
 - [Docs/database-schema.md](Docs/database-schema.md) — auto-generated database schema ERD and indices
-- [DEVELOPMENT.md](DEVELOPMENT.md) — full local setup, Docker commands, Seq/Flower/pgAdmin usage, troubleshooting
+- [DEVELOPMENT.md](DEVELOPMENT.md) — full local setup, Docker commands, ports, Seq/Flower/pgAdmin usage, troubleshooting
+- [Docs/ai-development.md](Docs/ai-development.md) — superpowers, Archon, Dark Factory: setup and usage
 - [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — annotated file tree
 - [ENV_VARIABLES.md](ENV_VARIABLES.md) — all env vars with defaults and descriptions
 - [POLYGON_RATE_LIMITS.md](POLYGON_RATE_LIMITS.md) — API plan tiers, rate limits, key endpoints
@@ -312,14 +132,6 @@ bash scripts/codeindex.sh
 
 ## Agent Skills
 
-### Issue tracker
-
-GitHub Issues on `omniscient/markethawk`. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context layout — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+- **Issue tracker** — GitHub Issues on `omniscient/markethawk`. See `docs/agents/issue-tracker.md`.
+- **Triage labels** — five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+- **Domain docs** — single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

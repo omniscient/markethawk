@@ -9,7 +9,7 @@
 - [Bun](https://bun.sh/) — required for Archon CLI
 - (Optional) Interactive Brokers credentials for live broker data
 
-> **AI-assisted development:** This repo uses superpowers (Claude Code plugin) and Archon (autonomous workflow engine) for structured development. See the "AI-Assisted Development" and "Setup for AI Development" sections in [CLAUDE.md](CLAUDE.md) for full setup instructions.
+> **AI-assisted development:** This repo uses superpowers (Claude Code plugin) and Archon (autonomous workflow engine) for structured development, plus the Dark Factory autonomous pipeline. See [Docs/ai-development.md](Docs/ai-development.md) for full setup instructions.
 
 ## First-Time Setup
 
@@ -68,9 +68,14 @@ docker-compose exec backend python -m alembic upgrade head
 | Frontend | http://localhost:3333 | — |
 | Backend API | http://localhost:8000 | — |
 | Swagger / API Docs | http://localhost:8000/docs | — |
+| Metrics | http://localhost:8000/metrics | — |
 | pgAdmin | http://localhost:5050 | Values from `PGADMIN_DEFAULT_EMAIL/PASSWORD` in `.env` |
 | Flower | http://localhost:5555 | None (dev only) |
 | Seq Logs | http://localhost:5380 | Admin password used to generate `SEQ_ADMIN_PASSWORD_HASH` |
+| Seq GELF ingest | udp://localhost:12201 | — |
+| Prometheus | http://localhost:9090 | — |
+| Grafana | http://localhost:3001 | — |
+| Jaeger UI | http://localhost:16686 | — |
 
 ## Docker Commands
 
@@ -375,6 +380,20 @@ Docker Compose reads `.env` only at container start time. After changing `.env`:
 ```bash
 docker-compose down
 docker-compose up -d
+```
+
+## Codeindex (local visualization)
+
+The symbol index (`symbolindex.json`) and dependency graph (`codeindex.json`) are committed
+artifacts. Agents use the `lookup_symbol` and `get_impact` MCP tools against them (see
+[CLAUDE.md](CLAUDE.md#codeindex)). To explore the graph interactively on a dev machine:
+
+```bash
+# One-time install (developer machines only — never add to backend/requirements.txt)
+pip install "git+https://github.com/scheidydude/codeindex.git"
+
+# Launch interactive viz on http://localhost:8080
+bash scripts/codeindex.sh
 ```
 
 ## Security Notes
