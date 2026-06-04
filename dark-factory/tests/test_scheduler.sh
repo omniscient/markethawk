@@ -249,6 +249,37 @@ dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
 export -f has_new_comment_after_report elapsed_minutes_since_marker dispatch
 
 # ==========================================
+# H: Entry trigger — direct-to-pr admits Backlog items
+# ==========================================
+echo ""
+echo "--- H: Entry trigger ---"
+
+ITEM_DTP_ONLY='{"content":{"number":30},"labels":["direct-to-pr"],"status":"Backlog"}'
+ITEM_RFA_ONLY='{"content":{"number":31},"labels":["ready-for-agent"],"status":"Backlog"}'
+ITEM_NEITHER='{"content":{"number":32},"labels":["needs-triage"],"status":"Backlog"}'
+ITEM_BOTH='{"content":{"number":33},"labels":["direct-to-pr","ready-for-agent"],"status":"Backlog"}'
+
+# H1: direct-to-pr alone → passes entry gate
+(has_opt_in_refine_label "$ITEM_DTP_ONLY" || has_direct_to_pr_label "$ITEM_DTP_ONLY") \
+  && assert_eq "H1: direct-to-pr admits item" "0" "0" \
+  || assert_eq "H1: direct-to-pr admits item" "0" "1"
+
+# H2: ready-for-agent alone → still passes (unchanged)
+(has_opt_in_refine_label "$ITEM_RFA_ONLY" || has_direct_to_pr_label "$ITEM_RFA_ONLY") \
+  && assert_eq "H2: ready-for-agent still admits item" "0" "0" \
+  || assert_eq "H2: ready-for-agent still admits item" "0" "1"
+
+# H3: neither → blocked
+(has_opt_in_refine_label "$ITEM_NEITHER" || has_direct_to_pr_label "$ITEM_NEITHER") \
+  && assert_eq "H3: neither label is blocked" "0" "1" \
+  || assert_eq "H3: neither label is blocked" "0" "0"
+
+# H4: both labels → passes (direct-to-pr wins, no double-dispatch risk)
+(has_opt_in_refine_label "$ITEM_BOTH" || has_direct_to_pr_label "$ITEM_BOTH") \
+  && assert_eq "H4: both labels passes gate once" "0" "0" \
+  || assert_eq "H4: both labels passes gate once" "0" "1"
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"

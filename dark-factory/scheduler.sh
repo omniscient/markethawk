@@ -779,7 +779,7 @@ This issue was left in **In progress** with no running factory container — the
     if has_refine_skip_label "$item"; then continue; fi
     # Opt-in gate: only auto-refine Backlog items labelled ready-for-agent.
     # Unlabelled items are left for triage — humans add the label when the issue is ready.
-    if ! has_opt_in_refine_label "$item"; then continue; fi
+    if ! has_opt_in_refine_label "$item" && ! has_direct_to_pr_label "$item"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
 
