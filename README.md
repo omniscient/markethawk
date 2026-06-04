@@ -132,40 +132,11 @@ npm install
 npm run dev
 ```
 
-> See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed local setup, service connection instructions, and troubleshooting.
-
-## Database Migrations
-
-After changing any SQLAlchemy model:
-
-```bash
-cd backend
-python -m alembic revision --autogenerate -m "describe_the_change"
-python -m alembic upgrade head
-```
-
-## Running Tests
-
-```bash
-cd backend
-python -m pytest                   # all tests
-python -m pytest tests/api -v      # API tests only
-python -m pytest --cov             # with coverage report
-```
+> For detailed setup, manual (non-Docker) configuration, database migrations, running tests, and troubleshooting, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Environment Variables
 
 See [ENV_VARIABLES.md](ENV_VARIABLES.md) for the complete environment variable reference with defaults and descriptions.
-
-## Useful Docker Commands
-
-```bash
-docker-compose logs -f backend        # stream backend logs
-docker-compose exec backend bash      # shell into backend container
-docker-compose restart backend        # restart one service
-docker-compose down                   # stop everything (data volumes preserved)
-docker-compose down -v                # stop and delete all volumes
-```
 
 ## Documentation
 
