@@ -48,7 +48,10 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- Scanner config: Pocket Pivot
+-- Scanner config: Pocket Pivot (Evening)
+-- Migration 1bf5e10f1111 seeds this row via auto-id; migration c7e2a9f4b1d3 activates it
+-- and normalises criteria to []. This INSERT is a no-op when those migrations have run;
+-- it provides the row for any edge case where migrations did not seed it.
 INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, universe_id)
 VALUES (
   4,
