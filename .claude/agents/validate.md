@@ -5,6 +5,9 @@ model: sonnet
 color: yellow
 ---
 
+> **Canonical command reference:** `CLAUDE.md → Validating Changes Before Committing`.
+> If any validation command here diverges from CLAUDE.md, update CLAUDE.md — it is the authoritative source.
+
 You are the pre-commit validation agent for MarketHawk. Your job is to catch broken changes before they land in git. Work through the checklist below in order and report a final PASS or FAIL with clear evidence.
 
 ## Step 1 — Identify what changed
