@@ -237,6 +237,10 @@ Each issue gets its own preview stack on deterministic ports:
 
 Preview URLs are included in the PR body. The preview persists after the factory exits so you can browse and test.
 
+A **preview differentiator** step inspects the branch changeset after implementation. Docs-only, config-only, test-only, and CI-meta changes skip the preview stack entirely — `preview-up` no-ops and validate skips endpoint tests. Code-affecting changes (anything under `backend/app/**`, `frontend/src/**`, migrations, Docker config, etc.) always get a full preview.
+
+To disable the differentiator and always build: set `preview.enabled: false` in `.claude/skills/refinement/config.yaml`.
+
 ### Architecture
 
 See [dark factory design spec](docs/superpowers/specs/2026-05-02-dark-factory-design.md) for the full architecture, security model, and container topology.
