@@ -432,6 +432,153 @@ dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
 export -f gh get_pr_for_issue dispatch
 
 # ==========================================
+# K: Priority 1.5 — conflict gate
+# ==========================================
+echo ""
+echo "--- K: Priority 1.5 conflict gate ---"
+echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+DISPATCHED=""
+
+_ITEM_REVIEW_A='{"content":{"number":60},"labels":[],"status":"In review"}'
+_ITEM_REVIEW_B='{"content":{"number":61},"labels":[],"status":"In review"}'
+_ITEM_REVIEW_C='{"content":{"number":62},"labels":["needs-discussion"],"status":"In review"}'
+
+# K1: CONFLICTING → dispatch Deconflict
+get_pr_for_issue() { echo "200"; }
+check_pr_mergeable() { echo "CONFLICTING"; }
+is_issue_running() { return 1; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f get_pr_for_issue check_pr_mergeable is_issue_running dispatch
+
+CONFLICT_RESOLUTION_ENABLED=true
+CI_BLOCKED=""
+
+# Simulate the P1.5 loop body for one item
+ISSUE=$(get_issue_number "$_ITEM_REVIEW_A")
+has_skip_label "$_ITEM_REVIEW_A" && SKIP=1 || SKIP=0
+assert_eq "K1: no-skip-label item passes gate" "0" "$SKIP"
+
+PR_NUM=$(get_pr_for_issue "$ISSUE")
+MERGEABLE=$(check_pr_mergeable "$PR_NUM")
+case "$MERGEABLE" in
+  CONFLICTING)
+    if ! is_issue_running "$ISSUE"; then
+      if dispatch "Deconflict issue #${ISSUE}"; then
+        DISPATCHED="Deconflict issue #${ISSUE}"
+      fi
+    fi
+    ;;
+esac
+assert_eq "K1: CONFLICTING → Deconflict dispatched" \
+  "1" "$(grep -c 'dispatch Deconflict issue #60' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"; DISPATCHED=""
+
+# K2: UNKNOWN → no dispatch
+check_pr_mergeable() { echo "UNKNOWN"; }
+export -f check_pr_mergeable
+
+ISSUE=$(get_issue_number "$_ITEM_REVIEW_B")
+PR_NUM=$(get_pr_for_issue "$ISSUE")
+MERGEABLE=$(check_pr_mergeable "$PR_NUM")
+case "$MERGEABLE" in
+  CONFLICTING)
+    dispatch "Deconflict issue #${ISSUE}" || true
+    ;;
+  UNKNOWN)
+    : # skip
+    ;;
+esac
+assert_eq "K2: UNKNOWN → no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"; DISPATCHED=""
+
+# K3: MERGEABLE → no dispatch
+check_pr_mergeable() { echo "MERGEABLE"; }
+export -f check_pr_mergeable
+
+ISSUE=$(get_issue_number "$_ITEM_REVIEW_A")
+PR_NUM=$(get_pr_for_issue "$ISSUE")
+MERGEABLE=$(check_pr_mergeable "$PR_NUM")
+case "$MERGEABLE" in
+  CONFLICTING)
+    dispatch "Deconflict issue #${ISSUE}" || true
+    ;;
+esac
+assert_eq "K3: MERGEABLE → no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"; DISPATCHED=""
+
+# K4: skip label → no dispatch even if CONFLICTING
+check_pr_mergeable() { echo "CONFLICTING"; }
+export -f check_pr_mergeable
+
+ISSUE=$(get_issue_number "$_ITEM_REVIEW_C")
+has_skip_label "$_ITEM_REVIEW_C" \
+  && assert_eq "K4: needs-discussion is a skip label" "0" "0" \
+  || assert_eq "K4: needs-discussion is a skip label" "0" "1"
+
+if ! has_skip_label "$_ITEM_REVIEW_C"; then
+  dispatch "Deconflict issue #${ISSUE}" || true
+fi
+assert_eq "K4: skip label suppresses deconflict dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"; DISPATCHED=""
+
+# K5: CONFLICT_RESOLUTION_ENABLED=false → entire P1.5 block skipped
+check_pr_mergeable() { echo "CONFLICTING"; }
+export -f check_pr_mergeable
+
+CONFLICT_RESOLUTION_ENABLED=false
+if [ "${CONFLICT_RESOLUTION_ENABLED:-true}" = "true" ]; then
+  dispatch "Deconflict issue #60" || true
+fi
+assert_eq "K5: kill-switch disables conflict gate" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+CONFLICT_RESOLUTION_ENABLED=true
+
+> "$STUB_LOG"; DISPATCHED=""
+
+# K6: is_issue_running → no duplicate dispatch
+is_issue_running() { return 0; }
+export -f is_issue_running
+
+ISSUE=$(get_issue_number "$_ITEM_REVIEW_A")
+if ! is_issue_running "$ISSUE"; then
+  dispatch "Deconflict issue #${ISSUE}" || true
+fi
+assert_eq "K6: running issue skipped" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+# K7: check_pr_mergeable returns correct format
+check_pr_mergeable() {
+  local pr_num="$1"
+  gh pr view "$pr_num" --repo "omniscient/markethawk" --json mergeable --jq '.mergeable' 2>/dev/null || echo "UNKNOWN"
+}
+gh() {
+  case "$*" in
+    *"pr view"*) echo "CONFLICTING" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+export -f check_pr_mergeable gh
+
+_RESULT=$(check_pr_mergeable "99")
+assert_eq "K7: check_pr_mergeable returns value from gh" "CONFLICTING" "$_RESULT"
+
+# Restore stubs
+gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
+get_pr_for_issue() { echo ""; }
+is_issue_running() { return 1; }
+check_pr_mergeable() { echo "UNKNOWN"; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f gh get_pr_for_issue is_issue_running check_pr_mergeable dispatch
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"

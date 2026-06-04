@@ -97,3 +97,23 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [AVOID] After sourcing `scheduler.sh` with `SCHEDULER_SOURCE_ONLY=1`, the test shell inherits `set -euo pipefail` from the scheduler header. Any standalone function call that can return non-zero (e.g. `end_gate_check` in the fall-through case) will abort the test script — guard these calls with `|| true` in tests. <!-- issue:#183 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 - [PATTERN] In bash with `set -e`, a function ending with `if cmd; then ...; fi` (no `else`) where `cmd` returns non-zero (body not entered) exits the function with code 0 — the `if` statement itself returns 0. This differs from a bare `grep ... || true` pattern; use an explicit `return 0` if the function must guarantee 0 in all paths. <!-- issue:#183 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [FIX] When `poppler-utils` is unavailable (no `pdftotext` command), use `pip install pdfminer.six` to extract PDF text in Python: `from pdfminer.high_level import extract_text; text = extract_text('/path/to/file.pdf')`. This works in the factory container even when system packages cannot be installed. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [AVOID] `grep -c "pattern" file` exits with code 1 when the pattern is not found (count = 0), breaking `&&` chains even when 0 matches is the expected/desired outcome. Capture the count with `COUNT=$(grep -c ... || true)` or use `[ "$COUNT" -eq 0 ]` after the assignment rather than relying on `&&` chaining. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Conflict Resolution (Priority 1.5 / deconflict intent)
+
+- [PATTERN] `check_pr_mergeable()` calls `gh pr view --json mergeable --jq '.mergeable'`; GitHub returns the string "CONFLICTING", "MERGEABLE", or "UNKNOWN". Always skip UNKNOWN — GitHub hasn't computed mergeability yet and will compute it on the next poll. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] Bash `case` patterns match `*` across `/` (unlike filename globbing), so `backend/alembic/versions/*.py)` in a `case` statement correctly matches any migration file path. Use this for Tier 1 allowlist pattern matching. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] Inline Python in bash functions: `python3 - "$arg" << '_PYEOF'` passes the script via stdin and `"$arg"` as `sys.argv[1]`. Single-quoting the heredoc delimiter (`'_PYEOF'`) prevents shell variable expansion inside the Python body. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] After `git merge` returns non-zero, `git diff --name-only --diff-filter=U` lists files with unresolved conflict markers. Once resolved and `git add`-ed, the file disappears from this list. Add a hard `find . -exec grep -l '^<<<<<<' {}` safety grep AFTER all resolutions as a final marker check before committing. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] The shared de-conflict step for `continue` runs in `entrypoint.sh` BEFORE the archon call: checkout the feature branch, merge origin/main, apply Tier 1/2/3. Archon then runs on the already-synced branch. The implement agent sees the merge commit in `git log` and understands the sync already happened. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Analysis and Documentation Outputs
+
+- [PATTERN] Analysis/comparison documents (e.g. `docs/dark-factory-agyn-comparison.html`) must be delivered as self-contained HTML, not Markdown — HTML is preferred for portability and supports visual elements (colored tables, badges, cards) impossible in MD. Use inline CSS with no external dependencies so the file is portable as a single asset. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->

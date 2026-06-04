@@ -11,6 +11,7 @@ RATE_LIMIT_FLOOR="${RATE_LIMIT_FLOOR:-200}"
 DIRECT_TO_PR_LABEL="${DIRECT_TO_PR_LABEL:-direct-to-pr}"
 SPEC_GRACE_MINUTES="${SPEC_GRACE_MINUTES:-30}"
 PLAN_GRACE_MINUTES="${PLAN_GRACE_MINUTES:-30}"
+CONFLICT_RESOLUTION_ENABLED="${CONFLICT_RESOLUTION_ENABLED:-true}"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -352,9 +353,10 @@ trip_to_blocked() {
   # 3. Manual retry command varies by phase
   local retry_cmd
   case "$phase" in
-    refine) retry_cmd="Refine issue #${issue_num}" ;;
-    plan)   retry_cmd="Plan issue #${issue_num}" ;;
-    *)      retry_cmd="Fix issue #${issue_num}" ;;
+    refine)  retry_cmd="Refine issue #${issue_num}" ;;
+    plan)    retry_cmd="Plan issue #${issue_num}" ;;
+    resolve) retry_cmd="Deconflict issue #${issue_num}" ;;
+    *)       retry_cmd="Fix issue #${issue_num}" ;;
   esac
 
   # 4. Explanatory comment
@@ -381,6 +383,17 @@ docker compose --profile factory run --rm dark-factory \"${retry_cmd}\"
 
   # 5. Reset counter so a future manual retry starts clean
   reset_retry "$key"
+}
+
+# --- Mergeable status for a PR: CONFLICTING, MERGEABLE, or UNKNOWN ---
+# UNKNOWN means GitHub hasn't finished computing mergeability — callers must skip.
+# --repo is required because the scheduler runs outside a git checkout.
+check_pr_mergeable() {
+  local pr_num="$1"
+  local result
+  result=$(gh pr view "$pr_num" --repo "${OWNER}/markethawk" --json mergeable \
+    --jq '.mergeable' 2>/dev/null) || true
+  echo "${result:-UNKNOWN}"
 }
 
 # --- PR lookup: open PR number for an issue's feature branch ("" if none) ---
@@ -733,6 +746,44 @@ This issue was left in **In progress** with no running factory container — the
 ---
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
   done < <(echo "$IN_PROGRESS" | jq -c '.[]')
+
+  # --- Priority 1.5: In Review items with merge conflicts (proactive auto-resolve) ---
+  # Runs every cycle after the factory guard. Scans in-review PRs for GitHub's
+  # CONFLICTING mergeability state and dispatches a deconflict run before any
+  # human comments are processed. Honors SKIP_LABELS, CI_BLOCKED, and is_issue_running.
+  # UNKNOWN is skipped — GitHub hasn't computed mergeability yet.
+  if [ "${CONFLICT_RESOLUTION_ENABLED:-true}" = "true" ]; then
+    while IFS= read -r item; do
+      [ -n "$DISPATCHED" ] && break
+      ISSUE=$(get_issue_number "$item")
+      if has_skip_label "$item"; then continue; fi
+      case "$CI_BLOCKED" in *" $ISSUE "*) continue ;; esac
+      if is_issue_running "$ISSUE"; then continue; fi
+
+      RETRIES=$(get_retry_count "${ISSUE}:resolve")
+      if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+        trip_to_blocked "$ISSUE" "resolve" "retry limit of ${MAX_RETRIES} reached for conflict resolution"
+        continue
+      fi
+
+      PR_NUM=$(get_pr_for_issue "$ISSUE")
+      [ -z "$PR_NUM" ] && continue
+
+      MERGEABLE=$(check_pr_mergeable "$PR_NUM")
+      case "$MERGEABLE" in
+        CONFLICTING)
+          echo "[$(date -u +%FT%TZ)] conflict_gate issue=#${ISSUE} pr=#${PR_NUM} mergeable=CONFLICTING action=dispatch_deconflict"
+          increment_retry "${ISSUE}:resolve" || true
+          if dispatch "Deconflict issue #${ISSUE}"; then
+            DISPATCHED="Deconflict issue #${ISSUE}"
+          fi
+          ;;
+        UNKNOWN)
+          echo "[$(date -u +%FT%TZ)] conflict_gate issue=#${ISSUE} pr=#${PR_NUM} mergeable=UNKNOWN action=skip"
+          ;;
+      esac
+    done < <(echo "$IN_REVIEW" | jq -c '.[]')
+  fi
 
   # --- Priority 1: In Review items with new comments (unblock existing work) ---
   while IFS= read -r item; do
