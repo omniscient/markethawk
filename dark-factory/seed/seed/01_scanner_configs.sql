@@ -16,7 +16,7 @@ VALUES (
   true,
   1
 )
-ON CONFLICT (id) DO UPDATE SET universe_id = EXCLUDED.universe_id;
+ON CONFLICT (id) DO NOTHING;
 
 -- Scanner config: Liquidity Hunt (Evening)
 INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, universe_id)
@@ -31,7 +31,7 @@ VALUES (
   true,
   1
 )
-ON CONFLICT (id) DO UPDATE SET universe_id = EXCLUDED.universe_id;
+ON CONFLICT (id) DO NOTHING;
 
 -- Scanner config: Oversold Bounce
 INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, universe_id)
@@ -46,32 +46,22 @@ VALUES (
   true,
   1
 )
-ON CONFLICT (id) DO UPDATE SET universe_id = EXCLUDED.universe_id;
+ON CONFLICT (id) DO NOTHING;
 
--- Scanner config: Pocket Pivot (Evening)
--- If a pocket_pivot row already exists with a different id (e.g. auto-assigned by migration),
--- patch it to ensure universe_id=1. Then insert id=4 only if no pocket_pivot row exists at all.
-UPDATE scanner_configs
-SET universe_id = 1
-WHERE scanner_type = 'pocket_pivot'
-  AND id != 4;
-
-INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, run_frequency, universe_id)
-SELECT
+-- Scanner config: Pocket Pivot
+INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, universe_id)
+VALUES (
   4,
   gen_random_uuid(),
-  'Pocket Pivot (Evening)',
-  'Detects up-days where session volume exceeds the highest down-day volume in the prior 10 trading days (classic Morales/Kacher pocket pivot).',
+  'Pocket Pivot',
+  'Identifies pocket pivot breakout setups with above-average volume on up days',
   'pocket_pivot',
-  '{"lookback_days": 10, "min_lookback_days": 5, "price_floor": 5.0, "volume_floor": 100000}',
-  '{}',
+  '{"lookback_days": 10, "volume_floor": 100000}',
+  '[{"field": "volume_ratio", "op": ">=", "value": 1.5}, {"field": "price", "op": ">=", "value": 5.0}]',
   true,
-  'evening',
   1
-WHERE NOT EXISTS (
-  SELECT 1 FROM scanner_configs WHERE scanner_type = 'pocket_pivot'
 )
-ON CONFLICT (id) DO UPDATE SET universe_id = EXCLUDED.universe_id;
+ON CONFLICT (id) DO NOTHING;
 
 -- System config defaults
 INSERT INTO system_config (key, value)
