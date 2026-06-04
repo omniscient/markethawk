@@ -519,9 +519,30 @@ if [ "$INTENT" = "deconflict" ]; then
     exit 0
   fi
 
-  git checkout "$FEATURE_BRANCH" 2>/dev/null \
-    || git checkout -b "$FEATURE_BRANCH" "origin/$FEATURE_BRANCH" 2>/dev/null \
-    || true
+  # The shared setup above (clone → cp baked seed/preview/settings into the tree) leaves the
+  # working tree dirty. `git checkout <feature-branch>` then ABORTS when the branch touches
+  # those paths (e.g. a seed-file PR like #207), and the old `|| true` masked the failure: the
+  # run silently stayed on main, did a no-op "Already up to date" merge, then failed to push a
+  # branch it never checked out (`src refspec ... does not match any`). Reset to a pristine tree
+  # first. Scope clean to the copied dirs and never use -x, so gitignored node_modules survives
+  # for the tsc validation below.
+  git reset --hard HEAD >/dev/null 2>&1 || true
+  git clean -fd dark-factory/ .claude/ >/dev/null 2>&1 || true
+
+  if ! git checkout "$FEATURE_BRANCH" 2>&1 \
+       && ! git checkout -b "$FEATURE_BRANCH" "origin/$FEATURE_BRANCH" 2>&1; then
+    _conflict_escalate "Could not check out branch ${FEATURE_BRANCH} for conflict resolution."
+    exit 0
+  fi
+
+  # Hard guard: never run the merge/push on the wrong branch — this is the failure mode that
+  # turned a routine conflict into a silent no-op-merge + failed-push loop until the breaker
+  # tripped the PR to Blocked. If checkout didn't land us on the feature branch, escalate loudly.
+  CURRENT_BRANCH=$(git branch --show-current)
+  if [ "$CURRENT_BRANCH" != "$FEATURE_BRANCH" ]; then
+    _conflict_escalate "Checkout did not land on ${FEATURE_BRANCH} (HEAD on '${CURRENT_BRANCH}')."
+    exit 0
+  fi
 
   if ! _resolve_merge_conflicts; then
     # Tier 3 escalation already handled inside _resolve_merge_conflicts
