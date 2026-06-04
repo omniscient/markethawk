@@ -341,17 +341,30 @@ _conflict_tier2() {
   conflict_content=$(cat "$f" 2>/dev/null) || return 1
 
   tmpfile=$(mktemp /tmp/conflict-prompt-XXXXXX.txt)
-  printf 'Resolve the git merge conflict markers in this file. Return ONLY the resolved file content — no explanation, no markdown code fences. Preserve both intents (what the feature branch added AND what main added).\n\nFile: %s\n\nIssue context:\n%s\n\nRecent git log:\n%s\n\nFile content with conflict markers:\n%s\n' \
+  printf 'Resolve the git merge conflict markers in this file, preserving both intents (what the feature branch added AND what main added).\n\nReturn the COMPLETE resolved file content between two marker lines, EXACTLY like this and nothing else:\n===BEGIN_RESOLVED_FILE===\n<complete resolved file content>\n===END_RESOLVED_FILE===\n\nNo explanation, commentary, or markdown code fences — inside or outside the markers.\n\nFile: %s\n\nIssue context:\n%s\n\nRecent git log:\n%s\n\nFile content with conflict markers:\n%s\n' \
     "$f" "$issue_body" "$git_log" "$conflict_content" > "$tmpfile"
 
-  resolved=$(claude -p --model sonnet < "$tmpfile" 2>/dev/null)
+  local raw
+  raw=$(claude -p --model sonnet < "$tmpfile" 2>/dev/null)
   local exit_code=$?
   rm -f "$tmpfile"
+  [ "$exit_code" -ne 0 ] && return 1
 
-  if [ "$exit_code" -ne 0 ] || [ -z "$resolved" ] || echo "$resolved" | grep -q '^<<<<<<<'; then
+  # Extract ONLY the content between the sentinel markers. Claude often ignores
+  # "output only file content" and prepends prose ("The resolved content is ready,
+  # here's what I chose…"); writing that raw output silently corrupts the file and only
+  # surfaces later as a CI failure (#207: prose overwrote 01_scanner_configs.sql). If the
+  # markers are missing the response was malformed — treat as uncertain and escalate
+  # (return 1) rather than writing anything.
+  if ! printf '%s' "$raw" | grep -q '^===BEGIN_RESOLVED_FILE===$' \
+     || ! printf '%s' "$raw" | grep -q '^===END_RESOLVED_FILE===$'; then
     return 1
   fi
-  echo "$resolved" > "$f"
+  resolved=$(printf '%s\n' "$raw" | sed -n '/^===BEGIN_RESOLVED_FILE===$/,/^===END_RESOLVED_FILE===$/p' | sed '1d;$d')
+  if [ -z "$resolved" ] || printf '%s' "$resolved" | grep -qE '^(<<<<<<<|>>>>>>>)'; then
+    return 1
+  fi
+  printf '%s\n' "$resolved" > "$f"
   git add "$f"
 }
 
@@ -447,7 +460,7 @@ _resolve_merge_conflicts() {
   survivors=$(find . -not -path './.git/*' -type f \
     \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' \
        -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' \
-       -o -name '*.md' -o -name '*.sh' \) \
+       -o -name '*.md' -o -name '*.sh' -o -name '*.sql' \) \
     -exec grep -l '^<<<<<<' {} \; 2>/dev/null | head -20 || true)
 
   if [ -n "$ai_uncertain" ] || [ -n "$survivors" ]; then
