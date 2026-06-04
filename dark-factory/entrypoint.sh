@@ -25,10 +25,15 @@ git config --global user.email "$FACTORY_EMAIL"
 echo "GitHub auth: $(gh auth status 2>&1 | head -2 | tail -1 || echo 'using GH_TOKEN env var')"
 
 # --- Project board constants ---
+OWNER="omniscient"
 PROJECT_ID="PVT_kwHOAAFds84BWh4w"
 STATUS_FIELD="PVTSSF_lAHOAAFds84BWh4wzhR1VaA"
 STATUS_IN_PROGRESS="47fc9ee4"
+STATUS_IN_REVIEW="df73e18b"
 STATUS_BLOCKED="93d87b2f"
+
+# Conflict resolution
+CONFLICT_RESOLUTION_AI_TIER="${CONFLICT_RESOLUTION_AI_TIER:-true}"
 
 # --- Parse arguments ---
 ARGUMENTS="${*}"
@@ -43,7 +48,7 @@ fi
 
 # --- Extract issue number and intent immediately (no AI needed) ---
 ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1)
-INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan)' | head -1 | tr '[:upper:]' '[:lower:]')
+INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict)' | head -1 | tr '[:upper:]' '[:lower:]')
 INTENT=${INTENT:-fix}
 
 # --- Concurrency guard: only one factory container at a time ---
@@ -76,7 +81,7 @@ set_board_status() {
 }
 
 # --- Move to "In Progress" immediately (skip for close) ---
-if [ -n "$ISSUE_NUM" ] && [ "$INTENT" != "close" ] && [ "$INTENT" != "refine" ] && [ "$INTENT" != "plan" ]; then
+if [ -n "$ISSUE_NUM" ] && [ "$INTENT" != "close" ] && [ "$INTENT" != "refine" ] && [ "$INTENT" != "plan" ] && [ "$INTENT" != "deconflict" ]; then
   echo "Moving issue #$ISSUE_NUM to In Progress..."
   set_board_status "$STATUS_IN_PROGRESS" || echo "WARNING: Could not update project board"
 fi
@@ -227,7 +232,7 @@ ${RUN_ROWS}
 on_failure() {
   local EXIT_CODE=$?
   if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
-    if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ]; then
+    if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ] || [ "$INTENT" = "deconflict" ]; then
       # No board status change here — the scheduler's trip_to_blocked() handles the
       # Blocked transition after N attempts. Setting Blocked from on_failure would put
       # the issue in Blocked before the scheduler's counter accumulates; Priority 3
@@ -272,6 +277,193 @@ docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
 }
 trap on_failure ERR
 
+# =============================================================================
+# --- Conflict resolution helpers (tiered: mechanical → AI → escalate) ---
+# =============================================================================
+
+# Tier 1: mechanical, no-AI resolution for one file.
+# Returns 0 if the file is in the allowlist and was resolved; 1 otherwise.
+_conflict_tier1() {
+  local f="$1"
+  case "$f" in
+    codeindex.json|symbolindex.json|docs/codeindex-hotspots.md)
+      git checkout --theirs "$f" 2>/dev/null && git add "$f" || return 1
+      ;;
+    frontend/package-lock.json)
+      cd "$CLONE_DIR/frontend" && npm install --silent 2>/dev/null && cd "$CLONE_DIR" || return 1
+      git add frontend/package-lock.json || return 1
+      ;;
+    backend/app/models/__init__.py)
+      python3 - "$f" << '_PYEOF' || return 1
+import sys
+path = sys.argv[1]
+with open(path) as fh:
+    content = fh.read()
+lines = content.split('\n')
+result = []
+for line in lines:
+    if line.startswith('<<<<<<<') or line.startswith('=======') or line.startswith('>>>>>>>'):
+        continue
+    result.append(line)
+seen = set()
+final = []
+for line in result:
+    stripped = line.strip()
+    if stripped and (stripped.startswith('from ') or stripped.startswith('import ')):
+        if stripped not in seen:
+            seen.add(stripped)
+            final.append(line)
+    else:
+        final.append(line)
+with open(path, 'w') as fh:
+    fh.write('\n'.join(final))
+_PYEOF
+      git add "$f" || return 1
+      ;;
+    backend/alembic/versions/*.py)
+      git checkout --theirs "$f" 2>/dev/null && git add "$f" || return 1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# Tier 2: AI resolution via claude -p for one conflicted file.
+# Returns 0 if resolved cleanly; 1 if uncertain or Claude unavailable.
+_conflict_tier2() {
+  local f="$1"
+  [ -f "$f" ] || return 1
+
+  local issue_body git_log conflict_content tmpfile resolved
+  issue_body=$(gh issue view "$ISSUE_NUM" --repo "${OWNER}/markethawk" --json body --jq '.body' 2>/dev/null || echo "")
+  git_log=$(git log --oneline -15 HEAD 2>/dev/null || echo "")
+  conflict_content=$(cat "$f" 2>/dev/null) || return 1
+
+  tmpfile=$(mktemp /tmp/conflict-prompt-XXXXXX.txt)
+  printf 'Resolve the git merge conflict markers in this file. Return ONLY the resolved file content — no explanation, no markdown code fences. Preserve both intents (what the feature branch added AND what main added).\n\nFile: %s\n\nIssue context:\n%s\n\nRecent git log:\n%s\n\nFile content with conflict markers:\n%s\n' \
+    "$f" "$issue_body" "$git_log" "$conflict_content" > "$tmpfile"
+
+  resolved=$(claude -p --model sonnet < "$tmpfile" 2>/dev/null)
+  local exit_code=$?
+  rm -f "$tmpfile"
+
+  if [ "$exit_code" -ne 0 ] || [ -z "$resolved" ] || echo "$resolved" | grep -q '^<<<<<<<'; then
+    return 1
+  fi
+  echo "$resolved" > "$f"
+  git add "$f"
+}
+
+# Tier 3: move issue to Blocked and post an explanatory comment.
+# Does NOT exit — caller decides whether to exit after this.
+_conflict_escalate() {
+  local reason="$1"
+  echo "[deconflict] Tier 3 escalation: ${reason}"
+  set_board_status "$STATUS_BLOCKED" 2>/dev/null || true
+  gh issue comment "$ISSUE_NUM" --repo "${OWNER}/markethawk" --body \
+"## Dark Factory — Conflict Resolution Escalated
+
+The factory attempted automatic merge conflict resolution but could not complete it.
+
+**Reason:** ${reason}
+
+**To fix manually:**
+\`\`\`bash
+git checkout feat/issue-${ISSUE_NUM}-*
+git fetch origin main
+git merge origin/main
+# Resolve conflicts manually, then push
+\`\`\`
+
+---
+*Posted by MarketHawk Dark Factory*" 2>/dev/null || true
+}
+
+# Main resolver: merge origin/main into HEAD, apply Tier 1 → Tier 2 → Tier 3.
+# Returns 0 on clean merge or successful resolution.
+# Returns 1 after escalation (Tier 3); the caller must then exit.
+_resolve_merge_conflicts() {
+  echo "[deconflict] Fetching origin/main..."
+  git fetch origin main 2>&1 || true
+
+  local merge_exit=0
+  git merge origin/main --no-edit --no-ff 2>&1 || merge_exit=$?
+
+  if [ "$merge_exit" -eq 0 ]; then
+    echo "[deconflict] Clean merge — no conflicts."
+    return 0
+  fi
+
+  local conflicted
+  conflicted=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+  if [ -z "$conflicted" ]; then
+    git merge --abort 2>/dev/null || true
+    _conflict_escalate "Merge failed with no resolvable conflict markers (possibly a binary file or submodule conflict)."
+    return 1
+  fi
+
+  echo "[deconflict] Conflicted files: $(echo "$conflicted" | tr '\n' ' ')"
+
+  # --- Tier 1: mechanical resolution ---
+  local tier2_needed=""
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    if _conflict_tier1 "$f"; then
+      echo "[deconflict] Tier1 resolved: $f"
+    else
+      tier2_needed="$tier2_needed $f"
+    fi
+  done <<< "$conflicted"
+
+  # Alembic multi-head merge (run after Tier 1 migration file resolution)
+  local heads_count=0
+  heads_count=$(cd "$CLONE_DIR/backend" && python -m alembic heads 2>/dev/null | grep -c '^[a-f0-9]' || echo "0")
+  if [ "${heads_count:-0}" -gt 1 ]; then
+    echo "[deconflict] Multiple alembic heads (${heads_count}) — creating merge migration..."
+    (cd "$CLONE_DIR/backend" && python -m alembic merge heads -m "merge_branches_issue_${ISSUE_NUM}" 2>/dev/null) || true
+    git add backend/alembic/versions/ 2>/dev/null || true
+  fi
+
+  # --- Tier 2: AI resolution ---
+  local ai_uncertain=""
+  if [ -n "$tier2_needed" ]; then
+    if [ "${CONFLICT_RESOLUTION_AI_TIER:-true}" = "true" ]; then
+      for f in $tier2_needed; do
+        if _conflict_tier2 "$f"; then
+          echo "[deconflict] Tier2 resolved: $f"
+        else
+          ai_uncertain="$ai_uncertain $f"
+        fi
+      done
+    else
+      ai_uncertain="$tier2_needed"
+      echo "[deconflict] AI tier disabled; escalating: ${tier2_needed}"
+    fi
+  fi
+
+  # --- Hard grep: surviving conflict markers (safety net) ---
+  local survivors
+  survivors=$(find . -not -path './.git/*' -type f \
+    \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' \
+       -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' \
+       -o -name '*.md' -o -name '*.sh' \) \
+    -exec grep -l '^<<<<<<' {} \; 2>/dev/null | head -20 || true)
+
+  if [ -n "$ai_uncertain" ] || [ -n "$survivors" ]; then
+    local reason=""
+    [ -n "$ai_uncertain" ] && reason="AI could not resolve:${ai_uncertain}."
+    [ -n "$survivors" ] && reason="${reason} Surviving markers in: $(echo "$survivors" | tr '\n' ' ')."
+    git merge --abort 2>/dev/null || true
+    _conflict_escalate "${reason}"
+    return 1
+  fi
+
+  # Commit the resolution
+  git commit -m "chore: merge origin/main, resolve conflicts [#${ISSUE_NUM}]" 2>/dev/null || true
+  echo "[deconflict] Merge resolution committed."
+}
+
 # --- Clone the repo ---
 echo "Cloning markethawk..."
 if [ -d "$CLONE_DIR" ]; then
@@ -312,6 +504,76 @@ fi
 
 # --- Install pre-commit hooks so codeindex-blast warn hook fires in the run log ---
 pre-commit install --allow-missing-config 2>/dev/null || true
+
+# =============================================================================
+# --- Deconflict flow: resolve → validate → push → report → exit ---
+# 'continue' sync is handled by the archon workflow's de-conflict node.
+# =============================================================================
+if [ "$INTENT" = "deconflict" ]; then
+  git fetch --all 2>/dev/null || true
+  FEATURE_BRANCH=$(git branch -r 2>/dev/null | grep -E "origin/feat/issue-${ISSUE_NUM}-" | head -1 | tr -d ' ' | sed 's|origin/||')
+
+  if [ -z "$FEATURE_BRANCH" ]; then
+    echo "ERROR: No feature branch found for issue #${ISSUE_NUM}" >&2
+    _conflict_escalate "No feature branch matching feat/issue-${ISSUE_NUM}-* was found."
+    exit 0
+  fi
+
+  git checkout "$FEATURE_BRANCH" 2>/dev/null \
+    || git checkout -b "$FEATURE_BRANCH" "origin/$FEATURE_BRANCH" 2>/dev/null \
+    || true
+
+  if ! _resolve_merge_conflicts; then
+    # Tier 3 escalation already handled inside _resolve_merge_conflicts
+    exit 0
+  fi
+fi
+
+if [ "$INTENT" = "deconflict" ]; then
+  # --- Validate: TypeScript type-check (lightweight; no running DB needed) ---
+  DECONFLICT_VALIDATION="PASS"
+  echo "[deconflict] Running TypeScript validation..."
+  if ! (cd "$CLONE_DIR/frontend" && npx tsc --noEmit 2>&1); then
+    DECONFLICT_VALIDATION="FAIL"
+    echo "[deconflict] TypeScript validation failed — escalating to Blocked."
+    _conflict_escalate "TypeScript type errors after merge. Run 'cd frontend && npx tsc --noEmit' to see them."
+    exit 0
+  fi
+
+  # --- Push the resolved branch ---
+  echo "[deconflict] Pushing resolved branch ${FEATURE_BRANCH}..."
+  git push origin "$FEATURE_BRANCH" 2>&1
+
+  # --- Move board back to In Review ---
+  set_board_status "$STATUS_IN_REVIEW" 2>/dev/null || true
+
+  # --- Write artifact ---
+  DECONFLICT_ARTIFACTS_DIR="/root/.archon/workspaces/omniscient/markethawk/artifacts"
+  mkdir -p "$DECONFLICT_ARTIFACTS_DIR"
+  cat > "$DECONFLICT_ARTIFACTS_DIR/conflict_resolution.md" << EOF
+# Conflict Resolution — Issue #${ISSUE_NUM}
+
+**Status:** RESOLVED
+**Branch:** ${FEATURE_BRANCH}
+**TypeScript validation:** ${DECONFLICT_VALIDATION}
+
+Merged origin/main into the feature branch using the tiered resolution strategy.
+EOF
+
+  # --- Post success comment ---
+  gh issue comment "$ISSUE_NUM" --repo "${OWNER}/markethawk" --body \
+"## Dark Factory — Merge Conflicts Resolved
+
+\`main\` has been merged into \`${FEATURE_BRANCH}\` and all conflicts were resolved automatically.
+
+The branch has been pushed and is ready for re-review.
+
+---
+*Posted by MarketHawk Dark Factory*" 2>/dev/null || true
+
+  echo "[deconflict] Done — issue #${ISSUE_NUM} conflicts resolved and pushed."
+  exit 0
+fi
 
 # --- Run via Archon workflow ---
 export CLAUDE_BIN_PATH=/usr/bin/claude
