@@ -392,6 +392,22 @@ nodes:
   # Layer 3: Spin up preview and validate
   - id: preview-up
     bash: |
+      NEEDS_PREVIEW=$classify-preview.output.needs_preview
+      SKIP_REASON="$classify-preview.output.reason"
+
+      # Skip ONLY on an explicit "false". Any other value (garbled, missing) falls through to
+      # building the preview — fail-safe direction: never skip on uncertainty.
+      if [ "$NEEDS_PREVIEW" = "false" ]; then
+        ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+        echo "Preview differentiator: skipping preview for issue #${ISSUE}"
+        echo "Reason: ${SKIP_REASON}"
+        mkdir -p "$ARTIFACTS_DIR"
+        printf 'export PREVIEW_SKIPPED=true\nexport PREVIEW_SKIP_REASON="%s"\nexport PREVIEW_FRONTEND=""\nexport PREVIEW_BACKEND=""\nexport PREVIEW_NET=""\n' "${SKIP_REASON}" > "$ARTIFACTS_DIR/preview_env.sh"
+        echo "PREVIEW_SKIPPED=true"
+        echo "PREVIEW_SKIP_REASON=${SKIP_REASON}"
+        exit 0
+      fi
+
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       # Preview ports follow 1{SLOT}{suffix} (e.g. slot 03 -> frontend 10333, backend 10380).
       # Collision-free allocation: recover the slot from the already-running preview stack (Continue runs),
@@ -479,14 +495,11 @@ nodes:
           echo "PREVIEW_FRONTEND=http://localhost:1${PADDED}33"
           echo "PREVIEW_BACKEND=${BACKEND_INTERNAL}"
           echo "PREVIEW_MOUNT_SECS=${PREVIEW_SECS}"
+          echo "PREVIEW_SKIPPED=false"
           # Write env file so the validate command can source it reliably without
           # having to parse raw step output or guess the URL.
           mkdir -p "$ARTIFACTS_DIR"
-          {
-            echo "export PREVIEW_FRONTEND=\"http://localhost:1${PADDED}33\""
-            echo "export PREVIEW_BACKEND=\"${BACKEND_INTERNAL}\""
-            echo "export PREVIEW_NET=\"${PREVIEW_NET}\""
-          } > "$ARTIFACTS_DIR/preview_env.sh"
+          printf 'export PREVIEW_SKIPPED=false\nexport PREVIEW_FRONTEND="http://localhost:1%s33"\nexport PREVIEW_BACKEND="%s"\nexport PREVIEW_NET="%s"\n' "${PADDED}" "${BACKEND_INTERNAL}" "${PREVIEW_NET}" > "$ARTIFACTS_DIR/preview_env.sh"
           exit 0
         fi
         sleep 3
@@ -494,7 +507,7 @@ nodes:
       echo "WARNING: Backend did not become healthy within 180s"
       docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
       exit 1
-    depends_on: [regen-codeindex]
+    depends_on: [classify-preview]
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 300000
 
