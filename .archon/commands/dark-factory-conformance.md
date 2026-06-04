@@ -32,7 +32,7 @@ gh issue view $ISSUE_NUM --json comments \
   | jq -r '[.comments[] | select(.body | test("Refinement Pipeline — Plan Generated"))] | last | .body // ""'
 ```
 
-Parse the **Spec:** or **Plan:** line from that comment to find the spec file path. The Plan comment typically links the plan file; look for any linked file under `Docs/superpowers/specs/`.
+Parse the **Spec:** or **Plan:** line from that comment to find the spec file path. The Plan comment typically links the plan file; look for any linked file under `docs/superpowers/specs/`.
 
 ### 2b. Check $ARTIFACTS_DIR/refinement-status.md
 
@@ -42,10 +42,10 @@ cat "$ARTIFACTS_DIR/refinement-status.md" 2>/dev/null || true
 
 Look for a `SPEC_PATH:` or `PLAN_PATH:` line that points to a spec.
 
-### 2c. Scan Docs/superpowers/specs/
+### 2c. Scan docs/superpowers/specs/
 
 ```bash
-ls Docs/superpowers/specs/ 2>/dev/null | sort -r | head -10
+ls docs/superpowers/specs/ 2>/dev/null | sort -r | head -10
 ```
 
 Look for a file whose name contains keywords from the issue title. Pick the most recently created file that matches.
