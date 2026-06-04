@@ -118,6 +118,19 @@ Use the `lookup_symbol` MCP tool before grepping for any function or class.
 Use `get_impact` before modifying a high-blast file (see `docs/codeindex-hotspots.md` for the current list).
 Local interactive visualization: see [DEVELOPMENT.md](DEVELOPMENT.md#codeindex-local-visualization).
 
+## Repowise (code-health + git signals)
+
+Adopted alongside codeindex (see `docs/repowise-pilot-eval.md`). Use for health scoring and hotspot queries that codeindex doesn't cover.
+
+```bash
+bash scripts/repowise.sh          # rebuild index + open dashboard
+~/.venvs/repowise/bin/repowise health              # top worst files by biomarker score
+~/.venvs/repowise/bin/repowise health --file PATH  # per-file deep-dive
+~/.venvs/repowise/bin/repowise risk main..HEAD     # change risk score for a branch
+```
+
+Wire the MCP server in `.claude/settings.local.json` (see eval doc) to use `get_health`, `get_overview`, and `get_risk` tools in-session. Index lives in `.repowise/` (gitignored except `config.yaml`).
+
 ## Further Reading
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — service topology, scan execution flow, module map, Celery tasks

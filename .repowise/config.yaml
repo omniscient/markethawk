@@ -1,0 +1,21 @@
+# .repowise/config.yaml
+# Offline pilot config — deterministic analysis only (no LLM/embedder layers).
+# Use `repowise init --index-only` to rebuild the index without LLM generation.
+# Use `bash scripts/repowise.sh` to rebuild + serve the dashboard.
+
+# Exclude generated, vendored, and build artifacts from analysis
+exclude_patterns:
+  - node_modules/
+  - __pycache__/
+  - "**/__pycache__/**"
+  - .git/
+  - frontend/dist/
+  - frontend/node_modules/
+  - .venv/
+  - venv/
+  - .repowise/
+  - alembic/versions/
+  - "*.pyc"
+
+# Limit git history depth for performance on a long-lived repo
+commit_limit: 500
