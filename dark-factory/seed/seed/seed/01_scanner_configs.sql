@@ -4,7 +4,7 @@
 BEGIN;
 
 -- Scanner config: Pre-Market Volume Spike
-INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active)
+INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, universe_id)
 VALUES (
   1,
   gen_random_uuid(),
@@ -13,12 +13,13 @@ VALUES (
   'pre_market_volume_spike',
   '{"lookback_days": 20, "min_volume": 50000}',
   '[{"field": "relative_volume", "op": ">=", "value": 4.0}, {"field": "price", "op": ">=", "value": 5.0}, {"field": "gap_pct", "op": ">=", "value": 1.0}]',
-  true
+  true,
+  1
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET universe_id = EXCLUDED.universe_id;
 
 -- Scanner config: Liquidity Hunt (Evening)
-INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active)
+INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, universe_id)
 VALUES (
   2,
   gen_random_uuid(),
@@ -27,12 +28,13 @@ VALUES (
   'liquidity_hunt',
   '{"lookback_days": 20, "min_volume": 100000, "scan_window": "evening"}',
   '[{"field": "volume_spike", "op": ">=", "value": 3.0}, {"field": "price", "op": ">=", "value": 10.0}, {"field": "spread_pct", "op": ">=", "value": 0.5}]',
-  true
+  true,
+  1
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET universe_id = EXCLUDED.universe_id;
 
 -- Scanner config: Oversold Bounce
-INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active)
+INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, universe_id)
 VALUES (
   3,
   gen_random_uuid(),
@@ -41,9 +43,35 @@ VALUES (
   'oversold_bounce',
   '{"lookback_days": 14, "rsi_period": 14}',
   '[{"field": "rsi", "op": "<=", "value": 30.0}, {"field": "price", "op": ">=", "value": 5.0}, {"field": "volume", "op": ">=", "value": 50000}]',
-  true
+  true,
+  1
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET universe_id = EXCLUDED.universe_id;
+
+-- Scanner config: Pocket Pivot (Evening)
+-- If a pocket_pivot row already exists with a different id (e.g. auto-assigned by migration),
+-- patch it to ensure universe_id=1. Then insert id=4 only if no pocket_pivot row exists at all.
+UPDATE scanner_configs
+SET universe_id = 1
+WHERE scanner_type = 'pocket_pivot'
+  AND id != 4;
+
+INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, run_frequency, universe_id)
+SELECT
+  4,
+  gen_random_uuid(),
+  'Pocket Pivot (Evening)',
+  'Detects up-days where session volume exceeds the highest down-day volume in the prior 10 trading days (classic Morales/Kacher pocket pivot).',
+  'pocket_pivot',
+  '{"lookback_days": 10, "min_lookback_days": 5, "price_floor": 5.0, "volume_floor": 100000}',
+  '{}',
+  true,
+  'evening',
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM scanner_configs WHERE scanner_type = 'pocket_pivot'
+)
+ON CONFLICT (id) DO UPDATE SET universe_id = EXCLUDED.universe_id;
 
 -- System config defaults
 INSERT INTO system_config (key, value)
