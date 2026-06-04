@@ -138,6 +138,29 @@ has_opt_in_refine_label() {
   echo "$labels" | grep -qi "ready-for-agent"
 }
 
+has_direct_to_pr_label() {
+  local item="$1"
+  echo "$item" | jq -r '.labels[]?' 2>/dev/null | grep -qi "$DIRECT_TO_PR_LABEL"
+}
+
+# Returns minutes elapsed since the last comment matching $marker_re on the given issue.
+# Returns "" if no matching comment exists or if the timestamp cannot be parsed.
+elapsed_minutes_since_marker() {
+  local issue_num="$1"
+  local marker_re="$2"
+  local comments
+  comments=$(gh issue view "$issue_num" --repo "${OWNER}/markethawk" \
+    --json comments -q '.comments' 2>/dev/null) || { echo ""; return; }
+  local created_at
+  created_at=$(echo "$comments" | jq -r --arg m "$marker_re" \
+    '[.[] | select(.body | test($m))] | last | .createdAt // ""')
+  [ -z "$created_at" ] && { echo ""; return; }
+  local marker_epoch now_epoch
+  marker_epoch=$(date -u -d "$created_at" +%s 2>/dev/null) || { echo ""; return; }
+  now_epoch=$(date -u +%s)
+  echo $(( (now_epoch - marker_epoch) / 60 ))
+}
+
 has_new_comment_after_report() {
   local issue_num="$1"
   local report_marker="$2"

@@ -126,6 +126,53 @@ has_opt_in_refine_label "$ITEM_WITHOUT" \
   || assert_eq "item WITHOUT label blocked"     "0" "0"
 
 # ==========================================
+# E: has_direct_to_pr_label
+# ==========================================
+echo ""
+echo "--- E: has_direct_to_pr_label ---"
+
+ITEM_DTP='{"content":{"number":10},"labels":["enhancement","direct-to-pr"],"status":"Backlog"}'
+ITEM_NO_DTP='{"content":{"number":11},"labels":["enhancement","ready-for-agent"],"status":"Backlog"}'
+
+has_direct_to_pr_label "$ITEM_DTP" \
+  && assert_eq "item WITH direct-to-pr returns true" "0" "0" \
+  || assert_eq "item WITH direct-to-pr returns true" "0" "1"
+
+has_direct_to_pr_label "$ITEM_NO_DTP" \
+  && assert_eq "item WITHOUT direct-to-pr returns false" "0" "1" \
+  || assert_eq "item WITHOUT direct-to-pr returns false" "0" "0"
+
+# ==========================================
+# F: elapsed_minutes_since_marker
+# ==========================================
+echo ""
+echo "--- F: elapsed_minutes_since_marker ---"
+
+# Compute a timestamp 35 minutes in the past
+_MARKER_EPOCH=$(( $(date -u +%s) - 35*60 ))
+_MARKER_TS=$(date -u -d "@${_MARKER_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)
+
+gh() {
+  printf '[{"body":"Refinement Pipeline — Plan Generated","createdAt":"%s"}]\n' "$_MARKER_TS"
+}
+export -f gh
+
+_ELAPSED=$(elapsed_minutes_since_marker "55" "Refinement Pipeline")
+[ -n "$_ELAPSED" ] && [ "$_ELAPSED" -ge 34 ] \
+  && assert_eq "elapsed ≥ 34 for 35-min-old marker" "0" "0" \
+  || assert_eq "elapsed ≥ 34 for 35-min-old marker" "0" "1"
+
+# No matching comment → returns ""
+gh() { printf '[{"body":"some other comment","createdAt":"%s"}]\n' "$_MARKER_TS"; }
+export -f gh
+_ELAPSED2=$(elapsed_minutes_since_marker "55" "Refinement Pipeline")
+assert_eq "no matching marker returns empty" "" "$_ELAPSED2"
+
+# Restore original gh stub
+gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
+export -f gh
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"
