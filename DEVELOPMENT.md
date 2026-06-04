@@ -65,7 +65,7 @@ docker-compose exec backend python -m alembic upgrade head
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| Frontend | http://localhost:3000 | — |
+| Frontend | http://localhost:3333 | — |
 | Backend API | http://localhost:8000 | — |
 | Swagger / API Docs | http://localhost:8000/docs | — |
 | pgAdmin | http://localhost:5050 | Values from `PGADMIN_DEFAULT_EMAIL/PASSWORD` in `.env` |
@@ -156,7 +156,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```bash
 cd frontend
 npm install
-npm run dev        # Dev server at http://localhost:3000
+npm run dev        # Dev server at http://localhost:3333
 npm run build      # Production build
 npm run lint       # ESLint check
 ```
@@ -331,7 +331,7 @@ SELECT pid, state, query_start, query FROM pg_stat_activity WHERE datname = 'sto
 netstat -ano | findstr :5432   # PostgreSQL
 netstat -ano | findstr :6379   # Redis
 netstat -ano | findstr :8000   # Backend
-netstat -ano | findstr :3000   # Frontend
+netstat -ano | findstr :3333   # Frontend
 ```
 
 ### Containers failing to start
