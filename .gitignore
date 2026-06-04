@@ -61,3 +61,9 @@ dark-factory/tmp/
 # Local artifacts (log dumps, scratch DBs)
 *.db
 *-logs.txt
+
+# Repowise pilot (generated index and editor files — do not commit)
+.repowise/*
+!.repowise/config.yaml
+.mcp.json
+.claude/CLAUDE.md
