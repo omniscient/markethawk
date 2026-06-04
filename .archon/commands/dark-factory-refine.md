@@ -67,7 +67,7 @@ Follow the process in `orchestrator-prompt.md`:
 
 1. Propose 2-3 approaches with trade-offs
 2. Select the best approach based on Q&A answers and codebase patterns
-3. Write the spec to `Docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` following existing spec format:
+3. Write the spec to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` following existing spec format:
    - Overview / problem statement
    - Requirements (from Q&A)
    - Architecture / approach
@@ -118,7 +118,7 @@ Follow the process in `orchestrator-prompt.md`:
 
 1. Determine the current branch name: `BRANCH=$(git branch --show-current)`
 2. Build GitHub links:
-   - Spec link: `https://github.com/omniscient/markethawk/blob/$BRANCH/<spec-file-path>` (e.g. `Docs/superpowers/specs/2026-05-13-topic-design.md`)
+   - Spec link: `https://github.com/omniscient/markethawk/blob/$BRANCH/<spec-file-path>` (e.g. `docs/superpowers/specs/2026-05-13-topic-design.md`)
    - Branch link: `https://github.com/omniscient/markethawk/tree/$BRANCH`
 3. Post a summary comment on the issue:
    ```

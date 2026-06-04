@@ -40,7 +40,7 @@ Propose 2-3 approaches with trade-offs. Select the best one based on:
 - Simplicity and maintainability
 
 ### Phase 4: Spec Writing
-Write the spec to `Docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` following the existing spec format. Include:
+Write the spec to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` following the existing spec format. Include:
 - Overview (problem statement from issue)
 - Requirements (distilled from Q&A)
 - Architecture / approach
