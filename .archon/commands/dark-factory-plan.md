@@ -14,7 +14,7 @@ argument-hint: (no arguments - reads issue context from workflow)
 1. Read `CLAUDE.md` for development rules, architecture, and conventions
 2. The issue context has been fetched by the workflow. It is available in the conversation.
 3. Read `/opt/refinement-skills/architect-prompt.md` — you will pass this to the review subagent
-4. Find the spec file: look in `Docs/superpowers/specs/` for a file matching this issue's topic, or check the issue comments for a "Refinement Pipeline — Spec Generated" report that names the spec path
+4. Find the spec file: look in `docs/superpowers/specs/` for a file matching this issue's topic, or check the issue comments for a "Refinement Pipeline — Spec Generated" report that names the spec path
 5. Read the spec file
 6. Read `.archon/memory/codebase-patterns.md` — global lessons applicable to any change.
 7. Read `.archon/memory/architecture.md` — prior architectural decisions (if the file exists). If a memory entry marks an approach as AVOID, do not plan steps that use that approach.
@@ -28,7 +28,7 @@ argument-hint: (no arguments - reads issue context from workflow)
 ## Phase 2: PLAN WRITING
 
 Write a full implementation plan following these conventions:
-- Save to `Docs/superpowers/plans/YYYY-MM-DD-<feature>.md`
+- Save to `docs/superpowers/plans/YYYY-MM-DD-<feature>.md`
 - Start with the standard plan header (Goal, Architecture, Tech Stack)
 - Include a File Structure table
 - Break into bite-sized tasks (each step is one 2-5 minute action)

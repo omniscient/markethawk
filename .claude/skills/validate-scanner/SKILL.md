@@ -62,7 +62,7 @@ sessions and will likely return no historical results — warn the user if selec
 
 ### Phase 2: Load or Create Cursor
 
-The cursor file path is: `Docs/scanner-validation/{scanner_type}_progress.json`
+The cursor file path is: `docs/scanner-validation/{scanner_type}_progress.json`
 
 **If the file exists AND `scanner_type`/`start_date`/`end_date` match:**
 - Load it and resume from `current_day` at `current_signal_index`.
@@ -284,8 +284,8 @@ Then run **Phase 5: Report**.
 
 ### Phase 5: Report
 
-1. Read cursor from `Docs/scanner-validation/{scanner_type}_progress.json` if it exists.
-   - If invoked as `/validate-scanner report` with no scanner_type, list available `*.json` files in `Docs/scanner-validation/` and prompt the user to select one.
+1. Read cursor from `docs/scanner-validation/{scanner_type}_progress.json` if it exists.
+   - If invoked as `/validate-scanner report` with no scanner_type, list available `*.json` files in `docs/scanner-validation/` and prompt the user to select one.
 
 2. Fetch all reviews from DB:
    ```bash
@@ -325,4 +325,4 @@ Then run **Phase 5: Report**.
 - If the backend is unreachable: print `Backend not responding. Is docker compose up?` and exit.
 - If an event has no `indicators` key: treat as empty dict; print `(no indicators)`.
 - If outcome fetch returns 404: treat as `Outcome: not yet tracked`.
-- If `Docs/scanner-validation/` directory doesn't exist: create it with `mkdir -p Docs/scanner-validation`.
+- If `docs/scanner-validation/` directory doesn't exist: create it with `mkdir -p docs/scanner-validation`.

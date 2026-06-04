@@ -61,7 +61,7 @@ hooks/        — Custom React hooks
 
 ## AI-Assisted Development
 
-Three systems, all pre-configured. See [Docs/ai-development.md](Docs/ai-development.md) for setup and full detail.
+Three systems, all pre-configured. See [docs/ai-development.md](docs/ai-development.md) for setup and full detail.
 
 - **Superpowers** (interactive, in-session) — brainstorming, planning, implementation, and review via the `Skill` tool (`superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:verification-before-completion`, etc.).
 - **Archon** (autonomous, isolated worktrees) — fire-and-forget workflows that produce PRs: `archon workflow run <name> "description"` or *"Use archon to fix issue #3"*. Run `archon workflow list` for the catalog.
@@ -121,9 +121,9 @@ Local interactive visualization: see [DEVELOPMENT.md](DEVELOPMENT.md#codeindex-l
 ## Further Reading
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — service topology, scan execution flow, module map, Celery tasks
-- [Docs/database-schema.md](Docs/database-schema.md) — auto-generated database schema ERD and indices
+- [docs/database-schema.md](docs/database-schema.md) — auto-generated database schema ERD and indices
 - [DEVELOPMENT.md](DEVELOPMENT.md) — full local setup, Docker commands, ports, Seq/Flower/pgAdmin usage, troubleshooting
-- [Docs/ai-development.md](Docs/ai-development.md) — superpowers, Archon, Dark Factory: setup and usage
+- [docs/ai-development.md](docs/ai-development.md) — superpowers, Archon, Dark Factory: setup and usage
 - [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — annotated file tree
 - [ENV_VARIABLES.md](ENV_VARIABLES.md) — all env vars with defaults and descriptions
 - [POLYGON_RATE_LIMITS.md](POLYGON_RATE_LIMITS.md) — API plan tiers, rate limits, key endpoints

@@ -9,7 +9,7 @@
 - [Bun](https://bun.sh/) — required for Archon CLI
 - (Optional) Interactive Brokers credentials for live broker data
 
-> **AI-assisted development:** This repo uses superpowers (Claude Code plugin) and Archon (autonomous workflow engine) for structured development, plus the Dark Factory autonomous pipeline. See [Docs/ai-development.md](Docs/ai-development.md) for full setup instructions.
+> **AI-assisted development:** This repo uses superpowers (Claude Code plugin) and Archon (autonomous workflow engine) for structured development, plus the Dark Factory autonomous pipeline. See [docs/ai-development.md](docs/ai-development.md) for full setup instructions.
 
 ## First-Time Setup
 
