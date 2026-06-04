@@ -213,6 +213,31 @@ The factory runs a custom Archon workflow (`archon-dark-factory`) that encodes t
 11. **Push and PR** — create or update PR with preview URL in body
 12. **Exit** — factory container stops, preview keeps running
 
+```mermaid
+flowchart TD
+    A(["docker compose run --rm dark-factory 'verb issue #N'"])
+    A --> B{Intent?}
+
+    B -->|"Fix issue #N"| C["Clone repo · create feat/issue-N-slug branch"]
+    B -->|"Continue issue #N"| D["Pull branch · read PR comments via gh"]
+    B -->|"Close issue #N"| Z["Merge PR · delete branch · docker compose down -v · comment · exit"]
+
+    C --> E["Fetch issue body via gh"]
+    D --> E
+
+    E --> F["Write implementation plan"]
+    F --> G["Write failing tests"]
+    G --> H["Implement feature"]
+    H --> I{"pytest + tsc pass?"}
+    I -->|No| G
+    I -->|Yes| J["Spin up preview stack\ndocker compose -p mh-preview-N up -d"]
+
+    J --> K["Poll backend :1N80/api/health"]
+    K --> L["curl-validate new endpoints\nagainst preview"]
+    L --> M["git push · gh pr create or update\n(preview URL in PR body)"]
+    M --> O(["Exit · preview keeps running for human review"])
+```
+
 ### PR Body Format
 
 ```markdown
