@@ -619,6 +619,13 @@ nodes:
       PREVIEW_SLOT=$(echo $preview-up.output | grep '^PREVIEW_SLOT=' | cut -d= -f2-)
       PREVIEW_FRONTEND=$(echo $preview-up.output | grep '^PREVIEW_FRONTEND=' | cut -d= -f2-)
       PREVIEW_BACKEND=$(echo $preview-up.output | grep '^PREVIEW_BACKEND=' | cut -d= -f2-)
+      PREVIEW_SKIPPED=$(echo $preview-up.output | grep '^PREVIEW_SKIPPED=' | cut -d= -f2-)
+      PREVIEW_SKIP_REASON=$(echo $preview-up.output | grep '^PREVIEW_SKIP_REASON=' | cut -d= -f2-)
+      if [ "$PREVIEW_SKIPPED" = "true" ]; then
+        PREVIEW_SECTION=$(printf "### Preview Environment\n\n_No preview environment — this change does not affect the running app (%s)._" "${PREVIEW_SKIP_REASON}")
+      else
+        PREVIEW_SECTION=$(printf "### Preview Environment\n\n| Service | URL |\n|---------|-----|\n| Frontend | %s |\n| Backend API | %s |\n| API Docs | %s/docs |\n| PostgreSQL | \`localhost:1%s54\` |\n| Redis | \`localhost:1%s63\` |" "${PREVIEW_FRONTEND}" "${PREVIEW_BACKEND}" "${PREVIEW_BACKEND}" "${PREVIEW_SLOT}" "${PREVIEW_SLOT}")
+      fi
       INTENT=$parse-intent.output.intent
       BRANCH=$(git branch --show-current)
       echo "Posting summary to issue #${ISSUE}..."
@@ -661,39 +668,12 @@ nodes:
         esac
       fi
 
-      gh issue comment "$ISSUE" --body "## Dark Factory Run — ${ACTION}
-
-      ${PR_LINE}
-      ${EPIC_LINE}
-      **Branch:** \`${BRANCH}\`
-
-      ### Changes
-
-      ${CHANGES:-_No implementation summary available._}
-
-      ${CONFORMANCE_SECTION}
-
-      ### Preview Environment
-
-      | Service | URL |
-      |---------|-----|
-      | Frontend | ${PREVIEW_FRONTEND} |
-      | Backend API | ${PREVIEW_BACKEND} |
-      | API Docs | ${PREVIEW_BACKEND}/docs |
-      | PostgreSQL | \`localhost:1${PREVIEW_SLOT}54\` |
-      | Redis | \`localhost:1${PREVIEW_SLOT}63\` |
-
-      ### Commands
-      \`\`\`bash
-      # Iterate after review
-      docker compose --profile factory run --rm dark-factory \"Continue issue #${ISSUE}\"
-
-      # Tear down when done
-      docker compose --profile factory run --rm dark-factory \"Close issue #${ISSUE}\"
-      \`\`\`
-
-      ---
-      *Posted by MarketHawk Dark Factory*"
+      gh issue comment "$ISSUE" --body "$(printf "## Dark Factory Run — %s\n\n%s\n%s\n**Branch:** \`%s\`\n\n### Changes\n\n%s\n\n%s\n\n%s\n\n### Commands\n\`\`\`bash\n# Iterate after review\ndocker compose --profile factory run --rm dark-factory \"Continue issue #%s\"\n\n# Tear down when done\ndocker compose --profile factory run --rm dark-factory \"Close issue #%s\"\n\`\`\`\n\n---\n*Posted by MarketHawk Dark Factory*" \
+        "$ACTION" "$PR_LINE" "$EPIC_LINE" "$BRANCH" \
+        "${CHANGES:-_No implementation summary available._}" \
+        "${CONFORMANCE_SECTION}" \
+        "${PREVIEW_SECTION}" \
+        "$ISSUE" "$ISSUE")"
 
       echo "Report posted to issue #${ISSUE}"
     depends_on: [status-in-review]
