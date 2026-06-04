@@ -280,6 +280,80 @@ ITEM_BOTH='{"content":{"number":33},"labels":["direct-to-pr","ready-for-agent"],
   || assert_eq "H4: both labels passes gate once" "0" "1"
 
 # ==========================================
+# I: Plan auto-advance (direct-to-pr)
+# ==========================================
+echo ""
+echo "--- I: Plan auto-advance ---"
+echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+REFINE_RUNNING=0
+DISPATCHED=""
+
+_ITEM_DTP_PPR='{"content":{"number":40},"labels":["direct-to-pr","plan-pending-review"],"status":"Refined"}'
+_ITEM_NODTP_PPR='{"content":{"number":41},"labels":["plan-pending-review"],"status":"Refined"}'
+
+# I1: flag + human comment → re-plan
+has_new_comment_after_report() { echo "yes"; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f has_new_comment_after_report dispatch
+
+plan_advance_check 40 "$_ITEM_DTP_PPR"
+assert_eq "I1: re-plan: remove-label called" \
+  "1" "$(grep -c -- '--remove-label plan-pending-review' "$STUB_LOG" || echo 0)"
+assert_eq "I1: re-plan: Plan dispatched" \
+  "1" "$(grep -c 'dispatch Plan issue #40' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# I2: flag + no comment + elapsed ≥ grace → advance to Ready
+has_new_comment_after_report() { echo "no"; }
+export PLAN_GRACE_MINUTES=30
+elapsed_minutes_since_marker() { echo "35"; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker
+
+plan_advance_check 40 "$_ITEM_DTP_PPR"
+assert_eq "I2: advance: remove-label called" \
+  "1" "$(grep -c -- '--remove-label plan-pending-review' "$STUB_LOG" || echo 0)"
+assert_eq "I2: advance: set_board_status READY" \
+  "1" "$(grep -c "set_board_status 40 ${STATUS_READY}" "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# I3: flag + no comment + elapsed < grace → no action
+elapsed_minutes_since_marker() { echo "10"; }
+export -f elapsed_minutes_since_marker
+
+plan_advance_check 40 "$_ITEM_DTP_PPR"
+assert_eq "I3: within-window: no set_board_status" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+assert_eq "I3: within-window: no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# I4: no flag → no auto-advance (regression guard)
+elapsed_minutes_since_marker() { echo "99"; }
+export -f elapsed_minutes_since_marker
+
+plan_advance_check 41 "$_ITEM_NODTP_PPR"
+assert_eq "I4: no-flag regression: no advance" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# I5: flag + needs-discussion → suppressed (no advance, even with elapsed ≥ grace)
+_ITEM_DTP_PPR_ND='{"content":{"number":42},"labels":["direct-to-pr","plan-pending-review","needs-discussion"],"status":"Refined"}'
+elapsed_minutes_since_marker() { echo "99"; }
+export -f elapsed_minutes_since_marker
+
+plan_advance_check 42 "$_ITEM_DTP_PPR_ND"
+assert_eq "I5: needs-discussion suppresses plan advance" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+assert_eq "I5: needs-discussion suppresses plan dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+# Restore
+has_new_comment_after_report() { echo "no"; }
+elapsed_minutes_since_marker() { echo ""; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker dispatch
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"

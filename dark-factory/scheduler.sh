@@ -196,6 +196,41 @@ spec_advance_check() {
   fi
 }
 
+plan_advance_check() {
+  local issue_num="$1"
+  local item="$2"
+  has_skip_label "$item" && return 0
+  local has_new
+  has_new=$(has_new_comment_after_report "$issue_num" "Posted by MarketHawk Refinement Pipeline")
+  if [ "$has_new" = "yes" ]; then
+    reset_retry "${issue_num}:plan"
+    gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+      --remove-label "plan-pending-review" 2>/dev/null || true
+    gh issue comment "$issue_num" --repo "${OWNER}/markethawk" --body \
+"🔄 **Refinement Pipeline** — Re-running plan with new feedback.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+    if dispatch "Plan issue #${issue_num}"; then
+      DISPATCHED="Plan issue #${issue_num}"
+      REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    fi
+    return 0
+  fi
+  if has_direct_to_pr_label "$item"; then
+    local elapsed
+    elapsed=$(elapsed_minutes_since_marker "$issue_num" "Posted by MarketHawk Refinement Pipeline")
+    if [ -n "$elapsed" ] && [ "$elapsed" -ge "$PLAN_GRACE_MINUTES" ]; then
+      echo "[$(date -u +%FT%TZ)] plan_auto_advance issue=#${issue_num} elapsed=${elapsed}m grace=${PLAN_GRACE_MINUTES}m action=advance_to_ready"
+      gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+        --remove-label "plan-pending-review" 2>/dev/null || true
+      set_board_status "$issue_num" "$STATUS_READY" || true
+    else
+      echo "[$(date -u +%FT%TZ)] plan_grace_window issue=#${issue_num} elapsed=${elapsed:-unknown}m grace=${PLAN_GRACE_MINUTES}m action=waiting"
+    fi
+  fi
+}
+
 has_new_comment_after_report() {
   local issue_num="$1"
   local report_marker="$2"
@@ -741,6 +776,16 @@ This issue was left in **In progress** with no running factory container — the
   while IFS= read -r item; do
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
+
+    # Direct-to-PR plan auto-advance: handle before refine_skip_label blocks plan-pending-review
+    if echo "$item" | jq -r '.labels[]?' 2>/dev/null | grep -qi "plan-pending-review" \
+       && has_direct_to_pr_label "$item"; then
+      if ! is_issue_running "$ISSUE" && [ "$REFINE_RUNNING" -lt "$REFINE_WIP_LIMIT" ]; then
+        plan_advance_check "$ISSUE" "$item"
+      fi
+      continue
+    fi
+
     if has_refine_skip_label "$item"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
     if [ "$REFINE_RUNNING" -ge "$REFINE_WIP_LIMIT" ]; then break; fi
