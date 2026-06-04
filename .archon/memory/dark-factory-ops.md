@@ -55,6 +55,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Pre-commit hooks that invoke advisory/optional tools (e.g. `codeindex-blast`) must always exit 0 — use `|| true` or `; exit 0`. A non-zero exit from a pre-commit hook blocks the commit and will abort an autonomous factory run. <!-- issue:#159 date:2026-06-03 expires:2026-12-03 source:implement -->
 
+## Preview Environment Differentiator
+
+- [PATTERN] When a workflow node's tail depends on a conditionally-built resource (e.g. preview stack), use a gated executor pattern rather than a conditional node: always run the node, read the decision from the prior step, and write a `PREVIEW_SKIPPED` marker to `$ARTIFACTS_DIR/preview_env.sh` so all downstream steps can branch on it uniformly. <!-- issue:#178 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] `$ARTIFACTS_DIR/preview_env.sh` is the single source of truth for preview state across `preview-up`, `validate`, `push-and-pr`, and `report`. Downstream steps source this file rather than parsing step output, except for the two nodes that need `grep '^PREVIEW_SKIPPED='` on step output directly. <!-- issue:#178 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] For fail-safe LLM classifier guards, skip only on explicit `false` (string comparison `[ "$VAR" = "false" ]`); any other value — including empty string or garbled output — falls through to the safe direction (building the preview). This prevents wrongly skipped previews when the classifier errors. <!-- issue:#178 date:2026-06-04 expires:2026-12-04 source:implement -->
+
 ## Environment and Credentials
 
 - [PATTERN] Every new environment variable introduced by a feature must be documented in `ENV_VARIABLES.md` with its default value and a one-line description. CLAUDE.md references ENV_VARIABLES.md as the authoritative env var reference. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
