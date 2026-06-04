@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Dark Factory v2 — Engineering Deep-Dive</title>
+<style>
+  :root{
+    --bg:#0a0b0e; --bg2:#0e1015; --panel:#13151d; --panel2:#181b24;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --ink:#eceef3; --mut:#9aa0ad; --mut2:#6b7280;
+    --amber:#ff8a3d; --amber-hot:#ff6a1a; --amber-soft:#ffc08a;
+    --cyan:#3fe0c8; --cyan-soft:#8af0e2;
+    --green:#54d18a; --red:#ff6b6b; --violet:#a78bfa;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --grad:linear-gradient(135deg,var(--amber-hot),var(--amber-soft));
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{height:100%; font-size:clamp(16px, 1.08vw, 20px)}
+  body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    overflow:hidden; -webkit-font-smoothing:antialiased; line-height:1.5;
+  }
+
+  /* ---------- deck / slide engine ---------- */
+  #deck{position:fixed; inset:0}
+  .slide{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    justify-content:center; padding:4.5vh 4vw 5vh;
+    opacity:0; visibility:hidden; transform:translateY(14px) scale(.995);
+    transition:opacity .55s ease, transform .55s cubic-bezier(.2,.7,.2,1);
+    pointer-events:none; overflow:hidden;
+  }
+  .slide.active{opacity:1; visibility:visible; transform:none; pointer-events:auto}
+
+  /* background texture */
+  .slide::before{
+    content:""; position:absolute; inset:0; z-index:-2;
+    background:
+      radial-gradient(1200px 700px at 78% -10%, rgba(255,120,40,.10), transparent 60%),
+      radial-gradient(900px 600px at 8% 110%, rgba(63,224,200,.06), transparent 55%),
+      var(--bg);
+  }
+  .slide::after{
+    content:""; position:absolute; inset:0; z-index:-1; opacity:.5;
+    background-image:
+      linear-gradient(rgba(255,255,255,.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.022) 1px, transparent 1px);
+    background-size:46px 46px;
+    -webkit-mask-image:radial-gradient(120% 100% at 50% 40%, #000 55%, transparent 100%);
+            mask-image:radial-gradient(120% 100% at 50% 40%, #000 55%, transparent 100%);
+  }
+
+  /* reveal build animation */
+  .r{opacity:0; transform:translateY(16px); transition:opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1)}
+  .active .r{opacity:1; transform:none}
+  .active .r{transition-delay:calc(var(--d,0) * 1ms)}
+
+  /* ---------- typography ---------- */
+  .kicker{
+    font-family:var(--mono); font-size:.9rem; letter-spacing:.32em; text-transform:uppercase;
+    color:var(--amber); display:inline-flex; align-items:center; gap:.6em; margin-bottom:1.1rem;
+  }
+  .kicker .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 12px var(--amber-hot)}
+  h1{font-size:clamp(2.6rem,6.4vw,6rem); font-weight:800; letter-spacing:-.02em; line-height:1.02}
+  h2{font-size:clamp(1.7rem,3.8vw,3.1rem); font-weight:750; letter-spacing:-.015em; line-height:1.08; margin-bottom:.4rem}
+  .lead{font-size:clamp(1.05rem,1.8vw,1.5rem); color:var(--mut); max-width:64ch; line-height:1.5}
+  .em{color:var(--ink)} .am{color:var(--amber)} .cy{color:var(--cyan)} .gr{color:var(--green)} .rd{color:var(--red)} .vi{color:var(--violet)}
+  b,strong{font-weight:700;color:var(--ink)}
+  .mono{font-family:var(--mono)}
+  .small{font-size:.86rem;color:var(--mut)}
+  .tiny{font-size:.74rem;color:var(--mut2)}
+
+  /* ---------- reusable bits ---------- */
+  .grid{display:grid; gap:1.1rem}
+  .card{
+    background:linear-gradient(180deg,var(--panel),var(--bg2));
+    border:1px solid var(--line); border-radius:16px; padding:1.25rem 1.4rem; position:relative;
+  }
+  .card.glow{box-shadow:0 0 0 1px rgba(255,138,61,.10), 0 16px 40px -24px rgba(255,106,26,.5)}
+  .card h3{font-size:1.02rem; font-weight:700; margin-bottom:.4rem; display:flex; align-items:center; gap:.55rem}
+  .card p{color:var(--mut); font-size:.92rem}
+  .ico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none;
+       background:rgba(255,138,61,.12); color:var(--amber); font-family:var(--mono); font-weight:700; font-size:.95rem;
+       border:1px solid rgba(255,138,61,.22)}
+  .ico.cy{background:rgba(63,224,200,.12);color:var(--cyan);border-color:rgba(63,224,200,.24)}
+  .ico.gr{background:rgba(84,209,138,.12);color:var(--green);border-color:rgba(84,209,138,.24)}
+  .ico.rd{background:rgba(255,107,107,.12);color:var(--red);border-color:rgba(255,107,107,.24)}
+
+  .tag{font-family:var(--mono); font-size:.7rem; letter-spacing:.06em; padding:.22em .6em; border-radius:6px;
+       border:1px solid var(--line2); color:var(--mut); white-space:nowrap}
+  .tag.am{color:var(--amber);border-color:rgba(255,138,61,.4);background:rgba(255,138,61,.07)}
+  .tag.cy{color:var(--cyan);border-color:rgba(63,224,200,.4);background:rgba(63,224,200,.07)}
+  .tag.gr{color:var(--green);border-color:rgba(84,209,138,.4);background:rgba(84,209,138,.07)}
+  .tag.rd{color:var(--red);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.07)}
+  .tag.vi{color:var(--violet);border-color:rgba(167,139,250,.4);background:rgba(167,139,250,.07)}
+
+  .code{font-family:var(--mono); background:#0c0e13; border:1px solid var(--line); border-radius:12px;
+        padding:1rem 1.15rem; font-size:.84rem; color:#cdd3df; line-height:1.7; overflow:auto}
+  .code .c{color:var(--mut2)} .code .k{color:var(--amber)} .code .s{color:var(--cyan)} .code .n{color:var(--green)}
+
+  ul.clean{list-style:none} ul.clean li{position:relative; padding-left:1.5rem; margin:.45rem 0; color:var(--mut); font-size:.94rem}
+  ul.clean li::before{content:"▸"; position:absolute; left:0; color:var(--amber)}
+  ul.clean li b{color:var(--ink)}
+
+  /* ---------- header / hud ---------- */
+  .wm{position:fixed; top:2.6vh; left:6.5vw; z-index:30; font-family:var(--mono); font-size:.72rem;
+      letter-spacing:.28em; text-transform:uppercase; color:var(--mut); display:flex; align-items:center; gap:.6em}
+  .wm .b{width:14px;height:14px;border-radius:4px;background:var(--grad);box-shadow:0 0 14px rgba(255,106,26,.6)}
+  .wm .b::after{content:"";display:block;width:6px;height:6px;background:#0a0b0e;border-radius:1px;margin:4px}
+  #seclabel{position:fixed; top:2.6vh; right:6.5vw; z-index:30; font-family:var(--mono); font-size:.72rem;
+      letter-spacing:.22em; text-transform:uppercase; color:var(--mut2)}
+  #progress{position:fixed; left:0; bottom:0; height:3px; width:100%; background:rgba(255,255,255,.06); z-index:40}
+  #bar{height:100%; width:0; background:var(--grad); box-shadow:0 0 14px rgba(255,106,26,.7); transition:width .5s ease}
+  #hud{position:fixed; bottom:2.4vh; right:6.5vw; z-index:30; font-family:var(--mono); font-size:.74rem; color:var(--mut2)}
+  #hud b{color:var(--amber)}
+  .hint{position:fixed; bottom:2.4vh; left:6.5vw; z-index:30; font-family:var(--mono); font-size:.68rem; color:var(--mut2); letter-spacing:.04em}
+  .hint span{color:var(--mut)}
+
+  .navbtn{position:fixed; top:50%; transform:translateY(-50%); z-index:30; width:42px;height:42px;
+          border-radius:50%; border:1px solid var(--line2); background:rgba(20,22,29,.6); color:var(--mut);
+          cursor:pointer; font-size:1.1rem; display:grid; place-items:center; backdrop-filter:blur(6px); transition:.2s}
+  .navbtn:hover{color:var(--ink); border-color:var(--amber); box-shadow:0 0 18px -6px var(--amber-hot)}
+  #prev{left:2vw} #next{right:2vw}
+
+  /* ---------- overview ---------- */
+  #overview{position:fixed; inset:0; z-index:50; background:rgba(7,8,11,.96); backdrop-filter:blur(8px);
+            display:none; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:1rem;
+            padding:8vh 6vw; overflow:auto; align-content:start}
+  #overview.open{display:grid}
+  .ov-card{border:1px solid var(--line); border-radius:12px; padding:1rem 1.1rem; cursor:pointer; background:var(--panel);
+           transition:.2s; min-height:96px}
+  .ov-card:hover{border-color:var(--amber); transform:translateY(-3px); box-shadow:0 14px 30px -20px var(--amber-hot)}
+  .ov-card .n{font-family:var(--mono); color:var(--amber); font-size:.74rem; letter-spacing:.1em}
+  .ov-card .t{font-weight:650; margin-top:.4rem; font-size:.98rem; line-height:1.25}
+  .ov-card .s{color:var(--mut2); font-size:.74rem; margin-top:.35rem; font-family:var(--mono); letter-spacing:.08em; text-transform:uppercase}
+  #overview h2{grid-column:1/-1; margin-bottom:.4rem}
+
+  /* ---------- notes ---------- */
+  #notes{position:fixed; left:0; right:0; bottom:0; z-index:45; transform:translateY(101%);
+         transition:transform .35s ease; background:linear-gradient(180deg,#0d0f15,#090a0d);
+         border-top:1px solid var(--amber); padding:1.4rem 6.5vw 2rem; max-height:42vh; overflow:auto}
+  #notes.open{transform:none}
+  #notes .lab{font-family:var(--mono); font-size:.68rem; letter-spacing:.24em; text-transform:uppercase; color:var(--amber); margin-bottom:.6rem}
+  #notes p{color:var(--mut); font-size:.96rem; max-width:90ch}
+
+  /* ============ DIAGRAMS / COMPONENTS ============ */
+
+  /* mermaid frame */
+  .dframe{border:1px solid var(--line); border-radius:16px; background:linear-gradient(180deg,var(--panel),var(--bg2));
+          padding:1rem 1.1rem; position:relative}
+  .mermaid{display:flex; justify-content:center; width:100%; min-height:40px; overflow:hidden}
+  .mermaid svg{max-width:100% !important; max-height:60vh; height:auto; overflow:hidden; cursor:grab}
+  .mermaid svg:active{cursor:grabbing}
+  /* svg-pan-zoom control icons — keep them legible on the dark panel */
+  .mermaid .svg-pan-zoom-control{opacity:.5; transition:opacity .2s}
+  .mermaid:hover .svg-pan-zoom-control{opacity:1}
+  .dcap{font-family:var(--mono); font-size:.66rem; letter-spacing:.14em; text-transform:uppercase; color:var(--mut2);
+        margin-bottom:.5rem; display:flex; justify-content:space-between; align-items:center}
+
+  /* pipeline rail */
+  .pipe{display:flex; align-items:stretch; gap:0; margin-top:.4rem; flex-wrap:nowrap}
+  .stage{flex:1; text-align:center; padding:.2rem .25rem; position:relative}
+  .stage .chip{border:1px solid var(--line2); border-radius:12px; padding:.8rem .35rem; background:var(--panel);
+        transition:.4s; height:100%}
+  .stage.aut .chip{border-color:rgba(255,138,61,.4); background:linear-gradient(180deg,rgba(255,138,61,.10),var(--panel))}
+  .stage .n{font-family:var(--mono); font-size:.62rem; color:var(--mut2)}
+  .stage .t{font-weight:700; font-size:.84rem; margin-top:.2rem}
+  .stage .s{font-size:.64rem; color:var(--mut); margin-top:.18rem; min-height:2.2em}
+  .stage .arr{position:absolute; right:-7px; top:50%; transform:translateY(-50%); color:var(--mut2); z-index:2; font-size:.9rem}
+  .stage.gatecell{flex:.78}
+  .stage.gatecell .chip{border-style:dashed; border-color:rgba(63,224,200,.55); background:linear-gradient(180deg,rgba(63,224,200,.09),var(--panel))}
+  .stage.gatecell .t{color:var(--cyan)} .stage.gatecell .n{color:var(--cyan)}
+  .legend{display:flex; gap:1.3rem; margin-top:1rem; font-size:.8rem; color:var(--mut); flex-wrap:wrap}
+  .legend .k{display:inline-flex;align-items:center;gap:.5em}
+  .sw{width:13px;height:13px;border-radius:4px;border:1px solid var(--line2)}
+  .sw.a{background:rgba(255,138,61,.5);border-color:var(--amber)} .sw.h{background:rgba(63,224,200,.5);border-color:var(--cyan)}
+
+  /* can/cannot */
+  .cc{display:grid; grid-template-columns:1fr 1fr; gap:1.3rem; margin-top:.3rem}
+  .cc .col{border:1px solid var(--line); border-radius:16px; padding:1.2rem 1.3rem; background:var(--panel)}
+  .cc .col.can{border-color:rgba(84,209,138,.32)} .cc .col.cant{border-color:rgba(255,107,107,.3)}
+  .cc h4{font-family:var(--mono); font-size:.8rem; letter-spacing:.16em; text-transform:uppercase; margin-bottom:.8rem; display:flex; align-items:center; gap:.5rem}
+  .cc .can h4{color:var(--green)} .cc .cant h4{color:var(--red)}
+  .cc li{list-style:none; padding:.34rem 0 .34rem 1.6rem; position:relative; color:var(--mut); font-size:.9rem; border-top:1px solid var(--line)}
+  .cc li:first-of-type{border-top:none}
+  .cc .can li::before{content:"✓"; position:absolute; left:0; color:var(--green); font-weight:700}
+  .cc .cant li::before{content:"✕"; position:absolute; left:0; color:var(--red); font-weight:700}
+
+  /* ranked ladder */
+  .rank{display:grid; gap:.55rem; margin-top:.3rem}
+  .rstep{display:flex; align-items:center; gap:.9rem; border:1px solid var(--line2); border-radius:11px;
+         padding:.6rem .9rem; background:var(--panel)}
+  .rstep .pn{font-family:var(--mono); font-weight:800; color:var(--amber); font-size:.9rem; width:2.6rem; flex:none}
+  .rstep .rt{font-weight:650; font-size:.92rem}
+  .rstep .rd{color:var(--mut); font-size:.82rem}
+  .rstep.side{border-color:rgba(63,224,200,.4)} .rstep.side .pn{color:var(--cyan)}
+
+  /* loop */
+  .loop{display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; margin-top:.4rem}
+  .lstep{border:1px solid var(--line2); border-radius:10px; padding:.55rem .8rem; background:var(--panel); font-size:.82rem; font-family:var(--mono); color:var(--mut)}
+  .lstep b{color:var(--ink); font-family:var(--sans)}
+  .lstep.red{border-color:rgba(255,107,107,.4);color:var(--red)}
+  .lstep.green{border-color:rgba(84,209,138,.4);color:var(--green)}
+  .larr{color:var(--mut2)}
+
+  /* tables */
+  table{border-collapse:collapse; width:100%; font-size:.84rem}
+  th,td{text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--mut2); font-weight:600}
+  td.mono{font-family:var(--mono); color:var(--mut)}
+  tr.total td{border-top:1px solid var(--line2); border-bottom:none; font-weight:700; color:var(--ink)}
+  .v1col{color:var(--mut)} .v2col{color:var(--ink)}
+
+  /* stat row */
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-top:.3rem}
+  .stat{border:1px solid var(--line); border-radius:14px; padding:1.1rem 1.2rem; background:var(--panel)}
+  .stat .v{font-size:clamp(1.6rem,3.2vw,2.4rem); font-weight:800; line-height:1; background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent}
+  .stat .v.cy{background:linear-gradient(135deg,var(--cyan),var(--cyan-soft)); -webkit-background-clip:text; background-clip:text}
+  .stat .l{color:var(--mut); font-size:.8rem; margin-top:.5rem}
+
+  .row{display:grid; gap:1.1rem}
+  .flex{display:flex; gap:.6rem; flex-wrap:wrap; align-items:center}
+  .mt{margin-top:1rem} .mt2{margin-top:1.6rem}
+  .center{text-align:center}
+  .max{max-width:1640px; margin:0 auto; width:100%}
+  .cols2{display:grid; grid-template-columns:1fr 1fr; gap:1.4rem; align-items:start}
+  .cols-7-5{display:grid; grid-template-columns:1.4fr 1fr; gap:1.4rem; align-items:start}
+  .cols-5-7{display:grid; grid-template-columns:1fr 1.4fr; gap:1.4rem; align-items:start}
+
+  /* title slide flourish */
+  .title-wrap{position:relative}
+  .ember{position:absolute; border-radius:50%; background:var(--amber); filter:blur(1px); opacity:.0;
+         animation:rise 6s ease-in infinite}
+  @keyframes rise{0%{opacity:0;transform:translateY(40px) scale(.6)}20%{opacity:.8}100%{opacity:0;transform:translateY(-220px) scale(1.1)}}
+  .badge-row{display:flex; gap:.7rem; flex-wrap:wrap; margin-top:2rem}
+
+  @media (max-width:980px){
+    .cc,.stats,.cols2,.cols-7-5,.cols-5-7{grid-template-columns:1fr}
+    .pipe{flex-wrap:wrap} .stage{flex:1 1 40%}
+  }
+</style>
+</head>
+<body>
+
+<div class="wm"><span class="b"></span> The Dark Factory · v2</div>
+<div id="seclabel"></div>
+
+<div id="deck">
+
+  <!-- 0 — TITLE -->
+  <section class="slide" data-sec="">
+    <div class="title-wrap max">
+      <div class="ember" style="left:12%;width:6px;height:6px;animation-delay:.2s"></div>
+      <div class="ember" style="left:20%;width:4px;height:4px;animation-delay:1.4s"></div>
+      <div class="ember" style="left:31%;width:5px;height:5px;animation-delay:2.6s"></div>
+      <div class="ember" style="left:9%;width:3px;height:3px;animation-delay:3.5s"></div>
+      <div class="kicker r"><span class="dot"></span>Semi-Autonomous AI-First Engineering Experimentation</div>
+      <h1 class="r" style="--d:80">The <span class="am">Dark Factory</span> <span class="cy" style="font-size:.42em; vertical-align:middle; font-weight:700">v2</span></h1>
+      <p class="lead r" style="--d:200; margin-top:1.3rem; font-size:clamp(1.05rem,1.9vw,1.5rem)">
+        An engineering deep-dive into the machine that turns a GitHub issue into a reviewed PR —
+        <span class="em">two cooperating brains</span>, a board as the bus, and a human only at the gates.
+      </p>
+      <div class="badge-row r" style="--d:340">
+        <span class="tag am">Scheduler × Archon</span>
+        <span class="tag cy">Sequence · State · Activity diagrams</span>
+        <span class="tag">Accurate to the running system</span>
+      </div>
+      <div class="r small" style="--d:460; margin-top:2.2rem; font-family:var(--mono); letter-spacing:.06em">
+        <span class="tiny">press <span class="am">→</span> to begin · <span class="am">O</span> overview · <span class="am">N</span> notes</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 — TWO BRAINS, ONE BUS -->
+  <section class="slide" data-sec="01 · The Model">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 01 · Two brains, one bus</div>
+      <h2 class="r" style="--d:60">A <span class="am">conductor</span> and an <span class="cy">assembly line</span> that only talk through the board.</h2>
+      <div class="cols-5-7 mt2">
+        <div class="r" style="--d:140">
+          <ul class="clean">
+            <li><b class="am">Scheduler</b> — decides <b>what & when</b>. Polls the board, runs the priority waterfall, enforces WIP, retries, and the CI/conflict guards. <i>It never writes code.</i></li>
+            <li><b class="cy">Archon</b> — does <b>how</b>. Inside each ephemeral container it parses intent, branches, and runs refine / plan / build / conformance. <i>It never decides scheduling.</i></li>
+            <li><b>The GitHub board + labels</b> is the only thing they share — and it's also the human's control surface.</li>
+          </ul>
+          <div class="flex mt"><span class="tag am">scheduler.sh</span><span class="tag cy">archon-dark-factory.yaml</span><span class="tag">GitHub Projects v2</span></div>
+        </div>
+        <div class="dframe r" style="--d:240">
+          <div class="dcap"><span>System map</span><span>flow</span></div>
+          <pre class="mermaid">
+flowchart LR
+  HUMAN(["👤 Human"])
+  subgraph SCHED["🧭 Scheduler — what &amp; when"]
+    direction TB
+    S1["poll board · 60s"] --> S2["priority waterfall"] --> S3["dispatch ONE run"]
+  end
+  subgraph BUS["📋 GitHub Board + Labels"]
+    direction TB
+    B1["columns: Backlog…Done"]
+    B2["labels &amp; gates"]
+  end
+  subgraph ARCH["🏭 Archon — how"]
+    direction TB
+    A1["parse intent"] --> A2["refine / plan / build"] --> A3["push PR · move card"]
+  end
+  S3 -->|"docker compose run"| ARCH
+  ARCH -->|"status + labels"| BUS
+  BUS -->|"board state"| SCHED
+  HUMAN -->|"approve / comment"| BUS
+  BUS -->|"gates &amp; reviews"| HUMAN
+</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 — THE BOARD AS BUS -->
+  <section class="slide" data-sec="02 · Control Plane">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 02 · The board is the bus</div>
+      <h2 class="r" style="--d:60">Seven columns, a label vocabulary, WIP baked into the board.</h2>
+      <div class="cols2 mt2">
+        <div class="r" style="--d:140">
+          <div class="dcap">COLUMNS (Status field)</div>
+          <div class="flex" style="gap:.4rem">
+            <span class="tag">Backlog</span><span class="tag">Refined</span><span class="tag am">Ready</span>
+            <span class="tag am">In&nbsp;Progress</span><span class="tag cy">In&nbsp;Review</span><span class="tag rd">Blocked</span><span class="tag gr">Done</span>
+          </div>
+          <div class="dcap mt2">LABELS &amp; what they do</div>
+          <table>
+            <tbody>
+              <tr><td class="mono am">ready-for-agent</td><td>opt-in: backlog item may auto-refine</td></tr>
+              <tr><td class="mono am">direct-to-pr</td><td>auto-advance spec &amp; plan gates after grace; auto-close/continue on PR review</td></tr>
+              <tr><td class="mono cy">spec-pending-review</td><td>refine done → awaiting spec gate</td></tr>
+              <tr><td class="mono cy">plan-pending-review</td><td>plan done → awaiting plan gate</td></tr>
+              <tr><td class="mono rd">needs-discussion</td><td><b>universal pause</b> — filtered out of every dispatch loop</td></tr>
+              <tr><td class="mono">epic</td><td>never built whole; resolved to next sub-issue</td></tr>
+              <tr><td class="mono vi">scope-spillover</td><td>auto-filed ticket for an excised out-of-scope change</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico">⟳</span>WIP limits live on the board</h3><p>The scheduler reads <span class="mono">limit: N</span> from each Status column's <i>description</i> at startup — <span class="mono">In&nbsp;Progress</span> and <span class="mono">In&nbsp;Review</span> caps are data, not code.</p></div>
+          <div class="card"><h3><span class="ico cy">🔗</span>Dependencies in the body</h3><p>A <span class="mono">Depends on: #NN</span> line blocks a Ready item until that dependency reaches <b>Done</b>.</p></div>
+          <div class="card"><h3><span class="ico gr">🏷</span>Labels are the API</h3><p>Both brains and the human coordinate entirely through column + label transitions — no side channel, no shared database.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 — ONE POLL CYCLE (centerpiece) -->
+  <section class="slide" data-sec="02 · Control Plane">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 03 · One poll cycle — everything that runs each tick</div>
+      <h2 class="r" style="--d:60">Guards and sweeps run <span class="cy">every poll</span>; one dispatch <span class="am">wins</span> per cycle.</h2>
+      <div class="dframe mt r" style="--d:160">
+        <div class="dcap"><span>scheduler.sh · main loop</span><span>activity</span></div>
+        <pre class="mermaid">
+flowchart TD
+  subgraph LADDER["dispatch ladder — first match wins, ONE run / cycle"]
+    direction TB
+    L15["P1.5 · CONFLICTING PR → Deconflict"] --> L1["P1 · review comments → Merge / Continue / Skip"]
+    L1 --> L2["P2 · Ready → Fix"]
+    L2 --> L3["P3 · Blocked → Continue / Fix (or circuit-break)"]
+    L3 --> L4["P4 · Refined → Plan"]
+    L4 --> L5["P5 · Backlog + ready-for-agent → Refine"]
+  end
+  START(["poll tick"]) --> RL["rate-limit guard"]
+  RL --> FETCH["fetch board + WIP limits"]
+  FETCH --> P0[/"P0 · CI gate: red-CI In-Review → Blocked&lt;br/&gt;(runs even while factory is busy)"/]
+  P0 --> BUSY{"factory&lt;br/&gt;already running?"}
+  BUSY -->|yes| SLEEP(["sleep 60s"])
+  BUSY -->|no| SWEEP[/"orphan sweep: stuck In-Progress → Blocked"/]
+  SWEEP --> L15
+  L5 --> SLEEP
+  SLEEP --> START
+</pre>
+      </div>
+      <p class="small mt r" style="--d:320">Priority 0 and the orphan sweep are <b>always-on hygiene</b>. The lettered ladder is mutually exclusive per cycle — the highest-priority match dispatches and the rest wait for the next tick.</p>
+    </div>
+  </section>
+
+  <!-- 5 — PRIORITY WATERFALL -->
+  <section class="slide" data-sec="02 · Control Plane">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 04 · The waterfall, explained</div>
+      <h2 class="r" style="--d:60">Why this order? <span class="am">Finish work before starting work.</span></h2>
+      <div class="rank mt2 r" style="--d:140">
+        <div class="rstep side"><span class="pn">P0</span><div><span class="rt">CI-failure gate</span> <span class="rd small">· always</span><div class="rd">Red-CI PRs in review → Blocked + comment, so a human can't merge a failing PR. Runs even when a container is busy.</div></div></div>
+        <div class="rstep side"><span class="pn">⌁</span><div><span class="rt">Orphan sweep</span> <span class="rd small">· always</span><div class="rd">In-Progress with no live container (host reboot / OOM) → Blocked for retry.</div></div></div>
+        <div class="rstep"><span class="pn">P1.5</span><div><span class="rt">Conflict scan → Deconflict</span><div class="rd">In-Review PR is <span class="mono">CONFLICTING</span> → resolve before a human looks at it.</div></div></div>
+        <div class="rstep"><span class="pn">P1</span><div><span class="rt">Review comments</span><div class="rd">New human comment → classify → Merge / Continue / Skip. Unblock work already in flight.</div></div></div>
+        <div class="rstep"><span class="pn">P2</span><div><span class="rt">Ready → Fix</span><div class="rd">Implement what's already refined + planned (respects WIP + dependencies).</div></div></div>
+        <div class="rstep"><span class="pn">P3</span><div><span class="rt">Blocked → retry</span><div class="rd">Branch-aware: Continue if a PR exists, else Fix. Circuit-break after 3.</div></div></div>
+        <div class="rstep"><span class="pn">P4</span><div><span class="rt">Refined → Plan</span><div class="rd">Advance refined work before pulling brand-new backlog.</div></div></div>
+        <div class="rstep"><span class="pn">P5</span><div><span class="rt">Backlog → Refine</span><div class="rd">Lowest priority: groom new (opt-in) ideas only when nothing else needs attention.</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 — ISSUE LIFECYCLE STATE MACHINE -->
+  <section class="slide" data-sec="02 · Control Plane">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 05 · Issue lifecycle — the state machine</div>
+      <h2 class="r" style="--d:60">One issue, its whole journey across <span class="am">columns</span> and <span class="cy">gates</span>.</h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>column × label × gate</span><span>state</span></div>
+          <pre class="mermaid">
+stateDiagram-v2
+  [*] --> Backlog
+  Backlog --> Refining: ready-for-agent
+  Refining --> SpecReview: spec-pending-review
+  SpecReview --> Refined: approve / grace
+  Refined --> Planning
+  Planning --> PlanReview: plan-pending-review
+  PlanReview --> Ready: approve / grace
+  Ready --> InProgress: Fix
+  InProgress --> InReview: PR opened
+  InReview --> Done: approve then Close
+  InReview --> InProgress: changes requested
+  InReview --> Blocked: CI fail / conflict
+  Blocked --> InProgress: retry &lt; 3
+  Blocked --> Paused: needs-discussion
+  Done --> [*]
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico cy">✋</span>Three gates</h3><p>Spec → <b>Refined</b>, Plan → <b>Ready</b>, PR → <b>Done</b>. A human moves the card (or comments to iterate).</p></div>
+          <div class="card glow"><h3><span class="ico am">⏩</span>direct-to-pr auto-advance</h3><p>With that label the spec &amp; plan gates self-open after a <b>30-min grace</b> window, and the end-gate auto-Closes on PR approval / auto-Continues on changes requested.</p></div>
+          <div class="card"><h3><span class="ico rd">⏸</span>needs-discussion</h3><p>The universal off-switch — an issue carrying it is invisible to every dispatch loop until a human removes it.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 — RESILIENCE SIDE-LOOP -->
+  <section class="slide" data-sec="02 · Control Plane">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 06 · Resilience — how stuck work recovers</div>
+      <h2 class="r" style="--d:60">Nothing sits stuck silently. <span class="am">Three escape hatches.</span></h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>failure → recovery</span><span>flow</span></div>
+          <pre class="mermaid">
+flowchart TD
+  F["run fails / dies"] --> T{"trappable exit?"}
+  T -->|"yes"| OF["entrypoint on_failure → Blocked + comment"]
+  T -->|"no — OOM / reboot"| SW["scheduler orphan sweep → Blocked"]
+  OF --> RETRY{"retry count &lt; 3?"}
+  SW --> RETRY
+  RETRY -->|"yes"| RE["re-dispatch: Continue if PR else Fix"]
+  RETRY -->|"no"| CB["circuit-breaker: trip_to_blocked"]
+  CB --> ND["+ needs-discussion · reset counter · post comment"]
+  ND --> HUMAN(["👤 human investigates"])
+  RE --> F
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico">🔁</span>Per-phase retries</h3><p>Counters are keyed by phase — <span class="mono">#N:refine</span>, <span class="mono">#N:plan</span>, <span class="mono">#N:resolve</span>, <span class="mono">#N</span> (implement) — so a flaky plan doesn't burn the build budget.</p></div>
+          <div class="card"><h3><span class="ico rd">⛔</span>Circuit-breaker</h3><p>After 3 failed attempts in a phase: Blocked + <span class="mono">needs-discussion</span> + an explanatory comment with the manual retry command, then the counter resets clean.</p></div>
+          <div class="card"><h3><span class="ico cy">🧹</span>Durable state</h3><p>Retry counts live on a named volume, so they survive the <span class="mono">restart: unless-stopped</span> cycle of the scheduler container.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 — THE ARCHON DAG -->
+  <section class="slide" data-sec="03 · Work Plane">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 07 · The Archon workflow — one DAG, conditional routing</div>
+      <h2 class="r" style="--d:60">An intent router picks the branch; <span class="am">model tiering</span> picks the brain.</h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>archon-dark-factory.yaml</span><span>node DAG</span></div>
+          <pre class="mermaid">
+flowchart TD
+  PI["parse-intent · haiku"] --> FI["fetch-issue + epic resolve"]
+  FI --> R{"intent?"}
+  R -->|"refine"| RF["refine → push → spec-pending-review"]
+  R -->|"plan"| PL["plan → architect loop → plan-pending-review"]
+  R -->|"new / continue"| IM["branch → codeindex → implement"]
+  R -->|"close"| CL["merge PR → teardown preview → Done"]
+  R -->|"resolve"| RS["checkout branch → de-conflict"]
+  IM --> DC["de-conflict (continue)"]
+  DC --> CP{"preview needed?"}
+  CP -->|"yes"| PV["preview-up + validate"]
+  CP -->|"no"| VAL["validate only"]
+  PV --> CON["conformance gate"]
+  VAL --> CON
+  CON --> PR["push · draft PR → In Review"]
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico cy">→</span>Intent router</h3><div class="flex mt" style="gap:.4rem"><span class="tag am">new</span><span class="tag am">continue</span><span class="tag">close</span><span class="tag cy">refine</span><span class="tag cy">plan</span><span class="tag vi">resolve</span></div><p class="mt">One verb selects the DAG branch. Epics resolve to their next open sub-issue automatically.</p></div>
+          <div class="card"><h3><span class="ico gr">⚙</span>Model tiering</h3><p><span class="mono am">haiku</span> — parse, summarize-feedback, classify-preview. <span class="mono cy">sonnet</span> — refine, plan, implement, conformance, AI conflict resolution. Cheap models do mechanics; capable models reason. Every node is cost-logged.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 — END-TO-END LIFECYCLE RAIL -->
+  <section class="slide" data-sec="03 · Work Plane">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 08 · End-to-end rail (implement path)</div>
+      <h2 class="r" style="--d:60">Eight stations. Two pre-build gates, one post-build gate.</h2>
+      <div class="pipe mt2 r" style="--d:160">
+        <div class="stage aut"><div class="chip"><div class="n">auto</div><div class="t">Refine</div><div class="s">brainstorm → spec</div></div><span class="arr">›</span></div>
+        <div class="stage gatecell"><div class="chip"><div class="n">✋ gate*</div><div class="t">Spec</div><div class="s">spec-pending-review</div></div><span class="arr">›</span></div>
+        <div class="stage aut"><div class="chip"><div class="n">auto</div><div class="t">Plan</div><div class="s">architect-reviewed</div></div><span class="arr">›</span></div>
+        <div class="stage gatecell"><div class="chip"><div class="n">✋ gate*</div><div class="t">Plan</div><div class="s">plan-pending-review</div></div><span class="arr">›</span></div>
+        <div class="stage aut"><div class="chip"><div class="n">auto</div><div class="t">Implement</div><div class="s">TDD build</div></div><span class="arr">›</span></div>
+        <div class="stage aut"><div class="chip"><div class="n">auto</div><div class="t">Conformance</div><div class="s">code↔spec + scope</div></div><span class="arr">›</span></div>
+        <div class="stage aut"><div class="chip"><div class="n">auto</div><div class="t">Preview</div><div class="s">if app-affecting</div></div><span class="arr">›</span></div>
+        <div class="stage aut"><div class="chip"><div class="n">auto</div><div class="t">PR</div><div class="s">draft + URL</div></div><span class="arr">›</span></div>
+        <div class="stage gatecell"><div class="chip"><div class="n">✋ gate</div><div class="t">Review</div><div class="s">comment / approve</div></div></div>
+      </div>
+      <div class="legend r" style="--d:340">
+        <span class="k"><span class="sw a"></span> Agent-driven station</span>
+        <span class="k"><span class="sw h"></span> Human approval gate</span>
+        <span class="k mono" style="color:var(--mut2)">* spec &amp; plan gates auto-open under <span class="cy">direct-to-pr</span></span>
+      </div>
+      <p class="small mt2 r" style="--d:420"><span class="cy">Conformance</span> station between build and preview, and the preview step is now <b>conditional</b> on whether the change touches the running app.</p>
+    </div>
+  </section>
+
+  <!-- 10 — DEEP DIVE: REFINE -->
+  <section class="slide" data-sec="04 · Deep Dive · Refine">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 09 · Refinement — orchestrator × product-owner</div>
+      <h2 class="r" style="--d:60">One question at a time; a <span class="cy">subagent</span> answers from the codebase.</h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>dark-factory-refine</span><span>sequence</span></div>
+          <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant SC as Scheduler
+  participant OR as Orchestrator (sonnet)
+  participant PO as Product-Owner subagent
+  participant CB as Codebase + memory
+  participant GH as GitHub issue
+  SC->>OR: Refine issue #N
+  OR->>CB: read CLAUDE.md, ARCHITECTURE, .archon/memory
+  loop one question at a time
+    OR->>PO: clarifying question + context
+    PO->>CB: Glob / Grep / Read
+    alt confident
+      PO-->>OR: answer + rationale
+    else uncertain
+      PO-->>OR: UNCERTAIN:
+      OR->>GH: post question + needs-discussion
+    end
+  end
+  OR->>OR: choose approach · write spec · self-review
+  OR->>CB: commit spec + memory PATTERN/AVOID
+  OR->>GH: post full Q&amp;A · label spec-pending-review
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico cy">🙋</span>Subagent judgement</h3><p>Each question spawns a fresh <span class="mono">product-owner</span> with Glob/Grep/Read. It can answer <b>or</b> escalate <span class="mono rd">UNCERTAIN:</span> — which pauses the issue for a human instead of guessing.</p></div>
+          <div class="card"><h3><span class="ico">🧠</span>Memory in, memory out</h3><p>It reads accumulated <span class="mono">PATTERN/AVOID</span> lessons and writes new architectural decisions back to <span class="mono">.archon/memory/architecture.md</span>.</p></div>
+          <div class="card"><h3><span class="ico gr">📄</span>Output</h3><p>A spec under <span class="mono">docs/superpowers/specs/</span>, the full brainstorming Q&amp;A on the issue, and the <span class="mono cy">spec-pending-review</span> gate.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 — DEEP DIVE: PLAN -->
+  <section class="slide" data-sec="04 · Deep Dive · Plan">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 10 · Planning — architect-validated, then conformance-checked</div>
+      <h2 class="r" style="--d:60">Two reviewers see the plan <span class="am">before any human does.</span></h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>dark-factory-plan</span><span>sequence</span></div>
+          <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant OR as Planner (sonnet)
+  participant AR as Architect subagent
+  participant CR as Conformance reviewer
+  participant GH as GitHub issue
+  OR->>OR: read spec + memory · write TDD plan
+  loop ≤ 3 cycles
+    OR->>AR: validate plan vs spec
+    alt issues found
+      AR-->>OR: feedback
+      OR->>OR: revise plan
+    else approved
+      AR-->>OR: ✅ approved
+    end
+  end
+  OR->>CR: plan-vs-spec conformance
+  CR-->>OR: ✅ conforms / ⛔ material
+  OR->>GH: post plan + dialogue · label plan-pending-review
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico">📐</span>Bite-sized &amp; test-first</h3><p>Every task is: failing test → confirm fail → implement → confirm pass → commit. Exact paths, real code, expected output — <b>no placeholders.</b></p></div>
+          <div class="card"><h3><span class="ico cy">🏛</span>Architect loop</h3><p>An architect subagent validates against the spec, up to 3 cycles. Still not approved? Post the feedback and <span class="mono">needs-discussion</span>.</p></div>
+          <div class="card glow"><h3><span class="ico gr">✔</span>Plan-vs-spec gate</h3><p>A <b>second</b> reviewer checks the plan conforms to the spec (Gate 1) — material divergence reconciles or blocks.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 — DEEP DIVE: BUILD -->
+  <section class="slide" data-sec="04 · Deep Dive · Build">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 11 · Construction — disciplined TDD, hard scope rule</div>
+      <h2 class="r" style="--d:60">Red-green-refactor — and it <span class="am">won't</span> fix what you didn't ask for.</h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>dark-factory-implement</span><span>activity</span></div>
+          <pre class="mermaid">
+flowchart TD
+  subgraph LOOP["per task — red / green TDD"]
+    direction TB
+    T1["write failing test"] --> T2["confirm it fails"] --> T3["minimal code"] --> T4["confirm pass"] --> T5["small commit"]
+  end
+  P["read issue / feedback + memory"] --> PL["write checklist plan.md"]
+  PL --> T1
+  T5 --> SC{"unrelated defect spotted?"}
+  SC -->|"yes"| OOS["log to out-of-scope.md — do NOT fix"]
+  SC -->|"no"| DOC["update ARCHITECTURE / PROJECT_STRUCTURE"]
+  OOS --> DOC
+  DOC --> MEM["append memory PATTERN/AVOID/FIX"]
+  MEM --> RPT["write implementation.md"]
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card glow"><h3><span class="ico rd">⛔</span>Scope discipline</h3><p>Spot a pre-existing bug while building? <b>Do not fix it.</b> Record it in <span class="mono">out-of-scope.md</span> — the conformance gate turns each entry into a backlog ticket.</p></div>
+          <div class="card"><h3><span class="ico cy">⤺</span>Continue = feedback-driven</h3><p>On <span class="mono">Continue #N</span> it reads PR <b>review + inline</b> comments (with <span class="mono">path</span>/<span class="mono">line</span>) and changes only what was asked.</p></div>
+          <div class="card"><h3><span class="ico gr">🗄</span>Migrations · seed · docs</h3><p>New model → autogenerate Alembic migration + <span class="mono">__init__</span> import. Missing preview data → idempotent seed SQL. Docs map kept honest in the same PR.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13 — DEEP DIVE: CONFORMANCE + SCOPE -->
+  <section class="slide" data-sec="04 · Deep Dive · Conformance">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 12 · Conformance &amp; scope gate (Gate 2 — code ↔ spec)</div>
+      <h2 class="r" style="--d:60">Does the code match the spec — and <span class="am">only</span> the spec?</h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>dark-factory-conformance</span><span>activity</span></div>
+          <pre class="mermaid">
+flowchart TD
+  D["pre-triage diff: strip lockfiles / docs / memory"] --> REV["reviewer: code vs spec"]
+  REV --> OOS{"out-of-scope changes?"}
+  OOS -->|"yes &amp; enforce"| EX["excise from branch + file scope-spillover ticket"]
+  EX --> REV
+  OOS -->|"no"| V{"verdict"}
+  V -->|"conforms / minor"| PASS["attest → push &amp; PR"]
+  V -->|"material"| RC{"reconcile &lt; 3?"}
+  RC -->|"yes"| FIX["failing test → fix → commit"]
+  FIX --> REV
+  RC -->|"no"| BLK["Blocked + needs-discussion"]
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico">🔍</span>Pre-triage first</h3><p>Lockfiles, generated indexes and memory are stripped from the diff so they aren't mis-flagged as out-of-scope.</p></div>
+          <div class="card glow"><h3><span class="ico vi">✂</span>Scope excision</h3><p>Out-of-scope hunks are reverted from the branch and each becomes a linked <span class="mono">scope-spillover</span> ticket — the branch stays clean, the defect isn't lost.</p></div>
+          <div class="card"><h3><span class="ico rd">⛔</span>Block on material</h3><p>A material divergence reconciles in ≤3 TDD cycles; failing that, the issue goes Blocked rather than shipping a PR that doesn't match its spec.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 14 — DEEP DIVE: REVIEW -->
+  <section class="slide" data-sec="04 · Deep Dive · Review">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 13 · Review — the human gate &amp; the continue loop</div>
+      <h2 class="r" style="--d:60">A comment is <span class="am">classified</span>, then turned into an action.</h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>scheduler P1 · end-gate</span><span>sequence</span></div>
+          <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant H as 👤 Reviewer
+  participant GH as PR / issue
+  participant SC as Scheduler
+  participant CL as Classifier (haiku)
+  participant FA as Factory
+  H->>GH: comment / review on PR
+  SC->>GH: read comments since last run
+  SC->>CL: classify intent
+  CL-->>SC: MERGE | CONTINUE | SKIP
+  alt MERGE / approved
+    SC->>FA: Close issue #N
+    FA->>GH: merge + teardown → Done
+  else CONTINUE / changes requested
+    SC->>FA: Continue issue #N
+    FA->>GH: read inline comments · fix · re-push
+  else SKIP (bot-only)
+    SC-->>SC: no action
+  end
+  note over SC,GH: direct-to-pr → auto Close/Continue on PR review state
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico am">🧭</span>Classifier, not keywords</h3><p>A haiku pass reads comments since the last run and returns <span class="mono">MERGE/CONTINUE/SKIP</span>. When in doubt between Continue and Skip, it chooses <b>Continue</b>.</p></div>
+          <div class="card"><h3><span class="ico">🤖</span>Bot comments ignored</h3><p>The factory's own cost reports and pipeline status comments are matched by footer marker and never re-trigger work (the fix for the #124 spec loop).</p></div>
+          <div class="card glow"><h3><span class="ico cy">⏩</span>Hands-off mode</h3><p>For <span class="mono">direct-to-pr</span> issues the end-gate reads the PR's GitHub review state directly: APPROVED → Close, CHANGES_REQUESTED → Continue.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 15 — DEEP DIVE: CONFLICT RESOLUTION -->
+  <section class="slide" data-sec="04 · Deep Dive · Conflicts">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 14 · Conflict resolution — tiered, mechanical → AI → human</div>
+      <h2 class="r" style="--d:60">Merge <span class="mono" style="font-size:.8em">main</span> in and resolve, before a human is bothered.</h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>de-conflict · entrypoint + workflow</span><span>activity</span></div>
+          <pre class="mermaid">
+flowchart TD
+  TR{"trigger"} -->|"P1.5 · CONFLICTING PR"| MG["merge origin/main into branch"]
+  TR -->|"inline on Continue"| MG
+  MG --> C{"conflicts?"}
+  C -->|"no"| OK["push → In Review"]
+  C -->|"yes"| T1["Tier 1 mechanical:&lt;br/&gt;codeindex · lockfile · alembic heads · import union"]
+  T1 --> R1{"all resolved?"}
+  R1 -->|"yes"| GREP{"surviving &lt;&lt; markers?"}
+  R1 -->|"no &amp; ai on"| T2["Tier 2 AI: claude -p sonnet per file"]
+  T2 --> GREP
+  GREP -->|"no"| TSC["tsc --noEmit"]
+  TSC --> OK
+  GREP -->|"yes"| T3["Tier 3 escalate → Blocked + needs-discussion"]
+</pre>
+        </div>
+        <div class="r" style="--d:260">
+          <div class="dcap">TIER 1 — KNOWN FILE CLASSES (no AI)</div>
+          <table>
+            <tbody>
+              <tr><td class="mono">codeindex.json · symbolindex.json</td><td>take <span class="mono">--theirs</span> (regenerated anyway)</td></tr>
+              <tr><td class="mono">package-lock.json</td><td><span class="mono">--theirs</span> then <span class="mono">npm install</span></td></tr>
+              <tr><td class="mono">alembic/versions/*</td><td>resolve + <span class="mono">alembic merge heads</span></td></tr>
+              <tr><td class="mono">models/__init__.py</td><td>union both sides' imports</td></tr>
+            </tbody>
+          </table>
+          <p class="small mt">Everything else falls to Tier 2 (AI, per file, preserving both intents). A <b>hard grep</b> for surviving <span class="mono">&lt;&lt;&lt;&lt;&lt;</span> markers is the safety net — if any survive, escalate. <span class="mono">CONFLICT_RESOLUTION_ENABLED</span> and <span class="mono">ai_tier</span> are kill-switches.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16 — PREVIEW ENVIRONMENTS -->
+  <section class="slide" data-sec="05 · Supporting">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 15 · Preview environments — only when they earn it</div>
+      <h2 class="r" style="--d:60">A clickable stack per issue — <span class="am">if</span> the change touches the app.</h2>
+      <div class="cols2 mt2">
+        <div class="r" style="--d:140">
+          <ul class="clean">
+            <li><b>Differentiator first.</b> A haiku classifier reads the diff: docs / config / tests / CI-only → <span class="mono">skip preview</span>. Anything under <span class="mono">backend/app</span>, <span class="mono">frontend/src</span>, migrations, compose → build it. Fail-safe builds on any doubt.</li>
+            <li><b>Collision-free slots.</b> Scans running stacks and picks the lowest free slot <span class="mono">00–99</span> — decoupled from the issue number (#124).</li>
+            <li><b>Self-bootstrapping.</b> Fresh DB → create tables, stamp + upgrade. Existing DB → upgrade only. Health-gated on <span class="mono">/api/health</span>.</li>
+            <li><b>Reachable by hostname.</b> The factory joins the preview network and curl-tests endpoints by container hostname, then tears down on <span class="mono">Close</span>.</li>
+          </ul>
+        </div>
+        <div class="r" style="--d:260">
+          <div class="dcap">PORT SCHEME — <span class="mono">1{slot}{suffix}</span></div>
+          <table>
+            <thead><tr><th>Service</th><th>Formula</th><th>slot 03</th><th>slot 12</th></tr></thead>
+            <tbody>
+              <tr><td>Frontend</td><td class="mono">1{ss}33</td><td class="mono am">10333</td><td class="mono am">11233</td></tr>
+              <tr><td>Backend</td><td class="mono">1{ss}80</td><td class="mono">10380</td><td class="mono">11280</td></tr>
+              <tr><td>Postgres</td><td class="mono">1{ss}54</td><td class="mono">10354</td><td class="mono">11254</td></tr>
+              <tr><td>Redis</td><td class="mono">1{ss}63</td><td class="mono">10363</td><td class="mono">11263</td></tr>
+            </tbody>
+          </table>
+          <p class="small mt"><span class="mono">{ss}</span> is the allocated slot, <i>not</i> the issue number — so issue #3 may land on any free slot, and previews never collide.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 17 — CODEINDEX + MEMORY -->
+  <section class="slide" data-sec="05 · Supporting">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 16 · Codeindex + the memory loop</div>
+      <h2 class="r" style="--d:60">The factory <span class="am">navigates</span> faster and <span class="cy">learns</span> across runs.</h2>
+      <div class="cols2 mt2">
+        <div class="grid r" style="--d:140; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico">🧭</span>Codeindex (MCP)</h3><p>Regenerated at startup and post-implement and committed with the PR. Subagents call <span class="mono">lookup_symbol</span> instead of grep and <span class="mono">get_impact</span> for blast-radius before touching a hot file. A blast report rides along in the PR body.</p></div>
+          <div class="card"><h3><span class="ico cy">🧠</span>.archon/memory</h3><p>Append-only <span class="mono">PATTERN / AVOID / FIX</span> bullets, namespaced by area, each with an <span class="mono">expires:</span> date that's swept on write. Lessons get baked into future plans, not left as advice.</p></div>
+        </div>
+        <div class="r" style="--d:260">
+          <div class="dcap">READER / WRITER MATRIX</div>
+          <table>
+            <thead><tr><th>Memory file</th><th>Refine</th><th>Plan</th><th>Implement</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">architecture.md</td><td>r/w</td><td>r</td><td>r</td></tr>
+              <tr><td class="mono">codebase-patterns.md</td><td>r</td><td>r</td><td>r/w</td></tr>
+              <tr><td class="mono">backend-patterns.md</td><td>r</td><td>r</td><td>r/w</td></tr>
+              <tr><td class="mono">frontend-patterns.md</td><td>r</td><td>r</td><td>r/w</td></tr>
+              <tr><td class="mono">dark-factory-ops.md</td><td>r</td><td>r</td><td>r/w</td></tr>
+            </tbody>
+          </table>
+          <p class="small mt">Refine owns architectural decisions; implement owns runtime-proven lessons. The split keeps each file authoritative.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 18 — SECURITY MODEL (built-in qualities) -->
+  <section class="slide" data-sec="05 · Supporting">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 17 · Security model — built in, not bolted on</div>
+      <h2 class="r" style="--d:60">Disposable by design, <span class="am">scoped by capability.</span></h2>
+      <div class="cols-7-5 mt2">
+        <div class="dframe r" style="--d:140">
+          <div class="dcap"><span>trust boundaries</span><span>network</span></div>
+          <pre class="mermaid">
+flowchart TB
+  GH(["🌐 GitHub · repo / issues / PRs"])
+  AN(["🌐 Anthropic API"])
+  subgraph FAC["🏭 Ephemeral factory · one run at a time · --rm"]
+    direction TB
+    CLONE["fresh git clone @ /workspace/gitrepo&lt;br/&gt;host source is never mounted"]
+    CRED["runtime-only scoped credentials&lt;br/&gt;never baked into the image"]
+  end
+  subgraph PREV["♻️ Per-issue previews · disposable · isolated"]
+    direction LR
+    PA["mh-preview-A&lt;br/&gt;own network · synthetic-seed DB"]
+    PB["mh-preview-B&lt;br/&gt;own network · synthetic-seed DB"]
+  end
+  GH -->|"clone in (read)"| CLONE
+  CLONE -->|"push branch · open PR"| GH
+  CLONE -->|"prompts only"| AN
+  CLONE -->|"create · health-check · tear down"| PA
+  CLONE -->|"create · health-check · tear down"| PB
+</pre>
+        </div>
+        <div class="grid r" style="--d:260; gap:.9rem; align-content:start">
+          <div class="card"><h3><span class="ico">♻</span>Ephemeral by default</h3><p>Every run is a throwaway <span class="mono">--rm</span> container working from a <b>fresh clone</b> — nothing persists between runs, so nothing accumulates to compromise.</p></div>
+          <div class="card glow"><h3><span class="ico cy">📥</span>Your source is never mounted</h3><p>The agent edits a <b>clone</b> at <span class="mono">/workspace/gitrepo</span>, not your host working tree — it cannot read or write your real files.</p></div>
+          <div class="card"><h3><span class="ico gr">🧪</span>Previews isolated &amp; synthetic</h3><p>Each <span class="mono">mh-preview-N</span> is its own network + a DB seeded with <b>synthetic</b> data, torn down on <span class="mono">Close</span> — no production data, no cross-talk.</p></div>
+          <div class="card"><h3><span class="ico am">🎯</span>Bounded blast radius</h3><p><b>One run at a time</b> (hard lock), <b>runtime-only</b> credentials never baked into the image, and a narrow capability surface: git, GitHub, Anthropic, preview orchestration.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 19 — COST + OBSERVABILITY -->
+  <section class="slide" data-sec="05 · Supporting">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 18 · Cost &amp; observability</div>
+      <h2 class="r" style="--d:60">Every run is <span class="am">priced</span> and <span class="cy">logged.</span></h2>
+      <div class="stats mt2 r" style="--d:140">
+        <div class="stat"><div class="v">∑</div><div class="l">Cumulative cost report — one comment per issue, updated each run, per-node token table</div></div>
+        <div class="stat"><div class="v cy">2</div><div class="l">model tiers — haiku for mechanics, sonnet for reasoning, chosen per node</div></div>
+        <div class="stat"><div class="v">GELF</div><div class="l">every container ships structured logs to Seq via the GELF driver</div></div>
+        <div class="stat"><div class="v cy">1×</div><div class="l">serialized runs keep spend predictable under the Claude Max limit</div></div>
+      </div>
+      <div class="grid mt2 r" style="--d:300; grid-template-columns:repeat(3,1fr)">
+        <div class="card"><h3><span class="ico">💲</span>Cumulative cost</h3><p>The cost comment accumulates across refine / plan / build / continue runs, with a per-step model + token + duration breakdown and a running grand total.</p></div>
+        <div class="card"><h3><span class="ico cy">📊</span>Seq via GELF</h3><p>Both <span class="mono">dark-factory</span> and <span class="mono">backlog-scheduler</span> tag their logs, so a run is traceable end-to-end in Seq.</p></div>
+        <div class="card"><h3><span class="ico gr">⚖</span>Tiering map</h3><p><span class="mono am">haiku</span>: parse-intent, classify-preview, classify-comments. <span class="mono cy">sonnet</span>: refine, plan, implement, conformance, AI conflicts.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 20 — ARCHON × SCHEDULER SYNTHESIS -->
+  <section class="slide" data-sec="06 · Synthesis">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 19 · Archon × Scheduler — the whole picture</div>
+      <h2 class="r" style="--d:60">Decide vs. build, with the board between them.</h2>
+      <div class="dframe mt r" style="--d:160">
+        <div class="dcap"><span>who decides · who builds · who approves</span><span>flow</span></div>
+        <pre class="mermaid">
+flowchart LR
+  subgraph H["👤 Human — curates"]
+    direction TB
+    H1["add ready-for-agent"]
+    H2["approve gates / review PR"]
+  end
+  subgraph SCHED["🧭 Scheduler — decides what &amp; when"]
+    direction TB
+    SC1["poll · waterfall"] --> SC2["guards: CI · conflict · circuit-break"] --> SC3["dispatch one verb"]
+  end
+  subgraph BOARD["📋 Board + Labels — the bus"]
+    direction TB
+    BD1["column = phase"]
+    BD2["label = gate / pause"]
+  end
+  subgraph ARCH["🏭 Archon — builds how"]
+    direction TB
+    AR1["refine · plan · implement"] --> AR2["conformance · preview · validate"] --> AR3["PR + status"]
+  end
+  H1 --> BOARD
+  H2 --> BOARD
+  BOARD --> SCHED
+  SCHED --> ARCH
+  ARCH --> BOARD
+  BOARD --> H2
+</pre>
+      </div>
+      <p class="small mt r" style="--d:320">The scheduler is the only thing that <i>starts</i> work; Archon is the only thing that <i>does</i> work; the human is the only thing that <i>judges</i> it — and all three meet on the board.</p>
+    </div>
+  </section>
+
+  <!-- 21 — FAILURE & RECOVERY STORY -->
+  <section class="slide" data-sec="06 · Synthesis">
+    <div class="max">
+      <div class="kicker r"><span class="dot"></span> 20 · One issue, every failure mode</div>
+      <h2 class="r" style="--d:60">However it breaks, there's a path <span class="am">back to motion.</span></h2>
+      <div class="grid mt2 r" style="--d:160; grid-template-columns:repeat(2,1fr); gap:1.1rem">
+        <div class="card"><h3><span class="ico rd">CI</span>PR goes red after merge to main elsewhere</h3><p>P0 pulls it out of review → Blocked; P3 continues the existing branch and re-runs validate to fix it.</p></div>
+        <div class="card"><h3><span class="ico vi">⚔</span>Branch drifts into conflict</h3><p>P1.5 spots <span class="mono">CONFLICTING</span> and dispatches Deconflict — tiered resolution pushes a clean branch back to review.</p></div>
+        <div class="card"><h3><span class="ico">💀</span>Run is SIGKILLed mid-build</h3><p>No error handler fires, but the orphan sweep finds the In-Progress card with no container and routes it to Blocked for retry.</p></div>
+        <div class="card glow"><h3><span class="ico rd">3×</span>It just can't get there</h3><p>After three attempts in a phase the circuit-breaker stops the bleeding: Blocked + <span class="mono">needs-discussion</span> + a comment telling a human exactly how to resume.</p></div>
+      </div>
+      <p class="small mt2 r" style="--d:340">The common thread: failures converge on <b>Blocked</b>, and <b>Blocked</b> is just another column the scheduler knows how to work.</p>
+    </div>
+  </section>
+
+  <!-- 22 — CLOSE -->
+  <section class="slide" data-sec="07 · Close">
+    <div class="max center">
+      <div class="kicker r" style="justify-content:center"><span class="dot"></span> 21 · Where it goes next — industrialization</div>
+      <h2 class="r" style="--d:60">From embedded tool to a <span class="am">multi-repo platform.</span></h2>
+      <p class="lead r" style="--d:120; margin-left:auto; margin-right:auto">Today the factory lives <i>inside</i> one git repo. The path to a product is to lift it out and make every assumption configurable.</p>
+      <div class="grid mt2 r" style="--d:200; grid-template-columns:repeat(3,1fr); max-width:1180px; margin-left:auto; margin-right:auto; text-align:left">
+        <div class="card glow"><h3><span class="ico am">⧉</span>Extract &amp; generalize</h3><p>Lift the factory + scheduler out of this repo into a standalone, <b>repo-agnostic</b> control plane — one deployment driving <b>many repositories</b>, each with its own config.</p></div>
+        <div class="card"><h3><span class="ico cy">☁</span>Kubernetes &amp; cloud</h3><p>Move runs and previews off a single host's Docker engine onto <b>Kubernetes</b> — the factory <b>scales horizontally</b> and runs as a managed cloud service.</p></div>
+        <div class="card"><h3><span class="ico gr">🔌</span>Pluggable trackers</h3><p>Abstract the board + labels bus behind an <b>adapter</b> so it isn't GitHub-only — <b>Jira</b> (and GitLab, Linear…) as first-class backends.</p></div>
+      </div>
+      <h2 class="r mt2" style="--d:320; font-size:clamp(1.4rem,2.8vw,2.2rem); max-width:980px; margin-left:auto; margin-right:auto">
+        Issue in. Reviewed PR out. <span class="am">Next — for every repo, on any tracker.</span>
+      </h2>
+      <div class="r mt2" style="--d:440; font-family:var(--mono); color:var(--mut2); font-size:.8rem; letter-spacing:.2em">THE DARK FACTORY · v2</div>
+    </div>
+  </section>
+
+</div>
+
+<button id="prev" class="navbtn" aria-label="previous">‹</button>
+<button id="next" class="navbtn" aria-label="next">›</button>
+
+<div id="progress"><div id="bar"></div></div>
+<div id="hud"><b id="cur">01</b> / <span id="tot">23</span></div>
+<div class="hint">← → <span>navigate</span> · O <span>overview</span> · N <span>notes</span> · F <span>fullscreen</span></div>
+
+<div id="overview"></div>
+<div id="notes"><div class="lab">Speaker notes</div><p id="notetext"></p></div>
+
+<script src="mermaid.min.js"></script>
+<script src="svg-pan-zoom.min.js"></script>
+<script>
+(function(){
+  // ---- Mermaid init (bundled inline above) ----
+  try{
+    if(window.mermaid){
+      mermaid.initialize({
+        startOnLoad:false,
+        securityLevel:'loose',
+        theme:'base',
+        fontFamily:'system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif',
+        themeVariables:{
+          background:'#13151d',
+          primaryColor:'#1b1f2a', primaryBorderColor:'#ff8a3d', primaryTextColor:'#eceef3',
+          secondaryColor:'#13251f', secondaryBorderColor:'#3fe0c8', secondaryTextColor:'#eceef3',
+          tertiaryColor:'#181b24', tertiaryBorderColor:'#3a3f4b', tertiaryTextColor:'#cdd3df',
+          lineColor:'#9aa0ad', textColor:'#cdd3df',
+          mainBkg:'#1b1f2a', nodeBorder:'#ff8a3d', clusterBkg:'rgba(255,255,255,.02)',
+          clusterBorder:'rgba(255,255,255,.14)', titleColor:'#ffc08a', edgeLabelBackground:'#0e1015',
+          noteBkgColor:'#1a1410', noteTextColor:'#ffc08a', noteBorderColor:'#ff8a3d',
+          actorBkg:'#1b1f2a', actorBorder:'#ff8a3d', actorTextColor:'#eceef3', actorLineColor:'#6b7280',
+          signalColor:'#9aa0ad', signalTextColor:'#cdd3df',
+          labelBoxBkgColor:'#13251f', labelBoxBorderColor:'#3fe0c8', labelTextColor:'#eceef3',
+          loopTextColor:'#8af0e2', altBackground:'rgba(63,224,200,.05)',
+          sequenceNumberColor:'#0a0b0e'
+        },
+        flowchart:{ htmlLabels:true, curve:'basis', useMaxWidth:true, padding:8 },
+        sequence:{ useMaxWidth:true, mirrorActors:false, wrap:true, width:150 },
+        state:{ useMaxWidth:true }
+      });
+      mermaid.run({ querySelector:'.mermaid' }).then(function(){
+        if(!window.svgPanZoom) return;
+        document.querySelectorAll('.mermaid svg').forEach(function(svg){
+          var r = svg.getBoundingClientRect();
+          if(r.width < 10 || r.height < 10) return;
+          // Pin the rendered size so pan/zoom has a stable viewport, then enable it.
+          svg.style.setProperty('max-width','none','important');
+          svg.style.maxHeight='none';
+          svg.style.width = r.width + 'px';
+          svg.style.height = r.height + 'px';
+          try{
+            svgPanZoom(svg, {
+              panEnabled:true, zoomEnabled:true, controlIconsEnabled:true,
+              dblClickZoomEnabled:false, fit:true, center:true,
+              minZoom:0.5, maxZoom:14, zoomScaleSensitivity:0.3
+            });
+          }catch(e){ console.error('svg-pan-zoom init failed', e); }
+        });
+      }).catch(function(e){ console.error('mermaid render error', e); });
+    }
+  }catch(e){ console.error('mermaid render error', e); }
+
+  // ---- Deck engine ----
+  const slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  const total = slides.length;
+  let cur = 0;
+  const bar = document.getElementById('bar');
+  const curEl = document.getElementById('cur');
+  const totEl = document.getElementById('tot');
+  const secEl = document.getElementById('seclabel');
+  const ov = document.getElementById('overview');
+  const notes = document.getElementById('notes');
+  const noteText = document.getElementById('notetext');
+  totEl.textContent = String(total).padStart(2,'0');
+
+  const NOTES = {
+    0:"Open by naming the audience: this is the engineering deep-dive. The frame for the whole talk is two cooperating brains — a scheduler that decides, an Archon workflow that builds — meeting on the GitHub board.",
+    1:"The core mental model and the spine of the deck. Scheduler = what & when, Archon = how, board = the only shared bus and also the human's control surface. Everything later is a zoom into one of these three.",
+    2:"Make the board concrete. Seven columns, a small label vocabulary that drives automation, and WIP limits that live in the column descriptions (data, not code). needs-discussion is the universal off switch.",
+    3:"The centerpiece. Walk the single poll cycle: rate-limit guard, fetch, P0 CI gate and the orphan sweep run every tick; then a mutually-exclusive ladder where the highest-priority match dispatches one run and the rest wait. Stress: only ONE run per cycle.",
+    4:"Explain the ordering intuition: finish work before starting work. Hygiene (P0, sweep) is always-on; then unblock in-flight review, then implement Ready, retry Blocked, advance Refined, and only then groom new backlog.",
+    5:"The issue's life as a state machine. Three human gates (spec→Refined, plan→Ready, PR→Done). Land two twists: direct-to-pr auto-advances the gates after a grace window, and needs-discussion freezes the issue out of all loops.",
+    6:"Resilience. Two ways a failure is detected (trappable on_failure vs the orphan sweep for untrappable deaths), per-phase retry counters, and the circuit-breaker that stops after 3 and hands off to a human with durable state across restarts.",
+    7:"Switch to the work plane. The Archon DAG: a haiku intent router, epic resolution, then conditional branches per verb. Highlight model tiering — cheap models for mechanics, sonnet for reasoning — and that every node is cost-logged.",
+    8:"The implement path as a rail. Eight agent stations, two pre-build gates and one post-build gate. The conformance station, and the preview step is conditional on whether the diff touches the running app.",
+    9:"Deep dive 1 — refinement. The multi-agent shape: an orchestrator asks one question at a time; a product-owner subagent answers from the codebase or escalates UNCERTAIN to a human. It reads and writes memory, then gates at spec-pending-review.",
+    10:"Deep dive 2 — planning. Two reviewers before any human: an architect loop (≤3 cycles) validates the plan against the spec, then a conformance reviewer checks plan-vs-spec. Plans are strictly test-first with real code and no placeholders.",
+    11:"Deep dive 3 — construction. Disciplined red-green TDD, not a code dump. The hard rule: never fix unrelated defects — log them to out-of-scope.md. Continue mode is feedback-driven from PR inline comments. Migrations, seed and docs come along.",
+    12:"Deep dive 4 — conformance & scope (Gate 2). Pre-triage strips noise; the reviewer checks code vs spec; out-of-scope hunks are excised and filed as spillover tickets; material divergence reconciles in TDD cycles or blocks. The branch ships matching its spec.",
+    13:"Deep dive 5 — review. A human comment is classified by haiku into Merge/Continue/Skip; bot comments are ignored by footer marker. Continue reads inline review comments. direct-to-pr issues are driven straight off the PR's GitHub review state.",
+    14:"Deep dive 6 — conflict resolution. Triggered proactively (P1.5) or inline on Continue. Tier 1 handles known file classes mechanically (codeindex, lockfile, alembic heads, model imports); Tier 2 is per-file AI; a hard grep for surviving markers gates escalation to a human.",
+    15:"Supporting system — previews. The differentiator decides whether a preview is even needed. Slots are dynamically allocated 00-99 and decoupled from the issue number. Self-bootstrapping, health-gated, torn down on Close.",
+    16:"Supporting system — codeindex + memory. Codeindex gives subagents lookup_symbol and get_impact and a blast report in the PR. The .archon/memory files accumulate PATTERN/AVOID/FIX lessons with expiry; refine owns architecture, implement owns runtime lessons.",
+    17:"Security as a positive, built-in story. Walk the network diagram: the factory is ephemeral (--rm, fresh clone), reaches out only to GitHub and Anthropic, and spins up per-issue previews isolated on their own networks with synthetic data, torn down on Close. Land the four qualities — ephemeral runs, your source is never mounted, isolated synthetic previews, and a bounded blast radius (one run at a time, runtime-only creds, narrow capability surface).",
+    18:"Cost and observability. The per-issue cost comment is cumulative across runs with a per-node token table. Model tiering keeps spend down. GELF→Seq makes a run traceable. Serialized runs keep spend predictable.",
+    19:"Synthesis — bring the three actors back together in one picture. The scheduler is the only thing that starts work, Archon the only thing that does it, the human the only thing that judges it, and they all meet on the board.",
+    20:"The memorable failure-mode tour: red CI, conflict, SIGKILL, and three-strikes. The point: every failure converges on Blocked, and Blocked is just another column the scheduler knows how to work.",
+    21:"Close honestly: what ships today, the known gaps, and the direction — more autonomy inside the gates, same human judgement at them. End on the line."
+  };
+
+  function render(){
+    slides.forEach((s,i)=>s.classList.toggle('active', i===cur));
+    bar.style.width = ((cur+1)/total*100)+'%';
+    curEl.textContent = String(cur+1).padStart(2,'0');
+    const sec = slides[cur].getAttribute('data-sec') || '';
+    secEl.textContent = sec;
+    noteText.textContent = NOTES[cur] || '';
+  }
+  function go(n){ cur = Math.max(0, Math.min(total-1, n)); render(); }
+  function next(){ go(cur+1); } function prev(){ go(cur-1); }
+
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){ e.preventDefault(); if(!ov.classList.contains('open')) next(); }
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); if(!ov.classList.contains('open')) prev(); }
+    else if(e.key==='Home'){ go(0); }
+    else if(e.key==='End'){ go(total-1); }
+    else if(e.key==='o'||e.key==='O'){ toggleOv(); }
+    else if(e.key==='n'||e.key==='N'){ notes.classList.toggle('open'); }
+    else if(e.key==='f'||e.key==='F'){ toggleFs(); }
+    else if(e.key==='Escape'){ if(ov.classList.contains('open')) toggleOv(); else notes.classList.remove('open'); }
+  });
+
+  document.getElementById('next').addEventListener('click', function(e){ e.stopPropagation(); next(); });
+  document.getElementById('prev').addEventListener('click', function(e){ e.stopPropagation(); prev(); });
+
+  document.getElementById('deck').addEventListener('click', function(e){
+    if(ov.classList.contains('open')) return;
+    if(e.target.closest('a,button,table,#notes,.code,.mermaid,.dframe')) return;
+    next();
+  });
+
+  function toggleFs(){
+    if(!document.fullscreenElement){ (document.documentElement.requestFullscreen||function(){})(); }
+    else if(document.exitFullscreen){ document.exitFullscreen(); }
+  }
+
+  function buildOv(){
+    ov.innerHTML = '<h2>Overview</h2>';
+    slides.forEach(function(s,i){
+      const sec = s.getAttribute('data-sec')||'';
+      const h = s.querySelector('h1,h2');
+      const title = i===0 ? 'The Dark Factory v2' : (h?h.textContent.trim():'Slide '+(i+1));
+      const c = document.createElement('div');
+      c.className='ov-card';
+      c.innerHTML = '<div class="n">'+String(i+1).padStart(2,'0')+'</div><div class="t">'+title+'</div><div class="s">'+(sec||'Title')+'</div>';
+      c.addEventListener('click', function(){ go(i); toggleOv(); });
+      ov.appendChild(c);
+    });
+  }
+  let ovBuilt=false;
+  function toggleOv(){
+    if(!ovBuilt){ buildOv(); ovBuilt=true; }
+    ov.classList.toggle('open');
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
