@@ -72,3 +72,11 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Plan Drift
 
 - [PATTERN] When a refinement plan specifies exact line numbers or file counts for reference fixes, always re-grep the actual files (`grep -rn "Docs/" ...`) rather than trusting the plan's enumeration — commits landing between plan creation and implementation can shift line numbers and add/remove references (e.g. PR #179 slimmed CLAUDE.md, changing a stated 1-ref count to 3 actual refs). <!-- issue:#171 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Third-party CLI Tools (repowise, codeindex)
+
+- [AVOID] The repowise `analyze` subcommand does not exist in v0.16.0 — the correct command is `repowise init --index-only .` to rebuild the dependency graph, git signals, dead-code, and health index without LLM page generation. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] The repowise MCP subcommand is `mcp` (not `serve-mcp` or `mcp-server`); launch with `repowise mcp /path/to/repo --transport stdio`. Generated index files land in `.repowise/` (not `.repowise/index/`) — gitignore pattern is `.repowise/*` + `!.repowise/config.yaml`. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] When `repowise init --index-only --dry-run` is run without `--dry-run` sanity, it still runs the full index pipeline and writes `.repowise/wiki.db`, `knowledge-graph.json`, `state.json`, and `.mcp.json` at the repo root. Add `.mcp.json` and `.claude/CLAUDE.md` to `.gitignore` to prevent accidentally committing repowise-generated editor files. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
