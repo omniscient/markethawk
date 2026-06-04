@@ -64,7 +64,7 @@ services/       — Business logic (scanner, stock_data, discovery_service,
                   futures_data, chart_indicators, catalyst_parser,
                   journal_service, websocket_manager, data_quality …)
 providers/      — External data integrations (Polygon, IBKR, base interface, bulk ops)
-tasks.py        — Celery background/scheduled tasks
+tasks/          — Celery task package (sync.py, scanning.py, trading.py, quality.py)
 ```
 
 ### Frontend (`frontend/src/`)
@@ -110,7 +110,7 @@ IB Gateway takes ~60 seconds on first startup while IBC authenticates. The backe
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost:3000 |
+| Frontend | http://localhost:3333 |
 | Backend API | http://localhost:8000 |
 | API Docs (Swagger) | http://localhost:8000/docs |
 | pgAdmin | http://localhost:5050 |
@@ -132,53 +132,11 @@ npm install
 npm run dev
 ```
 
-> See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed local setup, service connection instructions, and troubleshooting.
-
-## Database Migrations
-
-After changing any SQLAlchemy model:
-
-```bash
-cd backend
-python -m alembic revision --autogenerate -m "describe_the_change"
-python -m alembic upgrade head
-```
-
-## Running Tests
-
-```bash
-cd backend
-python -m pytest                   # all tests
-python -m pytest tests/api -v      # API tests only
-python -m pytest --cov             # with coverage report
-```
+> For detailed setup, manual (non-Docker) configuration, database migrations, running tests, and troubleshooting, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Environment Variables
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `POLYGON_API_KEY` | Yes | Polygon.io market data |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `POSTGRES_DB/USER/PASSWORD` | Yes | Used by the postgres container |
-| `SECRET_KEY` | Yes | JWT tokens and sessions |
-| `PGADMIN_DEFAULT_EMAIL/PASSWORD` | Yes | pgAdmin login |
-| `SEQ_ADMIN_PASSWORD_HASH` | Yes | Seq log viewer login |
-| `REDIS_URL` | No | Defaults to `redis://redis:6379/0` |
-| `ENVIRONMENT` | No | `development` / `production` (default: `development`) |
-| `LOG_LEVEL` | No | `DEBUG` / `INFO` / … (default: `INFO`) |
-| `IB_USERNAME/PASSWORD` | No | IB Gateway auto-login credentials |
-| `IB_TRADING_MODE` | No | `paper` or `live` (default: `paper`) |
-| `IBKR_HOST/PORT/CLIENT_ID` | No | Backend connection to IB Gateway |
-
-## Useful Docker Commands
-
-```bash
-docker-compose logs -f backend        # stream backend logs
-docker-compose exec backend bash      # shell into backend container
-docker-compose restart backend        # restart one service
-docker-compose down                   # stop everything (data volumes preserved)
-docker-compose down -v                # stop and delete all volumes
-```
+See [ENV_VARIABLES.md](ENV_VARIABLES.md) for the complete environment variable reference with defaults and descriptions.
 
 ## Documentation
 
