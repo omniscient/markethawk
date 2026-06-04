@@ -695,10 +695,18 @@ nodes:
             CONFORMANCE_VERDICT=$(grep '^VERDICT:' "$ARTIFACTS_DIR/conformance.md" | cut -d' ' -f2)
             CONFORMANCE_CYCLES=$(grep '^CYCLES:' "$ARTIFACTS_DIR/conformance.md" | cut -d' ' -f2)
             NO_SPEC=$(grep '^NO_SPEC:' "$ARTIFACTS_DIR/conformance.md" | cut -d' ' -f2)
+            OOS_EXCISED=$(grep '^OOS_EXCISED:' "$ARTIFACTS_DIR/conformance.md" | cut -d' ' -f2)
+            OOS_TICKETS=$(grep '^OOS_TICKETS:' "$ARTIFACTS_DIR/conformance.md" | cut -d' ' -f2-)
             ATTESTATION=$(sed -n '/^---$/,$ p' "$ARTIFACTS_DIR/conformance.md" | tail -n +2)
             CONFORMANCE_SECTION=$(printf "### Spec Conformance\n\n%s" "${ATTESTATION}")
             if [ "${NO_SPEC}" = "true" ]; then
               CONFORMANCE_SECTION=$(printf "%s\n\n_Advisory-only: no spec found; reviewed against issue body._" "${CONFORMANCE_SECTION}")
+            fi
+            # Surface scope outcome if any OOS changes were found
+            if [ -n "${OOS_EXCISED}" ] && [ "${OOS_EXCISED}" != "0" ]; then
+              TICKET_REFS=$(echo "${OOS_TICKETS}" | tr ' ' '\n' | grep -v '^$' | sed 's/^/#/' | tr '\n' ' ')
+              CONFORMANCE_SECTION=$(printf "%s\n\n**Scope enforcement:** excised %s out-of-scope change(s) → %s" \
+                "${CONFORMANCE_SECTION}" "${OOS_EXCISED}" "${TICKET_REFS}")
             fi
             ;;
           SKIPPED)

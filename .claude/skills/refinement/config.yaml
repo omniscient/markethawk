@@ -22,6 +22,9 @@ conformance:
   enabled: true
   max_reconcile_cycles: 3
   block_on_material: true
+  scope_enforcement: true    # detect & remediate out-of-scope changes at the conformance gate
+  excise_out_of_scope: true  # revert out-of-scope changes from the branch (false = file backlog ticket only)
+  backlog_label: scope-spillover  # label applied to auto-created spillover tickets
 
 preview:
   enabled: true   # false = always build the preview (pre-differentiator behavior) — kill-switch

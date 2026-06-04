@@ -19,6 +19,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not embed data directly in Alembic migration files — migrations are schema-only. Feature-specific seed data goes in `dark-factory/seed/99_feature.sql` (idempotent, `ON CONFLICT DO NOTHING`). Data needed across multiple features goes in a new numbered baseline module. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+- [AVOID] Never edit existing numbered seed modules (e.g. `01_scanner_configs.sql`) to fix pre-existing defects while implementing an unrelated ticket — this is an out-of-scope change. Record the defect in `$ARTIFACTS_DIR/out-of-scope.md` instead; the conformance gate will create a backlog ticket. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Scope Enforcement
+
+- [PATTERN] When an out-of-scope defect is noticed during implementation, write it to `$ARTIFACTS_DIR/out-of-scope.md` with `- <file>: <one-sentence description>` and leave the defect unfixed. The conformance gate reads this file and converts each entry into a `scope-spillover`-labelled backlog ticket automatically. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] The conformance reviewer's `## Out-of-Scope Changes` section is always present in its output. Downstream steps parse `[OOS]` bullets to drive scope remediation (excision + backlog ticket creation) independent of the CONFORMS/MINOR/MATERIAL verdict. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
+
 ## YAML Block Scalar / Bash Multiline Strings
 
 - [AVOID] Never use multiline bash string assignments with literal newlines inside a YAML `|` block scalar — non-blank content at column 1 terminates the block scalar, causing a YAML parse error. Use `printf "line1\n\nline2"` or `$'\n'` concatenation instead (e.g. `VAR=$(printf "### Header\n\n%s" "${BODY}")`). <!-- issue:#162 date:2026-06-03 expires:2026-12-03 source:implement -->
