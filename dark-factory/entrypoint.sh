@@ -81,7 +81,7 @@ set_board_status() {
 }
 
 # --- Move to "In Progress" immediately (skip for close) ---
-if [ -n "$ISSUE_NUM" ] && [ "$INTENT" != "close" ] && [ "$INTENT" != "refine" ] && [ "$INTENT" != "plan" ]; then
+if [ -n "$ISSUE_NUM" ] && [ "$INTENT" != "close" ] && [ "$INTENT" != "refine" ] && [ "$INTENT" != "plan" ] && [ "$INTENT" != "deconflict" ]; then
   echo "Moving issue #$ISSUE_NUM to In Progress..."
   set_board_status "$STATUS_IN_PROGRESS" || echo "WARNING: Could not update project board"
 fi
