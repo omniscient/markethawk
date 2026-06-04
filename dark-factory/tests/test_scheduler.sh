@@ -173,6 +173,82 @@ gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
 export -f gh
 
 # ==========================================
+# G: Spec auto-advance (direct-to-pr)
+# ==========================================
+echo ""
+echo "--- G: Spec auto-advance ---"
+echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+# Initialize variables that the main loop sets but tests don't have
+REFINE_RUNNING=0
+DISPATCHED=""
+
+_ITEM_DTP_SPR='{"content":{"number":20},"labels":["direct-to-pr","spec-pending-review"],"status":"Backlog"}'
+_ITEM_NODTP_SPR='{"content":{"number":21},"labels":["spec-pending-review"],"status":"Backlog"}'
+
+# G1: flag + human comment → re-refine path (remove-label + dispatch Refine)
+has_new_comment_after_report() { echo "yes"; }
+elapsed_minutes_since_marker() { echo "99"; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker dispatch
+
+spec_advance_check 20 "$_ITEM_DTP_SPR"
+assert_eq "G1: re-refine: remove-label called" \
+  "1" "$(grep -c -- '--remove-label spec-pending-review' "$STUB_LOG" || echo 0)"
+assert_eq "G1: re-refine: Refine dispatched" \
+  "1" "$(grep -c 'dispatch Refine issue #20' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# G2: flag + no comment + elapsed ≥ grace → advance (remove-label + set_board_status REFINED)
+has_new_comment_after_report() { echo "no"; }
+export SPEC_GRACE_MINUTES=30
+elapsed_minutes_since_marker() { echo "35"; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker
+
+spec_advance_check 20 "$_ITEM_DTP_SPR"
+assert_eq "G2: advance: remove-label called" \
+  "1" "$(grep -c -- '--remove-label spec-pending-review' "$STUB_LOG" || echo 0)"
+assert_eq "G2: advance: set_board_status REFINED" \
+  "1" "$(grep -c "set_board_status 20 ${STATUS_REFINED}" "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# G3: flag + no comment + elapsed < grace → no action
+elapsed_minutes_since_marker() { echo "10"; }
+export -f elapsed_minutes_since_marker
+
+spec_advance_check 20 "$_ITEM_DTP_SPR"
+assert_eq "G3: within-window: no set_board_status" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+assert_eq "G3: within-window: no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# G4: no flag → no auto-advance (regression guard)
+elapsed_minutes_since_marker() { echo "99"; }
+export -f elapsed_minutes_since_marker
+
+spec_advance_check 21 "$_ITEM_NODTP_SPR"
+assert_eq "G4: no-flag regression: no advance" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# G5: flag + needs-discussion → suppressed (no advance, even with elapsed ≥ grace)
+_ITEM_DTP_SPR_ND='{"content":{"number":22},"labels":["direct-to-pr","spec-pending-review","needs-discussion"],"status":"Backlog"}'
+elapsed_minutes_since_marker() { echo "99"; }
+export -f elapsed_minutes_since_marker
+
+spec_advance_check 22 "$_ITEM_DTP_SPR_ND"
+assert_eq "G5: needs-discussion suppresses spec advance" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+assert_eq "G5: needs-discussion suppresses spec dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+# Restore stubs
+has_new_comment_after_report() { echo "no"; }
+elapsed_minutes_since_marker() { echo ""; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker dispatch
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"

@@ -161,6 +161,41 @@ elapsed_minutes_since_marker() {
   echo $(( (now_epoch - marker_epoch) / 60 ))
 }
 
+spec_advance_check() {
+  local issue_num="$1"
+  local item="$2"
+  has_skip_label "$item" && return 0
+  local has_new
+  has_new=$(has_new_comment_after_report "$issue_num" "Posted by MarketHawk Refinement Pipeline")
+  if [ "$has_new" = "yes" ]; then
+    reset_retry "${issue_num}:refine"
+    gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+      --remove-label "spec-pending-review" 2>/dev/null || true
+    gh issue comment "$issue_num" --repo "${OWNER}/markethawk" --body \
+"🔄 **Refinement Pipeline** — Re-running with new feedback.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+    if dispatch "Refine issue #${issue_num}"; then
+      DISPATCHED="Refine issue #${issue_num}"
+      REFINE_RUNNING=$((REFINE_RUNNING + 1))
+    fi
+    return 0
+  fi
+  if has_direct_to_pr_label "$item"; then
+    local elapsed
+    elapsed=$(elapsed_minutes_since_marker "$issue_num" "Posted by MarketHawk Refinement Pipeline")
+    if [ -n "$elapsed" ] && [ "$elapsed" -ge "$SPEC_GRACE_MINUTES" ]; then
+      echo "[$(date -u +%FT%TZ)] spec_auto_advance issue=#${issue_num} elapsed=${elapsed}m grace=${SPEC_GRACE_MINUTES}m action=advance_to_refined"
+      gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+        --remove-label "spec-pending-review" 2>/dev/null || true
+      set_board_status "$issue_num" "$STATUS_REFINED" || true
+    else
+      echo "[$(date -u +%FT%TZ)] spec_grace_window issue=#${issue_num} elapsed=${elapsed:-unknown}m grace=${SPEC_GRACE_MINUTES}m action=waiting"
+    fi
+  fi
+}
+
 has_new_comment_after_report() {
   local issue_num="$1"
   local report_marker="$2"
@@ -736,19 +771,7 @@ This issue was left in **In progress** with no running factory container — the
     ITEM_LABELS=$(echo "$item" | jq -r '.labels[]?' 2>/dev/null)
     if echo "$ITEM_LABELS" | grep -qi "spec-pending-review"; then
       if ! is_issue_running "$ISSUE" && [ "$REFINE_RUNNING" -lt "$REFINE_WIP_LIMIT" ]; then
-        HAS_NEW=$(has_new_comment_after_report "$ISSUE" "Posted by MarketHawk Refinement Pipeline")
-        if [ "$HAS_NEW" = "yes" ]; then
-          reset_retry "${ISSUE}:refine"
-          gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" --remove-label "spec-pending-review" 2>/dev/null || true
-          gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body "🔄 **Refinement Pipeline** — Re-running with new feedback.
-
----
-*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-          if dispatch "Refine issue #${ISSUE}"; then
-            DISPATCHED="Refine issue #${ISSUE}"
-            REFINE_RUNNING=$((REFINE_RUNNING + 1))
-          fi
-        fi
+        spec_advance_check "$ISSUE" "$item"
       fi
       continue
     fi
