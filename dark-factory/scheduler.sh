@@ -231,6 +231,41 @@ plan_advance_check() {
   fi
 }
 
+end_gate_check() {
+  local issue_num="$1"
+  local item="$2"
+  has_direct_to_pr_label "$item" || return 1
+  local pr_num
+  pr_num=$(get_pr_for_issue "$issue_num")
+  [ -z "$pr_num" ] && return 1
+  local review_state
+  review_state=$(gh pr view "$pr_num" --repo "${OWNER}/markethawk" --json reviews \
+    --jq '[.reviews[] | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED")] | last | .state // ""' \
+    2>/dev/null) || review_state=""
+  case "$review_state" in
+    APPROVED)
+      echo "[$(date -u +%FT%TZ)] end_gate issue=#${issue_num} pr=#${pr_num} state=APPROVED action=Close"
+      if dispatch "Close issue #${issue_num}"; then
+        DISPATCHED="Close issue #${issue_num}"
+      fi
+      return 0
+      ;;
+    CHANGES_REQUESTED)
+      echo "[$(date -u +%FT%TZ)] end_gate issue=#${issue_num} pr=#${pr_num} state=CHANGES_REQUESTED action=Continue"
+      if ! is_issue_running "$issue_num"; then
+        if dispatch "Continue issue #${issue_num}"; then
+          DISPATCHED="Continue issue #${issue_num}"
+          reset_retry "$issue_num"
+        fi
+      fi
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 has_new_comment_after_report() {
   local issue_num="$1"
   local report_marker="$2"
@@ -703,6 +738,8 @@ This issue was left in **In progress** with no running factory container — the
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
     case "$CI_BLOCKED" in *" $ISSUE "*) continue ;; esac   # gated to Blocked this cycle
+
+    if end_gate_check "$ISSUE" "$item"; then continue; fi
 
     NEW_COMMENTS=$(get_new_comments "$ISSUE")
     COMMENT_COUNT=$(echo "$NEW_COMMENTS" | jq 'length')

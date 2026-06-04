@@ -354,6 +354,84 @@ dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
 export -f has_new_comment_after_report elapsed_minutes_since_marker dispatch
 
 # ==========================================
+# J: End-gate auto-merge (direct-to-pr)
+# ==========================================
+echo ""
+echo "--- J: End-gate auto-merge ---"
+echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+DISPATCHED=""
+
+_ITEM_DTP_REVIEW='{"content":{"number":50},"labels":["direct-to-pr"],"status":"In review"}'
+_ITEM_NODTP_REVIEW='{"content":{"number":51},"labels":[],"status":"In review"}'
+
+# J1: flag + APPROVED → Close dispatched
+get_pr_for_issue() { echo "99"; }
+gh() {
+  case "$*" in
+    *"pr view"*) echo "APPROVED" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f get_pr_for_issue gh dispatch
+
+end_gate_check 50 "$_ITEM_DTP_REVIEW"
+assert_eq "J1: APPROVED → Close dispatched" \
+  "1" "$(grep -c 'dispatch Close issue #50' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# J2: flag + CHANGES_REQUESTED → Continue dispatched
+gh() {
+  case "$*" in
+    *"pr view"*) echo "CHANGES_REQUESTED" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+export -f gh
+
+end_gate_check 50 "$_ITEM_DTP_REVIEW"
+assert_eq "J2: CHANGES_REQUESTED → Continue dispatched" \
+  "1" "$(grep -c 'dispatch Continue issue #50' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# J3: flag + no actionable review → no dispatch (fall through)
+gh() {
+  case "$*" in
+    *"pr view"*) echo "" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+export -f gh
+
+end_gate_check 50 "$_ITEM_DTP_REVIEW" || true
+assert_eq "J3: no review → no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# J4: no flag → no end-gate dispatch (regression guard)
+gh() {
+  case "$*" in
+    *"pr view"*) echo "APPROVED" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+export -f gh
+
+end_gate_check 51 "$_ITEM_NODTP_REVIEW" || true
+assert_eq "J4: no-flag: no end-gate dispatch" \
+  "0" "$(grep -c 'dispatch Close' "$STUB_LOG" || true)"
+
+# Restore
+gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
+get_pr_for_issue() { echo ""; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f gh get_pr_for_issue dispatch
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"
