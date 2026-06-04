@@ -506,30 +506,26 @@ fi
 pre-commit install --allow-missing-config 2>/dev/null || true
 
 # =============================================================================
-# --- Shared sync step: de-conflict before continuing or deconflict run ---
-# For 'deconflict': full flow (resolve → validate → push → report → exit).
-# For 'continue': sync main + resolve, then fall through to archon.
+# --- Deconflict flow: resolve → validate → push → report → exit ---
+# 'continue' sync is handled by the archon workflow's de-conflict node.
 # =============================================================================
-if [ "$INTENT" = "deconflict" ] || [ "$INTENT" = "continue" ]; then
+if [ "$INTENT" = "deconflict" ]; then
   git fetch --all 2>/dev/null || true
   FEATURE_BRANCH=$(git branch -r 2>/dev/null | grep -E "origin/feat/issue-${ISSUE_NUM}-" | head -1 | tr -d ' ' | sed 's|origin/||')
 
   if [ -z "$FEATURE_BRANCH" ]; then
-    if [ "$INTENT" = "deconflict" ]; then
-      echo "ERROR: No feature branch found for issue #${ISSUE_NUM}" >&2
-      _conflict_escalate "No feature branch matching feat/issue-${ISSUE_NUM}-* was found."
-      exit 0
-    fi
-    # For 'continue': no branch yet (first run?) — fall through to archon as usual
-  else
-    git checkout "$FEATURE_BRANCH" 2>/dev/null \
-      || git checkout -b "$FEATURE_BRANCH" "origin/$FEATURE_BRANCH" 2>/dev/null \
-      || true
+    echo "ERROR: No feature branch found for issue #${ISSUE_NUM}" >&2
+    _conflict_escalate "No feature branch matching feat/issue-${ISSUE_NUM}-* was found."
+    exit 0
+  fi
 
-    if ! _resolve_merge_conflicts; then
-      # Tier 3 escalation already handled inside _resolve_merge_conflicts
-      exit 0
-    fi
+  git checkout "$FEATURE_BRANCH" 2>/dev/null \
+    || git checkout -b "$FEATURE_BRANCH" "origin/$FEATURE_BRANCH" 2>/dev/null \
+    || true
+
+  if ! _resolve_merge_conflicts; then
+    # Tier 3 escalation already handled inside _resolve_merge_conflicts
+    exit 0
   fi
 fi
 
