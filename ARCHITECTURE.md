@@ -4,39 +4,61 @@
 
 All services run as Docker containers on the `stockscanner-network` bridge network. Inter-service communication uses container names as hostnames.
 
-```
-                         ┌─────────────────────────────────────────┐
-                         │          stockscanner-network            │
-                         │                                          │
-  Browser ──HTTP:3333──> │ frontend ──HTTP──> backend:8000          │
-                         │   │ WS:3333/api/v1/live/ws/*             │
-                         │                       │                  │
-                         │                  asyncpg ──> postgres:5432
-                         │                  aioredis ──> redis:6379  │
-                         │                  ib_insync ──> ib-gateway:4004
-                         │                  HTTPS ──> api.polygon.io │
-                         │                  HTTP ──> seq:5341        │
-                         │                                          │
-                         │ live-scanner ──> postgres:5432           │
-                         │              ──> redis:6379              │
-                         │              ──> ib-gateway:4004         │
-                         │                                          │
-                         │ celery-worker ──> (same: DB, Redis, IBKR, Polygon)
-                         │ celery-beat ──> redis:6379 (broker only) │
-                         │ flower:5555 ──> redis:6379               │
-                         │ pgadmin:5050 ──> postgres:5432           │
-                         │ seq:5380/5341 ──> seq_data volume        │
-                         │                                          │
-                         │ tweet-monitor:8001 ──> postgres:5432     │
-                         │                    ──> redis:6379        │
-                         │  (Playwright Chromium, triggered by      │
-                         │   celery-beat every 45s via HTTP POST)   │
-                         │                                          │
-                         │ prometheus:9090 ──scrape──> backend:8000/metrics
-                         │ grafana:3001 ──> prometheus:9090         │
-                         │ jaeger:16686/4317 ──OTLP──> backend,     │
-                         │                   celery-worker, beat    │
-                         └─────────────────────────────────────────┘
+```mermaid
+graph TD
+    Browser["Browser :3333"]
+
+    subgraph net["stockscanner-network"]
+        frontend["frontend :3333"]
+        backend["backend :8000"]
+        livescanner["live-scanner"]
+        celery["celery-worker"]
+        beat["celery-beat"]
+        flower["flower :5555"]
+        pgadmin["pgadmin :5050"]
+        seq["seq :5380/5341"]
+        tweetmonitor["tweet-monitor :8001"]
+        postgres["postgres :5432"]
+        redis["redis :6379"]
+        ibgw["ib-gateway :4004"]
+        prometheus["prometheus :9090"]
+        grafana["grafana :3001"]
+        jaeger["jaeger :16686/:4317"]
+    end
+
+    polygon(["api.polygon.io"])
+
+    Browser -->|"HTTP :3333"| frontend
+    frontend -->|HTTP| backend
+    frontend -.->|"WS /api/v1/live/ws/*"| backend
+
+    backend --> postgres
+    backend --> redis
+    backend --> ibgw
+    backend -->|HTTPS| polygon
+    backend -->|HTTP| seq
+
+    livescanner --> postgres
+    livescanner --> redis
+    livescanner --> ibgw
+
+    celery --> postgres
+    celery --> redis
+    celery --> ibgw
+    celery -->|HTTPS| polygon
+
+    beat -->|broker| redis
+    beat -->|"HTTP POST / 45 s"| tweetmonitor
+    flower --> redis
+    pgadmin --> postgres
+    tweetmonitor --> postgres
+    tweetmonitor --> redis
+
+    prometheus -->|"scrape :8000/metrics"| backend
+    grafana --> prometheus
+    jaeger -->|OTLP| backend
+    jaeger -->|OTLP| celery
+    jaeger -->|OTLP| beat
 ```
 
 ## Scan Execution Flow
