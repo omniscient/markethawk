@@ -324,10 +324,93 @@ nodes:
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 120000
 
+  # Layer 2.5: Classify whether a preview environment is needed
+  - id: preview-changeset
+    bash: |
+      echo "=== Changed files (main...HEAD) ==="
+      git diff main...HEAD --name-only 2>/dev/null || true
+      echo "=== Stat ==="
+      git diff main...HEAD --stat 2>/dev/null || true
+    depends_on: [regen-codeindex, fetch-issue]
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
+    timeout: 15000
+
+  - id: classify-preview
+    prompt: |
+      You are a classifier deciding whether a dark-factory preview stack (postgres, redis, backend,
+      frontend, celery) is needed for this branch's changeset. A wasted preview costs minutes; a
+      wrongly skipped preview means a code change ships without live endpoint validation.
+
+      ## Config kill-switch
+      Read the preview.enabled flag from .claude/skills/refinement/config.yaml.
+      If preview.enabled is false, ALWAYS output needs_preview=true regardless of the changeset.
+
+      ## Changeset
+      $preview-changeset.output
+
+      ## Issue context (secondary signal only — the diff is authoritative)
+      Title: $fetch-issue.output.title
+      Labels: $fetch-issue.output.labels
+
+      ## Classifier rubric
+
+      Set needs_preview = false ONLY if EVERY changed file falls into one or more of these
+      non-runtime-affecting categories:
+
+      | Category        | Matches |
+      |-----------------|---------|
+      | Documentation   | *.md, *.mdx, anything under docs/ or Docs/, LICENSE |
+      | Agent/workflow config | .archon/**, .claude/**, workflow YAML (NOT docker-compose* or app config) |
+      | Tests           | backend/tests/**, **/*.test.ts(x), **/*.spec.ts(x), conftest.py, **/*_test.py, dark-factory/tests/** |
+      | CI / repo meta  | .github/**, .gitignore, .pre-commit-config.yaml, lint/format config (.eslintrc*, .prettierrc*, ruff/flake8/mypy config), .editorconfig |
+
+      Force needs_preview = true if ANY file touches the running app: backend/app/**, alembic/versions/**,
+      requirements.txt, frontend/src/**, package.json, package-lock.json, Dockerfile*, docker-compose*,
+      .env*, dark-factory/seed/**.
+
+      Fail-safe: an empty changeset, a mix that is not clearly skip-only, or any uncertainty → needs_preview=true.
+      The diff is authoritative — a documentation-labeled issue that touches backend/app/** still gets a preview.
+    allowed_tools: [Read]
+    model: haiku
+    depends_on: [preview-changeset, fetch-issue]
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
+    output_format:
+      type: object
+      properties:
+        needs_preview:
+          type: boolean
+        category:
+          type: string
+          enum: [code, docs, config, tests, ci, mixed]
+        reason:
+          type: string
+      required: [needs_preview, category, reason]
+
   # Layer 3: Spin up preview and validate
   - id: preview-up
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      NEEDS_PREVIEW=$classify-preview.output.needs_preview
+      SKIP_REASON="$classify-preview.output.reason"
+
+      # Skip ONLY on an explicit "false". Any other value (including garbled or errored
+      # classifier output) falls through to building the preview — fail-safe direction.
+      if [ "$NEEDS_PREVIEW" = "false" ]; then
+        echo "Preview differentiator: skipping preview for issue #${ISSUE}"
+        echo "Reason: ${SKIP_REASON}"
+        mkdir -p "$ARTIFACTS_DIR"
+        {
+          echo "export PREVIEW_SKIPPED=true"
+          echo "export PREVIEW_SKIP_REASON=\"${SKIP_REASON}\""
+          echo "export PREVIEW_FRONTEND=\"\""
+          echo "export PREVIEW_BACKEND=\"\""
+          echo "export PREVIEW_NET=\"\""
+        } > "$ARTIFACTS_DIR/preview_env.sh"
+        echo "PREVIEW_SKIPPED=true"
+        echo "PREVIEW_SKIP_REASON=${SKIP_REASON}"
+        exit 0
+      fi
+
       # Preview ports follow 1{SLOT}{suffix} (e.g. slot 03 -> frontend 10333, backend 10380).
       # Collision-free allocation: recover the slot from the already-running preview stack (Continue runs),
       # or scan docker ps for occupied 1PP33->3333 frontend ports and pick the lowest free 2-digit slot.
@@ -418,6 +501,7 @@ nodes:
           # having to parse raw step output or guess the URL.
           mkdir -p "$ARTIFACTS_DIR"
           {
+            echo "export PREVIEW_SKIPPED=false"
             echo "export PREVIEW_FRONTEND=\"http://localhost:1${PADDED}33\""
             echo "export PREVIEW_BACKEND=\"${BACKEND_INTERNAL}\""
             echo "export PREVIEW_NET=\"${PREVIEW_NET}\""
@@ -429,7 +513,7 @@ nodes:
       echo "WARNING: Backend did not become healthy within 180s"
       docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
       exit 1
-    depends_on: [regen-codeindex]
+    depends_on: [classify-preview]
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 300000
 
@@ -451,6 +535,8 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
+      PREVIEW_SKIPPED=$(echo $preview-up.output | grep '^PREVIEW_SKIPPED=' | cut -d= -f2-)
+      PREVIEW_SKIP_REASON=$(echo $preview-up.output | grep '^PREVIEW_SKIP_REASON=' | cut -d= -f2-)
       PREVIEW_FRONTEND=$(echo $preview-up.output | grep '^PREVIEW_FRONTEND=' | cut -d= -f2-)
       PREVIEW_BACKEND=$(echo $preview-up.output | grep '^PREVIEW_BACKEND=' | cut -d= -f2-)
       BRANCH=$(git branch --show-current)
@@ -481,6 +567,14 @@ nodes:
         fi
       fi
 
+      # --- Build the Preview section ---
+      if [ "$PREVIEW_SKIPPED" = "true" ]; then
+        PREVIEW_SECTION="_No preview environment — this change does not affect the running app (${PREVIEW_SKIP_REASON})._"
+      else
+        PREVIEW_SECTION="- Frontend: ${PREVIEW_FRONTEND}
+      - Backend API: ${PREVIEW_BACKEND}/docs"
+      fi
+
       EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number // empty')
       if [ -n "$EXISTING_PR" ]; then
         echo "PR #${EXISTING_PR} already exists, updated with latest push."
@@ -497,8 +591,7 @@ nodes:
       Automated implementation for issue #${ISSUE}.${EPIC_LINE}
 
       ## Preview
-      - Frontend: ${PREVIEW_FRONTEND}
-      - Backend API: ${PREVIEW_BACKEND}/docs
+      ${PREVIEW_SECTION}
 
       ## Commands
       \`\`\`bash
@@ -548,6 +641,8 @@ nodes:
     bash: |
       ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
       EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
+      PREVIEW_SKIPPED=$(echo $preview-up.output | grep '^PREVIEW_SKIPPED=' | cut -d= -f2-)
+      PREVIEW_SKIP_REASON=$(echo $preview-up.output | grep '^PREVIEW_SKIP_REASON=' | cut -d= -f2-)
       PREVIEW_SLOT=$(echo $preview-up.output | grep '^PREVIEW_SLOT=' | cut -d= -f2-)
       PREVIEW_FRONTEND=$(echo $preview-up.output | grep '^PREVIEW_FRONTEND=' | cut -d= -f2-)
       PREVIEW_BACKEND=$(echo $preview-up.output | grep '^PREVIEW_BACKEND=' | cut -d= -f2-)
@@ -593,6 +688,19 @@ nodes:
         esac
       fi
 
+      # --- Build the Preview Environment section ---
+      if [ "$PREVIEW_SKIPPED" = "true" ]; then
+        PREVIEW_SECTION="_No preview environment — this change does not affect the running app (${PREVIEW_SKIP_REASON})._"
+      else
+        PREVIEW_SECTION="| Service | URL |
+      |---------|-----|
+      | Frontend | ${PREVIEW_FRONTEND} |
+      | Backend API | ${PREVIEW_BACKEND} |
+      | API Docs | ${PREVIEW_BACKEND}/docs |
+      | PostgreSQL | \`localhost:1${PREVIEW_SLOT}54\` |
+      | Redis | \`localhost:1${PREVIEW_SLOT}63\` |"
+      fi
+
       gh issue comment "$ISSUE" --body "## Dark Factory Run — ${ACTION}
 
       ${PR_LINE}
@@ -607,13 +715,7 @@ nodes:
 
       ### Preview Environment
 
-      | Service | URL |
-      |---------|-----|
-      | Frontend | ${PREVIEW_FRONTEND} |
-      | Backend API | ${PREVIEW_BACKEND} |
-      | API Docs | ${PREVIEW_BACKEND}/docs |
-      | PostgreSQL | \`localhost:1${PREVIEW_SLOT}54\` |
-      | Redis | \`localhost:1${PREVIEW_SLOT}63\` |
+      ${PREVIEW_SECTION}
 
       ### Commands
       \`\`\`bash

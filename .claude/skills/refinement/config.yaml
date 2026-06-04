@@ -18,3 +18,7 @@ conformance:
   enabled: true
   max_reconcile_cycles: 3
   block_on_material: true
+
+preview:
+  enabled: true   # false = always build the preview (pre-differentiator behavior) — kill-switch
+  model: haiku
