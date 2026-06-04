@@ -72,3 +72,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Plan Drift
 
 - [PATTERN] When a refinement plan specifies exact line numbers or file counts for reference fixes, always re-grep the actual files (`grep -rn "Docs/" ...`) rather than trusting the plan's enumeration — commits landing between plan creation and implementation can shift line numbers and add/remove references (e.g. PR #179 slimmed CLAUDE.md, changing a stated 1-ref count to 3 actual refs). <!-- issue:#171 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## PR Iteration — Removing Specific Commits
+
+- [PATTERN] When feedback is "remove commit X from this PR and move to a separate branch": (1) create the new branch from the commit just before X, (2) cherry-pick X onto the new branch, (3) push the new branch, (4) create a GitHub issue + add to project in Blocked column (`gh project item-add` + GraphQL mutation on `PVTSSF_lAHOAAFds84BWh4wzhR1VaA` with option id `93d87b2f`), (5) on the original branch run `git reset --hard <parent-of-X>`, (6) force-push. Use `git reset --hard` (not `git revert`) when removing a tip commit — revert adds noise; reset keeps history clean. <!-- issue:#174 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] The MarketHawk Kanban has no `blocked` label. To place an issue in the Blocked column, use `needs-discussion` label + set project status via GraphQL (`updateProjectV2ItemFieldValue` with field `PVTSSF_lAHOAAFds84BWh4wzhR1VaA`, option `93d87b2f`). <!-- issue:#174 date:2026-06-04 expires:2026-12-04 source:implement -->
