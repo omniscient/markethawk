@@ -1,4 +1,4 @@
-# ADR-0010: GELF Log Shipping for Dark Factory Containers
+# ADR-0011: GELF Log Shipping for Dark Factory Containers
 
 **Date**: 2026-05-29
 **Status**: Accepted
