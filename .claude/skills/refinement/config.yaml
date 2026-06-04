@@ -29,3 +29,7 @@ conformance:
 preview:
   enabled: true   # false = always build the preview (pre-differentiator behavior) — kill-switch
   model: haiku
+
+conflict_resolution:
+  enabled: true       # false = disable the P1.5 conflict scanner entirely (env CONFLICT_RESOLUTION_ENABLED overrides)
+  ai_tier: true       # false = only Tier 1 (mechanical) resolution; never invoke Claude for conflict markers
