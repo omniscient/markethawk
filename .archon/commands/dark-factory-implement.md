@@ -121,7 +121,7 @@ If the change requires a new SQLAlchemy model:
    - If a file was modified but nothing added/removed (e.g. only existing model fields changed), still read the current doc row and update it if the description is now inaccurate.
    - If a file was deleted, remove the corresponding doc row.
    - `CLAUDE.md` is only touched if the change adds/removes a developer-facing command, port, or architectural pattern. This is rare and requires explicit judgment.
-   - `Docs/database-schema.md` is auto-generated — never edit it.
+   - `docs/database-schema.md` is auto-generated — never edit it.
 
 3. If no pairs matched, skip this phase entirely (no docs commit needed).
 4. For each `(doc_file, section)` pair:
