@@ -254,24 +254,42 @@ def run_liquidity_hunt_scheduled(self):
             .all()
         )
 
+        if not configs:
+            logger.error(
+                "run_liquidity_hunt_scheduled: no active liquidity_hunt ScannerConfig "
+                "rows found — add a row to scanner_configs with scanner_type='liquidity_hunt', "
+                "is_active=true, and a valid universe_id FK."
+            )
+            raise RuntimeError("no active liquidity_hunt scanner configs")
+
         for cfg in configs:
-            universe_id = cfg.parameters.get("universe_id")
-            if not universe_id:
-                logger.warning(
-                    "liquidity_hunt ScannerConfig %s has no universe_id", cfg.id
+            if cfg.universe_id is None:
+                logger.error(
+                    "run_liquidity_hunt_scheduled: ScannerConfig id=%s has universe_id=NULL "
+                    "— this is a data integrity violation; run the migration "
+                    "c7d8e9f0a1b2_add_universe_id_to_scanner_configs to backfill.",
+                    cfg.id,
                 )
-                continue
+                raise RuntimeError(
+                    f"ScannerConfig id={cfg.id} has universe_id=NULL"
+                )
 
             tickers = [
                 ms.ticker
                 for ms in db.query(MonitoredStock)
                 .filter(
-                    MonitoredStock.universe_id == universe_id,
+                    MonitoredStock.universe_id == cfg.universe_id,
                     MonitoredStock.is_active.is_(True),
                 )
                 .all()
             ]
             if not tickers:
+                logger.warning(
+                    "run_liquidity_hunt_scheduled: universe_id=%s has no active tickers, "
+                    "skipping ScannerConfig id=%s",
+                    cfg.universe_id,
+                    cfg.id,
+                )
                 continue
 
             results = asyncio.run(
@@ -281,7 +299,7 @@ def run_liquidity_hunt_scheduled(self):
             )
             logger.info(
                 "liquidity_hunt scheduled scan for universe %s on %s: %d events",
-                universe_id,
+                cfg.universe_id,
                 event_date,
                 len(results),
             )
@@ -598,24 +616,42 @@ def run_pocket_pivot_scheduled(self):
             .all()
         )
 
+        if not configs:
+            logger.error(
+                "run_pocket_pivot_scheduled: no active pocket_pivot ScannerConfig "
+                "rows found — add a row to scanner_configs with scanner_type='pocket_pivot', "
+                "is_active=true, and a valid universe_id FK."
+            )
+            raise RuntimeError("no active pocket_pivot scanner configs")
+
         for cfg in configs:
-            universe_id = cfg.parameters.get("universe_id")
-            if not universe_id:
-                logger.warning(
-                    "pocket_pivot ScannerConfig %s has no universe_id", cfg.id
+            if cfg.universe_id is None:
+                logger.error(
+                    "run_pocket_pivot_scheduled: ScannerConfig id=%s has universe_id=NULL "
+                    "— this is a data integrity violation; run the migration "
+                    "c7d8e9f0a1b2_add_universe_id_to_scanner_configs to backfill.",
+                    cfg.id,
                 )
-                continue
+                raise RuntimeError(
+                    f"ScannerConfig id={cfg.id} has universe_id=NULL"
+                )
 
             tickers = [
                 ms.ticker
                 for ms in db.query(MonitoredStock)
                 .filter(
-                    MonitoredStock.universe_id == universe_id,
+                    MonitoredStock.universe_id == cfg.universe_id,
                     MonitoredStock.is_active.is_(True),
                 )
                 .all()
             ]
             if not tickers:
+                logger.warning(
+                    "run_pocket_pivot_scheduled: universe_id=%s has no active tickers, "
+                    "skipping ScannerConfig id=%s",
+                    cfg.universe_id,
+                    cfg.id,
+                )
                 continue
 
             results = asyncio.run(
@@ -625,7 +661,7 @@ def run_pocket_pivot_scheduled(self):
             )
             logger.info(
                 "pocket_pivot scheduled scan for universe %s on %s: %d events",
-                universe_id,
+                cfg.universe_id,
                 event_date,
                 len(results),
             )
@@ -638,4 +674,75 @@ def run_pocket_pivot_scheduled(self):
         celery_task_duration_seconds.labels(task_name=_task_name).observe(
             _time.monotonic() - _start
         )
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Startup validation — wired to worker_ready signal in celery_app.py
+# ---------------------------------------------------------------------------
+
+_BEAT_SCHEDULED_SCANNER_TYPES = ["liquidity_hunt", "pocket_pivot"]
+
+
+def validate_scheduled_scanner_configs() -> None:
+    """Check that every beat-scheduled scanner type has at least one active
+    ScannerConfig with a non-null universe_id. Logs errors but never raises —
+    a crash here would kill the entire worker process rather than surfacing a
+    clear, actionable message.
+
+    Called once at Celery worker/beat startup via the worker_ready signal.
+    """
+    from app.models.scanner_config import ScannerConfig
+
+    try:
+        db = SessionLocal()
+    except Exception as exc:
+        logger.error(
+            "validate_scheduled_scanner_configs: could not open DB session — %s. "
+            "Beat tasks may still fail at runtime.",
+            exc,
+        )
+        return
+
+    try:
+        for scanner_type in _BEAT_SCHEDULED_SCANNER_TYPES:
+            configs = (
+                db.query(ScannerConfig)
+                .filter(
+                    ScannerConfig.scanner_type == scanner_type,
+                    ScannerConfig.is_active.is_(True),
+                )
+                .all()
+            )
+
+            if not configs:
+                logger.error(
+                    "STARTUP VALIDATION FAILED: no active ScannerConfig rows for "
+                    "scanner_type='%s'. The '%s' beat task will fail at 02:00 UTC. "
+                    "Add a row to scanner_configs with scanner_type='%s', is_active=true, "
+                    "and a valid universe_id FK referencing stock_universes(id).",
+                    scanner_type,
+                    scanner_type,
+                    scanner_type,
+                )
+                continue
+
+            for cfg in configs:
+                if cfg.universe_id is None:
+                    logger.error(
+                        "STARTUP VALIDATION FAILED: ScannerConfig id=%s "
+                        "(scanner_type='%s') has universe_id=NULL. "
+                        "Run migration c7d8e9f0a1b2_add_universe_id_to_scanner_configs "
+                        "to backfill existing rows.",
+                        cfg.id,
+                        scanner_type,
+                    )
+
+    except Exception as exc:
+        logger.error(
+            "validate_scheduled_scanner_configs: unexpected error during startup "
+            "validation — %s. Beat tasks may still fail at runtime.",
+            exc,
+        )
+    finally:
         db.close()

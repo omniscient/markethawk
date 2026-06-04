@@ -9,18 +9,28 @@ import pytest
 from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
 from app.models.stock_aggregate import StockAggregate
+from app.models.stock_universe import StockUniverse
 from app.services.outcome_service import OutcomeService
 from sqlalchemy.orm import Session
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
 
+def _universe(db):
+    u = StockUniverse(name="Test Universe", criteria={})
+    db.add(u)
+    db.flush()
+    return u
+
+
 def _config(db, scanner_type="pre_market_volume_spike"):
+    universe = _universe(db)
     cfg = ScannerConfig(
         name="Test Config",
         scanner_type=scanner_type,
         parameters={},
         criteria={},
+        universe_id=universe.id,
         outcome_config={
             "intervals": ["1h", "eod"],
             "reference_price_source": "opening_price",

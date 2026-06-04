@@ -141,7 +141,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `ActiveWatchlist` | `active_watchlist` | Manually curated symbols under live observation. Soft limit: 50. Fields: `symbol`, `security_type` (STK/FUT), `exchange`, `notes`, `added_at`. |
 | `ScannerRun` | `scanner_runs` | One row per scan execution; stores timing, config snapshot, hit count |
 | `ScannerEvent` | `scanner_events` | One row per ticker that passed all criteria in a run. Carries `signal_quality_score` (Float, indexed DESC NULLS LAST) computed at write time by `signal_ranker.py`. Also written by the live scanner. |
-| `ScannerConfig` | `scanner_configs` | Saved scanner parameter sets |
+| `ScannerConfig` | `scanner_configs` | Saved scanner parameter sets. Carries `universe_id` FK (non-null, backfilled default 1) that drives scheduled beat tasks (`run_liquidity_hunt_scheduled`, `run_pocket_pivot_scheduled`); `parameters` JSONB holds scanner-specific knobs (lookback, price/volume floors). |
 | `StockUniverse` | `stock_universes` | Named groups of tickers (e.g., "Russell 2000 Small Caps") |
 | `StockUniverseTicker` | `stock_universe_tickers` | Universe membership records |
 | `MonitoredStock` | `monitored_stocks` | Per-ticker tracking state and metadata |

@@ -25,7 +25,7 @@ MarketHawk/
 │   │   │   ├── active_watchlist.py     # ActiveWatchlist — manually curated live-observation list (soft limit 50)
 │   │   │   ├── scanner_run.py          # ScannerRun — one row per scan execution; failed_tickers JSONB for per-ticker domain failures
 │   │   │   ├── scanner_event.py        # ScannerEvent — tickers that passed criteria; carries signal_quality_score (Float, indexed DESC NULLS LAST)
-│   │   │   ├── scanner_config.py       # ScannerConfig — saved parameter sets
+│   │   │   ├── scanner_config.py       # ScannerConfig — saved parameter sets; universe_id FK (NOT NULL) drives scheduled beat tasks
 │   │   │   ├── stock_universe.py       # StockUniverse — named ticker groups
 │   │   │   ├── stock_universe_ticker.py # StockUniverseTicker — universe membership
 │   │   │   ├── monitored_stock.py      # MonitoredStock — per-ticker tracking state
