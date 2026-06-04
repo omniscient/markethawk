@@ -87,6 +87,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When a refinement plan specifies exact line numbers or file counts for reference fixes, always re-grep the actual files (`grep -rn "Docs/" ...`) rather than trusting the plan's enumeration — commits landing between plan creation and implementation can shift line numbers and add/remove references (e.g. PR #179 slimmed CLAUDE.md, changing a stated 1-ref count to 3 actual refs). <!-- issue:#171 date:2026-06-04 expires:2026-12-04 source:implement -->
 
+## PR Iteration — Removing Specific Commits
+
+- [PATTERN] When feedback is "remove commit X from this PR and move to a separate branch": (1) create the new branch from the commit just before X, (2) cherry-pick X onto the new branch, (3) push the new branch, (4) create a GitHub issue + add to project in Blocked column (`gh project item-add` + GraphQL mutation on `PVTSSF_lAHOAAFds84BWh4wzhR1VaA` with option id `93d87b2f`), (5) on the original branch run `git reset --hard <parent-of-X>`, (6) force-push. Use `git reset --hard` (not `git revert`) when removing a tip commit — revert adds noise; reset keeps history clean. <!-- issue:#174 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [PATTERN] The MarketHawk Kanban has no `blocked` label. To place an issue in the Blocked column, use `needs-discussion` label + set project status via GraphQL (`updateProjectV2ItemFieldValue` with field `PVTSSF_lAHOAAFds84BWh4wzhR1VaA`, option `93d87b2f`). <!-- issue:#174 date:2026-06-04 expires:2026-12-04 source:implement -->
+
 ## Third-party CLI Tools (repowise, codeindex)
 
 - [AVOID] The repowise `analyze` subcommand does not exist in v0.16.0 — the correct command is `repowise init --index-only .` to rebuild the dependency graph, git signals, dead-code, and health index without LLM page generation. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
@@ -94,6 +100,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] The repowise MCP subcommand is `mcp` (not `serve-mcp` or `mcp-server`); launch with `repowise mcp /path/to/repo --transport stdio`. Generated index files land in `.repowise/` (not `.repowise/index/`) — gitignore pattern is `.repowise/*` + `!.repowise/config.yaml`. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 - [PATTERN] When `repowise init --index-only --dry-run` is run without `--dry-run` sanity, it still runs the full index pipeline and writes `.repowise/wiki.db`, `knowledge-graph.json`, `state.json`, and `.mcp.json` at the repo root. Add `.mcp.json` and `.claude/CLAUDE.md` to `.gitignore` to prevent accidentally committing repowise-generated editor files. <!-- issue:#177 date:2026-06-04 expires:2026-12-04 source:implement -->
+
 - [AVOID] After sourcing `scheduler.sh` with `SCHEDULER_SOURCE_ONLY=1`, the test shell inherits `set -euo pipefail` from the scheduler header. Any standalone function call that can return non-zero (e.g. `end_gate_check` in the fall-through case) will abort the test script — guard these calls with `|| true` in tests. <!-- issue:#183 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 - [PATTERN] In bash with `set -e`, a function ending with `if cmd; then ...; fi` (no `else`) where `cmd` returns non-zero (body not entered) exits the function with code 0 — the `if` statement itself returns 0. This differs from a bare `grep ... || true` pattern; use an explicit `return 0` if the function must guarantee 0 in all paths. <!-- issue:#183 date:2026-06-04 expires:2026-12-04 source:implement -->

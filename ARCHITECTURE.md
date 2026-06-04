@@ -4,39 +4,61 @@
 
 All services run as Docker containers on the `stockscanner-network` bridge network. Inter-service communication uses container names as hostnames.
 
-```
-                         ┌─────────────────────────────────────────┐
-                         │          stockscanner-network            │
-                         │                                          │
-  Browser ──HTTP:3333──> │ frontend ──HTTP──> backend:8000          │
-                         │   │ WS:3333/api/v1/live/ws/*             │
-                         │                       │                  │
-                         │                  asyncpg ──> postgres:5432
-                         │                  aioredis ──> redis:6379  │
-                         │                  ib_insync ──> ib-gateway:4004
-                         │                  HTTPS ──> api.polygon.io │
-                         │                  HTTP ──> seq:5341        │
-                         │                                          │
-                         │ live-scanner ──> postgres:5432           │
-                         │              ──> redis:6379              │
-                         │              ──> ib-gateway:4004         │
-                         │                                          │
-                         │ celery-worker ──> (same: DB, Redis, IBKR, Polygon)
-                         │ celery-beat ──> redis:6379 (broker only) │
-                         │ flower:5555 ──> redis:6379               │
-                         │ pgadmin:5050 ──> postgres:5432           │
-                         │ seq:5380/5341 ──> seq_data volume        │
-                         │                                          │
-                         │ tweet-monitor:8001 ──> postgres:5432     │
-                         │                    ──> redis:6379        │
-                         │  (Playwright Chromium, triggered by      │
-                         │   celery-beat every 45s via HTTP POST)   │
-                         │                                          │
-                         │ prometheus:9090 ──scrape──> backend:8000/metrics
-                         │ grafana:3001 ──> prometheus:9090         │
-                         │ jaeger:16686/4317 ──OTLP──> backend,     │
-                         │                   celery-worker, beat    │
-                         └─────────────────────────────────────────┘
+```mermaid
+graph TD
+    Browser["Browser :3333"]
+
+    subgraph net["stockscanner-network"]
+        frontend["frontend :3333"]
+        backend["backend :8000"]
+        livescanner["live-scanner"]
+        celery["celery-worker"]
+        beat["celery-beat"]
+        flower["flower :5555"]
+        pgadmin["pgadmin :5050"]
+        seq["seq :5380/5341"]
+        tweetmonitor["tweet-monitor :8001"]
+        postgres["postgres :5432"]
+        redis["redis :6379"]
+        ibgw["ib-gateway :4004"]
+        prometheus["prometheus :9090"]
+        grafana["grafana :3001"]
+        jaeger["jaeger :16686/:4317"]
+    end
+
+    polygon(["api.polygon.io"])
+
+    Browser -->|"HTTP :3333"| frontend
+    frontend -->|HTTP| backend
+    frontend -.->|"WS /api/v1/live/ws/*"| backend
+
+    backend --> postgres
+    backend --> redis
+    backend --> ibgw
+    backend -->|HTTPS| polygon
+    backend -->|HTTP| seq
+
+    livescanner --> postgres
+    livescanner --> redis
+    livescanner --> ibgw
+
+    celery --> postgres
+    celery --> redis
+    celery --> ibgw
+    celery -->|HTTPS| polygon
+
+    beat -->|broker| redis
+    beat -->|"HTTP POST / 45 s"| tweetmonitor
+    flower --> redis
+    pgadmin --> postgres
+    tweetmonitor --> postgres
+    tweetmonitor --> redis
+
+    prometheus -->|"scrape :8000/metrics"| backend
+    grafana --> prometheus
+    jaeger -->|OTLP| backend
+    jaeger -->|OTLP| celery
+    jaeger -->|OTLP| beat
 ```
 
 ## Scan Execution Flow
@@ -52,6 +74,48 @@ A full pre-market scan proceeds as follows:
 7. **Criteria evaluation** — Each ticker is evaluated against the five scanner criteria (see README). Passing tickers produce `ScannerEvent` records.
 8. **Persistence** — A `ScannerRun` row is written with metadata; `ScannerEvent` rows are written for each hit.
 9. **Delivery** — The frontend polls `/api/v1/scanner/results` via React Query. Live pushes are broadcast through `services/websocket_manager.py`.
+
+```mermaid
+sequenceDiagram
+    participant Beat as Celery Beat / User POST
+    participant Task as scanning.run_universe_scan
+    participant Svc as ScannerService
+    participant Poly as Polygon.io
+    participant DB as PostgreSQL
+    participant BE as Backend API (FastAPI)
+    participant FE as Frontend (React Query / WS)
+
+    Beat->>Task: fire run_scanner (scheduled or manual)
+    Task->>Svc: calculate_day_metrics(tickers, session)
+    Svc->>Svc: classify session (pre-market / regular / post)
+    Svc->>DB: SELECT StockUniverseTicker for universe
+    DB-->>Svc: [ticker list]
+
+    loop per batch (asyncio.Semaphore 10)
+        Svc->>Poly: GET /v2/aggs/{ticker} (OHLCV bars)
+        Poly-->>Svc: bars[]
+    end
+
+    Svc->>DB: SELECT TickerReference for full batch (1 round-trip)
+    DB-->>Svc: [enrichment metadata]
+    Svc->>DB: SELECT NewsArticle WHERE timestamp > now-72h
+    DB-->>Svc: [articles]
+    Svc->>Svc: CatalystParser.analyze_batch()
+
+    loop per ticker
+        Svc->>Svc: evaluate 5 criteria (vol ratio, gap %, liquidity, …)
+        alt passes all criteria
+            Svc->>DB: INSERT ScannerEvent (signal_quality_score computed)
+        end
+    end
+
+    Svc->>DB: INSERT ScannerRun (timing, hit count, config snapshot)
+    FE->>BE: GET /api/v1/scanner/results (React Query poll)
+    BE->>DB: SELECT ScannerEvent (eager-load reviews, sort by score)
+    DB-->>BE: [ScannerEvent list]
+    BE-->>FE: JSON response
+    BE->>FE: broadcast via websocket_manager (live push)
+```
 
 ## Backend Module Map
 
