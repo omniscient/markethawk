@@ -73,13 +73,13 @@ To reduce pressure immediately:
 
 ```bash
 # Check market status (uses one API call)
-python .agent/skills/massive_api_research/scripts/query_api.py custom "/v1/marketstatus/now"
+curl -s "https://api.polygon.io/v1/marketstatus/now?apiKey=$POLYGON_API_KEY" | python -m json.tool
 
 # Verify your key works
-python .agent/skills/massive_api_research/scripts/query_api.py details "AAPL"
+curl -s "https://api.polygon.io/v3/reference/tickers/AAPL?apiKey=$POLYGON_API_KEY" | python -m json.tool
 ```
 
-The script reads `POLYGON_API_KEY` from `.env` automatically.
+Set `POLYGON_API_KEY` in `.env` — `docker-compose` exports it automatically.
 
 ---
 
