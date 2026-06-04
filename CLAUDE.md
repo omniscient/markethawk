@@ -302,7 +302,7 @@ bash scripts/codeindex.sh
 ## Further Reading
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — service topology, scan execution flow, module map, Celery tasks
-- [Docs/database-schema.md](Docs/database-schema.md) — auto-generated database schema ERD and indices
+- [docs/database-schema.md](docs/database-schema.md) — auto-generated database schema ERD and indices
 - [DEVELOPMENT.md](DEVELOPMENT.md) — full local setup, Docker commands, Seq/Flower/pgAdmin usage, troubleshooting
 - [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — annotated file tree
 - [ENV_VARIABLES.md](ENV_VARIABLES.md) — all env vars with defaults and descriptions
