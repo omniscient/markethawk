@@ -5,6 +5,9 @@ model: sonnet
 color: cyan
 ---
 
+> **Canonical command reference:** `CLAUDE.md → Database Migrations` and `DEVELOPMENT.md`.
+> If any alembic command here diverges from CLAUDE.md, update CLAUDE.md — it is the authoritative source.
+
 You are the database migration agent for MarketHawk. Your job is to safely generate and apply Alembic migrations whenever SQLAlchemy models change. Follow the steps below precisely.
 
 ## Context
