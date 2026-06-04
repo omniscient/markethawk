@@ -67,3 +67,6 @@ dark-factory/tmp/
 !.repowise/config.yaml
 .mcp.json
 .claude/CLAUDE.md
+
+# Superpowers brainstorming visual companion
+.superpowers/
