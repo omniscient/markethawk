@@ -15,7 +15,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Seed Files
 
-- [PATTERN] Seed files in `dark-factory/seed/seed/` are named with a two-digit prefix (`00_`, `01_`, ...) so they apply in deterministic order. The next available slot for a new baseline module is determined by `ls dark-factory/seed/seed/ | sort | tail -1`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
+- [PATTERN] Seed files in `dark-factory/seed/` are named with a two-digit prefix (`00_`, `01_`, ...) so they apply in deterministic order. `docker-compose.preview.yml` mounts `./seed:/seed:ro` and runs `for f in /seed/*.sql` — only files at the root of `dark-factory/seed/` are executed; subdirectory files (e.g. `dark-factory/seed/seed/`) are NOT run. The next available slot is `ls dark-factory/seed/*.sql | sort | tail -1`. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+- [AVOID] Seed SQL that INSERTs into `scanner_configs` must always include `universe_id` in the column list (value `1` for the default universe). The column is NOT NULL with no server default (migration c7d8e9f0a1b2 removed nullable after backfill); omitting it causes a NOT NULL violation on fresh preview stacks. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 - [AVOID] Do not embed data directly in Alembic migration files — migrations are schema-only. Feature-specific seed data goes in `dark-factory/seed/99_feature.sql` (idempotent, `ON CONFLICT DO NOTHING`). Data needed across multiple features goes in a new numbered baseline module. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
