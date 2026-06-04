@@ -24,7 +24,7 @@ For each requirement or key decision in the spec, evaluate four dimensions:
 - **MINOR DEVIATION** — one or more deviations exist, but each is clearly documented/justified or cosmetic; no deviation changes *what gets built* relative to the spec.
 - **MATERIAL DIVERGENCE** — one or more deviations change *what gets built* relative to the spec (different approach chosen, requirement dropped or added, explicit constraint violated).
 
-Reserve `MATERIAL DIVERGENCE` for genuine departures that affect outcomes. A different file name, an extra helper function, or a split/merged task is not material unless it violates a spec constraint. When uncertain, default to `MINOR DEVIATION` or `CONFORMS` with a note.
+A different file name, an extra helper function, or a split/merged task is not material unless it violates a spec constraint. Changes not named in the spec — including fixes to pre-existing, unrelated defects — are **out-of-scope deviations** and must be listed in the `## Out-of-Scope Changes` section even if they appear beneficial.
 
 ## Output Format
 
@@ -47,11 +47,20 @@ Your entire response must follow this exact structure. Do not include any text o
 - [MATERIAL] <what deviates> — <how it diverges from the spec>
 
 (If there are no deviations, write: No deviations found.)
+
+## Out-of-Scope Changes
+
+List every change in the diff that is NOT (a) spec-named, (b) supporting housekeeping directly backing an (a) change, or (c) strictly required for the in-scope work to compile/run. Include fixes to pre-existing defects even if they appear beneficial.
+
+- [OOS] <file or area> — <one-sentence description of the unrelated change>
+
+(If there are no out-of-scope changes, write: None.)
 ```
 
 If only `CONFORMS` verdict: the **Deviations** section is "No deviations found."
 If only `MINOR` deviations: all bullets are `[MINOR]`.
 If any `MATERIAL` deviation exists: the verdict is `⛔ Material divergence` regardless of how many `[MINOR]` items are also present.
+The `## Out-of-Scope Changes` section is **always present**, even when the verdict is CONFORMS.
 
 ## Context
 

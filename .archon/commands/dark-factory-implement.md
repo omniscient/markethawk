@@ -58,14 +58,36 @@ Based on the issue description (new) or feedback (continue) and codebase analysi
 - [ ] Plan written to `$ARTIFACTS_DIR/plan.md`
 - [ ] All affected files identified
 
+### Scope Discipline
+
+**Hard rule: fix only what the spec asks for.** This applies to every file you touch.
+
+When you notice an unrelated defect while implementing — a pre-existing SQL bug, a typo in an unrelated file, a test failure you didn't cause — **do not fix it**. Instead:
+
+1. Record it in `$ARTIFACTS_DIR/out-of-scope.md` (create if absent):
+   ```
+   ## Out-of-scope defects observed
+   - <file>: <one-sentence description of the defect>
+   ```
+2. Leave the defect unfixed. The conformance gate reads this file and will convert each entry into a linked backlog ticket.
+
+A change is **in-scope** only if it is:
+- (a) **Spec-named** — explicitly required by the spec/issue,
+- (b) **Supporting housekeeping** — docs-map, memory, tests, or migrations that *directly* back an (a) change, or
+- (c) **Strictly required** — the in-scope work literally cannot ship without it (e.g. a broken import blocking compilation).
+
+Fixing a pre-existing, unrelated defect — even a real one, even if it makes tests pass — is **out-of-scope**. The correct response is always a backlog entry, never an inline fix.
+
 ### Seed Data Awareness
 
 Before implementing, check if the feature requires data that isn't in the baseline seed modules (`dark-factory/seed/`). The baseline covers: tickers, universes, scanner configs, scanner runs/events, stock aggregates (minute bars), watchlist, and system config.
 
-If the feature touches pages or endpoints that need data not in the baseline:
-1. Create `dark-factory/seed/99_feature.sql` with idempotent INSERT statements (`ON CONFLICT DO NOTHING`) for the missing data
+If the feature touches pages or endpoints that need data **not in the baseline**:
+1. Create `dark-factory/seed/99_feature.sql` with idempotent INSERT statements (`ON CONFLICT DO NOTHING`) for the **missing** data
 2. If that data would benefit future features (not just this one), also add it to a new numbered baseline module (e.g. `05_trades.sql`, `06_journal.sql`) so it persists for future previews
 3. Include the seed file(s) in your commits
+
+**Do NOT edit existing numbered seed modules** (e.g. `01_scanner_configs.sql`) to fix pre-existing defects. If an existing seed file has a bug that predates this issue, record it in `out-of-scope.md` and leave it unchanged.
 
 Tables NOT in baseline that commonly need seed data: `trades`, `trade_executions`, `journal_entries`, `tags`, `trading_strategies`, `news_articles`, `alert_rules`, `futures_aggregates`, `stock_metrics`.
 
