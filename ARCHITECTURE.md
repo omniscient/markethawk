@@ -75,6 +75,48 @@ A full pre-market scan proceeds as follows:
 8. **Persistence** — A `ScannerRun` row is written with metadata; `ScannerEvent` rows are written for each hit.
 9. **Delivery** — The frontend polls `/api/v1/scanner/results` via React Query. Live pushes are broadcast through `services/websocket_manager.py`.
 
+```mermaid
+sequenceDiagram
+    participant Beat as Celery Beat / User POST
+    participant Task as scanning.run_universe_scan
+    participant Svc as ScannerService
+    participant Poly as Polygon.io
+    participant DB as PostgreSQL
+    participant BE as Backend API (FastAPI)
+    participant FE as Frontend (React Query / WS)
+
+    Beat->>Task: fire run_scanner (scheduled or manual)
+    Task->>Svc: calculate_day_metrics(tickers, session)
+    Svc->>Svc: classify session (pre-market / regular / post)
+    Svc->>DB: SELECT StockUniverseTicker for universe
+    DB-->>Svc: [ticker list]
+
+    loop per batch (asyncio.Semaphore 10)
+        Svc->>Poly: GET /v2/aggs/{ticker} (OHLCV bars)
+        Poly-->>Svc: bars[]
+    end
+
+    Svc->>DB: SELECT TickerReference for full batch (1 round-trip)
+    DB-->>Svc: [enrichment metadata]
+    Svc->>DB: SELECT NewsArticle WHERE timestamp > now-72h
+    DB-->>Svc: [articles]
+    Svc->>Svc: CatalystParser.analyze_batch()
+
+    loop per ticker
+        Svc->>Svc: evaluate 5 criteria (vol ratio, gap %, liquidity, …)
+        alt passes all criteria
+            Svc->>DB: INSERT ScannerEvent (signal_quality_score computed)
+        end
+    end
+
+    Svc->>DB: INSERT ScannerRun (timing, hit count, config snapshot)
+    FE->>BE: GET /api/v1/scanner/results (React Query poll)
+    BE->>DB: SELECT ScannerEvent (eager-load reviews, sort by score)
+    DB-->>BE: [ScannerEvent list]
+    BE-->>FE: JSON response
+    BE->>FE: broadcast via websocket_manager (live push)
+```
+
 ## Backend Module Map
 
 ### Core (`app/core/`)
