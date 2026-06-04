@@ -71,6 +71,12 @@ Tables NOT in baseline that commonly need seed data: `trades`, `trade_executions
 
 ## Phase 3: IMPLEMENT (TDD)
 
+### Codeindex blast-radius guidance (advisory)
+
+Before editing any file, call the `get_impact` MCP tool (from the `codeindex` MCP server) on that file's path. If the blast score is high (top-20 files in `codeindex.json`), take extra care: write a focused test covering the changed behaviour, confirm existing tests still pass, and note the high-blast file in your `implementation.md`.
+
+Use `lookup_symbol` instead of grep when you need to find where a function or class is defined or imported.
+
 For each change in the plan:
 
 1. **Write the failing test first** — pytest for backend, type-check for frontend

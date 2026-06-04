@@ -33,6 +33,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /usr/lib/python*/EXTERNALLY-MANAGED
 
+# codeindex dependency analyzer (dark-factory / agent tooling only — never in backend/requirements.txt)
+# pre-commit for the codeindex-blast warn-only hook
+RUN pip install --quiet "git+https://github.com/scheidydude/codeindex.git" pre-commit
+
 # Bun
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:${PATH}"

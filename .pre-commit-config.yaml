@@ -16,3 +16,10 @@ repos:
         entry: bash -c 'cd frontend && npm run lint'
         pass_filenames: false
         files: '\.(ts|tsx|js|jsx)$'
+
+      - id: codeindex-blast
+        name: codeindex blast-radius warning
+        language: system
+        entry: bash -c 'if command -v codeindex &>/dev/null; then codeindex impact "$@" 2>/dev/null && echo "[codeindex] blast-radius check complete" || true; fi; exit 0'
+        pass_filenames: true
+        stages: [pre-commit]
