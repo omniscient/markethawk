@@ -136,6 +136,9 @@ curl http://localhost:8000/health
 | `SCHEDULER_STATE_DIR` | `/var/lib/dark-factory` | Directory for durable scheduler retry state. Mounted from the `scheduler_state` named Docker volume in the `backlog-scheduler` service. |
 | `FACTORY_IMAGE` | `ghcr.io/omniscient/markethawk-dark-factory:latest` | Docker image the scheduler probes at startup and dispatches with `--no-build`. Override to use a locally-built tag. |
 | `IMAGE_TAG` | `latest` | Tag suffix for `FACTORY_IMAGE`. Used when `FACTORY_IMAGE` is not set explicitly. |
+| `DIRECT_TO_PR_LABEL` | `direct-to-pr` | Label name that opts a ticket into straight-through autonomous flow. Change only if your repo uses a different label string. |
+| `SPEC_GRACE_MINUTES` | `30` | Minutes the scheduler waits after posting the spec before auto-advancing a `direct-to-pr` ticket from Backlog to Refined. `0` = advance on the next poll. |
+| `PLAN_GRACE_MINUTES` | `30` | Minutes the scheduler waits after posting the plan before auto-advancing a `direct-to-pr` ticket from Refined to Ready. `0` = advance on the next poll. |
 
 ---
 

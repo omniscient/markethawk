@@ -139,8 +139,16 @@ If `conformance.enabled` is `false`, skip this phase entirely and proceed to Pha
 2. Build GitHub links:
    - Plan link: `https://github.com/omniscient/markethawk/blob/$BRANCH/<plan-file-path>`
    - Branch link: `https://github.com/omniscient/markethawk/tree/$BRANCH`
-3. Commit the plan
-4. Post a summary comment on the issue:
+3. Check if the issue carries the `direct-to-pr` label:
+   ```bash
+   IS_DIRECT_TO_PR=$(gh issue view $ISSUE_NUM --repo omniscient/markethawk \
+     --json labels --jq '.labels[].name' | grep -q "direct-to-pr" && echo "yes" || echo "no")
+   PLAN_GRACE=$(python3 -c "import yaml; d=yaml.safe_load(open('.claude/skills/refinement/config.yaml')); print(d.get('direct_to_pr',{}).get('plan_grace_minutes',30))" 2>/dev/null || echo "30")
+   ```
+   If `IS_DIRECT_TO_PR=yes`, prepend the following note to the "### Next Steps" section of the comment (replacing `$PLAN_GRACE` with the actual value):
+   > ⏩ **Auto-advancing in ~`$PLAN_GRACE` min** unless you comment — the scheduler will move this to **Ready** automatically. Leave a comment to re-run the plan or redirect.
+4. Commit the plan
+5. Post a summary comment on the issue:
    ```
    ## Refinement Pipeline — Plan Generated
 
@@ -170,6 +178,8 @@ If `conformance.enabled` is `false`, skip this phase entirely and proceed to Pha
 
    ### Next Steps
 
+   <!-- If IS_DIRECT_TO_PR=yes, insert the auto-advance note here (from step 3 above) -->
+
    - ✅ **Approve plan** — move the issue to the **Ready** column on the project board. The scheduler will automatically start implementation.
    - ✏️ **Request changes** — leave a comment on this issue with your feedback, then re-run:
      ```bash
@@ -180,8 +190,7 @@ If `conformance.enabled` is `false`, skip this phase entirely and proceed to Pha
    ---
    *Posted by MarketHawk Refinement Pipeline*
    ```
-5. Add label: `gh issue edit $ISSUE_NUM --add-label plan-pending-review`
-6. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
+7. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
    ```
    STATUS: PLAN_COMPLETE
    PLAN_PATH: <path>

@@ -120,7 +120,15 @@ Follow the process in `orchestrator-prompt.md`:
 2. Build GitHub links:
    - Spec link: `https://github.com/omniscient/markethawk/blob/$BRANCH/<spec-file-path>` (e.g. `docs/superpowers/specs/2026-05-13-topic-design.md`)
    - Branch link: `https://github.com/omniscient/markethawk/tree/$BRANCH`
-3. Post a summary comment on the issue:
+3. Check if the issue carries the `direct-to-pr` label:
+   ```bash
+   IS_DIRECT_TO_PR=$(gh issue view $ISSUE_NUM --repo omniscient/markethawk \
+     --json labels --jq '.labels[].name' | grep -q "direct-to-pr" && echo "yes" || echo "no")
+   SPEC_GRACE=$(python3 -c "import yaml; d=yaml.safe_load(open('.claude/skills/refinement/config.yaml')); print(d.get('direct_to_pr',{}).get('spec_grace_minutes',30))" 2>/dev/null || echo "30")
+   ```
+   If `IS_DIRECT_TO_PR=yes`, prepend the following note to the "### Next Steps" section of the comment (replacing `$SPEC_GRACE` with the actual value):
+   > ⏩ **Auto-advancing in ~`$SPEC_GRACE` min** unless you comment — the scheduler will move this to **Refined** automatically once the grace window elapses. Leave a comment to re-run the spec or override the direction.
+4. Post a summary comment on the issue:
    ```
    ## Refinement Pipeline — Spec Generated
 
@@ -150,6 +158,8 @@ Follow the process in `orchestrator-prompt.md`:
 
    ### Next Steps
 
+   <!-- If IS_DIRECT_TO_PR=yes, insert the auto-advance note here (from step 3 above) -->
+
    - ✅ **Approve spec** — move the issue to the **Refined** column on the project board. The scheduler will automatically trigger plan generation.
    - ✏️ **Request changes** — leave a comment on this issue with your feedback, then re-run:
      ```bash
@@ -160,8 +170,7 @@ Follow the process in `orchestrator-prompt.md`:
    ---
    *Posted by MarketHawk Refinement Pipeline*
    ```
-4. Add label: `gh issue edit $ISSUE_NUM --add-label spec-pending-review`
-5. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
+6. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
    ```
    STATUS: SPEC_COMPLETE
    SPEC_PATH: <path>

@@ -126,6 +126,312 @@ has_opt_in_refine_label "$ITEM_WITHOUT" \
   || assert_eq "item WITHOUT label blocked"     "0" "0"
 
 # ==========================================
+# E: has_direct_to_pr_label
+# ==========================================
+echo ""
+echo "--- E: has_direct_to_pr_label ---"
+
+ITEM_DTP='{"content":{"number":10},"labels":["enhancement","direct-to-pr"],"status":"Backlog"}'
+ITEM_NO_DTP='{"content":{"number":11},"labels":["enhancement","ready-for-agent"],"status":"Backlog"}'
+
+has_direct_to_pr_label "$ITEM_DTP" \
+  && assert_eq "item WITH direct-to-pr returns true" "0" "0" \
+  || assert_eq "item WITH direct-to-pr returns true" "0" "1"
+
+has_direct_to_pr_label "$ITEM_NO_DTP" \
+  && assert_eq "item WITHOUT direct-to-pr returns false" "0" "1" \
+  || assert_eq "item WITHOUT direct-to-pr returns false" "0" "0"
+
+# ==========================================
+# F: elapsed_minutes_since_marker
+# ==========================================
+echo ""
+echo "--- F: elapsed_minutes_since_marker ---"
+
+# Compute a timestamp 35 minutes in the past
+_MARKER_EPOCH=$(( $(date -u +%s) - 35*60 ))
+_MARKER_TS=$(date -u -d "@${_MARKER_EPOCH}" +%Y-%m-%dT%H:%M:%SZ)
+
+gh() {
+  printf '[{"body":"Refinement Pipeline — Plan Generated","createdAt":"%s"}]\n' "$_MARKER_TS"
+}
+export -f gh
+
+_ELAPSED=$(elapsed_minutes_since_marker "55" "Refinement Pipeline")
+[ -n "$_ELAPSED" ] && [ "$_ELAPSED" -ge 34 ] \
+  && assert_eq "elapsed ≥ 34 for 35-min-old marker" "0" "0" \
+  || assert_eq "elapsed ≥ 34 for 35-min-old marker" "0" "1"
+
+# No matching comment → returns ""
+gh() { printf '[{"body":"some other comment","createdAt":"%s"}]\n' "$_MARKER_TS"; }
+export -f gh
+_ELAPSED2=$(elapsed_minutes_since_marker "55" "Refinement Pipeline")
+assert_eq "no matching marker returns empty" "" "$_ELAPSED2"
+
+# Restore original gh stub
+gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
+export -f gh
+
+# ==========================================
+# G: Spec auto-advance (direct-to-pr)
+# ==========================================
+echo ""
+echo "--- G: Spec auto-advance ---"
+echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+# Initialize variables that the main loop sets but tests don't have
+REFINE_RUNNING=0
+DISPATCHED=""
+
+_ITEM_DTP_SPR='{"content":{"number":20},"labels":["direct-to-pr","spec-pending-review"],"status":"Backlog"}'
+_ITEM_NODTP_SPR='{"content":{"number":21},"labels":["spec-pending-review"],"status":"Backlog"}'
+
+# G1: flag + human comment → re-refine path (remove-label + dispatch Refine)
+has_new_comment_after_report() { echo "yes"; }
+elapsed_minutes_since_marker() { echo "99"; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker dispatch
+
+spec_advance_check 20 "$_ITEM_DTP_SPR"
+assert_eq "G1: re-refine: remove-label called" \
+  "1" "$(grep -c -- '--remove-label spec-pending-review' "$STUB_LOG" || echo 0)"
+assert_eq "G1: re-refine: Refine dispatched" \
+  "1" "$(grep -c 'dispatch Refine issue #20' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# G2: flag + no comment + elapsed ≥ grace → advance (remove-label + set_board_status REFINED)
+has_new_comment_after_report() { echo "no"; }
+export SPEC_GRACE_MINUTES=30
+elapsed_minutes_since_marker() { echo "35"; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker
+
+spec_advance_check 20 "$_ITEM_DTP_SPR"
+assert_eq "G2: advance: remove-label called" \
+  "1" "$(grep -c -- '--remove-label spec-pending-review' "$STUB_LOG" || echo 0)"
+assert_eq "G2: advance: set_board_status REFINED" \
+  "1" "$(grep -c "set_board_status 20 ${STATUS_REFINED}" "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# G3: flag + no comment + elapsed < grace → no action
+elapsed_minutes_since_marker() { echo "10"; }
+export -f elapsed_minutes_since_marker
+
+spec_advance_check 20 "$_ITEM_DTP_SPR"
+assert_eq "G3: within-window: no set_board_status" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+assert_eq "G3: within-window: no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# G4: no flag → no auto-advance (regression guard)
+elapsed_minutes_since_marker() { echo "99"; }
+export -f elapsed_minutes_since_marker
+
+spec_advance_check 21 "$_ITEM_NODTP_SPR"
+assert_eq "G4: no-flag regression: no advance" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# G5: flag + needs-discussion → suppressed (no advance, even with elapsed ≥ grace)
+_ITEM_DTP_SPR_ND='{"content":{"number":22},"labels":["direct-to-pr","spec-pending-review","needs-discussion"],"status":"Backlog"}'
+elapsed_minutes_since_marker() { echo "99"; }
+export -f elapsed_minutes_since_marker
+
+spec_advance_check 22 "$_ITEM_DTP_SPR_ND"
+assert_eq "G5: needs-discussion suppresses spec advance" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+assert_eq "G5: needs-discussion suppresses spec dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+# Restore stubs
+has_new_comment_after_report() { echo "no"; }
+elapsed_minutes_since_marker() { echo ""; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker dispatch
+
+# ==========================================
+# H: Entry trigger — direct-to-pr admits Backlog items
+# ==========================================
+echo ""
+echo "--- H: Entry trigger ---"
+
+ITEM_DTP_ONLY='{"content":{"number":30},"labels":["direct-to-pr"],"status":"Backlog"}'
+ITEM_RFA_ONLY='{"content":{"number":31},"labels":["ready-for-agent"],"status":"Backlog"}'
+ITEM_NEITHER='{"content":{"number":32},"labels":["needs-triage"],"status":"Backlog"}'
+ITEM_BOTH='{"content":{"number":33},"labels":["direct-to-pr","ready-for-agent"],"status":"Backlog"}'
+
+# H1: direct-to-pr alone → passes entry gate
+(has_opt_in_refine_label "$ITEM_DTP_ONLY" || has_direct_to_pr_label "$ITEM_DTP_ONLY") \
+  && assert_eq "H1: direct-to-pr admits item" "0" "0" \
+  || assert_eq "H1: direct-to-pr admits item" "0" "1"
+
+# H2: ready-for-agent alone → still passes (unchanged)
+(has_opt_in_refine_label "$ITEM_RFA_ONLY" || has_direct_to_pr_label "$ITEM_RFA_ONLY") \
+  && assert_eq "H2: ready-for-agent still admits item" "0" "0" \
+  || assert_eq "H2: ready-for-agent still admits item" "0" "1"
+
+# H3: neither → blocked
+(has_opt_in_refine_label "$ITEM_NEITHER" || has_direct_to_pr_label "$ITEM_NEITHER") \
+  && assert_eq "H3: neither label is blocked" "0" "1" \
+  || assert_eq "H3: neither label is blocked" "0" "0"
+
+# H4: both labels → passes (direct-to-pr wins, no double-dispatch risk)
+(has_opt_in_refine_label "$ITEM_BOTH" || has_direct_to_pr_label "$ITEM_BOTH") \
+  && assert_eq "H4: both labels passes gate once" "0" "0" \
+  || assert_eq "H4: both labels passes gate once" "0" "1"
+
+# ==========================================
+# I: Plan auto-advance (direct-to-pr)
+# ==========================================
+echo ""
+echo "--- I: Plan auto-advance ---"
+echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+REFINE_RUNNING=0
+DISPATCHED=""
+
+_ITEM_DTP_PPR='{"content":{"number":40},"labels":["direct-to-pr","plan-pending-review"],"status":"Refined"}'
+_ITEM_NODTP_PPR='{"content":{"number":41},"labels":["plan-pending-review"],"status":"Refined"}'
+
+# I1: flag + human comment → re-plan
+has_new_comment_after_report() { echo "yes"; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f has_new_comment_after_report dispatch
+
+plan_advance_check 40 "$_ITEM_DTP_PPR"
+assert_eq "I1: re-plan: remove-label called" \
+  "1" "$(grep -c -- '--remove-label plan-pending-review' "$STUB_LOG" || echo 0)"
+assert_eq "I1: re-plan: Plan dispatched" \
+  "1" "$(grep -c 'dispatch Plan issue #40' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# I2: flag + no comment + elapsed ≥ grace → advance to Ready
+has_new_comment_after_report() { echo "no"; }
+export PLAN_GRACE_MINUTES=30
+elapsed_minutes_since_marker() { echo "35"; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker
+
+plan_advance_check 40 "$_ITEM_DTP_PPR"
+assert_eq "I2: advance: remove-label called" \
+  "1" "$(grep -c -- '--remove-label plan-pending-review' "$STUB_LOG" || echo 0)"
+assert_eq "I2: advance: set_board_status READY" \
+  "1" "$(grep -c "set_board_status 40 ${STATUS_READY}" "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# I3: flag + no comment + elapsed < grace → no action
+elapsed_minutes_since_marker() { echo "10"; }
+export -f elapsed_minutes_since_marker
+
+plan_advance_check 40 "$_ITEM_DTP_PPR"
+assert_eq "I3: within-window: no set_board_status" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+assert_eq "I3: within-window: no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# I4: no flag → no auto-advance (regression guard)
+elapsed_minutes_since_marker() { echo "99"; }
+export -f elapsed_minutes_since_marker
+
+plan_advance_check 41 "$_ITEM_NODTP_PPR"
+assert_eq "I4: no-flag regression: no advance" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# I5: flag + needs-discussion → suppressed (no advance, even with elapsed ≥ grace)
+_ITEM_DTP_PPR_ND='{"content":{"number":42},"labels":["direct-to-pr","plan-pending-review","needs-discussion"],"status":"Refined"}'
+elapsed_minutes_since_marker() { echo "99"; }
+export -f elapsed_minutes_since_marker
+
+plan_advance_check 42 "$_ITEM_DTP_PPR_ND"
+assert_eq "I5: needs-discussion suppresses plan advance" \
+  "0" "$(grep -c 'set_board_status' "$STUB_LOG" || true)"
+assert_eq "I5: needs-discussion suppresses plan dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+# Restore
+has_new_comment_after_report() { echo "no"; }
+elapsed_minutes_since_marker() { echo ""; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f has_new_comment_after_report elapsed_minutes_since_marker dispatch
+
+# ==========================================
+# J: End-gate auto-merge (direct-to-pr)
+# ==========================================
+echo ""
+echo "--- J: End-gate auto-merge ---"
+echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+DISPATCHED=""
+
+_ITEM_DTP_REVIEW='{"content":{"number":50},"labels":["direct-to-pr"],"status":"In review"}'
+_ITEM_NODTP_REVIEW='{"content":{"number":51},"labels":[],"status":"In review"}'
+
+# J1: flag + APPROVED → Close dispatched
+get_pr_for_issue() { echo "99"; }
+gh() {
+  case "$*" in
+    *"pr view"*) echo "APPROVED" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f get_pr_for_issue gh dispatch
+
+end_gate_check 50 "$_ITEM_DTP_REVIEW"
+assert_eq "J1: APPROVED → Close dispatched" \
+  "1" "$(grep -c 'dispatch Close issue #50' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# J2: flag + CHANGES_REQUESTED → Continue dispatched
+gh() {
+  case "$*" in
+    *"pr view"*) echo "CHANGES_REQUESTED" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+export -f gh
+
+end_gate_check 50 "$_ITEM_DTP_REVIEW"
+assert_eq "J2: CHANGES_REQUESTED → Continue dispatched" \
+  "1" "$(grep -c 'dispatch Continue issue #50' "$STUB_LOG" || echo 0)"
+
+> "$STUB_LOG"
+# J3: flag + no actionable review → no dispatch (fall through)
+gh() {
+  case "$*" in
+    *"pr view"*) echo "" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+export -f gh
+
+end_gate_check 50 "$_ITEM_DTP_REVIEW" || true
+assert_eq "J3: no review → no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+> "$STUB_LOG"
+# J4: no flag → no end-gate dispatch (regression guard)
+gh() {
+  case "$*" in
+    *"pr view"*) echo "APPROVED" ;;
+    *) echo "gh $*" >> "$STUB_LOG" ;;
+  esac
+  return 0
+}
+export -f gh
+
+end_gate_check 51 "$_ITEM_NODTP_REVIEW" || true
+assert_eq "J4: no-flag: no end-gate dispatch" \
+  "0" "$(grep -c 'dispatch Close' "$STUB_LOG" || true)"
+
+# Restore
+gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
+get_pr_for_issue() { echo ""; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f gh get_pr_for_issue dispatch
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"

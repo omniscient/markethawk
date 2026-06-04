@@ -542,6 +542,28 @@ nodes:
       BRANCH=$(git branch --show-current)
       echo "Pushing branch and creating/updating PR for issue #${ISSUE}..."
 
+      # Archive spec/plan for this issue before pushing
+      SPEC_FILE=$(grep -rl "#${ISSUE}" docs/superpowers/specs/ 2>/dev/null | head -1)
+      PLAN_FILE=$(grep -rl "#${ISSUE}" docs/superpowers/plans/ 2>/dev/null | head -1)
+
+      ARCHIVED=0
+      if [ -n "$SPEC_FILE" ]; then
+        mkdir -p docs/archive
+        git mv "$SPEC_FILE" docs/archive/
+        ARCHIVED=$((ARCHIVED + 1))
+        echo "Archived spec: $SPEC_FILE -> docs/archive/"
+      fi
+      if [ -n "$PLAN_FILE" ]; then
+        mkdir -p docs/archive
+        git mv "$PLAN_FILE" docs/archive/
+        ARCHIVED=$((ARCHIVED + 1))
+        echo "Archived plan: $PLAN_FILE -> docs/archive/"
+      fi
+
+      if [ "$ARCHIVED" -gt 0 ]; then
+        git commit -m "docs: archive spec/plan for issue #${ISSUE}"
+      fi
+
       # Fail loudly if the push is rejected (e.g. token missing 'workflow' scope for .github/workflows
       # changes). Previously the rejection was swallowed and a misleading success comment was posted.
       if ! git push -u origin "$BRANCH"; then
