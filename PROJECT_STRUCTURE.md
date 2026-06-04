@@ -3,223 +3,223 @@
 ```
 MarketHawk/
 ├── backend/
-│   ├── live_scanner/                   # Live scanner — standalone asyncio process (separate Docker service)
+│   ├── live_scanner/
 │   │   ├── __init__.py
-│   │   ├── main.py                     # Entry point: connects to IB Gateway, runs sync + process loops
-│   │   ├── bar_aggregator.py           # BarAggregator: 5 s bars → 1 m MinuteBar; session/volume tracking
-│   │   ├── conditions.py               # Alert conditions: live_volume_spike, live_price_move
-│   │   └── publisher.py                # LivePublisher: Redis publish (quote/tick/minute_bar/alert) + DB writes
-│   ├── alembic/                        # Alembic migration framework
-│   │   ├── versions/                   # Migration scripts (one file per schema change)
-│   │   └── env.py                      # Alembic runtime config; imports models for autogenerate
+│   │   ├── main.py
+│   │   ├── bar_aggregator.py
+│   │   ├── conditions.py
+│   │   └── publisher.py
+│   ├── alembic/
+│   │   ├── versions/
+│   │   └── env.py
 │   ├── app/
-│   │   ├── exceptions.py               # Domain exception hierarchy: MarketHawkError base + ScanError, DataFetchError, ProviderError subclasses; is_retryable flag drives Celery retry logic
+│   │   ├── exceptions.py
 │   │   ├── core/
-│   │   │   ├── config.py               # Settings class; all env vars with typed defaults
-│   │   │   ├── database.py             # Async SQLAlchemy engine and session factory
-│   │   │   ├── celery_app.py           # Celery instance and beat schedule definitions
-│   │   │   ├── error_tracking.py       # ErrorTracker protocol; Seq + stdout implementations
-│   │   │   ├── cache.py                # Redis caching: get_redis() singleton, get_cached() read-through helper, invalidate(), @cache_response decorator; mh: key prefix
-│   │   │   └── tracing.py              # OtelTraceIdFilter (log correlation); setup_otel() (TracerProvider init); instrument_fastapi()
+│   │   │   ├── config.py
+│   │   │   ├── database.py
+│   │   │   ├── celery_app.py
+│   │   │   ├── error_tracking.py
+│   │   │   ├── cache.py
+│   │   │   └── tracing.py
 │   │   ├── models/
-│   │   │   ├── active_watchlist.py     # ActiveWatchlist — manually curated live-observation list (soft limit 50)
-│   │   │   ├── scanner_run.py          # ScannerRun — one row per scan execution; failed_tickers JSONB for per-ticker domain failures
-│   │   │   ├── scanner_event.py        # ScannerEvent — tickers that passed criteria; carries signal_quality_score (Float, indexed DESC NULLS LAST)
-│   │   │   ├── scanner_config.py       # ScannerConfig — saved parameter sets; universe_id FK (NOT NULL) drives scheduled beat tasks
-│   │   │   ├── stock_universe.py       # StockUniverse — named ticker groups
+│   │   │   ├── active_watchlist.py
+│   │   │   ├── scanner_run.py
+│   │   │   ├── scanner_event.py
+│   │   │   ├── scanner_config.py
+│   │   │   ├── stock_universe.py
 │   │   │   ├── stock_universe_ticker.py # StockUniverseTicker — universe membership
-│   │   │   ├── monitored_stock.py      # MonitoredStock — per-ticker tracking state
-│   │   │   ├── stock_aggregate.py      # StockAggregate — cached OHLCV bars
-│   │   │   ├── stock_metric.py         # StockMetric — computed daily metrics
-│   │   │   ├── stock_split.py          # StockSplit — split history
-│   │   │   ├── ticker_reference.py     # TickerReference — Polygon metadata cache
-│   │   │   ├── news_article.py         # NewsArticle — cached news for catalyst analysis
-│   │   │   ├── news_preference.py      # NewsPreference — user news preferences
-│   │   │   ├── futures_contract.py     # FuturesContract — contract specs
-│   │   │   ├── futures_aggregate.py    # FuturesAggregate — futures OHLCV bars
-│   │   │   ├── futures_rollover.py     # FuturesRollover — roll dates
-│   │   │   ├── market_holiday.py       # MarketHoliday — NYSE/NASDAQ holiday calendar
-│   │   │   ├── trade.py                # Trade — journal entries
+│   │   │   ├── monitored_stock.py
+│   │   │   ├── stock_aggregate.py
+│   │   │   ├── stock_metric.py
+│   │   │   ├── stock_split.py
+│   │   │   ├── ticker_reference.py
+│   │   │   ├── news_article.py
+│   │   │   ├── news_preference.py
+│   │   │   ├── futures_contract.py
+│   │   │   ├── futures_aggregate.py
+│   │   │   ├── futures_rollover.py
+│   │   │   ├── market_holiday.py
+│   │   │   ├── trade.py
 │   │   │   ├── universe_quality_report.py # UniverseQualityReport — data quality audits
-│   │   │   ├── signal_analysis_run.py  # SignalAnalysisRun — Phase 2b analysis execution anchor; stores correlation_matrix + feature_weights as JSONB
-│   │   │   ├── signal_cluster.py       # SignalCluster — K-means cluster archetype per analysis run; centroid + return_profile
-│   │   │   ├── signal_review.py        # SignalReview — user verdict (confirmed/rejected/enhanced/uncertain) on a ScannerEvent; latest_review @property exposed via ScannerEvent
-│   │   │   ├── monitored_account.py    # MonitoredAccount — X accounts tracked by tweet-monitor; handle, platform, poll_interval_seconds, last_tweet_id, classification_config JSONB
-│   │   │   ├── tweet_signal.py         # TweetSignal — one row per scraped tweet; classification, confidence, tickers/price_levels JSONB, promoted flag, FK → scanner_events
-│   │   │   ├── user.py                 # User — operator account; id (UUID PK), username (unique), password_hash (bcrypt), created_at, is_active
-│   │   │   └── __init__.py             # Re-exports all models (required for Alembic autogenerate)
+│   │   │   ├── signal_analysis_run.py
+│   │   │   ├── signal_cluster.py
+│   │   │   ├── signal_review.py
+│   │   │   ├── monitored_account.py
+│   │   │   ├── tweet_signal.py
+│   │   │   ├── user.py
+│   │   │   └── __init__.py
 │   │   ├── routers/
-│   │   │   ├── auth.py                 # /api/auth/* — status, register (bootstrap), login (HttpOnly JWT cookies), logout, refresh, me
-│   │   │   ├── scanner.py              # /api/scanner/* — run, results (eager-loads reviews), history, signal-quality-distribution; review endpoints: POST /events/{uuid}/review, GET /events/reviews, GET /reviews/stats
-│   │   │   ├── universe.py             # /api/universe/* — CRUD for universes
-│   │   │   ├── stocks.py               # /api/stocks/* — historical data, ticker search
-│   │   │   ├── news.py                 # /api/news/* — news articles and preferences
-│   │   │   ├── live_data.py            # /api/live/ws/{ticker}/{resolution} — per-symbol WS; /api/live/ws/watchlist — watchlist-wide WS
-│   │   │   ├── futures.py              # /api/futures/* — history, contracts, rollovers, download (catalog refresh)
-│   │   │   ├── journal.py              # /api/journal/* — trade journal CRUD
-│   │   │   ├── watchlist.py            # /api/watchlist/* — active watchlist CRUD
-│   │   │   ├── health.py               # GET /health — liveness probe
-│   │   │   ├── outcomes.py             # /api/outcomes/* — scorecard, signals, backfill; Phase 2b: analyze, correlations, analysis/latest
-│   │   │   ├── system.py               # /api/system/* — configuration and status
-│   │   │   ├── tweets.py               # GET /api/tweets/recent — TweetSignals; WS /api/tweets/feed — live Redis pub/sub stream
+│   │   │   ├── auth.py
+│   │   │   ├── scanner.py
+│   │   │   ├── universe.py
+│   │   │   ├── stocks.py
+│   │   │   ├── news.py
+│   │   │   ├── live_data.py
+│   │   │   ├── futures.py
+│   │   │   ├── journal.py
+│   │   │   ├── watchlist.py
+│   │   │   ├── health.py
+│   │   │   ├── outcomes.py
+│   │   │   ├── system.py
+│   │   │   ├── tweets.py
 │   │   │   └── __init__.py
 │   │   ├── schemas/
-│   │   │   ├── active_watchlist.py     # ActiveWatchlistAdd / ActiveWatchlistUpdate / ActiveWatchlistItem
-│   │   │   └── stock.py                # Pydantic request/response models
+│   │   │   ├── active_watchlist.py
+│   │   │   └── stock.py
 │   │   ├── services/
-│   │   │   ├── stock_data.py           # OHLCV fetch, gap calculation, session flags; is_futures_ticker(); get_historical_enriched() (coercion + indicators + guardrails)
-│   │   │   ├── universe_stats.py       # UniverseStatsService.compute() — universe aggregate stats (ticker count, bar count, date range, timespans)
-│   │   │   ├── scan_orchestrator.py    # Scanner registry (ScannerDescriptor, _REGISTRY, register, get_all, run); also compute_next_run, get_scan_progress, request_scan_cancel, enqueue_scan
+│   │   │   ├── stock_data.py
+│   │   │   ├── universe_stats.py
+│   │   │   ├── scan_orchestrator.py
 │   │   │   ├── scanner_query_service.py # ScannerQueryService: get_scan_status_block, get_signal_quality_distribution, get_review_stats
-│   │   │   ├── system_service.py       # SystemService: get_market_status, check_ibkr_reachable, format_bytes, get_storage_stats, get_active_tasks
-│   │   │   ├── auto_trade_service.py   # AutoTradeExecutor (lifecycle); approve_order, cancel_order, get_account, get_stats
-│   │   │   ├── pre_market_scan.py      # Self-registers "pre_market_volume_spike" in orchestrator
+│   │   │   ├── system_service.py
+│   │   │   ├── auto_trade_service.py
+│   │   │   ├── pre_market_scan.py
 │   │   │   ├── oversold_bounce_scan.py # Self-registers "oversold_bounce" in orchestrator
-│   │   │   ├── pocket_pivot.py         # Self-registers "pocket_pivot"; Morales/Kacher up-day volume signal; daily bars; nightly beat
-│   │   │   ├── scanner.py              # ScannerService; calculate_day_metrics; _save_event delegates to alert_service.save_event; OTel spans: scanner.batch_enrichment, scanner.evaluate_ticker
-│   │   │   ├── discovery_service.py    # Bulk ticker sync from Polygon; rate-limit-aware paging
-│   │   │   ├── catalyst_parser.py      # Batch 72-hour news analysis; returns latest_article_utc for recency enrichment
-│   │   │   ├── futures_data.py         # 2-method public interface: get_continuous_series, sync_contracts; private write-path helpers
-│   │   │   ├── chart_indicators.py     # Technical indicators (VWAP, MAs) for chart endpoints
-│   │   │   ├── journal_service.py      # Trade journal CRUD
-│   │   │   ├── websocket_manager.py    # WebSocket connection pool and broadcast
-│   │   │   ├── normalization.py        # Price/volume normalization, split adjustments
-│   │   │   ├── data_quality.py         # Quality checks; UniverseQualityReport generation
-│   │   │   ├── stats.py                # Aggregate statistics for dashboard metrics
-│   │   │   ├── event_helpers.py        # ScannerEvent construction and querying utilities
+│   │   │   ├── pocket_pivot.py
+│   │   │   ├── scanner.py
+│   │   │   ├── discovery_service.py
+│   │   │   ├── catalyst_parser.py
+│   │   │   ├── futures_data.py
+│   │   │   ├── chart_indicators.py
+│   │   │   ├── journal_service.py
+│   │   │   ├── websocket_manager.py
+│   │   │   ├── normalization.py
+│   │   │   ├── data_quality.py
+│   │   │   ├── stats.py
+│   │   │   ├── event_helpers.py
 │   │   │   ├── statistical_discovery.py # Phase 2b: pure-Python statistical analysis (correlation, SHAP, K-means); no DB dependencies
-│   │   │   ├── signal_ranker.py        # Phase 2c: compute_signal_quality_score() + load_ranker_config(); weights from SystemConfig
+│   │   │   ├── signal_ranker.py
 │   │   │   ├── universe_orchestrator.py # Celery dispatch + Redis state for universe ops: discover_and_refresh, sync_missing_aggregates, sync_aggregates, queue_quality_analysis, queue_normalization
-│   │   │   ├── universe_export.py      # ZIP streaming for universe aggregate exports; no Celery/Redis; duck-typed request
+│   │   │   ├── universe_export.py
 │   │   │   └── __init__.py
 │   │   ├── providers/
-│   │   │   ├── base.py                 # BaseDataProvider sync abstract interface: get_bars, get_snapshots, get_ticker_details
-│   │   │   ├── massive.py              # Polygon.io provider: get_bars (paginated), get_snapshots (normalised), bulk sync/backfill
-│   │   │   ├── ibkr.py                 # ib_insync Interactive Brokers provider (futures-only; get_bars/get_snapshots are no-op stubs)
+│   │   │   ├── base.py
+│   │   │   ├── massive.py
+│   │   │   ├── ibkr.py
 │   │   │   └── __init__.py
-│   │   ├── main.py                     # FastAPI app factory; global error handler; router mounts
-│   │   └── tasks/                      # Celery task package (sync.py, scanning.py, trading.py, quality.py)
+│   │   ├── main.py
+│   │   └── tasks/
 │   ├── tests/
-│   │   ├── conftest.py                 # Session-scoped engine + function-scoped db fixture (SAVEPOINT isolation)
-│   │   ├── api/                        # Router integration tests (DI override via tests/api/conftest.py)
-│   │   │   ├── conftest.py             # Autouse fixture: app.dependency_overrides[get_db] = test session
-│   │   │   ├── test_alerts.py          # Alert rule CRUD + delivery log endpoints
-│   │   │   ├── test_auto_trading.py    # Strategy CRUD, order lifecycle, stats, config
-│   │   │   ├── test_health.py          # /api/health liveness check
-│   │   │   ├── test_journal.py         # Journal trade and entry endpoints
-│   │   │   ├── test_outcomes.py        # Outcome scorecard and snapshot endpoints
-│   │   │   ├── test_scanner.py         # Scanner run, results, history endpoints
-│   │   │   ├── test_stocks.py          # Historical OHLCV endpoint
-│   │   │   ├── test_universe.py        # Universe CRUD endpoints
-│   │   │   ├── test_watchlist.py       # Active watchlist CRUD (soft-limit enforcement)
-│   │   │   └── test_live_data.py       # Skipped (requires live IBKR)
-│   │   └── services/                   # Service-layer unit / integration tests
-│   │       ├── test_alert_service.py   # AlertRuleService: matching, cooldown
-│   │       ├── test_auto_trade_service.py  # AutoTradeExecutor: position math, guards, paper/live paths
-│   │       ├── test_chart_indicators.py    # ChartIndicatorsService: pure DataFrame transforms
+│   │   ├── conftest.py
+│   │   ├── api/
+│   │   │   ├── conftest.py
+│   │   │   ├── test_alerts.py
+│   │   │   ├── test_auto_trading.py
+│   │   │   ├── test_health.py
+│   │   │   ├── test_journal.py
+│   │   │   ├── test_outcomes.py
+│   │   │   ├── test_scanner.py
+│   │   │   ├── test_stocks.py
+│   │   │   ├── test_universe.py
+│   │   │   ├── test_watchlist.py
+│   │   │   └── test_live_data.py
+│   │   └── services/
+│   │       ├── test_alert_service.py
+│   │       ├── test_auto_trade_service.py
+│   │       ├── test_chart_indicators.py
 │   │       ├── test_data_quality_helpers.py # _score_to_grade, _grade_color, weekday counting
-│   │       ├── test_discovery_service.py   # DiscoveryService with mocked Polygon client
-│   │       ├── test_journal_service.py     # JournalService CRUD operations
+│   │       ├── test_discovery_service.py
+│   │       ├── test_journal_service.py
 │   │       ├── test_normalization_helpers.py # _parse_date, _to_date_str round-trips
-│   │       ├── test_outcome_service.py     # OutcomeService: snapshot creation and capture
-│   │       └── test_split_adjustment.py    # SplitAdjustmentService: price-factor math
-│   ├── alembic.ini                     # Alembic configuration (points to DATABASE_URL)
-│   ├── requirements.txt                # Python dependencies
-│   └── Dockerfile                      # Backend container image
+│   │       ├── test_outcome_service.py
+│   │       └── test_split_adjustment.py
+│   ├── alembic.ini
+│   ├── requirements.txt
+│   └── Dockerfile
 ├── frontend/
 │   ├── src/
 │   │   ├── api/
-│   │   │   ├── client.ts               # Axios instance with error interceptor
-│   │   │   ├── scanner.ts              # Scanner API calls
-│   │   │   ├── stocks.ts               # Stocks and universe API calls
-│   │   │   ├── news.ts                 # News API calls
-│   │   │   ├── system.ts               # System/health API calls
-│   │   │   ├── watchlist.ts            # Active watchlist CRUD + React Query hooks
-│   │   │   └── analysis.ts             # Phase 2b: fetchCorrelations, fetchLatestAnalysis, triggerAnalysis
+│   │   │   ├── client.ts
+│   │   │   ├── scanner.ts
+│   │   │   ├── stocks.ts
+│   │   │   ├── news.ts
+│   │   │   ├── system.ts
+│   │   │   ├── watchlist.ts
+│   │   │   └── analysis.ts
 │   │   ├── components/
-│   │   │   ├── UniverseFormModal.tsx   # Create/edit universe modal
+│   │   │   ├── UniverseFormModal.tsx
 │   │   │   ├── UniverseDetailsModal.tsx # Universe detail view modal
-│   │   │   ├── ScannerResults.tsx      # Scanner results table/list
-│   │   │   └── ...                     # Other reusable components
+│   │   │   ├── ScannerResults.tsx
+│   │   │   └── ...
 │   │   ├── pages/
-│   │   │   ├── Dashboard.tsx           # System metrics, recent alerts, market status
-│   │   │   ├── Scanner/                # Co-located directory — shell + panels
-│   │   │   │   ├── index.tsx           # Shell: all queries, mutations, WS lifecycle
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Scanner/
+│   │   │   │   ├── index.tsx
 │   │   │   │   ├── ScanConfigPanel.tsx # Header, date controls, config grid, scan history
-│   │   │   │   ├── ScanStatusCard.tsx  # Status/metrics sidebar card
+│   │   │   │   ├── ScanStatusCard.tsx
 │   │   │   │   ├── LiveProgressPanel.tsx # In-flight WS progress display
-│   │   │   │   └── ResultsPanel.tsx    # Scan results + signal review stats
-│   │   │   ├── AutoTrading/            # Co-located directory
-│   │   │   │   ├── index.tsx           # Shell: all queries, mutations, modal state
-│   │   │   │   ├── StrategyPanel.tsx   # Strategy list card
-│   │   │   │   ├── OrdersPanel.tsx     # Orders table with filter pills
-│   │   │   │   ├── AccountPanel.tsx    # IBKR account, breakdown, config cards
-│   │   │   │   ├── ConfigPanel.tsx     # Strategy create/edit modal
-│   │   │   │   └── components.tsx      # Shared constants, helpers, sub-components
-│   │   │   ├── Alerts/                 # Co-located directory
-│   │   │   │   ├── index.tsx           # Shell: all queries, mutations, modal state
+│   │   │   │   └── ResultsPanel.tsx
+│   │   │   ├── AutoTrading/
+│   │   │   │   ├── index.tsx
+│   │   │   │   ├── StrategyPanel.tsx
+│   │   │   │   ├── OrdersPanel.tsx
+│   │   │   │   ├── AccountPanel.tsx
+│   │   │   │   ├── ConfigPanel.tsx
+│   │   │   │   └── components.tsx
+│   │   │   ├── Alerts/
+│   │   │   │   ├── index.tsx
 │   │   │   │   ├── AlertRulesPanel.tsx # Alert rule list card
-│   │   │   │   ├── AlertRuleModal.tsx  # Create/edit rule modal form
-│   │   │   │   ├── AlertLogsPanel.tsx  # AlertActivityCard (sidebar) + AlertLogsPanel (full table)
+│   │   │   │   ├── AlertRuleModal.tsx
+│   │   │   │   ├── AlertLogsPanel.tsx
 │   │   │   │   └── ChannelConfigPanel.tsx # Browser push registration card
-│   │   │   ├── StockDetailPage/        # Co-located directory
-│   │   │   │   ├── index.tsx           # Shell: all queries, mutations, state, handlers
-│   │   │   │   ├── ChartPanel.tsx      # Chart card + controls + market profile/extended hours
-│   │   │   │   ├── MetadataPanel.tsx   # News feed + trader plan checklist
+│   │   │   ├── StockDetailPage/
+│   │   │   │   ├── index.tsx
+│   │   │   │   ├── ChartPanel.tsx
+│   │   │   │   ├── MetadataPanel.tsx
 │   │   │   │   └── ScannerHistoryPanel.tsx # Event history + force scan dialog
-│   │   │   ├── ActiveWatchlist/        # Co-located directory
-│   │   │   │   ├── index.tsx           # Shell: watchlist query + live WS, AddSymbolForm
-│   │   │   │   ├── WatchlistTable.tsx  # PriceCell, SessionCell, WatchlistRow, table
-│   │   │   │   └── AlertBadges.tsx     # LiveAlert severity badge
-│   │   │   ├── PreMarketMovers.tsx     # Real-time pre-market volume leaders
-│   │   │   ├── Universes.tsx           # Create and manage stock universes
-│   │   │   ├── EdgeExplorer.tsx        # Historical scanner hit rates and outcome distributions
-│   │   │   ├── Journal.tsx             # Trade journal entry and review
-│   │   │   └── Settings.tsx            # System configuration
-│   │   ├── hooks/                      # Custom React hooks (useScannerState, useScannerWs, useWatchlistLive, …)
-│   │   ├── App.tsx                     # Router and layout wrapper
-│   │   └── main.tsx                    # React entry point
+│   │   │   ├── ActiveWatchlist/
+│   │   │   │   ├── index.tsx
+│   │   │   │   ├── WatchlistTable.tsx
+│   │   │   │   └── AlertBadges.tsx
+│   │   │   ├── PreMarketMovers.tsx
+│   │   │   ├── Universes.tsx
+│   │   │   ├── EdgeExplorer.tsx
+│   │   │   ├── Journal.tsx
+│   │   │   └── Settings.tsx
+│   │   ├── hooks/
+│   │   ├── App.tsx
+│   │   └── main.tsx
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── vite.config.ts
-│   └── Dockerfile                      # Frontend container image
+│   └── Dockerfile
 ├── .agent/
 │   └── skills/
-│       ├── backend_tests/SKILL.md      # How to run pytest
-│       ├── db_migrations/SKILL.md      # How to create and apply Alembic migrations
-│       ├── error_tracking/SKILL.md     # How to debug errors using Seq ErrorIds
-│       ├── frontend_lint/SKILL.md      # How to run ESLint
-│       ├── massive_api_research/       # Polygon.io query tool
+│       ├── backend_tests/SKILL.md
+│       ├── db_migrations/SKILL.md
+│       ├── error_tracking/SKILL.md
+│       ├── frontend_lint/SKILL.md
+│       ├── massive_api_research/
 │       │   ├── SKILL.md
-│       │   └── scripts/query_api.py    # CLI for ad-hoc Polygon API calls
-│       └── bash/SKILL.md               # Shell patterns for this environment
+│       │   └── scripts/query_api.py
+│       └── bash/SKILL.md
 ├── monitoring/
 │   └── prometheus/
-│       └── prometheus.yml              # Prometheus scrape config (targets backend:8000/metrics every 15s)
+│       └── prometheus.yml
 ├── grafana/
 │   └── provisioning/
 │       ├── datasources/
-│       │   └── prometheus.yaml         # Auto-provision Prometheus datasource
+│       │   └── prometheus.yaml
 │       ├── dashboards/
-│       │   ├── dashboards.yaml         # Dashboard provider config (loads JSON files from this dir)
-│       │   ├── api-overview.json       # HTTP request rate, latency, DB pool, WebSocket connections
+│       │   ├── dashboards.yaml
+│       │   ├── api-overview.json
 │       │   ├── scanner-performance.json # Scanner events/duration, Polygon calls, IBKR status
-│       │   ├── celery-tasks.json       # Celery success/failure rates, P95 durations
-│       │   └── infrastructure.json     # IBKR status, DB pool, WebSocket, Polygon calls
+│       │   ├── celery-tasks.json
+│       │   └── infrastructure.json
 │       └── alerting/
-│           ├── contact-points.yaml     # Webhook receiver → backend /api/alerts/infrastructure
+│           ├── contact-points.yaml
 │           ├── notification-policies.yaml # Default routing policy
-│           └── rules.yaml              # Alert rules: IBKR disconnect, high failure rate, DB overflow
-├── database-schema.sql                 # Legacy SQL reference schema — do not use directly; use Alembic
-├── docker-compose.yml                  # Full stack orchestration (all services)
-├── .env.example                        # Environment variable template — copy to .env
-├── README.md                           # Project overview and quick start
-├── ARCHITECTURE.md                     # System design, data flow, module map
-├── DEVELOPMENT.md                      # Local dev setup, Docker commands, debugging
-├── ENV_VARIABLES.md                    # Complete environment variable reference
-├── POLYGON_RATE_LIMITS.md              # Polygon.io API reference and rate limit guidance
-├── PROJECT_STRUCTURE.md                # This file
-└── CLAUDE.md                           # Claude Code instructions for this repository
+│           └── rules.yaml
+├── database-schema.sql
+├── docker-compose.yml
+├── .env.example
+├── README.md
+├── ARCHITECTURE.md
+├── DEVELOPMENT.md
+├── ENV_VARIABLES.md
+├── POLYGON_RATE_LIMITS.md
+├── PROJECT_STRUCTURE.md
+└── CLAUDE.md
 ```
 
 ## Notes for Navigation
