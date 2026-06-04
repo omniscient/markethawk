@@ -103,8 +103,8 @@ export -f docker
 EXIT_CODE=0
 dispatch "Fix issue #1" || EXIT_CODE=$?
 assert_eq "dispatch returns non-zero exit code" "42" "$EXIT_CODE"
-assert_eq "dispatch uses --no-build" \
-  "1" "$(grep -c -- '--no-build' "$STUB_LOG" || echo 0)"
+assert_eq "dispatch does not pass --no-build (invalid flag for 'compose run')" \
+  "0" "$(grep -c -- '--no-build' "$STUB_LOG" || true)"
 
 docker() { echo "docker $*" >> "$STUB_LOG"; return 0; }
 export -f docker

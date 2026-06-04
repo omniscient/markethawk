@@ -293,13 +293,15 @@ has_new_comment_after_report() {
 # --- Dispatch ---
 # Returns the docker compose exit code. Callers MUST use `if dispatch ...; then` —
 # a bare call under set -e exits the daemon on non-zero.
-# --no-build prevents inline image builds; the startup probe ensures the image exists.
+# `docker compose run` never builds inline (it has no --build by default); the startup
+# probe ensures the image exists. Note: --no-build is NOT a valid flag for `run` (it is
+# `up`/`create`-only) and passing it makes every dispatch fail with "unknown flag".
 dispatch() {
   local command="$1"
   local exit_code=0
   echo "[$(date -u +%FT%TZ)] dispatch command=\"${command}\""
   docker compose -f /opt/dark-factory/docker-compose.yml --profile factory run \
-    -d --rm --no-build dark-factory "$command" || exit_code=$?
+    -d --rm dark-factory "$command" || exit_code=$?
   if [ "$exit_code" -ne 0 ]; then
     echo "[$(date -u +%FT%TZ)] dispatch_error command=\"${command}\" exit=${exit_code}" >&2
   fi
@@ -617,8 +619,8 @@ MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
 echo "WIP limits: in_progress=${MAX_IN_PROGRESS} in_review=${MAX_IN_REVIEW}"
 
 # --- Startup probe: verify factory image is available locally ---
-# dispatch() uses --no-build so a missing image causes every dispatch to fail immediately
-# (no inline build). Exit here with actionable instructions rather than entering a loop
+# `docker compose run` does not build inline by default, so a missing image causes every
+# dispatch to fail immediately. Exit here with actionable instructions rather than entering a loop
 # where every dispatch fails and the circuit-breaker trips in N cycles.
 FACTORY_IMAGE="${FACTORY_IMAGE:-ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}}"
 echo "[$(date -u +%FT%TZ)] probe=image_check image=${FACTORY_IMAGE}"
