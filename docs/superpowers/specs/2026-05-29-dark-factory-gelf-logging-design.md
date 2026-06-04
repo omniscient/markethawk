@@ -63,7 +63,7 @@ Both factory services add `stockscanner-network` as a second network (they keep 
 | `docker-compose.yml` — new `seq-gelf` service | `datalust/seq-input-gelf` sidecar, UDP 12201, forwards to Seq |
 | `docker-compose.yml` — `dark-factory` | Add GELF `logging:` block, add `stockscanner-network` |
 | `docker-compose.yml` — `backlog-scheduler` | Add GELF `logging:` block, add `stockscanner-network` |
-| `Docs/adr/0010-dark-factory-gelf-logging.md` | ADR documenting the decision and trade-offs |
+| `docs/adr/0011-dark-factory-gelf-logging.md` | ADR documenting the decision and trade-offs |
 
 No changes to `entrypoint.sh`, `scheduler.sh`, `Dockerfile`, or application code.
 

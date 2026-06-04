@@ -9,7 +9,7 @@
 **Tech Stack:** Docker Compose, GELF protocol, Seq, `datalust/seq-input-gelf`
 
 **Spec:** [`Docs/superpowers/specs/2026-05-29-dark-factory-gelf-logging-design.md`](../specs/2026-05-29-dark-factory-gelf-logging-design.md)
-**ADR:** [`Docs/adr/0010-dark-factory-gelf-logging.md`](../../adr/0010-dark-factory-gelf-logging.md)
+**ADR:** [`docs/adr/0011-dark-factory-gelf-logging.md`](../../adr/0011-dark-factory-gelf-logging.md)
 **Issue:** [#122](https://github.com/omniscient/markethawk/issues/122)
 
 ---
@@ -206,15 +206,15 @@ git commit -m "feat(logging): add GELF log driver to dark-factory and backlog-sc
 
 **Files:**
 - Already on disk: `Docs/superpowers/specs/2026-05-29-dark-factory-gelf-logging-design.md`
-- Already on disk: `Docs/adr/0010-dark-factory-gelf-logging.md`
+- Already on disk: `docs/adr/0011-dark-factory-gelf-logging.md`
 
 These files were written during the brainstorming/design phase but not yet committed.
 
 - [ ] **Step 1: Commit spec and ADR**
 
 ```bash
-git add Docs/superpowers/specs/2026-05-29-dark-factory-gelf-logging-design.md Docs/adr/0010-dark-factory-gelf-logging.md
-git commit -m "docs: add spec and ADR-0010 for dark factory GELF logging (#122)"
+git add docs/superpowers/specs/2026-05-29-dark-factory-gelf-logging-design.md docs/adr/0011-dark-factory-gelf-logging.md
+git commit -m "docs: add spec and ADR-0011 for dark factory GELF logging (#122)"
 ```
 
 ---
