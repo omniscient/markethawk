@@ -353,9 +353,10 @@ trip_to_blocked() {
   # 3. Manual retry command varies by phase
   local retry_cmd
   case "$phase" in
-    refine) retry_cmd="Refine issue #${issue_num}" ;;
-    plan)   retry_cmd="Plan issue #${issue_num}" ;;
-    *)      retry_cmd="Fix issue #${issue_num}" ;;
+    refine)  retry_cmd="Refine issue #${issue_num}" ;;
+    plan)    retry_cmd="Plan issue #${issue_num}" ;;
+    resolve) retry_cmd="Deconflict issue #${issue_num}" ;;
+    *)       retry_cmd="Fix issue #${issue_num}" ;;
   esac
 
   # 4. Explanatory comment
@@ -759,6 +760,12 @@ This issue was left in **In progress** with no running factory container — the
       case "$CI_BLOCKED" in *" $ISSUE "*) continue ;; esac
       if is_issue_running "$ISSUE"; then continue; fi
 
+      RETRIES=$(get_retry_count "${ISSUE}:resolve")
+      if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+        trip_to_blocked "$ISSUE" "resolve" "retry limit of ${MAX_RETRIES} reached for conflict resolution"
+        continue
+      fi
+
       PR_NUM=$(get_pr_for_issue "$ISSUE")
       [ -z "$PR_NUM" ] && continue
 
@@ -766,6 +773,7 @@ This issue was left in **In progress** with no running factory container — the
       case "$MERGEABLE" in
         CONFLICTING)
           echo "[$(date -u +%FT%TZ)] conflict_gate issue=#${ISSUE} pr=#${PR_NUM} mergeable=CONFLICTING action=dispatch_deconflict"
+          increment_retry "${ISSUE}:resolve" || true
           if dispatch "Deconflict issue #${ISSUE}"; then
             DISPATCHED="Deconflict issue #${ISSUE}"
           fi

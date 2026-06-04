@@ -232,7 +232,7 @@ ${RUN_ROWS}
 on_failure() {
   local EXIT_CODE=$?
   if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
-    if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ]; then
+    if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ] || [ "$INTENT" = "deconflict" ]; then
       # No board status change here — the scheduler's trip_to_blocked() handles the
       # Blocked transition after N attempts. Setting Blocked from on_failure would put
       # the issue in Blocked before the scheduler's counter accumulates; Priority 3
