@@ -24,7 +24,7 @@ Single-context repo:
 └── src/
 ```
 
-Note: `docs/superpowers/specs/` contains feature specifications and implementation plans — these are *not* ADRs. ADRs record architectural decisions and their rationale; specs describe what to build.
+Note: `docs/superpowers/specs/` holds **in-flight** feature specifications; `docs/superpowers/plans/` holds **in-flight** implementation plans. Both are write-once artifacts — shipped specs/plans are archived to `docs/archive/` automatically when an implementation PR is created. These are *not* ADRs; ADRs record architectural decisions and their rationale.
 
 ## Use the glossary's vocabulary
 
