@@ -324,6 +324,71 @@ nodes:
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 120000
 
+  - id: preview-changeset
+    bash: |
+      echo "Gathering branch changeset for preview classifier..."
+      FILE_LIST=$(git diff main...HEAD --name-only 2>/dev/null || echo "")
+      STAT_OUT=$(git diff main...HEAD --stat 2>/dev/null || echo "")
+      if [ -z "$FILE_LIST" ]; then
+        echo "WARNING: Empty changeset — classifier will default to needs_preview=true" >&2
+      fi
+      printf "FILE_LIST:\n%s\n---STAT---\n%s\n" "$FILE_LIST" "$STAT_OUT"
+    depends_on: [regen-codeindex, fetch-issue]
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
+    timeout: 15000
+
+  - id: classify-preview
+    prompt: |
+      You are a preview-environment classifier for a software CI pipeline.
+
+      Your job: inspect a git changeset and decide whether a full Docker preview stack
+      (postgres, redis, backend, frontend, celery) needs to be built to validate this change.
+
+      ## Input
+
+      Changed files (from git diff main...HEAD --name-only):
+      $preview-changeset.output
+
+      Issue title and labels (secondary signal only):
+      $fetch-issue.output
+
+      ## Classifier Rubric
+
+      Set needs_preview=false ONLY if EVERY changed file falls into one of:
+      - Documentation: *.md, *.mdx, anything under docs/ or Docs/, LICENSE
+      - Agent/workflow config: .archon/**, .claude/**, workflow YAML (NOT docker-compose* or app config)
+      - Tests: backend/tests/**, **/*.test.ts(x), **/*.spec.ts(x), conftest.py, **/*_test.py, dark-factory/tests/**
+      - CI/repo meta: .github/**, .gitignore, .pre-commit-config.yaml, lint/format config files (.eslintrc*, .prettierrc*, ruff.toml, .flake8, mypy.ini), .editorconfig
+
+      Force needs_preview=true if ANYTHING touches:
+      backend/app/**, alembic/versions/**, requirements.txt, frontend/src/**,
+      package.json, package-lock.json, Dockerfile*, docker-compose*, .env*, dark-factory/seed/**
+
+      FAIL-SAFE: empty changeset, mixed/uncertain files, or any uncertainty → needs_preview=true.
+      The diff is authoritative — a docs-labeled issue that touches backend/app/** still needs a preview.
+
+      If preview.enabled is false in .claude/skills/refinement/config.yaml, output needs_preview=true regardless.
+
+      ## Output
+
+      Output ONLY valid JSON, no explanation outside the JSON object:
+      {"needs_preview": <boolean>, "category": "<code|docs|config|tests|ci|mixed>", "reason": "<one sentence>"}
+    model: haiku
+    allowed_tools: []
+    depends_on: [preview-changeset, fetch-issue]
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
+    output_format:
+      type: object
+      properties:
+        needs_preview:
+          type: boolean
+        category:
+          type: string
+          enum: [code, docs, config, tests, ci, mixed]
+        reason:
+          type: string
+      required: [needs_preview, category, reason]
+
   # Layer 3: Spin up preview and validate
   - id: preview-up
     bash: |
