@@ -155,20 +155,7 @@ python -m pytest --cov             # with coverage report
 
 ## Environment Variables
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `POLYGON_API_KEY` | Yes | Polygon.io market data |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `POSTGRES_DB/USER/PASSWORD` | Yes | Used by the postgres container |
-| `SECRET_KEY` | Yes | JWT tokens and sessions |
-| `PGADMIN_DEFAULT_EMAIL/PASSWORD` | Yes | pgAdmin login |
-| `SEQ_ADMIN_PASSWORD_HASH` | Yes | Seq log viewer login |
-| `REDIS_URL` | No | Defaults to `redis://redis:6379/0` |
-| `ENVIRONMENT` | No | `development` / `production` (default: `development`) |
-| `LOG_LEVEL` | No | `DEBUG` / `INFO` / … (default: `INFO`) |
-| `IB_USERNAME/PASSWORD` | No | IB Gateway auto-login credentials |
-| `IB_TRADING_MODE` | No | `paper` or `live` (default: `paper`) |
-| `IBKR_HOST/PORT/CLIENT_ID` | No | Backend connection to IB Gateway |
+See [ENV_VARIABLES.md](ENV_VARIABLES.md) for the complete environment variable reference with defaults and descriptions.
 
 ## Useful Docker Commands
 
