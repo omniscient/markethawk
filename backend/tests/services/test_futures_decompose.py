@@ -51,3 +51,10 @@ def test_future_series_service_callable():
 
     assert callable(FutureSeriesService.get_continuous_series)
     assert callable(FutureSeriesService._get_continuous_series_with_db)
+
+
+def test_symbol_exchange_map_importable_from_facade():
+    from app.services.futures_data import SYMBOL_EXCHANGE_MAP as facade_map
+
+    assert facade_map["ES"] == "CME"
+    assert facade_map["GC"] == "COMEX"

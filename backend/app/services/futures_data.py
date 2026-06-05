@@ -18,6 +18,7 @@ import pandas as pd
 from app.core.database import SessionLocal  # retained: test patch target
 from app.services.futures_aggregates import FuturesAggregatesService
 from app.services.futures_contracts import (
+    SYMBOL_EXCHANGE_MAP,  # noqa: F401 — re-exported for 3 callers: universe_orchestrator (×2), routers/stocks
     FuturesContractService,
     _resolve_exchange,
 )
