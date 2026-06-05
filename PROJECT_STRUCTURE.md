@@ -76,10 +76,16 @@ MarketHawk/
 │   │   │   ├── pre_market_scan.py
 │   │   │   ├── oversold_bounce_scan.py
 │   │   │   ├── pocket_pivot.py
-│   │   │   ├── scanner.py
+│   │   │   ├── scanner.py          (facade — scan bodies in sibling modules)
+│   │   │   ├── session_metrics.py  (calculate_day_metrics* — extracted from scanner.py)
+│   │   │   ├── scan_enrichment.py  (_get_batch_enrichment_data* — extracted from scanner.py)
 │   │   │   ├── discovery_service.py
 │   │   │   ├── catalyst_parser.py
-│   │   │   ├── futures_data.py
+│   │   │   ├── futures_data.py         (facade — impl in sibling modules)
+│   │   │   ├── futures_contracts.py    (SYMBOL_EXCHANGE_MAP, FuturesContractService)
+│   │   │   ├── futures_aggregates.py   (FuturesAggregatesService — download/gap-fill)
+│   │   │   ├── futures_rollovers.py    (FuturesRolloversService, _build_time_slices)
+│   │   │   ├── futures_series.py       (FutureSeriesService — continuous series assembly)
 │   │   │   ├── chart_indicators.py
 │   │   │   ├── journal_service.py
 │   │   │   ├── websocket_manager.py
