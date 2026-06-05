@@ -15,6 +15,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Reuse API response types defined in `frontend/src/api/*.ts` rather than re-declaring interfaces in components. Type imports keep the schema as the single source of truth. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+- [PATTERN] `frontend/tsconfig.json` must have an `"exclude"` array covering `**/*.test.ts`, `**/*.test.tsx`, `src/test-utils`, and `src/test-setup.ts` so test files are never compiled by the production `tsc --noEmit` gate. <!-- issue:#193 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] `frontend/src/vite-env.d.ts` (single line: `/// <reference types="vite/client" />`) must exist in `src/` so all source files and the test tsconfig can resolve `import.meta.env` without per-file triple-slash references. This is the standard Vite scaffold file that this project was missing. <!-- issue:#193 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] `frontend/tsconfig.test.json` extends `tsconfig.json` with `"types": ["vite/client", "vitest/globals"]`, relaxed `noUnusedLocals`/`noUnusedParameters`, and `"include"` limited to test files — used for IDE test-file support and optional `tsc -p tsconfig.test.json --noEmit` gate. <!-- issue:#193 date:2026-06-05 expires:2026-12-05 source:implement -->
+
 ## Frontend: Component Structure
 
 - [PATTERN] Pages (route-level views) live in `frontend/src/pages/`. Reusable UI pieces live in `frontend/src/components/`. A component that is only used by one page can live in a `components/` subdirectory named after the page. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
