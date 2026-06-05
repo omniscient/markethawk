@@ -3,7 +3,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import (
+    Cookie,
+    Depends,
+    HTTPException,
+    WebSocket,
+    WebSocketException,
+    status,
+)
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -56,4 +63,35 @@ def get_current_user(
     ).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    return user
+
+
+def ws_get_current_user(
+    websocket: WebSocket,
+    db: Session = Depends(get_db),
+) -> User:
+    """WebSocket counterpart to get_current_user.
+
+    Reads access_token from the handshake cookies. Raises WebSocketException(1008)
+    on any auth failure so the connection is rejected before accept() is called.
+    """
+    token = websocket.cookies.get("access_token")
+    if not token:
+        raise WebSocketException(code=1008, reason="Not authenticated")
+    _settings = get_settings()
+    try:
+        payload = jwt.decode(
+            token, _settings.JWT_SECRET_KEY, algorithms=[_settings.JWT_ALGORITHM]
+        )
+        user_id: str = payload.get("sub")
+    except JWTError:
+        raise WebSocketException(code=1008, reason="Token expired or invalid")
+    try:
+        user = db.execute(
+            select(User).where(User.id == uuid.UUID(user_id), User.is_active == True)
+        ).scalar_one_or_none()
+    except Exception:
+        raise WebSocketException(code=1008, reason="Not authenticated")
+    if not user:
+        raise WebSocketException(code=1008, reason="Not authenticated")
     return user
