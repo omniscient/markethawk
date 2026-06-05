@@ -950,6 +950,30 @@ nodes:
         esac
       fi
 
+      CODE_REVIEW_SECTION=""
+      if [ -f "$ARTIFACTS_DIR/review.md" ]; then
+        CR_STATUS=$(grep '^STATUS:' "$ARTIFACTS_DIR/review.md" | cut -d' ' -f2)
+        CR_BLOCKERS=$(grep '^BLOCKERS:' "$ARTIFACTS_DIR/review.md" | cut -d' ' -f2)
+        CR_ADVISORY=$(grep '^ADVISORY:' "$ARTIFACTS_DIR/review.md" | cut -d' ' -f2)
+        case "$CR_STATUS" in
+          PASS)
+            CODE_REVIEW_SECTION=$(printf "### Code Review\n\n✅ Passed — %s advisory finding(s), 0 blocking. See PR review comments." "${CR_ADVISORY:-0}")
+            ;;
+          BLOCKED)
+            CODE_REVIEW_SECTION=$(printf "### Code Review\n\n⛔ Blocked — %s blocking finding(s). Issue moved to Blocked; see PR review comments." "${CR_BLOCKERS:-0}")
+            ;;
+          SKIPPED)
+            CODE_REVIEW_SECTION=$(printf "### Code Review\n\n_Code review disabled (code_review.enabled=false)._")
+            ;;
+          ERROR)
+            CODE_REVIEW_SECTION=$(printf "### Code Review\n\n_Code review could not complete (advisory; did not block)._")
+            ;;
+          *)
+            CODE_REVIEW_SECTION=""
+            ;;
+        esac
+      fi
+
       # --- Build the Preview Environment section ---
       if [ "$INTENT" = "resolve" ]; then
         PREVIEW_SECTION="_No preview environment — conflict resolution run._"
@@ -988,6 +1012,7 @@ nodes:
       ${CHANGES:-_No implementation summary available._}
 
       ${CONFORMANCE_SECTION}
+      ${CODE_REVIEW_SECTION}
       ${CONFLICT_SECTION}
 
       ### Preview Environment
