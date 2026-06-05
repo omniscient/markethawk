@@ -26,6 +26,12 @@ conformance:
   excise_out_of_scope: true  # revert out-of-scope changes from the branch (false = file backlog ticket only)
   backlog_label: scope-spillover  # label applied to auto-created spillover tickets
 
+code_review:
+  enabled: true
+  block_threshold: high     # findings at this severity or above block (critical|high|medium|low)
+  fail_open: true           # reviewer error / unparseable output → advisory, never block
+  max_findings: 50          # cap inline comments to avoid spam (log if exceeded)
+
 preview:
   enabled: true   # false = always build the preview (pre-differentiator behavior) — kill-switch
   model: haiku
