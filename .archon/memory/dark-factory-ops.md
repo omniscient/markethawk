@@ -121,6 +121,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] The shared de-conflict step for `continue` runs in `entrypoint.sh` BEFORE the archon call: checkout the feature branch, merge origin/main, apply Tier 1/2/3. Archon then runs on the already-synced branch. The implement agent sees the merge commit in `git log` and understands the sync already happened. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
 
+## CI Audit Gates
+
+- [PATTERN] When dropping `|| true` from `pip-audit` or `npm audit` CI steps, baseline the current finding IDs first. Add each known finding to `--ignore-vuln` (pip-audit) or an audit allowlist file (npm) with a dated comment, then drop `|| true`. This makes the gate honest for *new* findings without immediately breaking CI on pre-existing debt. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:refine -->
+
+- [AVOID] Do not use `|| true` on CI audit steps — it silently swallows all security findings regardless of severity. Even if current findings are acceptable, `|| true` prevents any future finding from surfacing. Severity gating (`--audit-level=high`) + allowlisting is the correct pattern. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:refine -->
+
 ## Analysis and Documentation Outputs
 
 - [PATTERN] Analysis/comparison documents (e.g. `docs/dark-factory-agyn-comparison.html`) must be delivered as self-contained HTML, not Markdown — HTML is preferred for portability and supports visual elements (colored tables, badges, cards) impossible in MD. Use inline CSS with no external dependencies so the file is portable as a single asset. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->
