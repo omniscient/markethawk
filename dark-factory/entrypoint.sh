@@ -582,7 +582,7 @@ if [ "$INTENT" = "deconflict" ]; then
   set_board_status "$STATUS_IN_REVIEW" 2>/dev/null || true
 
   # --- Write artifact ---
-  DECONFLICT_ARTIFACTS_DIR="/root/.archon/workspaces/omniscient/markethawk/artifacts"
+  DECONFLICT_ARTIFACTS_DIR="${HOME}/.archon/workspaces/omniscient/markethawk/artifacts"
   mkdir -p "$DECONFLICT_ARTIFACTS_DIR"
   cat > "$DECONFLICT_ARTIFACTS_DIR/conflict_resolution.md" << EOF
 # Conflict Resolution — Issue #${ISSUE_NUM}
