@@ -95,11 +95,11 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: npm run lint || true
+        run: npx eslint . --report-unused-disable-directives-severity error
 
       - name: Dependency audit
         working-directory: frontend
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high
 
   migration-check:
     runs-on: ubuntu-latest
