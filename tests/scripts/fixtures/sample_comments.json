@@ -1,0 +1,9 @@
+{
+  "1": [
+    {
+      "body": "<!-- dark-factory-cost-report -->\n<!-- cumulative: cost=2.50 in=100 out=50000 -->\n## Dark Factory — Cost Report\n\n### Run: 2026-01-10 09:30 UTC (plan, completed)\n\n| Step | Model | In tokens | Out tokens | Cost | Duration |\n|------|-------|-----------|------------|------|----------|\n| plan |  | 50 | 25000 | $1.25 | 10m 0s |\n| **Subtotal** | | **50** | **25000** | **$1.25** | |\n\n### Run: 2026-01-10 10:15 UTC (implement, completed)\n\n| Step | Model | In tokens | Out tokens | Cost | Duration |\n|------|-------|-----------|------------|------|----------|\n| implement |  | 50 | 25000 | $1.25 | 10m 0s |\n| **Subtotal** | | **50** | **25000** | **$1.25** | |"
+    }
+  ],
+  "2": [{"body": "This looks like a bug in the session timezone handling."}],
+  "3": []
+}
