@@ -10,8 +10,10 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+import pybreaker
 from polygon import RESTClient
 
+from app.core.circuit_breakers import POLYGON_BREAKER
 from app.core.config import settings
 from app.core.metrics import polygon_api_calls_total
 from app.exceptions import ProviderError
@@ -35,7 +37,11 @@ class MassiveDataProvider(BaseDataProvider):
     def _init_client(self):
         if settings.POLYGON_API_KEY:
             try:
-                self._client = RESTClient(settings.POLYGON_API_KEY)
+                self._client = RESTClient(
+                    settings.POLYGON_API_KEY,
+                    connect_timeout=settings.POLYGON_CONNECT_TIMEOUT,
+                    read_timeout=settings.POLYGON_READ_TIMEOUT,
+                )
                 logger.info("MassiveDataProvider: Polygon client initialized.")
             except Exception as e:
                 logger.error(f"MassiveDataProvider: Failed to init Polygon client: {e}")
@@ -89,6 +95,39 @@ class MassiveDataProvider(BaseDataProvider):
             logger.error("MassiveDataProvider: client not initialized.")
             return []
 
+        try:
+            return POLYGON_BREAKER.call(
+                self._get_bars_impl,
+                symbol,
+                timespan,
+                multiplier,
+                from_date,
+                to_date,
+                adjusted,
+                sort,
+                limit,
+                paginate,
+            )
+        except pybreaker.CircuitBreakerError as e:
+            raise ProviderError(
+                "Polygon circuit breaker open — provider temporarily unavailable",
+                provider="massive",
+                endpoint="get_aggs",
+                is_retryable=False,
+            ) from e
+
+    def _get_bars_impl(
+        self,
+        symbol: str,
+        timespan: str,
+        multiplier: int,
+        from_date: str,
+        to_date: str,
+        adjusted: bool,
+        sort: str,
+        limit: int,
+        paginate: bool,
+    ) -> List[Dict[str, Any]]:
         def _convert(agg) -> Dict[str, Any]:
             return {
                 "timestamp": datetime.fromtimestamp(
@@ -158,24 +197,26 @@ class MassiveDataProvider(BaseDataProvider):
             return {}
 
         try:
-            polygon_api_calls_total.labels(endpoint="ticker_details").inc()
-            details = self._client.get_ticker_details(symbol.upper())
-            if not details:
-                return {}
-
-            return {
-                "name": details.name,
-                "sector": getattr(details, "sic_description", "") or "",
-                "industry": getattr(details, "sic_description", "") or "",
-                "market_cap": getattr(details, "market_cap", None),
-                "description": getattr(details, "description", None),
-            }
-
-        except Exception as e:
+            return POLYGON_BREAKER.call(self._get_ticker_details_impl, symbol)
+        except (pybreaker.CircuitBreakerError, Exception) as e:
             logger.error(
                 f"MassiveDataProvider: Error fetching details for {symbol}: {e}"
             )
             return {}
+
+    def _get_ticker_details_impl(self, symbol: str) -> Dict[str, Any]:
+        polygon_api_calls_total.labels(endpoint="ticker_details").inc()
+        details = self._client.get_ticker_details(symbol.upper())
+        if not details:
+            return {}
+
+        return {
+            "name": details.name,
+            "sector": getattr(details, "sic_description", "") or "",
+            "industry": getattr(details, "sic_description", "") or "",
+            "market_cap": getattr(details, "market_cap", None),
+            "description": getattr(details, "description", None),
+        }
 
     def get_snapshots(
         self, symbols: Optional[List[str]] = None
@@ -189,9 +230,8 @@ class MassiveDataProvider(BaseDataProvider):
         if not self._client:
             return []
         try:
-            polygon_api_calls_total.labels(endpoint="snapshot_all").inc()
-            raw = self._client.get_snapshot_all(market_type="stocks") or []
-        except Exception as e:
+            raw = POLYGON_BREAKER.call(self._fetch_snapshots_raw)
+        except (pybreaker.CircuitBreakerError, Exception) as e:
             logger.error(f"MassiveDataProvider: Error fetching snapshots: {e}")
             return []
 
@@ -233,6 +273,10 @@ class MassiveDataProvider(BaseDataProvider):
             )
 
         return results
+
+    def _fetch_snapshots_raw(self) -> list:
+        polygon_api_calls_total.labels(endpoint="snapshot_all").inc()
+        return self._client.get_snapshot_all(market_type="stocks") or []
 
     # ------------------------------------------------------------------ #
     #  Polygon-specific extras (not part of the base interface)           #
