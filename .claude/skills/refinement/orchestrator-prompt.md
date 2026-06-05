@@ -70,6 +70,7 @@ Fix issues inline.
 
 Use the Agent tool to spawn a product-owner subagent for each question:
 - Description: "Product owner: <short question summary>"
+- Model: `claude-opus-4-8` — always pin the product-owner subagent to Opus 4.8 (do not let it inherit the orchestrator's model)
 - Prompt: The full content of `product-owner-prompt.md` with $ISSUE_CONTEXT, $QA_HISTORY, and $QUESTION replaced
 - The subagent should have access to Read, Grep, and Glob tools for codebase exploration
 

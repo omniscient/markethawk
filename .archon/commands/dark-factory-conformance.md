@@ -109,6 +109,7 @@ fi
 
 4. Spawn a conformance reviewer subagent using the Agent tool:
    - `description`: "Conformance review: code vs spec"
+   - `model`: `claude-opus-4-8` — **always** pin this subagent to Opus 4.8 (applies to every reconcile re-spawn in Phase 3.5 too; do not let it inherit the orchestrator's model)
    - `prompt`: Content of `/opt/refinement-skills/conformance-reviewer-prompt.md` with:
      - `$ARTIFACT_KIND` replaced with `IMPLEMENTATION`
      - `$SPEC_CONTENT` replaced with the spec file contents (or issue body if `NO_SPEC=true`)

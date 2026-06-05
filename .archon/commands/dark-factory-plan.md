@@ -69,6 +69,7 @@ Prepend `$MEMORY_CONTEXT` to the architect prompt as a "## Memory: Accumulated P
 
 Spawn an architect subagent using the Agent tool:
 - `description`: "Architect review: validate plan against spec"
+- `model`: `claude-opus-4-8` — **always** pin this subagent to Opus 4.8 (applies to every re-spawn in the review cycle below too; do not let it inherit the orchestrator's model)
 - `prompt`: Content of `architect-prompt.md` with `$SPEC_CONTENT` and `$PLAN_CONTENT` replaced with the actual file contents, and with `$MEMORY_CONTEXT` prepended as shown:
 
   ```
@@ -103,6 +104,7 @@ If `conformance.enabled` is `false`, skip this phase entirely and proceed to Pha
 4. Build the artifact content: the plan document text is `$PLAN_CONTENT`
 5. Spawn a conformance reviewer subagent using the Agent tool:
    - `description`: "Conformance review: plan vs spec (cycle N)"
+   - `model`: `claude-opus-4-8` — **always** pin this subagent to Opus 4.8 (applies to every reconcile re-spawn too; do not let it inherit the orchestrator's model)
    - `prompt`: Content of `conformance-reviewer-prompt.md` with:
      - `$ARTIFACT_KIND` replaced with `PLAN`
      - `$SPEC_CONTENT` replaced with the spec file contents

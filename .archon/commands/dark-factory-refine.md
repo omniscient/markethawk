@@ -55,6 +55,7 @@ Follow the process in `orchestrator-prompt.md`:
 2. For each question, spawn a product-owner subagent using the Agent tool:
    - `description`: "Product owner: <short question summary>"
    - `prompt`: Content of `product-owner-prompt.md` with the $ISSUE_CONTEXT, $QA_HISTORY, and $QUESTION placeholders replaced with actual values
+   - `model`: `claude-opus-4-8` — **always** pin this subagent to Opus 4.8 (do not let it inherit the orchestrator's model)
    - The subagent needs Glob, Grep, and Read tools to explore the codebase
 3. If the subagent returns a response starting with `UNCERTAIN:`:
    - Post a comment on the issue explaining the question and context gathered so far
