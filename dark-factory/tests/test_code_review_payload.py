@@ -34,3 +34,25 @@ def test_parse_findings_location_without_line_goes_to_path_only():
     assert len(findings) == 1
     assert findings[0].path == "backend/app/x.py"
     assert findings[0].line is None
+
+
+def test_parse_findings_two_field_category_and_desc():
+    f = crp.parse_findings("- [high] security | SQL via f-string")
+    assert len(f) == 1
+    assert f[0].category == "security"
+    assert f[0].path is None and f[0].line is None
+    assert f[0].description == "SQL via f-string"
+
+
+def test_parse_findings_two_field_location_and_desc():
+    f = crp.parse_findings("- [high] backend/app/x.py:42 | SQL via f-string")
+    assert len(f) == 1
+    assert f[0].category == ""
+    assert f[0].path == "backend/app/x.py" and f[0].line == 42
+    assert f[0].description == "SQL via f-string"
+
+
+def test_parse_findings_line_zero_is_not_anchorable():
+    f = crp.parse_findings("- [low] naming | foo.py:0 | rename x")
+    assert len(f) == 1
+    assert f[0].path == "foo.py" and f[0].line is None

@@ -36,10 +36,13 @@ class Finding:
 
 
 def _split_loc(loc: str):
-    m = _LOC_RE.match((loc or "").strip())
-    if m:
-        return m.group("path").strip(), int(m.group("line"))
     cleaned = (loc or "").strip()
+    m = _LOC_RE.match(cleaned)
+    if m:
+        line = int(m.group("line"))
+        if line > 0:
+            return m.group("path").strip(), line
+        return m.group("path").strip(), None  # line 0/negative is not anchorable
     return (cleaned or None), None
 
 
@@ -55,7 +58,14 @@ def parse_findings(text: str):
         if len(fields) >= 3:
             category, loc, description = fields[0], fields[1], " | ".join(fields[2:])
         elif len(fields) == 2:
-            category, loc, description = "", fields[0], fields[1]
+            # 2-field is a malformed finding (the prompt mandates 3 fields).
+            # Disambiguate: if the first field looks like a path:line location,
+            # treat it as the location; otherwise treat it as the category.
+            first, description = fields[0], fields[1]
+            if _LOC_RE.match(first):
+                category, loc = "", first
+            else:
+                category, loc = first, ""
         else:
             category, loc, description = "", "", fields[0]
         path, line = _split_loc(loc)
