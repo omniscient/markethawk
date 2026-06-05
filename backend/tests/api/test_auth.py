@@ -6,8 +6,9 @@ from app.core.config import get_settings
 
 get_settings.cache_clear()
 
-from app.main import app
 from fastapi.testclient import TestClient
+
+from app.main import app
 
 client = TestClient(app)
 
@@ -84,3 +85,27 @@ def test_logout_clears_cookies(db):
     client.cookies.set("access_token", token)
     response = client.post("/api/auth/logout")
     assert response.status_code == 200
+
+
+def test_cookie_secure_defaults_to_true():
+    from app.core.config import Settings
+
+    s = Settings(
+        DATABASE_URL="postgresql://x:x@localhost/x",
+        POLYGON_API_KEY="test",
+        JWT_SECRET_KEY="test-secret-key-for-unit-tests-only-32chars!",
+    )
+    assert s.COOKIE_SECURE is True
+
+
+def test_login_cookies_have_strict_samesite(db):
+    client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "hunter2"},
+    )
+    assert response.status_code == 200
+    set_cookie_headers = [
+        v for k, v in response.headers.multi_items() if k.lower() == "set-cookie"
+    ]
+    assert any("samesite=strict" in h.lower() for h in set_cookie_headers)

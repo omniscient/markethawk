@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # Secure cookies — default True; set to false in docker-compose.override.yml for local HTTP dev
+    COOKIE_SECURE: bool = True
 
     # Connection pool
     DB_POOL_SIZE: int = 20
