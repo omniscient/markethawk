@@ -124,3 +124,11 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Analysis and Documentation Outputs
 
 - [PATTERN] Analysis/comparison documents (e.g. `docs/dark-factory-agyn-comparison.html`) must be delivered as self-contained HTML, not Markdown — HTML is preferred for portability and supports visual elements (colored tables, badges, cards) impossible in MD. Use inline CSS with no external dependencies so the file is portable as a single asset. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Non-Root Container Users
+
+- [PATTERN] To relocate Bun from `$HOME/.bun` to a global path (required before non-root user switch), set `BUN_INSTALL=/opt/bun` as an env var BEFORE the install script: `RUN BUN_INSTALL=/opt/bun curl -fsSL https://bun.sh/install | bash` and update `ENV PATH="/opt/bun/bin:${PATH}"`. This makes Bun accessible to all users including non-root. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] When adding a non-root user to a Dockerfile, always grep scripts that run inside the container for hardcoded `/root/` paths — they silently fail when `$HOME` changes to `/home/<user>`. In `dark-factory/entrypoint.sh`, `DECONFLICT_ARTIFACTS_DIR` was the only offender (fixed: `/root/.archon/` → `${HOME}/.archon/`). <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] The `docker-socket-proxy` service must have no `profiles:` key so it is a lifecycle superset of both `factory` and `scheduler` profiles. Consumers (`dark-factory`, `backlog-scheduler`) drop their raw `/var/run/docker.sock` volumes and instead set `DOCKER_HOST: tcp://docker-socket-proxy:2375` with `depends_on: [docker-socket-proxy]`. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
