@@ -27,6 +27,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Test fixtures that create ScannerConfig rows must now supply `universe_id`; if no universe exists in the test transaction, create one inline (see `seed_scanner_configs` in `tests/fixtures/core.py` for the pattern). <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
+## Backend: Middleware
+
+- [PATTERN] All middleware in `main.py` is implemented as pure ASGI classes (not `BaseHTTPMiddleware`). Pure ASGI leaves the app's single-message response intact so `GZipMiddleware` compresses it correctly; `BaseHTTPMiddleware` re-emits responses as a stream, causing chunked-gzip bodies that browsers never terminate. See the comment at `main.py:242` for details. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:refine -->
+
+- [PATTERN] Middleware registration order in Starlette is LIFO for "outermost": the last `app.add_middleware()` call is outermost (processes inbound requests first). Equivalently: "first added = innermost, closest to route handlers." To make middleware B run *after* middleware A on inbound requests (i.e., B is between A and the routes), register B before A in the code. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:refine -->
+
 ## Backend: Migrations
 
 - [PATTERN] After any model change: `cd backend && python -m alembic revision --autogenerate -m "description" && python -m alembic upgrade head`. Never skip the `upgrade head` step — the preview stack applies migrations at startup, but the local test suite does not. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->

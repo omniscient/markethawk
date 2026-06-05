@@ -21,3 +21,13 @@ entries as higher-confidence than source:refine entries when the two conflict.
 - [PATTERN] Agent memory is stored as plain markdown files in `.archon/memory/`, committed to the repo. Files are read at Phase 1 load time and updated post-run. This keeps memory human-readable, version-controlled, and accessible to all agents without any extra tooling. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
+
+## CSRF Defense (issue #192)
+
+- [PATTERN] Use a custom-header check (`X-Requested-With: XMLHttpRequest`) for CSRF protection rather than a double-submit cookie. Cross-site forms and navigations cannot set arbitrary headers; preflight enforcement via `CORS_ORIGINS` makes the custom header an unforgeable proof of JavaScript origin. Requires no token generation, cookie management, or per-session state. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:refine -->
+
+- [AVOID] Do not use the double-submit CSRF cookie pattern in this codebase — it requires generating, setting (non-HttpOnly cookie), and validating a per-session random token. For a single-operator internal tool the overhead adds no meaningful security over the custom-header approach, which the CORS preflight makes equally robust. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:refine -->
+
+- [PATTERN] Implement cross-cutting security middleware as a separate pure ASGI class (not by extending `AuthMiddleware` or using FastAPI `Depends`). Register it with `app.add_middleware()` before `AuthMiddleware` so it is innermost (first-added = innermost in Starlette). This ensures auth runs before CSRF in the request pipeline: 401 for missing cookie, then 403 for missing CSRF header. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:refine -->
+
+- [AVOID] Do not reuse `EXEMPT_PREFIXES` (the auth exempt list) as the CSRF exempt list. The two lists serve different concerns — auth exempts pre-authentication endpoints and infrastructure; CSRF exempts pre-authentication endpoints only. Coupling them conflates security boundaries and breaks if either list changes for unrelated reasons. Use a dedicated `CSRF_EXEMPT_PREFIXES = ("/api/auth/",)`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:refine -->
