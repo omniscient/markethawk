@@ -1,0 +1,11 @@
+{$DOMAIN:localhost} {
+    # WebSocket and REST API — backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Frontend SPA — all other paths
+    handle {
+        reverse_proxy frontend:3333
+    }
+}

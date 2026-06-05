@@ -64,8 +64,8 @@ services:
       TWOFA_TIMEOUT_ACTION: restart
       READ_ONLY_API: ${IB_READ_ONLY:-yes}   # safety: no order submission via API
     ports:
-      - "4004:4004"   # paper trading (socat proxy → localhost:4002) — use this for API clients
-      - "4003:4003"   # live trading  (socat proxy → localhost:4001) — unused until needed
+      - "127.0.0.1:4004:4004"   # paper trading (socat proxy → localhost:4002) — use this for API clients
+      - "127.0.0.1:4003:4003"   # live trading  (socat proxy → localhost:4001) — unused until needed
     volumes:
       - ib_gateway_settings:/home/ibgateway/Jts
     networks:
@@ -118,7 +118,7 @@ services:
       # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -147,7 +147,7 @@ services:
     # Bind-mounts (./frontend:/app, /app/node_modules) and npm run dev are restored in docker-compose.override.yml for local dev.
     command: npx vite preview --host --port 3333
     ports:
-      - "3333:3333"
+      - "127.0.0.1:3333:3333"
     environment:
       REACT_APP_API_URL: http://localhost:8000
       VITE_API_TARGET: http://backend:8000
@@ -384,7 +384,7 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -396,7 +396,7 @@ services:
       dockerfile: Dockerfile
     container_name: stockscanner-grafana
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -525,11 +525,34 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:16686:16686"   # Jaeger UI
-      - "4317:4317"                # OTLP gRPC receiver
+      - "127.0.0.1:4317:4317"        # OTLP gRPC receiver
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
     networks:
       - stockscanner-network
+
+  # Caddy reverse proxy — provides HTTPS termination and auto-provisioned Let's Encrypt certs.
+  # Start with: docker compose --profile tls up -d
+  # Requires DOMAIN env var (e.g. DOMAIN=markethawk.example.com) in .env.
+  caddy:
+    image: caddy:2-alpine
+    container_name: markethawk-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - stockscanner-network
+    profiles:
+      - tls
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
 volumes:
   postgres_data:
@@ -557,6 +580,8 @@ volumes:
       o: size=256m
   prometheus_data:
   grafana_data:
+  caddy_data:
+  caddy_config:
 
 
 networks:

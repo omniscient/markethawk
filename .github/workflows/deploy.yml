@@ -41,6 +41,9 @@ jobs:
             docker compose up -d \
               backend celery-worker celery-beat live-scanner flower frontend
 
+            # Restart Caddy if TLS profile is active
+            docker compose --profile tls up -d caddy
+
             # Restart backlog-scheduler if deployed with the scheduler profile
             docker compose --profile scheduler up -d backlog-scheduler
 
