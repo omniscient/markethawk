@@ -124,3 +124,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Analysis and Documentation Outputs
 
 - [PATTERN] Analysis/comparison documents (e.g. `docs/dark-factory-agyn-comparison.html`) must be delivered as self-contained HTML, not Markdown — HTML is preferred for portability and supports visual elements (colored tables, badges, cards) impossible in MD. Use inline CSS with no external dependencies so the file is portable as a single asset. <!-- issue:#184 date:2026-06-04 expires:2026-12-04 source:implement -->
+
+## Non-Root User in dark-factory Container (issue #203)
+
+- [PATTERN] Install Bun to /opt/bun (not /root/.bun) by setting BUN_INSTALL=/opt/bun before the curl install script. Update ENV PATH="/opt/bun/bin:${PATH}". This makes Bun accessible to any user (including factory UID 1000) and avoids /root home coupling. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:refine -->
+- [AVOID] Do not use ENV PATH="/root/.bun/bin:..." in dark-factory/Dockerfile when a non-root USER is added — the path will be inaccessible to the factory user, breaking archon and bun commands. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:refine -->
+- [PATTERN] The only hardcoded /root/ path in entrypoint.sh (as of 2026-06-05) is DECONFLICT_ARTIFACTS_DIR at line 585. Replace /root/.archon/workspaces with ${HOME}/.archon/workspaces when adding the factory non-root user so the path resolves correctly under UID 1000. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:refine -->
