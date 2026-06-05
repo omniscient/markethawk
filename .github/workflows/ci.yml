@@ -137,6 +137,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/markethawk_test
           POLYGON_API_KEY: dummy-key-for-ci
+          # >=32-char CI-only value so the JWT_SECRET_KEY startup validator (#190) passes
+          # when alembic imports app.core.config. Not a real secret.
+          JWT_SECRET_KEY: ci-test-only-not-secret-0123456789abcdef
         run: python -m alembic upgrade head
 
       - name: Check migration sync
@@ -144,4 +147,5 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/markethawk_test
           POLYGON_API_KEY: dummy-key-for-ci
+          JWT_SECRET_KEY: ci-test-only-not-secret-0123456789abcdef
         run: python -m alembic check
