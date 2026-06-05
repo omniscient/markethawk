@@ -49,17 +49,19 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Scanner config: Pocket Pivot (Evening)
-INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, run_frequency, universe_id)
+-- Migration 1bf5e10f1111 seeds this row via auto-id; migration c7e2a9f4b1d3 activates it
+-- and normalises criteria to []. This INSERT is a no-op when those migrations have run;
+-- it provides the row for any edge case where migrations did not seed it.
+INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, universe_id)
 VALUES (
   4,
   gen_random_uuid(),
-  'Pocket Pivot (Evening)',
-  'Detects up-days where session volume exceeds the highest down-day volume in the prior 10 trading days (classic Morales/Kacher pocket pivot).',
+  'Pocket Pivot',
+  'Identifies pocket pivot breakout setups with above-average volume on up days',
   'pocket_pivot',
-  '{"lookback_days": 10, "min_lookback_days": 5, "price_floor": 5.00, "volume_floor": 100000}',
-  '{}',
-  false,
-  'evening',
+  '{"lookback_days": 10, "volume_floor": 100000}',
+  '[{"field": "volume_ratio", "op": ">=", "value": 1.5}, {"field": "price", "op": ">=", "value": 5.0}]',
+  true,
   1
 )
 ON CONFLICT (id) DO NOTHING;
