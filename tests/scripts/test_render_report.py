@@ -1,6 +1,10 @@
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 import scripts.render_report as render_report
 from scripts.render_report import render
@@ -69,3 +73,23 @@ def test_render_no_placeholder_leakage(tmp_path, monkeypatch):
     html = output_path.read_text(encoding="utf-8")
     assert "{{ECHARTS_JS}}" not in html
     assert "{{METRICS_JSON}}" not in html
+
+
+# Real-ECharts regression guard. The stubbed unit tests above can't catch a chart
+# config that throws only inside real ECharts setOption (e.g. colorSaturation in a
+# treemap level → "e.charAt is not a function"), which halts the whole script and
+# blanks every chart after it plus the table. render_smoke.cjs renders all charts
+# headlessly with the vendored (offline) ECharts and exits non-zero on any throw.
+# Skipped when node isn't available so it never breaks a Python-only CI/factory env.
+SMOKE = Path(__file__).parent / "render_smoke.cjs"
+METRICS_SNAPSHOT = Path(__file__).parent.parent.parent / "metrics.json"
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node not available")
+@pytest.mark.skipif(not METRICS_SNAPSHOT.exists(), reason="metrics.json snapshot not present")
+def test_all_charts_render_with_real_echarts():
+    result = subprocess.run(
+        ["node", str(SMOKE)], capture_output=True, text=True, cwd=str(METRICS_SNAPSHOT.parent)
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "THROW" not in result.stdout, result.stdout

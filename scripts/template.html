@@ -563,13 +563,16 @@ function buildWeeklyTimeseries() {
   }
   const tmData=Object.entries(labelCounts).map(([n,v])=>({name:n,value:v}))
     .sort((a,b)=>b.value-a.value);
+  // NOTE: a treemap level's colorSaturation throws "e.charAt is not a function"
+  // in real ECharts (no level colour to saturate) — that blanks this chart AND
+  // every chart after it AND the table. Map the palette by node index instead.
+  // Guarded by tests/scripts/render_smoke.cjs.
   eChart('chart-treemap',{
-    series:[{type:'treemap',data:tmData,
-      label:{show:true,formatter:'{b}: {c}',fontSize:11},
-      itemStyle:{borderColor:C.line,borderWidth:1},
-      levels:[{itemStyle:{borderColor:'rgba(255,255,255,.12)',gapWidth:2,borderWidth:2,
-        colorSaturation:[.6,1]}}],
-      color:PALETTE}]
+    series:[{type:'treemap',data:tmData,roam:false,breadcrumb:{show:false},
+      label:{show:true,formatter:'{b}: {c}',fontSize:11,color:'#0a0b0e'},
+      itemStyle:{borderColor:C.line,borderWidth:1,gapWidth:2},
+      levels:[{color:PALETTE,colorMappingBy:'index',
+        itemStyle:{borderColor:'rgba(255,255,255,.12)',borderWidth:2,gapWidth:2}}]}]
   });
 })();
 
