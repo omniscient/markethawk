@@ -3,6 +3,7 @@ name: Build and Publish Images
 on:
   push:
     branches: [main]
+  workflow_dispatch: {}  # allow on-demand rebuild+push (e.g. to re-bake the vendored Archon clone)
 
 permissions:
   contents: read
