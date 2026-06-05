@@ -105,3 +105,54 @@ def test_changed_lines_ignores_no_newline_marker():
     changed = crp.changed_lines(diff)
     # new side has exactly line 1 (context) and line 2 (added 'new'); no phantom line 3
     assert changed["a.py"] == {1, 2}
+
+
+def _f(sev, path, line, desc="d", cat="c"):
+    return crp.Finding(sev, cat, path, line, desc)
+
+
+def test_build_review_blocks_on_high_and_anchors_inline():
+    changed = {"a.py": {10, 11}}
+    findings = [_f("high", "a.py", 10), _f("low", "a.py", 11)]
+    r = crp.build_review(findings, changed, block_threshold="high", max_findings=50)
+    assert r["status"] == "BLOCKED"
+    assert r["event"] == "REQUEST_CHANGES"
+    assert len(r["payload"]["comments"]) == 2
+    assert r["payload"]["comments"][0]["side"] == "RIGHT"
+    assert {c["line"] for c in r["payload"]["comments"]} == {10, 11}
+    assert len(r["blockers"]) == 1 and len(r["advisory"]) == 1
+
+
+def test_build_review_comment_event_when_no_blockers():
+    changed = {"a.py": {5}}
+    r = crp.build_review([_f("low", "a.py", 5)], changed, block_threshold="high")
+    assert r["status"] == "PASS"
+    assert r["event"] == "COMMENT"
+
+
+def test_build_review_offdiff_findings_demoted_to_body():
+    changed = {"a.py": {5}}
+    # line 999 is not in the diff -> must not be an inline comment
+    findings = [_f("high", "a.py", 999, desc="off-diff bug")]
+    r = crp.build_review(findings, changed, block_threshold="high")
+    assert r["payload"]["comments"] == []
+    assert r["status"] == "BLOCKED"  # still a blocker even if not anchorable
+    assert "off-diff bug" in r["payload"]["body"]
+    assert r["offdiff_count"] == 1
+
+
+def test_build_review_caps_inline_keeping_highest_severity():
+    changed = {"a.py": set(range(1, 11))}
+    findings = [_f("low", "a.py", i) for i in range(1, 6)] + [_f("high", "a.py", i) for i in range(6, 11)]
+    r = crp.build_review(findings, changed, block_threshold="high", max_findings=5)
+    assert len(r["payload"]["comments"]) == 5
+    # all kept comments should be the high-severity ones (lines 6..10)
+    assert all(c["line"] >= 6 for c in r["payload"]["comments"])
+
+
+def test_build_review_threshold_critical_only():
+    changed = {"a.py": {1, 2}}
+    findings = [_f("high", "a.py", 1), _f("critical", "a.py", 2)]
+    r = crp.build_review(findings, changed, block_threshold="critical")
+    assert len(r["blockers"]) == 1  # only the critical one blocks
+    assert r["status"] == "BLOCKED"

@@ -116,3 +116,61 @@ def changed_lines(diff_text: str):
             result.setdefault(current, set()).add(new_ln)
             new_ln += 1
     return result
+
+
+def _comment_body(f: Finding) -> str:
+    cat = f"**{f.category}** · " if f.category else ""
+    return f"{cat}**{f.severity}** — {f.description}"
+
+
+def _review_body(header, blockers, advisory, offdiff, dropped_count):
+    lines = [f"## {header}", ""]
+    lines.append(
+        f"**{len(blockers)}** blocking · **{len(advisory)}** advisory finding(s)."
+    )
+    if blockers:
+        lines += ["", "### ⛔ Blocking"]
+        for f in blockers:
+            loc = f"`{f.path}:{f.line}`" if f.path and f.line else (f"`{f.path}`" if f.path else "_(no location)_")
+            lines.append(f"- **[{f.severity}] {f.category}** {loc} — {f.description}")
+    if offdiff:
+        lines += ["", "### Findings not anchorable to the diff"]
+        for f in offdiff:
+            loc = f"`{f.path}:{f.line}`" if f.path and f.line else (f"`{f.path}`" if f.path else "_(no location)_")
+            lines.append(f"- [{f.severity}] {f.category} {loc} — {f.description}")
+    if dropped_count:
+        lines += ["", f"_Note: {dropped_count} additional inline comment(s) dropped (max_findings cap)._"]
+    return "\n".join(lines)
+
+
+def build_review(findings, changed, block_threshold="high", max_findings=50,
+                 header="🏭 Dark Factory Code Review"):
+    thr = SEVERITY_ORDER[block_threshold.lower()]
+    blockers = [f for f in findings if SEVERITY_ORDER[f.severity] >= thr]
+    advisory = [f for f in findings if SEVERITY_ORDER[f.severity] < thr]
+
+    def anchorable(f):
+        return f.path is not None and f.line is not None and f.line in changed.get(f.path, set())
+
+    anchored = sorted(
+        (f for f in findings if anchorable(f)),
+        key=lambda f: (-SEVERITY_ORDER[f.severity], f.path, f.line),
+    )
+    offdiff = [f for f in findings if not anchorable(f)]
+    kept = anchored[:max_findings]
+    dropped = anchored[max_findings:]
+    offdiff_for_body = offdiff + dropped
+
+    comments = [{"path": f.path, "line": f.line, "side": "RIGHT", "body": _comment_body(f)} for f in kept]
+    event = "REQUEST_CHANGES" if blockers else "COMMENT"
+    body = _review_body(header, blockers, advisory, offdiff_for_body, len(dropped))
+    status = "BLOCKED" if blockers else "PASS"
+    return {
+        "status": status,
+        "event": event,
+        "payload": {"event": event, "body": body, "comments": comments},
+        "blockers": [f.__dict__ for f in blockers],
+        "advisory": [f.__dict__ for f in advisory],
+        "inline_count": len(comments),
+        "offdiff_count": len(offdiff_for_body),
+    }
