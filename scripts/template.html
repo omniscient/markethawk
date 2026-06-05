@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dark Factory — Pipeline Report</title>
+<style>
+  :root {
+    --bg:#0a0b0e; --bg2:#0e1015; --panel:#13151d; --panel2:#181b24;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --ink:#eceef3; --mut:#9aa0ad; --mut2:#6b7280;
+    --amber:#ff8a3d; --amber-hot:#ff6a1a; --amber-soft:#ffc08a;
+    --cyan:#3fe0c8; --cyan-soft:#8af0e2;
+    --green:#54d18a; --red:#ff6b6b; --violet:#a78bfa;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{font-size:16px}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  /* ── layout ── */
+  .page-header{padding:3rem 2rem 2rem;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#0e1015 0%,var(--bg) 100%)}
+  .page-header .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--amber);display:flex;align-items:center;gap:.5em;margin-bottom:.8rem}
+  .page-header .kicker .dot{width:6px;height:6px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber-hot)}
+  .page-header h1{font-size:2.4rem;font-weight:800;letter-spacing:-.02em;margin-bottom:.5rem}
+  .page-header .meta{color:var(--mut);font-size:.9rem}
+
+  main{max-width:1400px;margin:0 auto;padding:2rem}
+  section{margin-bottom:3rem}
+  section h2{font-size:1.2rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--amber);margin-bottom:1.25rem;padding-bottom:.5rem;border-bottom:1px solid var(--line)}
+
+  /* ── KPI cards ── */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem}
+  .kpi-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1.2rem}
+  .kpi-card .label{font-size:.75rem;color:var(--mut);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.4rem}
+  .kpi-card .value{font-size:2rem;font-weight:800;font-family:var(--mono);color:var(--amber)}
+  .kpi-card .sub{font-size:.78rem;color:var(--mut2);margin-top:.2rem}
+
+  /* ── chart panels ── */
+  .chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+  .chart-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+  @media(max-width:900px){.chart-grid-2,.chart-grid-3{grid-template-columns:1fr}}
+  .chart-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1.2rem}
+  .chart-panel h3{font-size:.82rem;font-weight:600;color:var(--mut);letter-spacing:.06em;
+    text-transform:uppercase;margin-bottom:1rem}
+  .chart-box{height:260px}
+  .chart-box-tall{height:340px}
+
+  /* ── table ── */
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  thead tr{border-bottom:2px solid var(--line2)}
+  thead th{padding:.6rem .8rem;text-align:left;color:var(--mut);font-weight:600;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase}
+  tbody tr{border-bottom:1px solid var(--line);cursor:default}
+  tbody tr:hover{background:var(--panel2)}
+  td{padding:.55rem .8rem;color:var(--ink)}
+  td.mono{font-family:var(--mono);font-size:.8rem}
+  td.am{color:var(--amber);font-family:var(--mono)}
+  td.gr{color:var(--green)}
+  td.rd{color:var(--red)}
+  .badge{display:inline-block;font-size:.7rem;padding:.15em .5em;border-radius:5px;
+    border:1px solid;font-family:var(--mono)}
+  .badge-s{color:var(--green);border-color:rgba(84,209,138,.4);background:rgba(84,209,138,.08)}
+  .badge-m{color:var(--amber);border-color:rgba(255,138,61,.4);background:rgba(255,138,61,.08)}
+  .badge-l{color:var(--red);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.08)}
+  .badge-df{color:var(--cyan);border-color:rgba(63,224,200,.4);background:rgba(63,224,200,.08)}
+
+  /* ── filters ── */
+  .filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;align-items:center}
+  .filter-btn{font-family:var(--mono);font-size:.73rem;padding:.3em .8em;border-radius:6px;
+    border:1px solid var(--line2);background:transparent;color:var(--mut);cursor:pointer;
+    transition:all .15s}
+  .filter-btn:hover,.filter-btn.active{border-color:var(--amber);color:var(--amber);
+    background:rgba(255,138,61,.07)}
+  /* ── sortable columns ── */
+  th.sortable{cursor:pointer;user-select:none}
+  th.sortable:hover{color:var(--ink)}
+  th.sortable .sort-icon{color:var(--mut2);font-size:.7em}
+  th.sortable.asc .sort-icon::before{content:'↑'}
+  th.sortable.desc .sort-icon::before{content:'↓'}
+  th.sortable:not(.asc):not(.desc) .sort-icon::before{content:'↕'}
+
+  /* ── footer ── */
+  footer{text-align:center;padding:2rem;color:var(--mut2);font-size:.8rem;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div style="max-width:1400px;margin:0 auto">
+    <div class="kicker"><span class="dot"></span> Dark Factory</div>
+    <h1>Pipeline Production Report</h1>
+    <div class="meta" id="report-meta"></div>
+  </div>
+</div>
+
+<main>
+
+  <!-- ── Section 1: Headline KPIs ── -->
+  <section id="s-kpis">
+    <h2>Headline KPIs</h2>
+    <div class="kpi-grid" id="kpi-grid"></div>
+  </section>
+
+  <!-- ── Section 2: Throughput & Flow ── -->
+  <section id="s-throughput">
+    <h2>Throughput &amp; Flow</h2>
+    <div class="chart-grid-2">
+      <div class="chart-panel">
+        <h3>Created vs Closed / week</h3>
+        <div class="chart-box" id="chart-weekly-flow"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Cumulative closed</h3>
+        <div class="chart-box" id="chart-cumulative"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Backlog size over time</h3>
+        <div class="chart-box" id="chart-backlog"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Issues opened by category</h3>
+        <div class="chart-box" id="chart-category-bar"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 3: Speed ── -->
+  <section id="s-speed">
+    <h2>Speed</h2>
+    <div class="chart-grid-3">
+      <div class="chart-panel">
+        <h3>Lead-time distribution (hours)</h3>
+        <div class="chart-box" id="chart-lead-time-hist"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Median lead time trend</h3>
+        <div class="chart-box" id="chart-lead-time-trend"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Factory cycle time (DF issues)</h3>
+        <div class="chart-box" id="chart-cycle-time"></div>
+      </div>
+    </div>
+    <div class="chart-panel" style="margin-top:1rem">
+      <h3>Aging WIP — open issues by age</h3>
+      <div class="chart-box" id="chart-aging-wip"></div>
+    </div>
+  </section>
+
+  <!-- ── Section 4: AI Cost Analytics ── -->
+  <section id="s-cost">
+    <h2>AI Cost Analytics</h2>
+    <div class="chart-grid-2">
+      <div class="chart-panel">
+        <h3>Spend over time (cumulative)</h3>
+        <div class="chart-box" id="chart-cost-cumulative"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Per-ticket cost distribution</h3>
+        <div class="chart-box" id="chart-cost-dist"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Cost by pipeline step (aggregated)</h3>
+        <div class="chart-box" id="chart-cost-by-step"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Cost vs ticket size</h3>
+        <div class="chart-box" id="chart-cost-vs-size"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Token usage breakdown</h3>
+        <div class="chart-box" id="chart-tokens"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Rework spend (fix / retry runs)</h3>
+        <div class="chart-box" id="chart-rework"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section 5: Category & Label Composition ── -->
+  <section id="s-labels">
+    <h2>Category &amp; Label Composition</h2>
+    <div class="chart-grid-3">
+      <div class="chart-panel">
+        <h3>By priority</h3>
+        <div class="chart-box" id="chart-by-priority"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>By size</h3>
+        <div class="chart-box" id="chart-by-size"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>DF-autonomous vs human</h3>
+        <div class="chart-box" id="chart-df-split"></div>
+      </div>
+    </div>
+    <div class="chart-panel" style="margin-top:1rem">
+      <h3>Label treemap</h3>
+      <div class="chart-box-tall" id="chart-treemap"></div>
+    </div>
+  </section>
+
+  <!-- ── Section 6: Pipeline Health ── -->
+  <section id="s-health">
+    <h2>Dark Factory Pipeline Health</h2>
+    <div class="chart-grid-3">
+      <div class="chart-panel">
+        <h3>Run success rate by type</h3>
+        <div class="chart-box" id="chart-run-success"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Retry / rework rate trend</h3>
+        <div class="chart-box" id="chart-retry-trend"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Steps per run distribution</h3>
+        <div class="chart-box" id="chart-steps-per-run"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Issue table ── -->
+  <section id="s-table">
+    <h2>All Issues</h2>
+    <div class="filters" id="table-filters"></div>
+    <div class="table-wrap">
+      <table id="issue-table">
+        <thead>
+          <tr>
+            <th data-col="number" class="sortable"># <span class="sort-icon">↕</span></th>
+            <th data-col="title" class="sortable">Title <span class="sort-icon">↕</span></th>
+            <th data-col="size" class="sortable">Size <span class="sort-icon">↕</span></th>
+            <th data-col="state" class="sortable">State <span class="sort-icon">↕</span></th>
+            <th data-col="lead_time_hours" class="sortable">Lead time <span class="sort-icon">↕</span></th>
+            <th data-col="cost" class="sortable">Cost <span class="sort-icon">↕</span></th>
+            <th>DF?</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<footer id="footer"></footer>
+
+<script>{{ECHARTS_JS}}</script>
+<script>
+// ── Inject metrics data ──────────────────────────────────────────────────────
+window.__METRICS__ = {{METRICS_JSON}};
+
+// ── Colour palette helpers ───────────────────────────────────────────────────
+const C = {
+  amber:'#ff8a3d', amberHot:'#ff6a1a', amberSoft:'#ffc08a',
+  cyan:'#3fe0c8', cyanSoft:'#8af0e2',
+  green:'#54d18a', red:'#ff6b6b', violet:'#a78bfa',
+  mut:'#9aa0ad', mut2:'#6b7280', line:'rgba(255,255,255,.08)',
+};
+const PALETTE = [C.amber, C.cyan, C.green, C.violet, C.amberSoft, C.red, C.cyanSoft];
+
+function eChart(id, opts) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  const chart = echarts.init(el, null, {renderer:'canvas'});
+  chart.setOption({
+    backgroundColor:'transparent',
+    textStyle:{color:C.mut, fontFamily:'system-ui,sans-serif'},
+    tooltip:{backgroundColor:'#13151d',borderColor:'rgba(255,255,255,.14)',textStyle:{color:'#eceef3'}},
+    ...opts
+  });
+  window.addEventListener('resize', () => chart.resize());
+  return chart;
+}
+
+const M = window.__METRICS__;
+const S = M.summary;
+const issues = M.issues || [];
+
+// ── KPI cards ────────────────────────────────────────────────────────────────
+(function buildKPIs() {
+  const grid = document.getElementById('kpi-grid');
+  function kpi(label, value, sub) {
+    return `<div class="kpi-card">
+      <div class="label">${label}</div>
+      <div class="value">${value}</div>
+      ${sub ? `<div class="sub">${sub}</div>` : ''}
+    </div>`;
+  }
+  const medLt = S.median_lead_time_hours != null
+    ? (S.median_lead_time_hours < 48
+        ? S.median_lead_time_hours.toFixed(1) + 'h'
+        : (S.median_lead_time_hours/24).toFixed(1) + 'd')
+    : '—';
+  grid.innerHTML = [
+    kpi('Shipped', S.closed_issues, `of ${S.total_issues} total`),
+    kpi('Total AI spend', '$' + S.total_cost_usd.toFixed(2), `${S.autonomous_issues} autonomous tickets`),
+    kpi('Avg $/ticket', '$' + S.avg_cost_per_ticket.toFixed(2), 'autonomous only'),
+    kpi('Median lead time', medLt, 'all closed issues'),
+    kpi('% Autonomous', S.pct_autonomous.toFixed(1) + '%', 'tickets with cost report'),
+  ].join('');
+  document.getElementById('report-meta').textContent =
+    `Generated ${new Date(M.generated_at).toLocaleString()} · ${S.total_issues} issues`;
+})();
+
+// ── Weekly timeseries helpers ─────────────────────────────────────────────────
+function weekKey(iso) {
+  const d = new Date(iso);
+  const day = d.getUTCDay();
+  const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+  const mon = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff));
+  return mon.toISOString().slice(0, 10);
+}
+
+function buildWeeklyTimeseries() {
+  const createdByWeek = {}, closedByWeek = {};
+  for (const iss of issues) {
+    if (iss.created_at) {
+      const w = weekKey(iss.created_at);
+      createdByWeek[w] = (createdByWeek[w] || 0) + 1;
+    }
+    if (iss.closed_at) {
+      const w = weekKey(iss.closed_at);
+      closedByWeek[w] = (closedByWeek[w] || 0) + 1;
+    }
+  }
+  const weeks = [...new Set([...Object.keys(createdByWeek), ...Object.keys(closedByWeek)])].sort();
+  let cum = 0, backlog = 0;
+  const series = weeks.map(w => {
+    const cr = createdByWeek[w] || 0;
+    const cl = closedByWeek[w] || 0;
+    backlog += cr - cl;
+    cum += cl;
+    return { week: w, created: cr, closed: cl, cumClosed: cum, backlog: Math.max(0, backlog) };
+  });
+  return { weeks, series };
+}
+
+// ── Section 2: Throughput ────────────────────────────────────────────────────
+(function buildThroughput() {
+  const { weeks, series } = buildWeeklyTimeseries();
+
+  eChart('chart-weekly-flow', {
+    legend:{ data:['Created','Closed'], textStyle:{color:C.mut}, bottom:0 },
+    xAxis:{ type:'category', data:weeks, axisLine:{lineStyle:{color:C.line}}, axisLabel:{color:C.mut2,rotate:30,fontSize:10} },
+    yAxis:{ type:'value', splitLine:{lineStyle:{color:C.line}}, axisLabel:{color:C.mut2} },
+    series:[
+      { name:'Created', type:'bar', data:series.map(s=>s.created), itemStyle:{color:C.violet} },
+      { name:'Closed', type:'bar', data:series.map(s=>s.closed), itemStyle:{color:C.green} },
+    ]
+  });
+
+  eChart('chart-cumulative', {
+    xAxis:{ type:'category', data:weeks, axisLabel:{color:C.mut2,rotate:30,fontSize:10}, axisLine:{lineStyle:{color:C.line}} },
+    yAxis:{ type:'value', splitLine:{lineStyle:{color:C.line}}, axisLabel:{color:C.mut2} },
+    series:[{ type:'line', data:series.map(s=>s.cumClosed), smooth:true,
+      lineStyle:{color:C.amber,width:2}, itemStyle:{color:C.amber},
+      areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+        colorStops:[{offset:0,color:'rgba(255,138,61,.25)'},{offset:1,color:'rgba(255,138,61,.01)'}]}} }]
+  });
+
+  eChart('chart-backlog', {
+    xAxis:{ type:'category', data:weeks, axisLabel:{color:C.mut2,rotate:30,fontSize:10}, axisLine:{lineStyle:{color:C.line}} },
+    yAxis:{ type:'value', splitLine:{lineStyle:{color:C.line}}, axisLabel:{color:C.mut2} },
+    series:[{ type:'line', data:series.map(s=>s.backlog), smooth:true,
+      lineStyle:{color:C.red,width:2}, itemStyle:{color:C.red},
+      areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+        colorStops:[{offset:0,color:'rgba(255,107,107,.25)'},{offset:1,color:'rgba(255,107,107,.01)'}]}} }]
+  });
+
+  // category bar
+  const cats = {};
+  for (const iss of issues) {
+    const cat = iss.labels.find(l => ['enhancement','bug','chore','analytics'].some(t => l.includes(t))) || 'other';
+    cats[cat] = (cats[cat] || 0) + 1;
+  }
+  const catKeys = Object.keys(cats).sort((a,b)=>cats[b]-cats[a]);
+  eChart('chart-category-bar', {
+    xAxis:{ type:'value', splitLine:{lineStyle:{color:C.line}}, axisLabel:{color:C.mut2} },
+    yAxis:{ type:'category', data:catKeys, axisLabel:{color:C.mut2,fontSize:10} },
+    series:[{ type:'bar', data:catKeys.map(k=>cats[k]),
+      itemStyle:{color:new echarts.graphic.LinearGradient(0,0,1,0,[
+        {offset:0,color:C.amber},{offset:1,color:C.amberSoft}])} }]
+  });
+})();
+
+// ── Section 3: Speed ─────────────────────────────────────────────────────────
+(function buildSpeed() {
+  const ltHours = issues.filter(i=>i.state==='CLOSED'&&i.lead_time_hours!=null)
+    .map(i=>i.lead_time_hours).sort((a,b)=>a-b);
+
+  // histogram buckets (days)
+  const buckets = [0,1,2,4,7,14,30,60,999];
+  const labels = ['<1d','1d','2d','4d','1w','2w','1mo','>1mo'];
+  const counts = Array(labels.length).fill(0);
+  for (const h of ltHours) {
+    const d = h/24;
+    for (let i=0;i<buckets.length-1;i++) {
+      if (d>=buckets[i]&&d<buckets[i+1]){counts[i]++;break;}
+    }
+  }
+  eChart('chart-lead-time-hist',{
+    xAxis:{type:'category',data:labels,axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[{type:'bar',data:counts,itemStyle:{color:C.cyan}}]
+  });
+
+  // median trend (4-week rolling)
+  const { weeks, series } = buildWeeklyTimeseries();
+  const medByWeek = weeks.map((w,i) => {
+    const range = weeks.slice(Math.max(0,i-3),i+1);
+    const vals = issues
+      .filter(iss=>iss.closed_at&&range.includes(weekKey(iss.closed_at))&&iss.lead_time_hours!=null)
+      .map(iss=>iss.lead_time_hours).sort((a,b)=>a-b);
+    return vals.length ? vals[Math.floor(vals.length/2)]/24 : null;
+  });
+  eChart('chart-lead-time-trend',{
+    xAxis:{type:'category',data:weeks,axisLabel:{color:C.mut2,rotate:30,fontSize:10},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',name:'days',nameTextStyle:{color:C.mut2},splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[{type:'line',data:medByWeek,smooth:true,connectNulls:true,
+      lineStyle:{color:C.amber,width:2},itemStyle:{color:C.amber}}]
+  });
+
+  // factory cycle time histogram (DF only) — uses factory_cycle_hours per spec
+  const dfIssues = issues.filter(i=>i.autonomous&&i.cost?.runs?.length);
+  const ctHours = dfIssues.filter(i=>i.factory_cycle_hours!=null).map(i=>i.factory_cycle_hours).sort((a,b)=>a-b);
+  const ctCounts = Array(labels.length).fill(0);
+  for (const h of ctHours) {
+    const d=h/24;
+    for (let i=0;i<buckets.length-1;i++){if(d>=buckets[i]&&d<buckets[i+1]){ctCounts[i]++;break;}}
+  }
+  eChart('chart-cycle-time',{
+    xAxis:{type:'category',data:labels,axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[{type:'bar',data:ctCounts,itemStyle:{color:C.violet}}]
+  });
+
+  // aging WIP
+  const now = Date.now();
+  const ageBuckets = ['<1d','1-7d','1-4w','1-3mo','>3mo'];
+  const ageLimits = [1,7,30,90,Infinity].map(d=>d*24*3600*1000);
+  const ageCounts = Array(ageBuckets.length).fill(0);
+  for (const iss of issues.filter(i=>i.state==='OPEN'&&i.created_at)) {
+    const ageMs = now - new Date(iss.created_at).getTime();
+    for (let i=0;i<ageLimits.length;i++){if(ageMs<ageLimits[i]){ageCounts[i]++;break;}}
+  }
+  eChart('chart-aging-wip',{
+    xAxis:{type:'category',data:ageBuckets,axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[{type:'bar',data:ageCounts,
+      itemStyle:{color:(params)=>params.value>5?C.red:params.value>2?C.amber:C.green}}]
+  });
+})();
+
+// ── Section 4: AI Cost Analytics ─────────────────────────────────────────────
+(function buildCost() {
+  const dfIssues = issues.filter(i=>i.autonomous&&i.cost);
+
+  // cumulative spend
+  const sorted = [...dfIssues].filter(i=>i.closed_at).sort((a,b)=>new Date(a.closed_at)-new Date(b.closed_at));
+  const { weeks } = buildWeeklyTimeseries();
+  const costByWeek = {};
+  for (const iss of sorted) {
+    const w = weekKey(iss.closed_at);
+    costByWeek[w] = (costByWeek[w]||0) + iss.cost.total_usd;
+  }
+  let runCum=0;
+  const cumCost = weeks.map(w=>{ runCum+=(costByWeek[w]||0); return +runCum.toFixed(4); });
+  eChart('chart-cost-cumulative',{
+    xAxis:{type:'category',data:weeks,axisLabel:{color:C.mut2,rotate:30,fontSize:10},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',name:'$',nameTextStyle:{color:C.mut2},splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[{type:'line',data:cumCost,smooth:true,lineStyle:{color:C.amber,width:2},itemStyle:{color:C.amber},
+      areaStyle:{color:{type:'linear',x:0,y:0,x2:0,y2:1,
+        colorStops:[{offset:0,color:'rgba(255,138,61,.3)'},{offset:1,color:'rgba(255,138,61,.01)'}]}}}]
+  });
+
+  // cost distribution
+  const costs = dfIssues.map(i=>+(i.cost.total_usd.toFixed(2))).sort((a,b)=>a-b);
+  eChart('chart-cost-dist',{
+    xAxis:{type:'value',name:'$',nameTextStyle:{color:C.mut2},splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    yAxis:{type:'value',name:'count',nameTextStyle:{color:C.mut2},splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[{type:'scatter',data:costs.map((c,i)=>[c,i+1]),symbolSize:6,itemStyle:{color:C.cyan,opacity:.7}}]
+  });
+
+  // Use M.cost_by_step if present, else skip
+  const cbsData = M.cost_by_step || {};
+  const cbsKeys = Object.keys(cbsData).sort((a,b)=>cbsData[b]-cbsData[a]).slice(0,10);
+  eChart('chart-cost-by-step',{
+    xAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    yAxis:{type:'category',data:cbsKeys,axisLabel:{color:C.mut2,fontSize:10}},
+    series:[{type:'bar',data:cbsKeys.map(k=>+cbsData[k].toFixed(4)),
+      itemStyle:{color:new echarts.graphic.LinearGradient(0,0,1,0,[
+        {offset:0,color:C.amber},{offset:1,color:C.amberSoft}])}}]
+  });
+
+  // cost vs size
+  const sizeMap={'S':[],'M':[],'L':[],'XL':[]};
+  for (const iss of dfIssues) {
+    const s = iss.size||'?';
+    if (!sizeMap[s]) sizeMap[s]=[];
+    sizeMap[s].push(iss.cost.total_usd);
+  }
+  const sizeKeys = Object.keys(sizeMap).filter(k=>sizeMap[k].length>0);
+  eChart('chart-cost-vs-size',{
+    xAxis:{type:'category',data:sizeKeys,axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',name:'$ avg',nameTextStyle:{color:C.mut2},splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[{type:'bar',data:sizeKeys.map(k=>{
+      const arr=sizeMap[k]; return +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(4);
+    }),itemStyle:{color:C.violet}}]
+  });
+
+  // tokens
+  const totIn = dfIssues.reduce((s,i)=>s+i.cost.in_tokens,0);
+  const totOut = dfIssues.reduce((s,i)=>s+i.cost.out_tokens,0);
+  eChart('chart-tokens',{
+    series:[{type:'pie',radius:['40%','70%'],data:[
+      {value:totIn,name:'Input',itemStyle:{color:C.cyan}},
+      {value:totOut,name:'Output',itemStyle:{color:C.amber}},
+    ],label:{color:C.mut},emphasis:{itemStyle:{shadowBlur:10}}}]
+  });
+
+  // rework spend — run-level cost not tracked in schema; use issue-count proxy
+  const fixCount = dfIssues.filter(i=>(i.cost.runs||[]).some(r=>r.run_type==='fix')).length;
+  eChart('chart-rework',{
+    series:[{type:'pie',radius:['40%','70%'],data:[
+      {value:dfIssues.length-fixCount,name:'Clean runs',itemStyle:{color:C.green}},
+      {value:fixCount,name:'Had fix run',itemStyle:{color:C.amber}},
+    ],label:{color:C.mut},emphasis:{itemStyle:{shadowBlur:10}}}]
+  });
+})();
+
+// ── Section 5: Labels ────────────────────────────────────────────────────────
+(function buildLabels() {
+  function pieFrom(map) {
+    return Object.entries(map).sort((a,b)=>b[1]-a[1]).map(([n,v],i)=>({
+      value:v,name:n,itemStyle:{color:PALETTE[i%PALETTE.length]}}));
+  }
+
+  const priority={}, size={};
+  for (const iss of issues) {
+    const p=iss.priority||'unset'; priority[p]=(priority[p]||0)+1;
+    const s=iss.size||'?'; size[s]=(size[s]||0)+1;
+  }
+  eChart('chart-by-priority',{series:[{type:'pie',radius:['40%','70%'],data:pieFrom(priority),label:{color:C.mut}}]});
+  eChart('chart-by-size',{series:[{type:'pie',radius:['40%','70%'],data:pieFrom(size),label:{color:C.mut}}]});
+
+  const dfCount=issues.filter(i=>i.autonomous).length;
+  eChart('chart-df-split',{series:[{type:'pie',radius:['40%','70%'],data:[
+    {value:dfCount,name:'Autonomous (DF)',itemStyle:{color:C.amber}},
+    {value:issues.length-dfCount,name:'Human',itemStyle:{color:C.mut}},
+  ],label:{color:C.mut}}]});
+
+  // treemap
+  const labelCounts={};
+  for (const iss of issues) for (const l of iss.labels) {
+    labelCounts[l]=(labelCounts[l]||0)+1;
+  }
+  const tmData=Object.entries(labelCounts).map(([n,v])=>({name:n,value:v}))
+    .sort((a,b)=>b.value-a.value);
+  // NOTE: a treemap level's colorSaturation throws "e.charAt is not a function"
+  // in real ECharts (no level colour to saturate) — that blanks this chart AND
+  // every chart after it AND the table. Map the palette by node index instead.
+  // Guarded by tests/scripts/render_smoke.cjs.
+  eChart('chart-treemap',{
+    series:[{type:'treemap',data:tmData,roam:false,breadcrumb:{show:false},
+      label:{show:true,formatter:'{b}: {c}',fontSize:11,color:'#0a0b0e'},
+      itemStyle:{borderColor:C.line,borderWidth:1,gapWidth:2},
+      levels:[{color:PALETTE,colorMappingBy:'index',
+        itemStyle:{borderColor:'rgba(255,255,255,.12)',borderWidth:2,gapWidth:2}}]}]
+  });
+})();
+
+// ── Section 6: Pipeline Health ───────────────────────────────────────────────
+(function buildHealth() {
+  const allRuns=[];
+  for (const iss of issues.filter(i=>i.autonomous&&i.cost)) {
+    for (const r of (iss.cost.runs||[])) allRuns.push(r);
+  }
+  const byType={};
+  for (const r of allRuns) {
+    const t=r.run_type||'unknown';
+    if (!byType[t]) byType[t]={completed:0,total:0};
+    byType[t].total++;
+    if (r.status==='completed') byType[t].completed++;
+  }
+  const typeKeys=Object.keys(byType);
+  eChart('chart-run-success',{
+    legend:{data:['Completed','Other'],textStyle:{color:C.mut},bottom:0},
+    xAxis:{type:'category',data:typeKeys,axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[
+      {name:'Completed',type:'bar',stack:'total',data:typeKeys.map(k=>byType[k].completed),itemStyle:{color:C.green}},
+      {name:'Other',type:'bar',stack:'total',data:typeKeys.map(k=>byType[k].total-byType[k].completed),itemStyle:{color:C.red}},
+    ]
+  });
+
+  const {weeks} = buildWeeklyTimeseries();
+  const fixByWeek={};
+  for (const iss of issues.filter(i=>i.autonomous&&i.cost&&i.closed_at)) {
+    const hasFix=(iss.cost.runs||[]).some(r=>r.run_type==='fix');
+    if (hasFix) { const w=weekKey(iss.closed_at); fixByWeek[w]=(fixByWeek[w]||0)+1; }
+  }
+  const closedDFByWeek={};
+  for (const iss of issues.filter(i=>i.autonomous&&i.closed_at)) {
+    const w=weekKey(iss.closed_at); closedDFByWeek[w]=(closedDFByWeek[w]||0)+1;
+  }
+  const retryRate=weeks.map(w=>closedDFByWeek[w]
+    ? +((fixByWeek[w]||0)/closedDFByWeek[w]*100).toFixed(1) : null);
+  eChart('chart-retry-trend',{
+    xAxis:{type:'category',data:weeks,axisLabel:{color:C.mut2,rotate:30,fontSize:10},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',name:'%',nameTextStyle:{color:C.mut2},splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:[{type:'line',data:retryRate,smooth:true,connectNulls:true,
+      lineStyle:{color:C.red,width:2},itemStyle:{color:C.red}}]
+  });
+
+  // run type distribution (step count not in schema)
+  eChart('chart-steps-per-run',{
+    series:[{type:'pie',radius:['40%','70%'],data:typeKeys.map((k,i)=>({
+      value:byType[k].total,name:k,itemStyle:{color:PALETTE[i%PALETTE.length]}})),
+      label:{color:C.mut}}]
+  });
+})();
+
+// ── Issue table ──────────────────────────────────────────────────────────────
+(function buildTable() {
+  let filtered = [...issues];
+  const filters = {state:'ALL',autonomous:'ALL',size:'ALL'};
+  let sortCol = null, sortDir = 1; // 1=asc, -1=desc
+
+  const filtersEl = document.getElementById('table-filters');
+  function addFilter(key, values) {
+    values.forEach(v => {
+      const btn = document.createElement('button');
+      btn.className = 'filter-btn' + (v === 'ALL' ? ' active' : '');
+      btn.textContent = v;
+      btn.dataset.key = key;
+      btn.dataset.val = v;
+      btn.onclick = () => {
+        filtersEl.querySelectorAll(`[data-key="${key}"]`).forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        filters[key] = v;
+        renderTable();
+      };
+      filtersEl.appendChild(btn);
+    });
+  }
+  addFilter('state', ['ALL','CLOSED','OPEN']);
+  addFilter('autonomous', ['ALL','DF','Human']);
+  addFilter('size', ['ALL','S','M','L','XL']);
+
+  // Column sort — click header to sort asc; click again to flip
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) { sortDir *= -1; }
+      else { sortCol = col; sortDir = 1; }
+      document.querySelectorAll('th.sortable').forEach(h => h.classList.remove('asc','desc'));
+      th.classList.add(sortDir === 1 ? 'asc' : 'desc');
+      renderTable();
+    });
+  });
+
+  function colValue(iss, col) {
+    if (col === 'number') return iss.number;
+    if (col === 'title') return iss.title.toLowerCase();
+    if (col === 'size') return ['S','M','L','XL'].indexOf(iss.size ?? '?');
+    if (col === 'state') return iss.state;
+    if (col === 'lead_time_hours') return iss.lead_time_hours ?? Infinity;
+    if (col === 'cost') return iss.cost?.total_usd ?? -1;
+    return '';
+  }
+
+  function renderTable() {
+    filtered = issues.filter(iss => {
+      if (filters.state !== 'ALL' && iss.state !== filters.state) return false;
+      if (filters.autonomous === 'DF' && !iss.autonomous) return false;
+      if (filters.autonomous === 'Human' && iss.autonomous) return false;
+      if (filters.size !== 'ALL' && iss.size !== filters.size) return false;
+      return true;
+    });
+    if (sortCol) {
+      filtered = [...filtered].sort((a, b) => {
+        const av = colValue(a, sortCol), bv = colValue(b, sortCol);
+        return av < bv ? -sortDir : av > bv ? sortDir : 0;
+      });
+    }
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = filtered.map(iss => {
+      const lt = iss.lead_time_hours != null
+        ? (iss.lead_time_hours < 48 ? iss.lead_time_hours.toFixed(1)+'h' : (iss.lead_time_hours/24).toFixed(1)+'d')
+        : '—';
+      const cost = iss.cost ? '$'+iss.cost.total_usd.toFixed(2) : '—';
+      const sizeClass = iss.size === 'S' ? 'badge badge-s' : iss.size === 'M' ? 'badge badge-m' : iss.size ? 'badge badge-l' : '';
+      return `<tr>
+        <td class="mono">#${iss.number}</td>
+        <td>${iss.title}</td>
+        <td>${iss.size ? `<span class="${sizeClass}">${iss.size}</span>` : '—'}</td>
+        <td class="${iss.state==='CLOSED'?'gr':'mut'}">${iss.state}</td>
+        <td class="mono">${lt}</td>
+        <td class="am">${cost}</td>
+        <td>${iss.autonomous ? '<span class="badge badge-df">DF</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+  }
+  renderTable();
+})();
+
+// ── Footer ───────────────────────────────────────────────────────────────────
+document.getElementById('footer').textContent =
+  `MarketHawk Dark Factory · Pipeline Report · ${new Date(M.generated_at).toLocaleDateString()}`;
+</script>
+</body>
+</html>

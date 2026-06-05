@@ -1,0 +1,26 @@
+[
+  {
+    "number": 1,
+    "title": "Add volume spike scanner",
+    "state": "CLOSED",
+    "createdAt": "2026-01-10T09:00:00Z",
+    "closedAt": "2026-01-10T11:30:00Z",
+    "labels": [{"name": "enhancement"}, {"name": "size: S"}, {"name": "Dark Factory"}]
+  },
+  {
+    "number": 2,
+    "title": "Fix pre-market gap calculation",
+    "state": "CLOSED",
+    "createdAt": "2026-01-12T09:00:00Z",
+    "closedAt": "2026-01-14T15:00:00Z",
+    "labels": [{"name": "bug"}, {"name": "size: M"}, {"name": "priority: must-have"}]
+  },
+  {
+    "number": 3,
+    "title": "Dashboard WIP issue",
+    "state": "OPEN",
+    "createdAt": "2026-02-01T09:00:00Z",
+    "closedAt": null,
+    "labels": [{"name": "enhancement"}, {"name": "size: L"}]
+  }
+]
