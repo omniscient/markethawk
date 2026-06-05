@@ -119,6 +119,16 @@ class Settings(BaseSettings):
     def normalize_environment(cls, v: str) -> str:
         return v.lower()
 
+    @field_validator("JWT_SECRET_KEY")
+    @classmethod
+    def validate_jwt_secret_key(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError(
+                "JWT_SECRET_KEY must be at least 32 characters. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(48))'"
+            )
+        return v
+
 
 @lru_cache()
 def get_settings() -> Settings:

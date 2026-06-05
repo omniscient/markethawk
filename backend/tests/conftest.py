@@ -7,18 +7,20 @@ os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
 
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 os.environ.setdefault("POLYGON_API_KEY", "test-key-for-unit-tests-only")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-for-unit-tests-only-aaa")
 
 import logging as _logging
 from contextlib import contextmanager
 from typing import Generator
 
 import pytest
-from app.core.database import Base
-from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from testcontainers.postgres import PostgresContainer
+
+from app.core.database import Base
+from app.main import app
 
 _conftest_logger = _logging.getLogger(__name__)
 
