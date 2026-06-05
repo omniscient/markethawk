@@ -498,6 +498,9 @@ nodes:
       fi
       exit 0
     depends_on: [regen-codeindex, setup-branch-resolve]
+    # OR-join of mutually-exclusive branches (continue vs resolve); the always-skipped
+    # sibling must not skip this node. See checkTriggerRule in archon dag-executor.
+    trigger_rule: none_failed_min_one_success
     when: "$parse-intent.output.intent == 'continue' || $parse-intent.output.intent == 'resolve'"
     timeout: 300000
 
@@ -716,6 +719,9 @@ nodes:
   - id: validate
     command: dark-factory-validate
     depends_on: [preview-up, preview-up-resolve]
+    # OR-join: preview-up (new/continue) and preview-up-resolve (resolve) are mutually
+    # exclusive, so one is always skipped. Without this, all_success skips validate every run.
+    trigger_rule: none_failed_min_one_success
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue' || $parse-intent.output.intent == 'resolve'"
     idle_timeout: 300000
 
@@ -887,6 +893,9 @@ nodes:
         echo "WARNING: Issue #$ISSUE not found on project board"
       fi
     depends_on: [push-and-pr, push-resolve, code-review]
+    # OR-join: push-and-pr/code-review (new/continue) vs push-resolve (resolve) are
+    # mutually exclusive. Tolerate the skipped sibling; still skip if a real upstream failed.
+    trigger_rule: none_failed_min_one_success
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue' || $parse-intent.output.intent == 'resolve'"
     timeout: 15000
 
@@ -1033,5 +1042,8 @@ nodes:
 
       echo "Report posted to issue #${ISSUE}"
     depends_on: [status-in-review, code-review]
+    # OR-join: code-review (new/continue) is skipped on resolve runs. Tolerate the skipped
+    # sibling so the report still posts; skip only if a real upstream failed.
+    trigger_rule: none_failed_min_one_success
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue' || $parse-intent.output.intent == 'resolve'"
     timeout: 15000
