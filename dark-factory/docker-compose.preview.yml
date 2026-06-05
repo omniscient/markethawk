@@ -46,6 +46,9 @@ services:
       ENVIRONMENT: development
       LOG_LEVEL: INFO
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      # Dev-only throwaway key (>=32 chars) so the JWT_SECRET_KEY startup validator (#190)
+      # is satisfied. NOT a real secret — preview stacks are ephemeral and network-isolated.
+      JWT_SECRET_KEY: preview-only-not-secret-0123456789abcdef
     ports:
       - "1${ISSUE_NUM_PADDED:-00}80:8000"
     depends_on:
@@ -86,6 +89,8 @@ services:
       ENVIRONMENT: development
       LOG_LEVEL: INFO
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      # Dev-only throwaway key (>=32 chars) — see backend service note above.
+      JWT_SECRET_KEY: preview-only-not-secret-0123456789abcdef
     depends_on:
       postgres:
         condition: service_healthy
