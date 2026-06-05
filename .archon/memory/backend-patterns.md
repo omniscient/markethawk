@@ -15,6 +15,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] The SlowAPI `limiter` instance is in `app/core/rate_limits.py`, not `app/main.py`. Import from `core.rate_limits` to avoid the circular import that would arise if the limiter were in `main.py`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+- [PATTERN] `AuthMiddleware` in `main.py` short-circuits for non-HTTP scopes — WebSocket routes are NOT covered. Protect WS endpoints by adding `_user: User = Depends(ws_get_current_user)` from `app.core.auth`; this raises `WebSocketException(code=1008)` before `accept()` if the cookie is absent or invalid. <!-- issue:#191 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [AVOID] Do not raise `HTTPException` inside a WebSocket dependency — FastAPI will not convert it to a WS close frame. Use `WebSocketException(code=1008, reason="...")` (importable from `fastapi`) instead, which FastAPI closes gracefully before `accept()` is called. <!-- issue:#191 date:2026-06-05 expires:2026-12-05 source:implement -->
+
 ## Backend: Celery Tasks
 
 - [AVOID] For `bind=True` Celery tasks in tests, never call `task.run(mock_self)` — `.run` is already partially bound to the task instance, so passing `mock_self` adds an extra positional arg and raises `TypeError`. Instead call `task.run()` (no args) and use `patch.object(task, 'retry', side_effect=...)` to control retry behavior. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
