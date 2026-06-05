@@ -71,3 +71,46 @@ def parse_findings(text: str):
         path, line = _split_loc(loc)
         findings.append(Finding(severity, category, path, line, description.strip()))
     return findings
+
+
+_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+def changed_lines(diff_text: str):
+    """Map each changed file -> set of RIGHT-side (new) line numbers present in the diff.
+
+    Added ('+') and context (' ') lines advance the new-file counter and are anchorable;
+    removed ('-') lines do not. Deleted files (+++ /dev/null) are skipped.
+    """
+    result = {}
+    current = None
+    new_ln = 0
+    for line in (diff_text or "").splitlines():
+        if line.startswith("diff --git"):
+            current = None
+            continue
+        if line.startswith("+++ "):
+            path = line[4:].strip()
+            if path.startswith("b/"):
+                path = path[2:]
+            current = None if path == "/dev/null" else path
+            if current:
+                result.setdefault(current, set())
+            continue
+        if line.startswith("--- "):
+            continue
+        m = _HUNK_RE.match(line)
+        if m:
+            new_ln = int(m.group(1))
+            continue
+        if current is None:
+            continue
+        if line.startswith("+"):
+            result.setdefault(current, set()).add(new_ln)
+            new_ln += 1
+        elif line.startswith("-"):
+            continue  # left side only
+        else:  # context line (leading space) or blank
+            result.setdefault(current, set()).add(new_ln)
+            new_ln += 1
+    return result
