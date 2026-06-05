@@ -89,3 +89,19 @@ def test_changed_lines_ignores_deleted_file():
     changed = crp.changed_lines(DIFF)
     assert "/dev/null" not in changed
     assert "gone.py" not in changed
+
+
+def test_changed_lines_ignores_no_newline_marker():
+    diff = (
+        "diff --git a/a.py b/a.py\n"
+        "--- a/a.py\n"
+        "+++ b/a.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " context\n"
+        "-old\n"
+        "+new\n"
+        "\\ No newline at end of file\n"
+    )
+    changed = crp.changed_lines(diff)
+    # new side has exactly line 1 (context) and line 2 (added 'new'); no phantom line 3
+    assert changed["a.py"] == {1, 2}

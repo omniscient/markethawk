@@ -105,6 +105,8 @@ def changed_lines(diff_text: str):
             continue
         if current is None:
             continue
+        if line.startswith("\\"):  # "\ No newline at end of file" — not a content line
+            continue
         if line.startswith("+"):
             result.setdefault(current, set()).add(new_ln)
             new_ln += 1
