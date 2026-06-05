@@ -541,12 +541,11 @@ volumes:
     name: markethawk_ib_gateway_settings
   scheduler_state:
   timesfm_cache:
+  # Regular named volume (not tmpfs) so all containers (backend + celery-worker)
+  # share the same directory. prometheus-client MultiProcessCollector reads every
+  # PID-named .db file from this volume; with tmpfs each container had its own
+  # private mount so worker metrics were invisible to the backend's /metrics endpoint.
   prometheus_multiproc:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-      o: size=256m
   prometheus_data:
   grafana_data:
 
