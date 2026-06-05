@@ -33,6 +33,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Test a pydantic-settings validator by passing the invalid value as an init kwarg — `Settings(JWT_SECRET_KEY="")` — since init kwargs override env vars. This gives a clean, deterministic test without manipulating environment state. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+## Backend: Circuit Breakers
+
+- [PATTERN] Circuit breakers live in `app/core/circuit_breakers.py` as two module-level singletons (`POLYGON_BREAKER`, `IBKR_BREAKER`) built from `settings` at import time. Add new breakers here, not in provider files. <!-- issue:#205 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] For sync provider methods (e.g. Polygon), wrap with `POLYGON_BREAKER.call(self._impl, *args)` and catch `pybreaker.CircuitBreakerError` → `ProviderError(is_retryable=False)`. For async methods (e.g. IBKR), use `await IBKR_BREAKER.call_async(self._impl, *args)`. <!-- issue:#205 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] With pybreaker 1.x `fail_max=N`, the circuit opens when fail_counter reaches N; on the Nth call `CircuitBreakerError` is raised instead of the original exception (the breaker opens before re-raising). Test with `fail_max=2`: two real failures open the circuit on the 3rd call. <!-- issue:#205 date:2026-06-05 expires:2026-12-05 source:implement -->
+
 ## Backend: Migrations
 
 - [PATTERN] After any model change: `cd backend && python -m alembic revision --autogenerate -m "description" && python -m alembic upgrade head`. Never skip the `upgrade head` step — the preview stack applies migrations at startup, but the local test suite does not. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
