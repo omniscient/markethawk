@@ -20,7 +20,7 @@ These must be set before starting the stack. The application will start without 
 | `POSTGRES_PASSWORD` | PostgreSQL superuser password | `change_me` |
 | `DATABASE_URL` | Full PostgreSQL connection string (must match `POSTGRES_*` vars) | `postgresql://postgres:change_me@postgres:5432/stockscanner` |
 | `SECRET_KEY` | JWT and session signing key. Generate with: `python -c "import secrets; print(secrets.token_hex(32))"` | `a3f8d2...` |
-| `JWT_SECRET_KEY` | Signing key for user access tokens. Fail-closed: empty value blocks all non-exempt endpoints. Generate same as `SECRET_KEY`. | `b9e1c4...` |
+| `JWT_SECRET_KEY` | Signing key for user access tokens. **Must be ≥ 32 characters** — startup fails with a `ValidationError` if missing or shorter. Generate with: `python -c "import secrets; print(secrets.token_urlsafe(48))"` | `b9e1c4...` |
 | `PGADMIN_DEFAULT_EMAIL` | Login email for pgAdmin web UI | `admin@example.com` |
 | `PGADMIN_DEFAULT_PASSWORD` | Login password for pgAdmin web UI | `change_me` |
 | `SEQ_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Seq admin password. Generate with: `echo 'YourPassword' \| docker run --rm -i datalust/seq config hash` | `$2a$11$...` |
