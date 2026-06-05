@@ -25,6 +25,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When adding a NOT NULL FK column to a table that already has rows: (1) add nullable, (2) UPDATE to backfill default, (3) ALTER to NOT NULL — all in the same Alembic migration. The universe_id migration (c7d8e9f0a1b2) demonstrates this three-step pattern for `scanner_configs`. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
+- [PATTERN] For Celery tasks, HTTP calls to external REST APIs (Polygon, tweet-monitor) are mockable external dependencies — test them by patching `httpx.Client` with `unittest.mock`. Only live IBKR socket connections (`_poll_live_orders`, `FuturesDataService`) are "broker calls" that warrant `# pragma: no cover`. No new HTTP-mocking library (e.g. respx) is needed; `unittest.mock.patch("httpx.Client")` is the established convention. <!-- issue:#204 date:2026-06-05 expires:2026-12-05 source:refine -->
+
 - [PATTERN] Test fixtures that create ScannerConfig rows must now supply `universe_id`; if no universe exists in the test transaction, create one inline (see `seed_scanner_configs` in `tests/fixtures/core.py` for the pattern). <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
 ## Backend: Config / Settings
