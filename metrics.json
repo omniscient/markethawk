@@ -1,0 +1,2858 @@
+{
+  "generated_at": "2026-06-05T00:22:40.421551+00:00",
+  "summary": {
+    "total_issues": 116,
+    "closed_issues": 93,
+    "open_issues": 23,
+    "autonomous_issues": 35,
+    "pct_autonomous": 30.2,
+    "total_cost_usd": 214.5591,
+    "avg_cost_per_ticket": 6.1303,
+    "median_lead_time_hours": 30.072222222222223,
+    "p85_lead_time_hours": 225.98916666666668
+  },
+  "issues": [
+    {
+      "number": 215,
+      "title": "test: add P1.5-1 increment_retry and P1.5-5 trip_to_blocked scheduler tests",
+      "state": "OPEN",
+      "created_at": "2026-06-04T18:10:33Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 214,
+      "title": "Dark factory: completed plans/specs never get *-pending-review label -> direct-to-pr items loop on planning",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T17:33:04Z",
+      "closed_at": "2026-06-04T17:35:40Z",
+      "lead_time_hours": 0.043333333333333335,
+      "factory_cycle_hours": null,
+      "labels": [
+        "bug",
+        "infrastructure",
+        "Dark Factory"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 213,
+      "title": "Review all the self-improvement made and make sure they work well",
+      "state": "OPEN",
+      "created_at": "2026-06-04T16:59:43Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 212,
+      "title": "Interactive pipeline production report (Dark Factory metrics dashboard)",
+      "state": "OPEN",
+      "created_at": "2026-06-04T16:44:06Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: L",
+        "analytics",
+        "Dark Factory",
+        "direct-to-pr"
+      ],
+      "size": "L",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 16.927484049999997,
+        "in_tokens": 567,
+        "out_tokens": 222181,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 18:47 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 19:35 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 20:03 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 23:35 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 23:53 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 210,
+      "title": "Dark factory: auto-detect and resolve merge conflicts on in-review PRs",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T16:09:50Z",
+      "closed_at": "2026-06-04T18:26:20Z",
+      "lead_time_hours": 2.275,
+      "factory_cycle_hours": 1.1888888888888889,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: L",
+        "infrastructure",
+        "Dark Factory",
+        "direct-to-pr"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 15.363181699999998,
+        "in_tokens": 299,
+        "out_tokens": 188068,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 17:15 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 17:19 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 18:14 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 207,
+      "title": "seed: review scanner_config seed file changes (universe_id fix + pocket_pivot simplification)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T14:53:45Z",
+      "closed_at": "2026-06-04T23:28:18Z",
+      "lead_time_hours": 8.575833333333334,
+      "factory_cycle_hours": 6.988333333333333,
+      "labels": [
+        "size: S",
+        "needs-discussion"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 2.6001258000000003,
+        "in_tokens": 178,
+        "out_tokens": 51353,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 16:29 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 20:06 UTC",
+            "run_type": "continue",
+            "status": "failed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 206,
+      "title": "Dark factory: flag & excise out-of-scope incidental changes (scope enforcement at the conformance gate)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T14:02:48Z",
+      "closed_at": "2026-06-04T15:40:33Z",
+      "lead_time_hours": 1.6291666666666667,
+      "factory_cycle_hours": 0.15916666666666668,
+      "labels": [
+        "size: M",
+        "Dark Factory"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 2.24177075,
+        "in_tokens": 115,
+        "out_tokens": 30271,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 15:31 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 205,
+      "title": "[arch-v2][LOW] Add circuit breakers + outbound request timeouts",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:30Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "timeframe: medium-term",
+        "performance",
+        "architecture-audit-v2"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 204,
+      "title": "[arch-v2][MED] Include Celery tasks in coverage measurement",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:29Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "timeframe: short-term",
+        "testing",
+        "architecture-audit-v2"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 203,
+      "title": "[arch-v2][MED] Harden Docker socket mount (dark-factory / scheduler) + non-root containers",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:28Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "timeframe: medium-term",
+        "security",
+        "infrastructure",
+        "architecture-audit-v2"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 202,
+      "title": "[arch-v2][MED] Enforce secure cookies + TLS termination",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:27Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "timeframe: medium-term",
+        "security",
+        "infrastructure",
+        "architecture-audit-v2"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 201,
+      "title": "[arch-v2][MED] Documentation hygiene: sync/async drift, stale tables, ADR numbering, docs casing",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:26Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "documentation",
+        "priority: should-have",
+        "size: S",
+        "timeframe: short-term",
+        "architecture-audit-v2"
+      ],
+      "size": "S",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 200,
+      "title": "[arch-v2][MED] Codeindex artifacts referenced as committed but absent",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:24Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "documentation",
+        "priority: should-have",
+        "size: S",
+        "timeframe: short-term",
+        "architecture-audit-v2"
+      ],
+      "size": "S",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 199,
+      "title": "[arch-v2][MED] Decompose scanner.py / futures_data.py god modules",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:23Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: L",
+        "scanner",
+        "timeframe: short-term",
+        "architecture-audit-v2"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 198,
+      "title": "[arch-v2][MED] Expand frontend test breadth (pages/components) + honest coverage",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:22Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: L",
+        "frontend",
+        "timeframe: short-term",
+        "testing",
+        "architecture-audit-v2"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 197,
+      "title": "[arch-v2][MED] CI lint/audit gates are non-enforcing (ESLint TS rules + non-blocking audits)",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:21Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: S",
+        "frontend",
+        "timeframe: short-term",
+        "infrastructure",
+        "architecture-audit-v2"
+      ],
+      "size": "S",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 196,
+      "title": "[arch-v2][MED] Add brute-force rate limit to login/register",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:19Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: S",
+        "timeframe: immediate",
+        "security",
+        "architecture-audit-v2"
+      ],
+      "size": "S",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 195,
+      "title": "[arch-v2][HIGH] Automated database backups (carried over from v1, never ticketed)",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:18Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: must-have",
+        "size: M",
+        "timeframe: short-term",
+        "infrastructure",
+        "architecture-audit-v2"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 194,
+      "title": "[arch-v2][HIGH] Celery/worker Prometheus metrics never scraped",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:17Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "bug",
+        "priority: must-have",
+        "size: M",
+        "timeframe: immediate",
+        "infrastructure",
+        "observability",
+        "architecture-audit-v2"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 193,
+      "title": "[arch-v2][HIGH] Frontend tsc --noEmit is red \u2014 build/CI gate broken",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:16Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "bug",
+        "priority: must-have",
+        "size: S",
+        "frontend",
+        "timeframe: immediate",
+        "testing",
+        "architecture-audit-v2"
+      ],
+      "size": "S",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 192,
+      "title": "[arch-v2][HIGH] Add CSRF protection for cookie-based auth",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:14Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: must-have",
+        "size: M",
+        "timeframe: immediate",
+        "security",
+        "architecture-audit-v2"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 191,
+      "title": "[arch-v2][HIGH] Authenticate WebSocket connections (currently bypass auth)",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:13Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: must-have",
+        "size: M",
+        "timeframe: immediate",
+        "security",
+        "architecture-audit-v2"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 190,
+      "title": "[arch-v2][CRITICAL] Reject empty/weak JWT_SECRET_KEY at startup",
+      "state": "OPEN",
+      "created_at": "2026-06-04T12:49:12Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "bug",
+        "priority: must-have",
+        "size: S",
+        "timeframe: immediate",
+        "security",
+        "architecture-audit-v2"
+      ],
+      "size": "S",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 184,
+      "title": "Compare Dark Factory implementation against the Agyn multi-agent SE paper (arXiv:2602.01465v2)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T04:00:42Z",
+      "closed_at": "2026-06-04T16:11:25Z",
+      "lead_time_hours": 12.178611111111111,
+      "factory_cycle_hours": 3.4902777777777776,
+      "labels": [
+        "documentation",
+        "enhancement",
+        "priority: should-have",
+        "size: L",
+        "Dark Factory"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 7.197066849999999,
+        "in_tokens": 310,
+        "out_tokens": 123906,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 12:42 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 15:17 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 16:09 UTC",
+            "run_type": "continue",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 183,
+      "title": "Direct-to-PR mode: opt-in single-gate autonomous flow for the dark factory",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T03:50:56Z",
+      "closed_at": "2026-06-04T12:53:47Z",
+      "lead_time_hours": 9.0475,
+      "factory_cycle_hours": 6.996388888888889,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: L"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 12.083192799999997,
+        "in_tokens": 273,
+        "out_tokens": 163010,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 05:54 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 11:47 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 178,
+      "title": "Differentiate preview-environment creation: skip the stack for non-runtime changes",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T02:06:12Z",
+      "closed_at": "2026-06-04T03:22:27Z",
+      "lead_time_hours": 1.2708333333333333,
+      "factory_cycle_hours": 0.7408333333333333,
+      "labels": [
+        "Dark Factory"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 4.452157150000001,
+        "in_tokens": 1196,
+        "out_tokens": 75815,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 02:38 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 03:18 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 177,
+      "title": "Pilot: evaluate repowise structural layers vs codeindex",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T01:58:05Z",
+      "closed_at": "2026-06-04T15:25:45Z",
+      "lead_time_hours": 13.46111111111111,
+      "factory_cycle_hours": 12.395833333333334,
+      "labels": [
+        "size: M",
+        "infrastructure"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 9.117427849999997,
+        "in_tokens": 377,
+        "out_tokens": 137633,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 03:02 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 04:13 UTC",
+            "run_type": "fix",
+            "status": "failed"
+          },
+          {
+            "timestamp": "2026-06-04 04:32 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 174,
+      "title": "docs: add the missing diagram layer (topology, scan flow, domain model, factory pipeline)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T01:01:51Z",
+      "closed_at": "2026-06-04T23:53:16Z",
+      "lead_time_hours": 22.856944444444444,
+      "factory_cycle_hours": 18.637777777777778,
+      "labels": [
+        "documentation",
+        "size: M",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 5.70289265,
+        "in_tokens": 305,
+        "out_tokens": 80201,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 05:15 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 12:15 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 15:00 UTC",
+            "run_type": "continue",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 173,
+      "title": "docs: archive write-once specs/plans (separate historical residue from living docs)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T01:01:50Z",
+      "closed_at": "2026-06-04T14:26:27Z",
+      "lead_time_hours": 13.410277777777777,
+      "factory_cycle_hours": 9.4575,
+      "labels": [
+        "documentation",
+        "size: M",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 4.933591600000001,
+        "in_tokens": 298,
+        "out_tokens": 85475,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 04:59 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 12:00 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 12:59 UTC",
+            "run_type": "continue",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 172,
+      "title": "docs: ADR hygiene \u2014 renumber duplicate 0010 and add a decision-log index",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T01:01:48Z",
+      "closed_at": "2026-06-04T12:39:18Z",
+      "lead_time_hours": 11.625,
+      "factory_cycle_hours": 7.971666666666667,
+      "labels": [
+        "documentation",
+        "size: S",
+        "architecture-audit"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 2.574769399999999,
+        "in_tokens": 159,
+        "out_tokens": 37493,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 04:41 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 11:21 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 171,
+      "title": "docs: fix Docs/ vs docs/ casing collision (breaks links in Linux dark factory)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T01:01:47Z",
+      "closed_at": "2026-06-04T03:45:17Z",
+      "lead_time_hours": 2.725,
+      "factory_cycle_hours": 1.4380555555555556,
+      "labels": [
+        "documentation",
+        "size: S",
+        "architecture-audit"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 4.6660517499999985,
+        "in_tokens": 790,
+        "out_tokens": 61770,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 02:19 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 03:35 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 170,
+      "title": "docs: consolidate competing agent-instruction systems (retire orphaned .agent/skills)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T01:01:46Z",
+      "closed_at": "2026-06-04T12:41:26Z",
+      "lead_time_hours": 11.661111111111111,
+      "factory_cycle_hours": 10.607222222222223,
+      "labels": [
+        "documentation",
+        "size: M",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 3.0921052999999996,
+        "in_tokens": 165,
+        "out_tokens": 51503,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 02:05 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 03:48 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 169,
+      "title": "docs: one canonical module map (de-duplicate ARCHITECTURE / PROJECT_STRUCTURE / database-schema)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T01:01:45Z",
+      "closed_at": "2026-06-04T01:56:11Z",
+      "lead_time_hours": 0.9072222222222223,
+      "factory_cycle_hours": 0.45305555555555554,
+      "labels": [
+        "documentation",
+        "size: M",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 2.59214935,
+        "in_tokens": 125,
+        "out_tokens": 42471,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 01:29 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 01:54 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 168,
+      "title": "docs: give every drifting fact one canonical owner (single source of truth)",
+      "state": "CLOSED",
+      "created_at": "2026-06-04T01:01:44Z",
+      "closed_at": "2026-06-04T01:49:08Z",
+      "lead_time_hours": 0.79,
+      "factory_cycle_hours": 0.5355555555555556,
+      "labels": [
+        "documentation",
+        "size: M",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 3.7678073,
+        "in_tokens": 138,
+        "out_tokens": 51546,
+        "runs": [
+          {
+            "timestamp": "2026-06-04 01:17 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-04 01:45 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 162,
+      "title": "Dark factory: verify spec conformance at plan and code stages (tiered gate + attestation)",
+      "state": "CLOSED",
+      "created_at": "2026-06-03T18:54:36Z",
+      "closed_at": "2026-06-03T20:26:27Z",
+      "lead_time_hours": 1.5308333333333333,
+      "factory_cycle_hours": 0.7908333333333334,
+      "labels": [
+        "priority: must-have",
+        "size: M",
+        "Dark Factory"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 2.75297755,
+        "in_tokens": 173,
+        "out_tokens": 36712,
+        "runs": [
+          {
+            "timestamp": "2026-06-03 19:39 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-03 19:51 UTC",
+            "run_type": "continue",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 160,
+      "title": "Dark factory scheduler: universal loop circuit-breaker",
+      "state": "CLOSED",
+      "created_at": "2026-06-03T16:34:44Z",
+      "closed_at": "2026-06-03T21:02:07Z",
+      "lead_time_hours": 4.456388888888889,
+      "factory_cycle_hours": 3.268611111111111,
+      "labels": [
+        "priority: must-have",
+        "size: M",
+        "Dark Factory"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 9.7197653,
+        "in_tokens": 319,
+        "out_tokens": 122177,
+        "runs": [
+          {
+            "timestamp": "2026-06-03 17:46 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-03 19:23 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-03 20:33 UTC",
+            "run_type": "continue",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 159,
+      "title": "Integrate codeindex into the dark factory",
+      "state": "CLOSED",
+      "created_at": "2026-06-03T12:56:40Z",
+      "closed_at": "2026-06-04T00:24:59Z",
+      "lead_time_hours": 11.471944444444444,
+      "factory_cycle_hours": 2.616388888888889,
+      "labels": [
+        "priority: must-have",
+        "size: M",
+        "Dark Factory"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 3.2947202500000006,
+        "in_tokens": 124,
+        "out_tokens": 41575,
+        "runs": [
+          {
+            "timestamp": "2026-06-03 21:48 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 158,
+      "title": "Audit codebase for hardcoded API/WebSocket URLs that bypass the shared apiClient base",
+      "state": "CLOSED",
+      "created_at": "2026-06-03T01:58:44Z",
+      "closed_at": "2026-06-03T23:59:03Z",
+      "lead_time_hours": 22.005277777777778,
+      "factory_cycle_hours": 21.83416666666667,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 6.3968717999999996,
+        "in_tokens": 276,
+        "out_tokens": 40745,
+        "runs": [
+          {
+            "timestamp": "2026-06-03 02:09 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-03 02:27 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-03 20:47 UTC",
+            "run_type": "fix",
+            "status": "failed"
+          },
+          {
+            "timestamp": "2026-06-03 21:58 UTC",
+            "run_type": "continue",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 156,
+      "title": "Scheduled scanner beat tasks are a no-op: seeded ScannerConfigs lack parameters.universe_id",
+      "state": "CLOSED",
+      "created_at": "2026-06-03T00:12:01Z",
+      "closed_at": "2026-06-04T00:21:06Z",
+      "lead_time_hours": 24.15138888888889,
+      "factory_cycle_hours": 23.968333333333334,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "scanner",
+        "timeframe: immediate"
+      ],
+      "size": null,
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 16.164355500000003,
+        "in_tokens": 444,
+        "out_tokens": 92486,
+        "runs": [
+          {
+            "timestamp": "2026-06-03 00:23 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-03 02:59 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-03 21:25 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-03 22:14 UTC",
+            "run_type": "continue",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 149,
+      "title": "Add memory in the process to improve the subagent process",
+      "state": "CLOSED",
+      "created_at": "2026-06-01T13:27:16Z",
+      "closed_at": "2026-06-02T19:08:34Z",
+      "lead_time_hours": 29.688333333333333,
+      "factory_cycle_hours": 29.12611111111111,
+      "labels": [
+        "Dark Factory"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 12.5813163,
+        "in_tokens": 196,
+        "out_tokens": 8236,
+        "runs": [
+          {
+            "timestamp": "2026-06-01 14:01 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-01 21:01 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 01:01 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 02:31 UTC",
+            "run_type": "fix",
+            "status": "failed"
+          },
+          {
+            "timestamp": "2026-06-02 03:13 UTC",
+            "run_type": "continue",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 148,
+      "title": "Integrate https://github.com/microsoft/agent-governance-toolkit",
+      "state": "OPEN",
+      "created_at": "2026-06-01T13:26:25Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "spec-pending-review"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 2.3212083500000005,
+        "in_tokens": 33,
+        "out_tokens": 975,
+        "runs": [
+          {
+            "timestamp": "2026-06-01 13:43 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 147,
+      "title": "Deploy hardening: flower env + debug-gated SQL echo (shipped in #145)",
+      "state": "CLOSED",
+      "created_at": "2026-06-01T11:39:30Z",
+      "closed_at": "2026-06-01T11:39:33Z",
+      "lead_time_hours": 0.0008333333333333334,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 146,
+      "title": "Local dev bind-mounts the working tree into running containers (editing source mutates the live stack)",
+      "state": "CLOSED",
+      "created_at": "2026-06-01T11:36:37Z",
+      "closed_at": "2026-06-02T17:40:57Z",
+      "lead_time_hours": 30.072222222222223,
+      "factory_cycle_hours": 29.699166666666667,
+      "labels": [
+        "enhancement"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 5.725948499999999,
+        "in_tokens": 147,
+        "out_tokens": 21393,
+        "runs": [
+          {
+            "timestamp": "2026-06-01 11:59 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 00:28 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 02:41 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 144,
+      "title": "dark-factory scheduler: back off and stop comment-spamming on repeated identical failures",
+      "state": "CLOSED",
+      "created_at": "2026-06-01T10:52:43Z",
+      "closed_at": "2026-06-02T17:40:57Z",
+      "lead_time_hours": 30.80388888888889,
+      "factory_cycle_hours": 30.1325,
+      "labels": [
+        "enhancement",
+        "Dark Factory"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 4.417210999999999,
+        "in_tokens": 154,
+        "out_tokens": 66684,
+        "runs": [
+          {
+            "timestamp": "2026-06-01 11:33 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 01:42 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 02:49 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 143,
+      "title": "CI: validate .archon/workflows/*.yaml parses before merge",
+      "state": "CLOSED",
+      "created_at": "2026-06-01T10:52:42Z",
+      "closed_at": "2026-06-02T00:11:44Z",
+      "lead_time_hours": 13.317222222222222,
+      "factory_cycle_hours": 12.912222222222223,
+      "labels": [
+        "enhancement",
+        "plan-pending-review",
+        "Dark Factory"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 2.81139575,
+        "in_tokens": 140,
+        "out_tokens": 10166,
+        "runs": [
+          {
+            "timestamp": "2026-06-01 11:17 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-01 11:24 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-01 11:43 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-01 21:09 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 141,
+      "title": "Evaluate going from docker compose to kubernetes for easier cloud go live",
+      "state": "OPEN",
+      "created_at": "2026-05-30T18:28:12Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "spec-pending-review"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 1.7859118499999995,
+        "in_tokens": 31,
+        "out_tokens": 851,
+        "runs": [
+          {
+            "timestamp": "2026-06-01 12:40 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 140,
+      "title": "New scanner type for ta plot volume pocket pivot",
+      "state": "CLOSED",
+      "created_at": "2026-05-30T18:22:36Z",
+      "closed_at": "2026-06-02T02:08:49Z",
+      "lead_time_hours": 55.77027777777778,
+      "factory_cycle_hours": 55.51361111111111,
+      "labels": [
+        "enhancement",
+        "scanner"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 11.00196085,
+        "in_tokens": 157,
+        "out_tokens": 62316,
+        "runs": [
+          {
+            "timestamp": "2026-05-30 18:38 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-01 12:27 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 01:26 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 133,
+      "title": "Dark factory: block in-review tickets with failing CI",
+      "state": "CLOSED",
+      "created_at": "2026-05-29T17:06:51Z",
+      "closed_at": "2026-05-29T17:09:58Z",
+      "lead_time_hours": 0.051944444444444446,
+      "factory_cycle_hours": null,
+      "labels": [
+        "Dark Factory"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 129,
+      "title": "fix(dark-factory): cost report never posts + PR push silently fails",
+      "state": "CLOSED",
+      "created_at": "2026-05-29T16:12:44Z",
+      "closed_at": "2026-05-29T16:16:22Z",
+      "lead_time_hours": 0.06055555555555556,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: S",
+        "infrastructure",
+        "Dark Factory"
+      ],
+      "size": "S",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 125,
+      "title": "Dark factory: issues >=100 stuck In Progress; cost reports never post",
+      "state": "CLOSED",
+      "created_at": "2026-05-29T14:21:40Z",
+      "closed_at": "2026-05-29T14:28:26Z",
+      "lead_time_hours": 0.11277777777777778,
+      "factory_cycle_hours": 1.1072222222222223,
+      "labels": [
+        "Dark Factory"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 0.4208,
+        "in_tokens": 1500800,
+        "out_tokens": 23030,
+        "runs": [
+          {
+            "timestamp": "2026-05-29 13:22 UTC",
+            "run_type": "fix",
+            "status": "failed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 124,
+      "title": "Dark factory: collision-free dynamic preview port allocation (replace ISSUE % 100 slot)",
+      "state": "CLOSED",
+      "created_at": "2026-05-29T14:21:18Z",
+      "closed_at": "2026-05-30T18:24:26Z",
+      "lead_time_hours": 28.052222222222223,
+      "factory_cycle_hours": 24.940555555555555,
+      "labels": [
+        "Dark Factory"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 3.9618063000000006,
+        "in_tokens": 86,
+        "out_tokens": 17459,
+        "runs": [
+          {
+            "timestamp": "2026-05-29 17:28 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-05-29 20:55 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 122,
+      "title": "Add GELF logging for dark factory containers to Seq",
+      "state": "CLOSED",
+      "created_at": "2026-05-29T12:10:52Z",
+      "closed_at": "2026-05-29T13:06:09Z",
+      "lead_time_hours": 0.9213888888888889,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 107,
+      "title": "Add codeindex (https://github.com/scheidydude/codeindex)",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T16:22:40Z",
+      "closed_at": "2026-06-03T11:58:52Z",
+      "lead_time_hours": 163.60333333333332,
+      "factory_cycle_hours": 32.08111111111111,
+      "labels": [
+        "wontfix",
+        "priority: must-have",
+        "size: S",
+        "plan-pending-review",
+        "timeframe: immediate",
+        "Dark Factory"
+      ],
+      "size": "S",
+      "priority": "must-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 7.366940049999998,
+        "in_tokens": 314,
+        "out_tokens": 42921,
+        "runs": [
+          {
+            "timestamp": "2026-06-02 03:54 UTC",
+            "run_type": "refine",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 19:24 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 20:24 UTC",
+            "run_type": "fix",
+            "status": "failed"
+          },
+          {
+            "timestamp": "2026-06-02 20:33 UTC",
+            "run_type": "fix",
+            "status": "failed"
+          },
+          {
+            "timestamp": "2026-06-02 20:42 UTC",
+            "run_type": "fix",
+            "status": "failed"
+          },
+          {
+            "timestamp": "2026-06-02 20:51 UTC",
+            "run_type": "fix",
+            "status": "failed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 106,
+      "title": "Integrate HMM regime detection to enhance and validate scanner signals",
+      "state": "OPEN",
+      "created_at": "2026-05-27T02:56:07Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: L",
+        "plan-pending-review"
+      ],
+      "size": "L",
+      "priority": null,
+      "autonomous": true,
+      "cost": {
+        "total_usd": 5.638087600000001,
+        "in_tokens": 81,
+        "out_tokens": 87899,
+        "runs": [
+          {
+            "timestamp": "2026-06-02 03:45 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 105,
+      "title": "Add API versioning",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:26:52Z",
+      "closed_at": "2026-05-29T13:10:52Z",
+      "lead_time_hours": 59.733333333333334,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: L",
+        "timeframe: strategic",
+        "architecture-audit"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 104,
+      "title": "Set up container registry and CI/CD deployment pipeline",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:26:33Z",
+      "closed_at": "2026-06-03T02:16:30Z",
+      "lead_time_hours": 168.8325,
+      "factory_cycle_hours": 100.55833333333334,
+      "labels": [
+        "priority: should-have",
+        "size: L",
+        "timeframe: strategic",
+        "infrastructure",
+        "architecture-audit"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 3.1570963,
+        "in_tokens": 102,
+        "out_tokens": 19527,
+        "runs": [
+          {
+            "timestamp": "2026-05-29 21:43 UTC",
+            "run_type": "plan",
+            "status": "completed"
+          },
+          {
+            "timestamp": "2026-06-02 02:59 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 103,
+      "title": "Implement distributed tracing (OpenTelemetry)",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:26:11Z",
+      "closed_at": "2026-05-29T16:16:02Z",
+      "lead_time_hours": 62.83083333333333,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: L",
+        "timeframe: strategic",
+        "infrastructure",
+        "observability",
+        "architecture-audit"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 102,
+      "title": "Add frontend code splitting and lazy loading",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:25:52Z",
+      "closed_at": "2026-05-29T15:10:14Z",
+      "lead_time_hours": 61.739444444444445,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "frontend",
+        "timeframe: strategic",
+        "performance",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 101,
+      "title": "Migrate to async SQLAlchemy",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:25:34Z",
+      "closed_at": "2026-05-29T18:20:27Z",
+      "lead_time_hours": 64.91472222222222,
+      "factory_cycle_hours": 1.4241666666666666,
+      "labels": [
+        "wontfix",
+        "priority: should-have",
+        "timeframe: strategic",
+        "size: XL",
+        "performance",
+        "architecture-audit"
+      ],
+      "size": "XL",
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 4.566397799999997,
+        "in_tokens": 38,
+        "out_tokens": 1942,
+        "runs": [
+          {
+            "timestamp": "2026-05-29 16:55 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 100,
+      "title": "Add eager loading (joinedload) to N+1 query hotspots",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:25:14Z",
+      "closed_at": "2026-05-29T14:29:07Z",
+      "lead_time_hours": 61.06472222222222,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "timeframe: medium-term",
+        "performance",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 99,
+      "title": "Write ADRs for key architectural decisions",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:24:54Z",
+      "closed_at": "2026-05-29T10:58:45Z",
+      "lead_time_hours": 57.564166666666665,
+      "factory_cycle_hours": null,
+      "labels": [
+        "documentation",
+        "priority: should-have",
+        "size: M",
+        "timeframe: medium-term",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 98,
+      "title": "Implement Redis application caching for hot endpoints",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:24:32Z",
+      "closed_at": "2026-05-30T18:26:15Z",
+      "lead_time_hours": 89.0286111111111,
+      "factory_cycle_hours": 20.920833333333334,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "timeframe: medium-term",
+        "performance",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 12.247381999999995,
+        "in_tokens": 93,
+        "out_tokens": 32985,
+        "runs": [
+          {
+            "timestamp": "2026-05-29 21:31 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 97,
+      "title": "Add pre-commit hooks (ruff lint, ruff format, eslint)",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:24:11Z",
+      "closed_at": "2026-05-29T10:58:07Z",
+      "lead_time_hours": 57.565555555555555,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: S",
+        "timeframe: medium-term",
+        "architecture-audit",
+        "Dark Factory"
+      ],
+      "size": "S",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 96,
+      "title": "Extract business logic from thick routers into services",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:23:53Z",
+      "closed_at": "2026-05-28T19:28:28Z",
+      "lead_time_hours": 42.076388888888886,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: M",
+        "timeframe: medium-term",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 95,
+      "title": "Add Prometheus metrics and Grafana dashboards",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:23:34Z",
+      "closed_at": "2026-05-28T19:32:14Z",
+      "lead_time_hours": 42.144444444444446,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: L",
+        "timeframe: medium-term",
+        "infrastructure",
+        "observability",
+        "architecture-audit"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 94,
+      "title": "Create missing documentation (DEVELOPMENT.md, ARCHITECTURE.md, ENV_VARIABLES.md, POLYGON_RATE_LIMITS.md)",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:23:13Z",
+      "closed_at": "2026-05-27T01:41:04Z",
+      "lead_time_hours": 0.2975,
+      "factory_cycle_hours": null,
+      "labels": [
+        "documentation",
+        "priority: should-have",
+        "size: M",
+        "timeframe: short-term",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 93,
+      "title": "Add resource limits (memory/CPU) to all Docker services",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:22:56Z",
+      "closed_at": "2026-05-29T14:31:22Z",
+      "lead_time_hours": 61.14055555555556,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: S",
+        "timeframe: short-term",
+        "infrastructure",
+        "architecture-audit"
+      ],
+      "size": "S",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 92,
+      "title": "Enable TypeScript strict mode incrementally",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:22:36Z",
+      "closed_at": "2026-05-28T17:36:59Z",
+      "lead_time_hours": 40.23972222222222,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "frontend",
+        "timeframe: short-term",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 91,
+      "title": "Migrate config.py to pydantic-settings BaseSettings",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:22:14Z",
+      "closed_at": "2026-05-28T17:35:56Z",
+      "lead_time_hours": 40.22833333333333,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: M",
+        "timeframe: short-term",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 90,
+      "title": "Implement automated database backups with retention",
+      "state": "OPEN",
+      "created_at": "2026-05-27T01:21:52Z",
+      "closed_at": null,
+      "lead_time_hours": null,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: must-have",
+        "size: M",
+        "plan-pending-review",
+        "timeframe: short-term",
+        "infrastructure",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 89,
+      "title": "Install Vitest and add frontend tests for critical paths",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:21:33Z",
+      "closed_at": "2026-05-29T10:57:34Z",
+      "lead_time_hours": 57.60027777777778,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: L",
+        "frontend",
+        "plan-pending-review",
+        "timeframe: short-term",
+        "testing",
+        "architecture-audit"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 88,
+      "title": "Extend CI: frontend type check, build, migration validation, dependency audit",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:21:10Z",
+      "closed_at": "2026-05-29T18:11:19Z",
+      "lead_time_hours": 64.83583333333333,
+      "factory_cycle_hours": 1.7552777777777777,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "plan-pending-review",
+        "timeframe: short-term",
+        "infrastructure",
+        "architecture-audit",
+        "Dark Factory"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": true,
+      "cost": {
+        "total_usd": 0.9151692499999999,
+        "in_tokens": 46,
+        "out_tokens": 4890,
+        "runs": [
+          {
+            "timestamp": "2026-05-29 16:26 UTC",
+            "run_type": "fix",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "number": 87,
+      "title": "Add API rate limiting (slowapi)",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:20:51Z",
+      "closed_at": "2026-05-28T17:39:59Z",
+      "lead_time_hours": 40.318888888888885,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: must-have",
+        "size: S",
+        "timeframe: immediate",
+        "security",
+        "architecture-audit"
+      ],
+      "size": "S",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 86,
+      "title": "Bind management service ports to localhost only",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:20:28Z",
+      "closed_at": "2026-05-28T00:31:46Z",
+      "lead_time_hours": 23.188333333333333,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: must-have",
+        "size: S",
+        "plan-pending-review",
+        "timeframe: immediate",
+        "security",
+        "infrastructure",
+        "architecture-audit"
+      ],
+      "size": "S",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 85,
+      "title": "Configure SQLAlchemy connection pooling",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:20:09Z",
+      "closed_at": "2026-05-28T00:30:00Z",
+      "lead_time_hours": 23.164166666666667,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: must-have",
+        "size: S",
+        "plan-pending-review",
+        "timeframe: immediate",
+        "infrastructure",
+        "architecture-audit"
+      ],
+      "size": "S",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 84,
+      "title": "Add authentication and restrict CORS origins",
+      "state": "CLOSED",
+      "created_at": "2026-05-27T01:19:48Z",
+      "closed_at": "2026-05-28T01:35:29Z",
+      "lead_time_hours": 24.261388888888888,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: must-have",
+        "size: M",
+        "timeframe: immediate",
+        "security",
+        "architecture-audit"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 78,
+      "title": "feat: tweet-monitor microservice \u2014 scrape X accounts for real-time stock callouts",
+      "state": "CLOSED",
+      "created_at": "2026-05-25T14:30:52Z",
+      "closed_at": "2026-05-26T00:37:42Z",
+      "lead_time_hours": 10.113888888888889,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: must-have",
+        "size: L",
+        "spec-approved"
+      ],
+      "size": "L",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 76,
+      "title": "refactor: extract orchestration logic from oversized routers",
+      "state": "CLOSED",
+      "created_at": "2026-05-25T00:01:01Z",
+      "closed_at": "2026-05-26T23:55:25Z",
+      "lead_time_hours": 47.906666666666666,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "plan-pending-review"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 75,
+      "title": "refactor: abstract live scanner IBKR coupling behind provider seam",
+      "state": "CLOSED",
+      "created_at": "2026-05-25T00:00:59Z",
+      "closed_at": "2026-05-26T23:49:58Z",
+      "lead_time_hours": 47.81638888888889,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M",
+        "plan-pending-review"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 74,
+      "title": "refactor: decompose monolithic frontend page components",
+      "state": "CLOSED",
+      "created_at": "2026-05-25T00:00:57Z",
+      "closed_at": "2026-05-27T01:01:37Z",
+      "lead_time_hours": 49.01111111111111,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: L"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 73,
+      "title": "refactor: split tasks.py god module into domain-focused task modules",
+      "state": "CLOSED",
+      "created_at": "2026-05-25T00:00:56Z",
+      "closed_at": "2026-05-26T23:49:19Z",
+      "lead_time_hours": 47.80638888888889,
+      "factory_cycle_hours": null,
+      "labels": [
+        "priority: should-have",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 72,
+      "title": "Testing Architecture Review: deepen test coverage and infrastructure",
+      "state": "CLOSED",
+      "created_at": "2026-05-24T19:51:41Z",
+      "closed_at": "2026-05-25T23:41:23Z",
+      "lead_time_hours": 27.828333333333333,
+      "factory_cycle_hours": null,
+      "labels": [],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 70,
+      "title": "Modular seed data catalog for dark factory previews",
+      "state": "CLOSED",
+      "created_at": "2026-05-24T18:36:59Z",
+      "closed_at": "2026-05-24T18:46:58Z",
+      "lead_time_hours": 0.1663888888888889,
+      "factory_cycle_hours": null,
+      "labels": [
+        "size: M"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 64,
+      "title": "Standardize error handling conventions across modules",
+      "state": "CLOSED",
+      "created_at": "2026-05-23T13:20:05Z",
+      "closed_at": "2026-05-24T18:05:05Z",
+      "lead_time_hours": 28.75,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 63,
+      "title": "Deepen the Futures Data module: clear interface over 1,023-line implementation",
+      "state": "CLOSED",
+      "created_at": "2026-05-23T13:19:55Z",
+      "closed_at": "2026-05-23T18:46:49Z",
+      "lead_time_hours": 5.448333333333333,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: M",
+        "plan-pending-review"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 62,
+      "title": "Extract business logic from Scanner and Universe routers",
+      "state": "CLOSED",
+      "created_at": "2026-05-23T13:19:44Z",
+      "closed_at": "2026-05-23T19:16:57Z",
+      "lead_time_hours": 5.953611111111111,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 61,
+      "title": "Fix Provider seam: resolve async/sync mismatch, honest interface",
+      "state": "CLOSED",
+      "created_at": "2026-05-23T13:19:31Z",
+      "closed_at": "2026-05-23T18:50:52Z",
+      "lead_time_hours": 5.5225,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 60,
+      "title": "Deepen the Scanner module into a Scan Orchestrator with registry",
+      "state": "CLOSED",
+      "created_at": "2026-05-23T13:19:20Z",
+      "closed_at": "2026-05-23T18:48:58Z",
+      "lead_time_hours": 5.493888888888889,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: L"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 52,
+      "title": "Auto-refinement pipeline: multi-agent brainstorming for backlog issues",
+      "state": "CLOSED",
+      "created_at": "2026-05-13T21:02:37Z",
+      "closed_at": "2026-05-13T23:49:41Z",
+      "lead_time_hours": 2.7844444444444445,
+      "factory_cycle_hours": null,
+      "labels": [],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 48,
+      "title": "Dark Factory should be a bit more verbose as it progresses in each tickets",
+      "state": "CLOSED",
+      "created_at": "2026-05-13T15:39:30Z",
+      "closed_at": "2026-05-13T19:11:22Z",
+      "lead_time_hours": 3.531111111111111,
+      "factory_cycle_hours": null,
+      "labels": [],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 46,
+      "title": "Dark Factory shjould include project related documentation adjustments.",
+      "state": "CLOSED",
+      "created_at": "2026-05-13T15:28:25Z",
+      "closed_at": "2026-05-14T01:43:18Z",
+      "lead_time_hours": 10.248055555555556,
+      "factory_cycle_hours": null,
+      "labels": [
+        "spec-approved"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 35,
+      "title": "Mocked futures providers + endpoint tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:17:05Z",
+      "closed_at": "2026-05-13T17:16:58Z",
+      "lead_time_hours": 230.99805555555557,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 34,
+      "title": "Mocked Polygon news + endpoint tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:16:58Z",
+      "closed_at": "2026-05-13T17:07:24Z",
+      "lead_time_hours": 230.84055555555557,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 33,
+      "title": "Mocked Polygon provider + stocks endpoint tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:16:51Z",
+      "closed_at": "2026-05-13T13:59:55Z",
+      "lead_time_hours": 227.71777777777777,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 32,
+      "title": "System config endpoint integration tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:16:43Z",
+      "closed_at": "2026-05-13T12:16:04Z",
+      "lead_time_hours": 225.98916666666668,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 31,
+      "title": "Outcomes fixtures + endpoint integration tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:16:36Z",
+      "closed_at": "2026-05-13T11:55:17Z",
+      "lead_time_hours": 225.6447222222222,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 30,
+      "title": "Alerts fixtures + endpoint integration tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:16:30Z",
+      "closed_at": "2026-05-12T00:18:02Z",
+      "lead_time_hours": 190.02555555555554,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 29,
+      "title": "Journal fixtures + endpoint integration tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:16:23Z",
+      "closed_at": "2026-05-11T21:48:46Z",
+      "lead_time_hours": 187.53972222222222,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 28,
+      "title": "Universe endpoint integration tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:16:16Z",
+      "closed_at": "2026-05-11T21:04:23Z",
+      "lead_time_hours": 186.80194444444444,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 27,
+      "title": "Testcontainers + core fixtures + scanner endpoint tests",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T02:16:08Z",
+      "closed_at": "2026-05-11T19:42:55Z",
+      "lead_time_hours": 185.4463888888889,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: must-have",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 25,
+      "title": "Epic: Integration test fixtures and API endpoint coverage",
+      "state": "CLOSED",
+      "created_at": "2026-05-04T01:44:53Z",
+      "closed_at": "2026-05-11T21:05:57Z",
+      "lead_time_hours": 187.35111111111112,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: M",
+        "epic"
+      ],
+      "size": "M",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 24,
+      "title": "feat: Signal ranking via statistical discovery (Phase 2)",
+      "state": "CLOSED",
+      "created_at": "2026-05-03T13:11:04Z",
+      "closed_at": "2026-05-23T15:13:51Z",
+      "lead_time_hours": 482.0463888888889,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "ml",
+        "epic"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 23,
+      "title": "feat(phase-2c): Signal quality ranker",
+      "state": "CLOSED",
+      "created_at": "2026-05-03T13:11:03Z",
+      "closed_at": "2026-05-21T21:19:35Z",
+      "lead_time_hours": 440.14222222222224,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "ml",
+        "frontend"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 22,
+      "title": "feat(phase-2b): Statistical discovery engine",
+      "state": "CLOSED",
+      "created_at": "2026-05-03T13:11:03Z",
+      "closed_at": "2026-05-21T20:44:53Z",
+      "lead_time_hours": 439.56388888888887,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "ml",
+        "analytics"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 21,
+      "title": "feat(phase-2a): Feature enrichment at signal time",
+      "state": "CLOSED",
+      "created_at": "2026-05-03T13:11:02Z",
+      "closed_at": "2026-05-14T15:29:40Z",
+      "lead_time_hours": 266.31055555555554,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "ml",
+        "scanner"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 20,
+      "title": "feat: Dynamic volume thresholds via TimesFM (Phase 1)",
+      "state": "CLOSED",
+      "created_at": "2026-05-03T12:22:27Z",
+      "closed_at": "2026-05-13T19:13:35Z",
+      "lead_time_hours": 246.85222222222222,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "ml",
+        "scanner"
+      ],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 19,
+      "title": "Dark factory: smart continue skips redundant DB bootstrap",
+      "state": "CLOSED",
+      "created_at": "2026-05-03T11:31:17Z",
+      "closed_at": "2026-05-13T21:16:36Z",
+      "lead_time_hours": 249.7552777777778,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 18,
+      "title": "Dark factory: fetch PR review comments on Continue",
+      "state": "CLOSED",
+      "created_at": "2026-05-03T11:01:35Z",
+      "closed_at": "2026-05-04T02:08:42Z",
+      "lead_time_hours": 15.118611111111111,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 16,
+      "title": "Scan Status badge should show 'Scheduled' when next_run is set",
+      "state": "CLOSED",
+      "created_at": "2026-05-03T10:49:21Z",
+      "closed_at": "2026-05-14T01:45:24Z",
+      "lead_time_hours": 254.93416666666667,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 7,
+      "title": "Dry run: verify dark factory pipeline",
+      "state": "CLOSED",
+      "created_at": "2026-05-02T20:36:58Z",
+      "closed_at": "2026-05-04T01:37:57Z",
+      "lead_time_hours": 29.01638888888889,
+      "factory_cycle_hours": null,
+      "labels": [],
+      "size": null,
+      "priority": null,
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 6,
+      "title": "Human signal review and quality feedback loop",
+      "state": "CLOSED",
+      "created_at": "2026-05-02T17:06:43Z",
+      "closed_at": "2026-05-24T20:00:38Z",
+      "lead_time_hours": 530.8986111111111,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: L"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 5,
+      "title": "Scanner validation skill \u2014 guided day-by-day QA walkthrough",
+      "state": "CLOSED",
+      "created_at": "2026-05-02T17:06:25Z",
+      "closed_at": "2026-05-22T20:52:28Z",
+      "lead_time_hours": 483.7675,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: should-have",
+        "size: L"
+      ],
+      "size": "L",
+      "priority": "should-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 4,
+      "title": "Fix and enhance Scan Status block",
+      "state": "CLOSED",
+      "created_at": "2026-05-02T17:06:04Z",
+      "closed_at": "2026-05-03T10:39:37Z",
+      "lead_time_hours": 17.559166666666666,
+      "factory_cycle_hours": null,
+      "labels": [
+        "bug",
+        "enhancement",
+        "priority: must-have",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 3,
+      "title": "Clear scanner event history per stock",
+      "state": "CLOSED",
+      "created_at": "2026-05-02T17:05:46Z",
+      "closed_at": "2026-05-11T17:35:14Z",
+      "lead_time_hours": 216.4911111111111,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: must-have",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 2,
+      "title": "Backlog scheduler \u2014 Kanban flow controller for dark factory",
+      "state": "CLOSED",
+      "created_at": "2026-05-02T17:05:39Z",
+      "closed_at": "2026-05-13T13:58:00Z",
+      "lead_time_hours": 260.8725,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: must-have",
+        "size: S"
+      ],
+      "size": "S",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    },
+    {
+      "number": 1,
+      "title": "Autonomous backlog processing setup",
+      "state": "CLOSED",
+      "created_at": "2026-05-02T17:05:31Z",
+      "closed_at": "2026-05-04T01:37:50Z",
+      "lead_time_hours": 32.53861111111111,
+      "factory_cycle_hours": null,
+      "labels": [
+        "enhancement",
+        "priority: must-have",
+        "size: M"
+      ],
+      "size": "M",
+      "priority": "must-have",
+      "autonomous": false,
+      "cost": null
+    }
+  ],
+  "cost_by_step": {
+    "implement": 80.7319,
+    "plan": 74.8324,
+    "validate": 21.5221,
+    "refine": 19.7094,
+    "conformance": 15.057,
+    "parse-intent": 1.386,
+    "classify-preview": 0.5548,
+    "summarize-feedback": 0.3447,
+    "fetch-issue": 0.0,
+    "setup-refine-branch": 0.0,
+    "plan-push-and-advance": 0.0,
+    "setup-branch": 0.0,
+    "update-codeindex": 0.0,
+    "regen-codeindex": 0.0,
+    "preview-changeset": 0.0,
+    "preview-up": 0.0,
+    "push-and-pr": 0.0,
+    "status-in-review": 0.0,
+    "report": 0.0,
+    "acknowledge-continue": 0.0,
+    "refine-push": 0.0
+  },
+  "timeseries": {
+    "weekly": [
+      {
+        "week": "2026-04-27",
+        "created": 15,
+        "closed": 1,
+        "cum_closed": 1,
+        "backlog": 14
+      },
+      {
+        "week": "2026-05-04",
+        "created": 10,
+        "closed": 3,
+        "cum_closed": 4,
+        "backlog": 21
+      },
+      {
+        "week": "2026-05-11",
+        "created": 3,
+        "closed": 19,
+        "cum_closed": 23,
+        "backlog": 5
+      },
+      {
+        "week": "2026-05-18",
+        "created": 7,
+        "closed": 11,
+        "cum_closed": 34,
+        "backlog": 1
+      },
+      {
+        "week": "2026-05-25",
+        "created": 36,
+        "closed": 31,
+        "cum_closed": 65,
+        "backlog": 6
+      },
+      {
+        "week": "2026-06-01",
+        "created": 45,
+        "closed": 28,
+        "cum_closed": 93,
+        "backlog": 23
+      }
+    ]
+  }
+}
