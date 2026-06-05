@@ -27,6 +27,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Test fixtures that create ScannerConfig rows must now supply `universe_id`; if no universe exists in the test transaction, create one inline (see `seed_scanner_configs` in `tests/fixtures/core.py` for the pattern). <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
+## Backend: Cookie Security
+
+- [PATTERN] Use a dedicated `COOKIE_SECURE: bool = True` field in `Settings` rather than deriving the secure flag from `ENVIRONMENT == "production"` — the dedicated field is overridable independently, defaults secure-by-default, and avoids a regression if `ENVIRONMENT` is not set. Add `COOKIE_SECURE: "false"` to the `backend` service in `docker-compose.override.yml` so local HTTP dev works automatically. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
+
 ## Backend: Config / Settings
 
 - [PATTERN] When adding a `field_validator` to `Settings` in `config.py`, add a matching `os.environ.setdefault("FIELD_NAME", valid_value)` at the top of `backend/tests/conftest.py` (before app imports) — otherwise bare `Settings()` calls in existing tests will hit the new validator with the default value and fail. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->

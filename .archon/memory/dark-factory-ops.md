@@ -73,6 +73,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] For fail-safe LLM classifier guards, skip only on explicit `false` (string comparison `[ "$VAR" = "false" ]`); any other value — including empty string or garbled output — falls through to the safe direction (building the preview). This prevents wrongly skipped previews when the classifier errors. <!-- issue:#178 date:2026-06-04 expires:2026-12-04 source:implement -->
 
+## Docker Port Hardening
+
+- [PATTERN] All host-facing port bindings in `docker-compose.yml` should use the `"127.0.0.1:HOST:CONTAINER"` format to prevent inadvertent exposure on public interfaces even without a reverse proxy — this is defense-in-depth independent of whether a TLS profile is active. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] Profile-gated infra services (Caddy, forecaster, scheduler) follow the same restart pattern in `deploy.yml`: `docker compose --profile <name> up -d <service>`. The `--profile tls up -d caddy` command is a no-op when `DOMAIN` is not set (Caddy exits cleanly on invalid domain). <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
+
 ## Environment and Credentials
 
 - [PATTERN] Every new environment variable introduced by a feature must be documented in `ENV_VARIABLES.md` with its default value and a one-line description. CLAUDE.md references ENV_VARIABLES.md as the authoritative env var reference. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
