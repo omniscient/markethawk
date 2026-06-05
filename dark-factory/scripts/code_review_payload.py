@@ -174,3 +174,26 @@ def build_review(findings, changed, block_threshold="high", max_findings=50,
         "inline_count": len(comments),
         "offdiff_count": len(offdiff_for_body),
     }
+
+
+def _read(path: str) -> str:
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description="Build a GitHub PR review payload from reviewer findings.")
+    ap.add_argument("--review", required=True, help="path to the reviewer subagent's markdown output")
+    ap.add_argument("--diff", required=True, help="path to the unified diff that was reviewed")
+    ap.add_argument("--block-threshold", default="high", choices=list(SEVERITY_ORDER))
+    ap.add_argument("--max-findings", type=int, default=50)
+    args = ap.parse_args(argv)
+    findings = parse_findings(_read(args.review))
+    changed = changed_lines(_read(args.diff))
+    result = build_review(findings, changed, args.block_threshold, args.max_findings)
+    print(json.dumps(result))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

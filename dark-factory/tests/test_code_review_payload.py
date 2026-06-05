@@ -156,3 +156,29 @@ def test_build_review_threshold_critical_only():
     r = crp.build_review(findings, changed, block_threshold="critical")
     assert len(r["blockers"]) == 1  # only the critical one blocks
     assert r["status"] == "BLOCKED"
+
+
+import json
+import subprocess
+
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "code_review_payload.py"
+
+
+def test_cli_emits_json(tmp_path):
+    review = tmp_path / "review.md"
+    review.write_text("### Findings\n- [high] security | a.py:1 | bug\n", encoding="utf-8")
+    diff = tmp_path / "diff.txt"
+    diff.write_text(
+        "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -1,0 +1,1 @@\n+x = 1\n",
+        encoding="utf-8",
+    )
+    out = subprocess.check_output(
+        [sys.executable, str(SCRIPT), "--review", str(review), "--diff", str(diff),
+         "--block-threshold", "high", "--max-findings", "50"],
+        text=True,
+    )
+    result = json.loads(out)
+    assert result["status"] == "BLOCKED"
+    assert result["event"] == "REQUEST_CHANGES"
+    assert result["payload"]["comments"][0]["path"] == "a.py"
+    assert result["payload"]["comments"][0]["line"] == 1
