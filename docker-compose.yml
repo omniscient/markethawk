@@ -90,7 +90,7 @@ services:
       dockerfile: Dockerfile
     container_name: stockscanner-api
     # Bind-mount (./backend:/app:ro) and --reload are restored in docker-compose.override.yml for local dev.
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: sh -c "rm -rf /tmp/prometheus_multiproc/* 2>/dev/null; uvicorn app.main:app --host 0.0.0.0 --port 8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
@@ -161,7 +161,7 @@ services:
       dockerfile: Dockerfile
     container_name: stockscanner-celery
     # Bind-mount (./backend:/app:ro) and watchfiles hot-reload are restored in docker-compose.override.yml for local dev.
-    command: celery -A app.core.celery_app:celery_app worker --loglevel=info
+    command: sh -c "rm -rf /tmp/prometheus_multiproc/* 2>/dev/null; celery -A app.core.celery_app:celery_app worker --loglevel=info"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
