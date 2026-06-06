@@ -160,6 +160,7 @@ Add 14 test files covering 5 page shells, 4 shared components, and 4 page-embedd
      fetchScannerResults: vi.fn().mockResolvedValue([]),
      fetchScanStatus: vi.fn().mockResolvedValue({ status: 'completed' }),
      handleApiError: vi.fn().mockReturnValue('error'),
+     runScanner: vi.fn().mockResolvedValue({ scan_id: '1', task_id: 't1', scanner_type: 'pre_market_volume_spike' }),
      submitReview: vi.fn().mockResolvedValue({}),
    }));
 
@@ -203,7 +204,7 @@ Add 14 test files covering 5 page shells, 4 shared components, and 4 page-embedd
 
 ### Context
 
-Dashboard composes `NewsFeed` (WebSocket in useEffect) and `TweetFeed` (WebSocket in useEffect). Both are mocked as null-returning stubs so jsdom does not encounter `new WebSocket(...)`. `NewsSettings` uses `fetchNewsPreferences` from `api/news` — that module is mocked at the same level.
+Dashboard composes `NewsFeed` (WebSocket in useEffect) and `TweetFeed` (WebSocket in useEffect). Both are mocked as null-returning stubs so jsdom does not encounter `new WebSocket(...)`. `NewsSettings` uses `fetchNewsPreferences` from `api/news` — that module is mocked at the same level. `AlertList` and `RecentEvents` are pure-props components (no internal API calls); they receive derived data from `scannerResults` and do not need additional mocks. The `ReviewControls` sub-component in `RecentEvents` sets up a `useMutation` but never auto-executes it on render, so no network call occurs.
 
 ### TDD Steps
 
@@ -1197,10 +1198,10 @@ Login is not a thin orchestrator — it has its own form logic, validation, and 
        expect(screen.getByText(/pre-market volume spike/i)).toBeInTheDocument();
      });
 
-     it('calls onSave when Save Rule button is clicked', () => {
+     it('calls onSave when Create Rule button is clicked', () => {
        const onSave = vi.fn();
        renderWithQuery(<AlertRuleModal {...baseProps} onSave={onSave} />);
-       fireEvent.click(screen.getByRole('button', { name: /save rule/i }));
+       fireEvent.click(screen.getByRole('button', { name: /create rule/i }));
        expect(onSave).toHaveBeenCalledOnce();
      });
 
