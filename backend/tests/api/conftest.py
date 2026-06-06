@@ -15,9 +15,10 @@ from unittest.mock import patch
 
 import fakeredis
 import pytest
+from fastapi.testclient import TestClient
+
 from app.core.database import get_db
 from app.main import app
-from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)
@@ -53,11 +54,12 @@ def flush_app_cache():
 
 @pytest.fixture(autouse=True)
 def inject_auth_into_module_client(request):
-    """Inject a valid JWT cookie into any module-level TestClient.
+    """Inject a valid JWT cookie and CSRF header into any module-level TestClient.
 
     Existing test files define `client = TestClient(app)` at module level.
     The auth middleware only validates jwt.decode() — no DB lookup — so any
     token signed with the test secret passes, regardless of subject UUID.
+    The CSRF middleware requires X-Requested-With on mutating requests.
     """
     from app.core.auth import create_access_token
 
@@ -65,3 +67,4 @@ def inject_auth_into_module_client(request):
     if hasattr(module, "client") and isinstance(module.client, TestClient):
         token = create_access_token("00000000-0000-0000-0000-000000000001")
         module.client.cookies.set("access_token", token)
+        module.client.headers.update({"X-Requested-With": "XMLHttpRequest"})

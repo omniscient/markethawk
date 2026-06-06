@@ -22,18 +22,16 @@ export default [
   // Base JS rules
   js.configs.recommended,
 
-  // TypeScript + React files
+  // TS recommended — flat/recommended is an array in @typescript-eslint v8; spread each entry
+  ...tsPlugin.configs['flat/recommended'],
+
+  // Custom overrides (applied after TS recommended so they win)
   {
     files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-      },
-      globals: {
-        ...globals.browser,
-      },
+      parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+      globals: { ...globals.browser },
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
@@ -41,13 +39,11 @@ export default [
       'react-refresh': reactRefresh,
     },
     rules: {
-      // TypeScript recommended
-      ...tsPlugin.configs['flat/recommended'].rules,
+      // Pre-existing any debt — tracked in follow-on cleanup issue; warn only for now
+      '@typescript-eslint/no-explicit-any': 'warn',
 
-      // React Hooks
+      // React hooks
       ...reactHooks.configs['recommended-latest'].rules,
-
-      // Fast Refresh — warn on non-component exports from component files
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 
       // TypeScript handles unused-vars better than the base rule

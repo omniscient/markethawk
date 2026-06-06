@@ -15,7 +15,7 @@ services:
     volumes:
       - ./backend:/app:ro
       - prometheus_multiproc:/tmp/prometheus_multiproc
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "rm -rf /tmp/prometheus_multiproc/* 2>/dev/null; uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     environment:
       COOKIE_SECURE: "false"
 
@@ -23,7 +23,7 @@ services:
     volumes:
       - ./backend:/app:ro
       - prometheus_multiproc:/tmp/prometheus_multiproc
-    command: python -m watchfiles --filter python 'celery -A app.core.celery_app:celery_app worker --loglevel=info' /app/app
+    command: sh -c "rm -rf /tmp/prometheus_multiproc/* 2>/dev/null; python -m watchfiles --filter python 'celery -A app.core.celery_app:celery_app worker --loglevel=info' /app/app"
 
   celery-beat:
     volumes:

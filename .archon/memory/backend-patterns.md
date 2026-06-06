@@ -37,6 +37,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Test a pydantic-settings validator by passing the invalid value as an init kwarg — `Settings(JWT_SECRET_KEY="")` — since init kwargs override env vars. This gives a clean, deterministic test without manipulating environment state. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+## Backend: Middleware
+
+- [PATTERN] Pure-ASGI middleware classes (like `CSRFMiddleware`) should be defined at module level in `main.py`, not inside `create_app()` — module-level placement makes them importable by the test suite without triggering the full app factory. The `AuthMiddleware` is an exception because it closes over `EXEMPT_PREFIXES`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] When adding new middleware that the test suite needs to pass, update the `inject_auth_into_module_client` autouse fixture in `tests/api/conftest.py` to inject required headers (e.g. `module.client.headers.update({"X-Requested-With": "XMLHttpRequest"})`) so all module-level `TestClient` instances satisfy the new check automatically. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] CSRF_EXEMPT_PREFIXES and AUTH EXEMPT_PREFIXES serve different concerns and must remain separate tuples in `main.py`. Do not merge them — CSRF exempts pre-authentication paths; auth exempts docs/health/metrics paths that are unrelated to CSRF. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
+
 ## Backend: Migrations
 
 - [PATTERN] After any model change: `cd backend && python -m alembic revision --autogenerate -m "description" && python -m alembic upgrade head`. Never skip the `upgrade head` step — the preview stack applies migrations at startup, but the local test suite does not. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
@@ -44,3 +52,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [FIX] If `alembic revision --autogenerate` produces an empty migration (no `op.` calls in the body), verify that the model is imported in `backend/app/models/__init__.py` and that `Base` is the same `DeclarativeBase` instance as in `backend/app/core/database.py`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 - [FIX] When a migration backfills a FK column (e.g. `UPDATE scanner_configs SET universe_id = 1`), ensure the referenced row exists BEFORE the UPDATE by inserting it with `ON CONFLICT (id) DO NOTHING` — CI databases start empty (no seed SQL applied), so the FK constraint will fail if the parent row is absent. See migration `c7d8e9f0a1b2` for the pattern. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+## Backend: Dependency Constraints
+
+- [AVOID] `python-jose 3.4.0` pins `pyasn1<0.5.0,>=0.4.1`; the patched pyasn1 (CVE-2026-30922) requires 0.6.3 which is incompatible. Add `CVE-2026-30922` to `--ignore-vuln` in CI pip-audit instead of trying to bump pyasn1 alongside python-jose 3.x. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->

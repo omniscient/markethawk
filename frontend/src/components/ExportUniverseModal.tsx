@@ -78,7 +78,7 @@ const ExportUniverseModal: React.FC<ExportUniverseModalProps> = ({ isOpen, onClo
   const toggleTicker = (ticker: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(ticker) ? next.delete(ticker) : next.add(ticker);
+      if (next.has(ticker)) { next.delete(ticker); } else { next.add(ticker); }
       return next;
     });
   };
