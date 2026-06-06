@@ -1,6 +1,8 @@
+import os
+
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import worker_ready
+from celery.signals import worker_process_shutdown, worker_ready
 
 from app.core.config import settings
 
@@ -18,6 +20,14 @@ def _on_worker_ready(sender, **kwargs):
     from app.tasks.scanning import validate_scheduled_scanner_configs
 
     validate_scheduled_scanner_configs()
+
+
+@worker_process_shutdown.connect
+def _cleanup_prometheus_on_exit(sender, pid, exitcode, **kwargs):
+    if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        from prometheus_client import multiprocess
+
+        multiprocess.mark_process_dead(pid)
 
 
 # News polling runs weekdays only (Mon-Fri).
