@@ -39,6 +39,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] New routes are registered in `frontend/src/App.tsx` using React Router `<Route>` elements. Match the existing pattern of lazy-loaded page components (`React.lazy` + `Suspense`). <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+## Frontend: Testing Selectors
+
+- [AVOID] Do not use `screen.getAllByRole('button')[0]` in tests — it couples to DOM order and silently targets the wrong button when the component adds new ones. Use `getByRole('button', { name: /label/i })` to target by accessible name. <!-- issue:#198 date:2026-06-06 expires:2026-12-06 source:implement -->
+
+- [PATTERN] For `input[type="password"]`, there is no implicit ARIA role — RTL's `getByRole` cannot select it. Use `container.querySelector('input[type="password"]')` (stable attribute) when you cannot add `data-testid` to the source. For `input[type="text"]`, prefer `getByRole('textbox')`. <!-- issue:#198 date:2026-06-06 expires:2026-12-06 source:implement -->
+
+- [PATTERN] jsdom-level patches (e.g. `globalThis.Notification = { permission: 'default' }`) belong in `frontend/src/test-setup.ts`, not in per-file `beforeAll` blocks. Moving them there makes the patch available to every test file automatically. <!-- issue:#198 date:2026-06-06 expires:2026-12-06 source:implement -->
+
 ## Frontend: ESLint / @typescript-eslint v8
 
 - [AVOID] Do not call `.rules` on `tsPlugin.configs['flat/recommended']` in `frontend/eslint.config.js` — in `@typescript-eslint` v8 the value is an array of 3 config objects, so `.rules` is `undefined` and the spread silently loads zero TS rules. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->
