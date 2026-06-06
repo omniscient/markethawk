@@ -19,6 +19,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not raise `HTTPException` inside a WebSocket dependency — FastAPI will not convert it to a WS close frame. Use `WebSocketException(code=1008, reason="...")` (importable from `fastapi`) instead, which FastAPI closes gracefully before `accept()` is called. <!-- issue:#191 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+- [PATTERN] When HTTP and WS auth share user-resolution logic, extract a private `_resolve_user_from_token(token, db) -> User | None` helper (in `app/core/auth.py`) that returns None on all auth failures (JWTError, missing/empty sub, bad UUID); each public function then raises the exception type appropriate for its transport. This prevents drift and avoids broad `except Exception` that silently swallows real DB outages. <!-- issue:#191 date:2026-06-06 expires:2026-12-06 source:implement -->
+
+- [AVOID] Never wrap a DB call in bare `except Exception` inside a WebSocket dependency to convert errors to 1008 — it hides outages as auth failures and diverges from HTTP behavior. Guard only auth-specific failures (missing token, JWTError, bad UUID) and let DB errors propagate. <!-- issue:#191 date:2026-06-06 expires:2026-12-06 source:implement -->
+
 ## Backend: Celery Tasks
 
 - [AVOID] For `bind=True` Celery tasks in tests, never call `task.run(mock_self)` — `.run` is already partially bound to the task instance, so passing `mock_self` adds an extra positional arg and raises `TypeError`. Instead call `task.run()` (no args) and use `patch.object(task, 'retry', side_effect=...)` to control retry behavior. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
