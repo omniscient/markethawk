@@ -367,7 +367,7 @@ const StockChart: React.FC<StockChartProps> = ({
       }
 
       // Markers — events + inline indicators
-      let allMarkers: SeriesMarker<Time>[] = [];
+      const allMarkers: SeriesMarker<Time>[] = [];
 
       if (events && events.length > 0) {
         for (const e of events) {

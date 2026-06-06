@@ -32,3 +32,11 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Frontend: Routing
 
 - [PATTERN] New routes are registered in `frontend/src/App.tsx` using React Router `<Route>` elements. Match the existing pattern of lazy-loaded page components (`React.lazy` + `Suspense`). <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
+
+## Frontend: ESLint / @typescript-eslint v8
+
+- [AVOID] Do not call `.rules` on `tsPlugin.configs['flat/recommended']` in `frontend/eslint.config.js` — in `@typescript-eslint` v8 the value is an array of 3 config objects, so `.rules` is `undefined` and the spread silently loads zero TS rules. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] Spread `...tsPlugin.configs['flat/recommended']` directly at the top level of the ESLint export array (v8 flat-config idiom); add custom rule overrides in a separate config block after the spread so they win. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] When fixing `eslint.config.js` to enforce warning-level rules that produce many pre-existing warnings, update the pre-commit hook in `.pre-commit-config.yaml` to use `npx eslint . --report-unused-disable-directives-severity error` (errors only) rather than `npm run lint` — otherwise the hook blocks all commits until every warning is cleaned up. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->
