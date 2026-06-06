@@ -55,7 +55,9 @@ jobs:
       - name: Dependency audit
         run: |
           pip install pip-audit
-          pip-audit -r backend/requirements.txt --ignore-vuln PYSEC-2022-42969 || true
+          pip-audit -r backend/requirements.txt \
+            --ignore-vuln PYSEC-2022-42969 \
+            --ignore-vuln CVE-2026-30922
 
       - name: Run tests
         working-directory: backend
@@ -95,11 +97,11 @@ jobs:
 
       - name: Lint
         working-directory: frontend
-        run: npm run lint || true
+        run: npx eslint . --report-unused-disable-directives-severity error
 
       - name: Dependency audit
         working-directory: frontend
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high
 
   migration-check:
     runs-on: ubuntu-latest
