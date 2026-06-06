@@ -44,23 +44,38 @@ def create_refresh_token() -> str:
     return secrets.token_hex(32)
 
 
+def _resolve_user_from_token(token: str, db: Session) -> User | None:
+    """Decode JWT and fetch the active user. Returns None on any auth failure.
+
+    JWT errors and malformed sub/UUID return None. DB errors propagate so real
+    outages are not silently converted into auth rejections.
+    """
+    settings = get_settings()
+    try:
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
+    except JWTError:
+        return None
+    user_id: str | None = payload.get("sub")
+    if not user_id:
+        return None
+    try:
+        uid = uuid.UUID(user_id)
+    except (ValueError, AttributeError):
+        return None
+    return db.execute(
+        select(User).where(User.id == uid, User.is_active == True)
+    ).scalar_one_or_none()
+
+
 def get_current_user(
     access_token: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> User:
     if not access_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-    settings = get_settings()
-    try:
-        payload = jwt.decode(
-            access_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
-        )
-        user_id: str = payload.get("sub")
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-    user = db.execute(
-        select(User).where(User.id == uuid.UUID(user_id), User.is_active == True)
-    ).scalar_one_or_none()
+    user = _resolve_user_from_token(access_token, db)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     return user
@@ -78,20 +93,7 @@ def ws_get_current_user(
     token = websocket.cookies.get("access_token")
     if not token:
         raise WebSocketException(code=1008, reason="Not authenticated")
-    _settings = get_settings()
-    try:
-        payload = jwt.decode(
-            token, _settings.JWT_SECRET_KEY, algorithms=[_settings.JWT_ALGORITHM]
-        )
-        user_id: str = payload.get("sub")
-    except JWTError:
-        raise WebSocketException(code=1008, reason="Token expired or invalid")
-    try:
-        user = db.execute(
-            select(User).where(User.id == uuid.UUID(user_id), User.is_active == True)
-        ).scalar_one_or_none()
-    except Exception:
-        raise WebSocketException(code=1008, reason="Not authenticated")
+    user = _resolve_user_from_token(token, db)
     if not user:
         raise WebSocketException(code=1008, reason="Not authenticated")
     return user
