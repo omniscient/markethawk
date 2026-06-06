@@ -32,3 +32,13 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Frontend: Routing
 
 - [PATTERN] New routes are registered in `frontend/src/App.tsx` using React Router `<Route>` elements. Match the existing pattern of lazy-loaded page components (`React.lazy` + `Suspense`). <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
+
+## Frontend: Testing
+
+- [PATTERN] Page-level tests are smoke tests: mock API modules via `vi.mock('../../api/<module>')`, wrap the component in `renderWithQuery` (real QueryClient + MemoryRouter), assert renders without crashing and key headings/labels are visible. Full interaction tests belong on panel/component files where the branching logic lives, not the page shell. <!-- issue:#198 date:2026-06-06 expires:2026-12-06 source:refine -->
+
+- [AVOID] Do not mock React Query itself (`useQuery`, `useMutation`) — mock the API layer instead. The existing pattern in `useScorecard.test.ts` uses a real QueryClient with `retry: false` + `vi.mock(api)`. Mocking React Query makes tests fragile to hook renames and hides cache/refetch behavior. <!-- issue:#198 date:2026-06-06 expires:2026-12-06 source:refine -->
+
+- [PATTERN] Shared test utility for React Query + router lives at `frontend/src/test-utils/renderWithQuery.tsx`. It wraps with `QueryClientProvider` (real QueryClient, retry: false) and `MemoryRouter`. Use it for all page and component tests that touch React Query or routing. <!-- issue:#198 date:2026-06-06 expires:2026-12-06 source:refine -->
+
+- [PATTERN] Coverage config: use `all: true` (so untested files appear at 0%) with explicit exclusions for `src/main.tsx`, `src/test-setup.ts`, `src/test-utils/**`, `**/*.test.{ts,tsx}`, `**/*.d.ts`. Global thresholds: 35% statements/lines, 25% branches/functions. Without `all: true`, untested files are invisible and the threshold is dishonest. <!-- issue:#198 date:2026-06-06 expires:2026-12-06 source:refine -->
