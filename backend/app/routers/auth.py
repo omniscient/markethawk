@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 import redis
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -17,6 +17,7 @@ from app.core.auth import (
 )
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.rate_limits import AUTH_LIMIT, limiter
 from app.models.user import User
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -75,7 +76,8 @@ def auth_status(db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=UserResponse)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit(AUTH_LIMIT)
+def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
     count = db.execute(select(func.count()).select_from(User)).scalar_one()
     if count > 0:
         raise HTTPException(
@@ -89,7 +91,8 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit(AUTH_LIMIT)
+def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     user = db.execute(
         select(User).where(User.username == body.username, User.is_active == True)
     ).scalar_one_or_none()
@@ -130,7 +133,8 @@ def logout(
 
 
 @router.post("/refresh")
-def refresh(refresh_token: str | None = Cookie(default=None)):
+@limiter.limit(AUTH_LIMIT)
+def refresh(request: Request, refresh_token: str | None = Cookie(default=None)):
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 

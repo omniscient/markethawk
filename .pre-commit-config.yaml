@@ -13,7 +13,7 @@ repos:
       - id: eslint
         name: eslint
         language: system
-        entry: bash -c 'cd frontend && npm run lint'
+        entry: bash -c 'cd frontend && npx eslint . --report-unused-disable-directives-severity error'
         pass_filenames: false
         files: '\.(ts|tsx|js|jsx)$'
 

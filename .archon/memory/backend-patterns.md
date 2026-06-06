@@ -48,3 +48,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [FIX] If `alembic revision --autogenerate` produces an empty migration (no `op.` calls in the body), verify that the model is imported in `backend/app/models/__init__.py` and that `Base` is the same `DeclarativeBase` instance as in `backend/app/core/database.py`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 - [FIX] When a migration backfills a FK column (e.g. `UPDATE scanner_configs SET universe_id = 1`), ensure the referenced row exists BEFORE the UPDATE by inserting it with `ON CONFLICT (id) DO NOTHING` — CI databases start empty (no seed SQL applied), so the FK constraint will fail if the parent row is absent. See migration `c7d8e9f0a1b2` for the pattern. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+## Backend: Dependency Constraints
+
+- [AVOID] `python-jose 3.4.0` pins `pyasn1<0.5.0,>=0.4.1`; the patched pyasn1 (CVE-2026-30922) requires 0.6.3 which is incompatible. Add `CVE-2026-30922` to `--ignore-vuln` in CI pip-audit instead of trying to bump pyasn1 alongside python-jose 3.x. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->

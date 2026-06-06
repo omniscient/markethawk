@@ -115,6 +115,8 @@ services:
       PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: markethawk-backend
+      # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     ports:
       - "8000:8000"
     depends_on:
@@ -186,6 +188,8 @@ services:
       PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: markethawk-worker
+      # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -223,6 +227,8 @@ services:
       IBKR_PORT: 4004
       IBKR_CLIENT_ID: 5   # dedicated clientId — never shares with backend or Celery
       PYTHONDONTWRITEBYTECODE: "1"
+      # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -258,6 +264,8 @@ services:
       PYTHONDONTWRITEBYTECODE: "1"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: markethawk-beat
+      # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy

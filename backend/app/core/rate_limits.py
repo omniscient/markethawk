@@ -12,6 +12,7 @@ from app.core.config import settings
 GLOBAL_LIMIT = "100/minute"
 SCANNER_LIMIT = "5/minute"
 TRADING_LIMIT = "10/minute"
+AUTH_LIMIT = "5/minute"
 
 
 def _build_limiter() -> Limiter:

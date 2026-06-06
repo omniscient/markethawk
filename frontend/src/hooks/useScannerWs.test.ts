@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { SetStateAction } from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { QueryClient } from '@tanstack/react-query';
 import { MockWebSocket, installMockWebSocket } from '../test-utils/MockWebSocket';
@@ -16,7 +17,7 @@ function makeStateSlice() {
   const setActiveScan = vi.fn();
   const setScanError = vi.fn();
   let progress: LiveProgress = { ...EMPTY_PROGRESS };
-  const setLiveProgress = vi.fn((updater) => {
+  const setLiveProgress = vi.fn((updater: SetStateAction<LiveProgress>) => {
     if (typeof updater === 'function') progress = updater(progress);
     else progress = updater;
   });
