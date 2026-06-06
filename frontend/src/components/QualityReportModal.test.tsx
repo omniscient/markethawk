@@ -73,7 +73,7 @@ describe('QualityReportModal', () => {
     renderWithQuery(
       <QualityReportModal isOpen={true} onClose={onClose} universe={mockUniverse} />
     );
-    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
     expect(onClose).toHaveBeenCalledOnce();
   });
 });

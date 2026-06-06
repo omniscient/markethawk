@@ -32,17 +32,17 @@ describe('Login page', () => {
   it('shows username and password fields', async () => {
     const { container } = renderWithQuery(<Login />);
     await waitFor(() => screen.getByRole('button', { name: /sign in/i }));
-    expect(container.querySelector('input[type="text"]')).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
     expect(container.querySelector('input[type="password"]')).toBeInTheDocument();
   });
 
   it('calls login with typed credentials on submit', async () => {
-    const { container, getByRole } = renderWithQuery(<Login />);
-    await waitFor(() => getByRole('button', { name: /sign in/i }));
+    const { container } = renderWithQuery(<Login />);
+    await waitFor(() => screen.getByRole('button', { name: /sign in/i }));
 
-    fireEvent.change(container.querySelector('input[type="text"]')!, { target: { value: 'admin' } });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'admin' } });
     fireEvent.change(container.querySelector('input[type="password"]')!, { target: { value: 'secret' } });
-    fireEvent.click(getByRole('button', { name: /sign in/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => expect(mockLogin).toHaveBeenCalledOnce());
   });
@@ -52,7 +52,7 @@ describe('Login page', () => {
     const { container } = renderWithQuery(<Login />);
     await waitFor(() => screen.getByRole('button', { name: /sign in/i }));
 
-    fireEvent.change(container.querySelector('input[type="text"]')!, { target: { value: 'bad' } });
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bad' } });
     fireEvent.change(container.querySelector('input[type="password"]')!, { target: { value: 'wrong' } });
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 

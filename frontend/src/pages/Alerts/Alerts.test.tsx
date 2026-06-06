@@ -1,16 +1,7 @@
-import { vi, describe, it, expect, beforeAll } from 'vitest';
+import { vi, describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithQuery } from '../../test-utils/renderWithQuery';
 import Alerts from './index';
-
-// ChannelConfigPanel reads Notification.permission at render time; jsdom doesn't define it
-beforeAll(() => {
-  Object.defineProperty(globalThis, 'Notification', {
-    value: { permission: 'default' },
-    writable: true,
-    configurable: true,
-  });
-});
 
 vi.mock('../../api/alerts', () => ({
   useAlertRules: () => ({ data: [], isLoading: false }),
