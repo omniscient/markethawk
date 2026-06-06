@@ -35,6 +35,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [FIX] ESLint `no-restricted-syntax` selector `Literal[value=/\\/api\\//]` matches import paths like `'../api/client'` as false positives. Use the start-anchored form `Literal[value=/^\\/api\\//]` to only flag string literals that actually begin with `/api/`. <!-- issue:#158 date:2026-06-03 expires:2026-12-03 source:implement -->
 
+## Frontend: Security Headers
+
+- [PATTERN] Both `apiClient` and `unversionedClient` in `frontend/src/api/client.ts` must carry any security headers (e.g. `X-Requested-With: XMLHttpRequest`) as static defaults in the `headers` block — never add them only to one client, as auth endpoints use `unversionedClient` and API endpoints use `apiClient`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
+
 ## Frontend: Routing
 
 - [PATTERN] New routes are registered in `frontend/src/App.tsx` using React Router `<Route>` elements. Match the existing pattern of lazy-loaded page components (`React.lazy` + `Suspense`). <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
