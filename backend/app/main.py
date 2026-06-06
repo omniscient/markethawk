@@ -24,6 +24,7 @@ from app.core.config import get_settings, settings
 from app.core.database import engine
 from app.core.error_tracking import ErrorTrackerFactory
 from app.core.rate_limits import limiter
+from app.core.tracing import OtelTraceIdFilter, instrument_fastapi, setup_otel
 from app.exceptions import MarketHawkError
 from app.routers import (
     alerts_router,
@@ -42,8 +43,42 @@ from app.routers import (
     watchlist_router,
 )
 from app.routers.tweets import router as tweets_router
-from app.core.tracing import OtelTraceIdFilter, instrument_fastapi, setup_otel
 from app.services.websocket_manager import websocket_manager
+
+# CSRF header check — module-level so it is importable by the test suite without
+# triggering the full create_app() factory. Pure ASGI (not BaseHTTPMiddleware) to
+# avoid the chunked-gzip termination bug described at the AuthMiddleware comment below.
+CSRF_EXEMPT_PREFIXES = ("/api/auth/",)
+CSRF_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+class CSRFMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        method = scope.get("method", "")
+        if method not in CSRF_MUTATING_METHODS:
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        if any(path.startswith(p) for p in CSRF_EXEMPT_PREFIXES):
+            await self.app(scope, receive, send)
+            return
+        headers = dict(scope.get("headers", []))
+        if b"x-requested-with" not in headers:
+            await JSONResponse(
+                status_code=403,
+                content={
+                    "detail": "CSRF check failed: X-Requested-With header required"
+                },
+            )(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
 
 # Celery Configuration
 # celery instance is imported from app.core.celery_app
@@ -275,8 +310,10 @@ def create_app() -> FastAPI:
                 return
             await self.app(scope, receive, send)
 
-    # Added first => innermost middleware (closest to the routes), matching the prior
-    # @app.middleware("http") ordering.
+    # CSRFMiddleware added first = innermost (between AuthMiddleware and routes).
+    # Inbound request flow: AuthMiddleware (401) → CSRFMiddleware (403) → route.
+    app.add_middleware(CSRFMiddleware)
+    # AuthMiddleware added second = outer (validates JWT before CSRF check).
     app.add_middleware(AuthMiddleware)
 
     # CORS middleware

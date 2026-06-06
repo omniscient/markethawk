@@ -473,7 +473,7 @@ sequenceDiagram
 
 ### Prometheus metrics (`backend/app/core/metrics.py`)
 
-All custom metrics are registered in `app/core/metrics.py` and exported at `GET /metrics` (excluded from OpenAPI). The backend and `celery-worker` share a tmpfs volume (`prometheus_multiproc`) for `prometheus-client` multiprocess mode so Celery worker metrics aggregate correctly.
+All custom metrics are registered in `app/core/metrics.py` and exported at `GET /metrics` (excluded from OpenAPI). The backend and `celery-worker` share a named Docker volume (`prometheus_multiproc`) mounted at `/tmp/prometheus_multiproc`. Both containers set `PROMETHEUS_MULTIPROC_DIR` to this path; each process writes PID-named `.db` files to the shared volume, and the backend's `/metrics` endpoint uses `MultiProcessCollector` to read and aggregate all of them. The volume must be a regular named volume — not `type: tmpfs` — because Docker tmpfs mounts are per-container and would make worker files invisible to the backend.
 
 | Metric | Type | Labels | Source |
 |--------|------|--------|--------|
