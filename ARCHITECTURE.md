@@ -127,7 +127,7 @@ sequenceDiagram
 | `database.py` | Async SQLAlchemy engine and session factory (`AsyncSession`). `get_db()` dependency. |
 | `celery_app.py` | Celery instance; beat schedule definitions (scan times, sync intervals). |
 | `error_tracking.py` | `ErrorTracker` protocol; `SeqErrorTracker` and `StdoutErrorTracker` implementations; MD5-based `ErrorId` generation. |
-| `rate_limits.py` | SlowAPI `limiter` instance + three tier constants: `GLOBAL_LIMIT` (100/min), `SCANNER_LIMIT` (5/min), `TRADING_LIMIT` (10/min). Lives in `core/` (not `main.py`) to break the circular import from routers importing `limiter`. Redis db 1 storage when `RATE_LIMITING_ENABLED=true`. |
+| `rate_limits.py` | SlowAPI `limiter` instance + four tier constants: `GLOBAL_LIMIT` (100/min), `SCANNER_LIMIT` (5/min), `TRADING_LIMIT` (10/min), `AUTH_LIMIT` (5/min). Lives in `core/` (not `main.py`) to break the circular import from routers importing `limiter`. Redis db 1 storage when `RATE_LIMITING_ENABLED=true`. |
 | `cache.py` | Application-level Redis caching. `get_redis()` — process-scoped `@lru_cache` singleton (sync `redis.Redis`, fast-fail timeouts). `get_cached(key, ttl, fn)` — read-through helper; transparent on Redis failure. `invalidate(key)`, `invalidate_pattern(pattern)` — cache busting. `@cache_response(key, ttl)` — convenience decorator for parameter-less GETs. All keys use `mh:` prefix. Applied to six hot endpoints: `scanner/types` (1h), `scanner/configs` (5min), `system/status` (30s), `system/storage` (5min), `universe/list` (1min), `stocks/details/{ticker}` (60s). |
 
 ### Exception Hierarchy (`app/exceptions.py`)

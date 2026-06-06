@@ -1,8 +1,5 @@
 """Tests for API rate limiting (SlowAPI, issue #87)."""
 
-from app.core.config import settings
-from app.core.rate_limits import GLOBAL_LIMIT, SCANNER_LIMIT, TRADING_LIMIT, limiter
-from app.main import app as main_app
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
@@ -11,6 +8,16 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIASGIMiddleware
 from slowapi.util import get_remote_address
 
+from app.core.config import settings
+from app.core.rate_limits import (
+    AUTH_LIMIT,
+    GLOBAL_LIMIT,
+    SCANNER_LIMIT,
+    TRADING_LIMIT,
+    limiter,
+)
+from app.main import app as main_app
+
 # ── Task 1: constants and limiter instance ────────────────────────────────────
 
 
@@ -18,6 +25,10 @@ def test_rate_limit_constants():
     assert GLOBAL_LIMIT == "100/minute"
     assert SCANNER_LIMIT == "5/minute"
     assert TRADING_LIMIT == "10/minute"
+
+
+def test_auth_rate_limit_constant():
+    assert AUTH_LIMIT == "5/minute"
 
 
 def test_limiter_is_limiter_instance():
@@ -156,3 +167,67 @@ def test_news_websocket_is_exempt():
 
     fn = news_websocket
     assert f"{fn.__module__}.{fn.__name__}" in limiter._exempt_routes
+
+
+# ── Task 2: auth endpoint rate limiting ──────────────────────────────────────
+
+
+def _make_auth_test_app() -> FastAPI:
+    """Minimal FastAPI app with a POST route rate-limited to 1/minute via memory:// storage."""
+    auth_test_limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["100/minute"],
+        storage_uri="memory://",
+        headers_enabled=False,
+    )
+    auth_test_app = FastAPI()
+    auth_test_app.state.limiter = auth_test_limiter
+    auth_test_app.add_middleware(SlowAPIASGIMiddleware)
+
+    @auth_test_app.exception_handler(RateLimitExceeded)
+    async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+        retry_after = exc.limit.limit.get_expiry() if exc.limit else 60
+        return JSONResponse(
+            status_code=429,
+            headers={"Retry-After": str(retry_after)},
+            content={
+                "message": "Rate limit exceeded",
+                "error_id": None,
+                "retry_after": retry_after,
+            },
+        )
+
+    @auth_test_app.post("/mock-login")
+    @auth_test_limiter.limit("1/minute")
+    async def mock_login(request: Request):
+        return {"ok": True}
+
+    return auth_test_app
+
+
+def test_auth_endpoints_rate_limited():
+    """Second POST to a rate-limited auth-like endpoint must return 429 with correct body."""
+    test_app = _make_auth_test_app()
+    client = TestClient(test_app, raise_server_exceptions=False)
+    first = client.post("/mock-login")
+    assert first.status_code == 200
+    second = client.post("/mock-login")
+    assert second.status_code == 429
+    body = second.json()
+    assert body["message"] == "Rate limit exceeded"
+    assert body["error_id"] is None
+    assert isinstance(body["retry_after"], int)
+    assert "Retry-After" in second.headers
+
+
+def test_auth_handlers_carry_rate_limit():
+    """login, register, and refresh must be registered in limiter._route_limits."""
+    from app.main import app as _  # noqa: F401 — ensures all routers are registered
+    from app.routers.auth import login, refresh, register
+
+    for fn in (login, register, refresh):
+        route_key = f"{fn.__module__}.{fn.__name__}"
+        assert route_key in limiter._route_limits, (
+            f"{fn.__name__} is not registered in limiter._route_limits — "
+            f"apply @limiter.limit(AUTH_LIMIT) to the handler"
+        )
