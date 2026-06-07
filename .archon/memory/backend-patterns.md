@@ -31,6 +31,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Use a dedicated `COOKIE_SECURE: bool = True` field in `Settings` rather than deriving the secure flag from `ENVIRONMENT == "production"` — the dedicated field is overridable independently, defaults secure-by-default, and avoids a regression if `ENVIRONMENT` is not set. Add `COOKIE_SECURE: "false"` to the `backend` service in `docker-compose.override.yml` so local HTTP dev works automatically. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+- [PATTERN] Set `SameSite=Lax` on the `access_token` cookie and `SameSite=Strict` on the `refresh_token` cookie — Strict on the access cookie breaks top-level inbound navigation to the SPA (user lands logged-out), while the refresh token's narrow `/api/auth/refresh` path makes Strict safe there. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
+
+- [PATTERN] When testing auth cookie attributes, assert both the `samesite` value AND the `Secure` flag in the `Set-Cookie` headers — `"secure" in h.lower()` on the header string covers it. Without the Secure assertion the core of a COOKIE_SECURE fix goes untested. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
+
 ## Backend: Config / Settings
 
 - [PATTERN] When adding a `field_validator` to `Settings` in `config.py`, add a matching `os.environ.setdefault("FIELD_NAME", valid_value)` at the top of `backend/tests/conftest.py` (before app imports) — otherwise bare `Settings()` calls in existing tests will hit the new validator with the default value and fail. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
