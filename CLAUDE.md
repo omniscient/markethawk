@@ -146,6 +146,6 @@ Wire the MCP server in `.claude/settings.local.json` (see eval doc) to use `get_
 
 ## Agent Skills
 
-- **Issue tracker** — GitHub Issues on `omniscient/markethawk`. See `docs/agents/issue-tracker.md`.
+- **Issue tracker** — GitHub Issues on `omniscient/markethawk`. Epics group their tickets as native GitHub sub-issues (not just body checklists). See `docs/agents/issue-tracker.md`.
 - **Triage labels** — five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
 - **Domain docs** — single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
