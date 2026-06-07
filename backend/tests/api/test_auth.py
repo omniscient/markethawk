@@ -110,8 +110,8 @@ def test_login_cookies_have_correct_flags(db):
     ]
     access_cookie = next(h for h in set_cookie_headers if "access_token=" in h)
     refresh_cookie = next(h for h in set_cookie_headers if "refresh_token=" in h)
-    # access_token: Lax allows top-level cross-site navigation; refresh: Strict (narrower path)
-    assert "samesite=lax" in access_cookie.lower()
+    # Both cookies use Strict — all traffic routes through same-origin Caddy proxy in production
+    assert "samesite=strict" in access_cookie.lower()
     assert "samesite=strict" in refresh_cookie.lower()
     # Secure flag must appear on both cookies (COOKIE_SECURE defaults True)
     assert "secure" in access_cookie.lower()

@@ -1,4 +1,4 @@
-{$DOMAIN} {
+{$DOMAIN:localhost} {
     # HSTS: instruct browsers to use HTTPS for this domain for 1 year
     header Strict-Transport-Security "max-age=31536000; includeSubDomains" always
 
@@ -14,6 +14,6 @@
 }
 
 # Redirect all plain-HTTP requests to HTTPS
-http://{$DOMAIN} {
-    redir https://{$DOMAIN}{uri} permanent
+http://{$DOMAIN:localhost} {
+    redir https://{$DOMAIN:localhost}{uri} permanent
 }
