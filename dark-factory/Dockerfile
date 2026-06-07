@@ -37,9 +37,9 @@ RUN apt-get update && apt-get install -y \
 # pre-commit for the codeindex-blast warn-only hook
 RUN pip install --quiet "git+https://github.com/scheidydude/codeindex.git" pre-commit
 
-# Bun
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:${PATH}"
+# Bun — install to /opt/bun so it is accessible to non-root users
+RUN BUN_INSTALL=/opt/bun curl -fsSL https://bun.sh/install | bash
+ENV PATH="/opt/bun/bin:${PATH}"
 
 # GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -77,6 +77,17 @@ COPY docker-compose.yml /opt/dark-factory/docker-compose.yml
 COPY .claude/skills/refinement/ /opt/refinement-skills/
 RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
 
+# Non-root factory user — must be created AFTER all root-level installs
+RUN groupadd --gid 1000 factory && \
+    useradd --uid 1000 --gid 1000 --create-home --home-dir /home/factory factory
+
+# Transfer workspace ownership to the factory user
+RUN chown -R factory:factory /workspace
+
+# Re-link archon CLI so it remains accessible after user switch
+RUN cd /opt/archon/packages/cli && /opt/bun/bin/bun link
+
+USER factory
 WORKDIR /workspace
 
 ENTRYPOINT ["entrypoint.sh"]
