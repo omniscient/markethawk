@@ -69,10 +69,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Pre-commit hooks that invoke advisory/optional tools (e.g. `codeindex-blast`) must always exit 0 — use `|| true` or `; exit 0`. A non-zero exit from a pre-commit hook blocks the commit and will abort an autonomous factory run. <!-- issue:#159 date:2026-06-03 expires:2026-12-03 source:implement -->
 
-- [FIX] `codeindex symbols . --inline` embeds symbols directly into `codeindex.json` nodes (not a separate file). To produce a standalone `symbolindex.json`, use `codeindex symbols . --output symbolindex.json` instead. <!-- issue:#200 date:2026-06-07 expires:2026-12-07 source:implement -->
-
-- [PATTERN] Write `codeindex high-blast` output via a temp file + `mv`: `codeindex high-blast > docs/codeindex-hotspots.md.tmp && mv docs/codeindex-hotspots.md.tmp docs/codeindex-hotspots.md`. Shell redirect truncates the target before the command runs, so a failed run would leave an empty file; the temp+mv pattern preserves the "failed run leaves repo clean" guarantee. <!-- issue:#200 date:2026-06-07 expires:2026-12-07 source:implement -->
-
 ## Preview Environment Differentiator
 
 - [PATTERN] When a workflow node's tail depends on a conditionally-built resource (e.g. preview stack), use a gated executor pattern rather than a conditional node: always run the node, read the decision from the prior step, and write a `PREVIEW_SKIPPED` marker to `$ARTIFACTS_DIR/preview_env.sh` so all downstream steps can branch on it uniformly. <!-- issue:#178 date:2026-06-04 expires:2026-12-04 source:implement -->
