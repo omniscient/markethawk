@@ -1,0 +1,19 @@
+{$DOMAIN:localhost} {
+    # HSTS: instruct browsers to use HTTPS for this domain for 1 year
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains" always
+
+    # WebSocket and REST API — backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Frontend SPA — all other paths
+    handle {
+        reverse_proxy frontend:3333
+    }
+}
+
+# Redirect all plain-HTTP requests to HTTPS
+http://{$DOMAIN:localhost} {
+    redir https://{$DOMAIN:localhost}{uri} permanent
+}

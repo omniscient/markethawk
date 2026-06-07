@@ -6,9 +6,10 @@ All services run as Docker containers on the `stockscanner-network` bridge netwo
 
 ```mermaid
 graph TD
-    Browser["Browser :3333"]
+    Browser["Browser :443"]
 
     subgraph net["stockscanner-network"]
+        caddy["caddy :80/:443 (profile: tls)"]
         frontend["frontend :3333"]
         backend["backend :8000"]
         livescanner["live-scanner"]
@@ -35,7 +36,9 @@ graph TD
     dockersock[/"Docker socket\n/var/run/docker.sock"\]
     polygon(["api.polygon.io"])
 
-    Browser -->|"HTTP :3333"| frontend
+    Browser -->|"HTTPS :443"| caddy
+    caddy -->|"/api/*"| backend
+    caddy -->|"/*"| frontend
     frontend -->|HTTP| backend
     frontend -.->|"WS /api/v1/live/ws/*"| backend
 

@@ -6,8 +6,9 @@ from app.core.config import get_settings
 
 get_settings.cache_clear()
 
-from app.main import app
 from fastapi.testclient import TestClient
+
+from app.main import app
 
 client = TestClient(app)
 
@@ -84,3 +85,34 @@ def test_logout_clears_cookies(db):
     client.cookies.set("access_token", token)
     response = client.post("/api/auth/logout")
     assert response.status_code == 200
+
+
+def test_cookie_secure_defaults_to_true():
+    from app.core.config import Settings
+
+    s = Settings(
+        DATABASE_URL="postgresql://x:x@localhost/x",
+        POLYGON_API_KEY="test",
+        JWT_SECRET_KEY="test-secret-key-for-unit-tests-only-32chars!",
+    )
+    assert s.COOKIE_SECURE is True
+
+
+def test_login_cookies_have_correct_flags(db):
+    client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "hunter2"},
+    )
+    assert response.status_code == 200
+    set_cookie_headers = [
+        v for k, v in response.headers.multi_items() if k.lower() == "set-cookie"
+    ]
+    access_cookie = next(h for h in set_cookie_headers if "access_token=" in h)
+    refresh_cookie = next(h for h in set_cookie_headers if "refresh_token=" in h)
+    # Both cookies use Strict — all traffic routes through same-origin Caddy proxy in production
+    assert "samesite=strict" in access_cookie.lower()
+    assert "samesite=strict" in refresh_cookie.lower()
+    # Secure flag must appear on both cookies (COOKIE_SECURE defaults True)
+    assert "secure" in access_cookie.lower()
+    assert "secure" in refresh_cookie.lower()

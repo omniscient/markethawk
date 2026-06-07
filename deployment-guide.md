@@ -57,7 +57,40 @@ A cron job example (runs at 3 AM daily):
 
 ### SSL / TLS
 
-Docker Compose does not include a TLS termination layer. For HTTPS, place a reverse proxy (nginx, Caddy, Traefik) in front of the frontend and backend containers and let Docker Compose handle internal traffic over HTTP.
+A Caddy reverse proxy service is included in `docker-compose.yml`, gated behind `profiles: ["tls"]`. Caddy auto-provisions and renews Let's Encrypt certificates from a single `DOMAIN` environment variable — no pre-provisioned secrets required.
+
+**Prerequisites**
+
+- A public domain name (e.g. `markethawk.example.com`) pointed at the server's IP address.
+- Ports 80 and 443 reachable from the internet (Let's Encrypt HTTP-01 challenge).
+
+**Enable TLS**
+
+1. Add `DOMAIN=markethawk.example.com` to `.env`.
+2. Start (or restart) the Caddy service:
+   ```bash
+   docker compose --profile tls up -d caddy
+   ```
+   Caddy obtains a certificate on first startup and stores it in the `caddy_data` volume for automatic renewal.
+3. All traffic to `https://<DOMAIN>/api/*` is proxied to `backend:8000`; all other paths go to `frontend:3333`.
+4. WebSocket connections (`/api/v1/live/ws/*`) are proxied transparently — Caddy handles the HTTP→WS upgrade.
+
+**Cookie security**
+
+> **Warning:** `COOKIE_SECURE` defaults to `true`. Any networked deployment that does not enable the `tls` profile will have session cookies silently dropped by browsers over plain HTTP — users will be unable to log in. Enable the Caddy `tls` profile (steps above) for all deployments reachable over a network. Local dev is exempt because `docker-compose.override.yml` automatically sets `COOKIE_SECURE=false`.
+
+`COOKIE_SECURE` defaults to `true`. Local dev overrides this automatically via `docker-compose.override.yml` so cookies work over plain HTTP. In production the cookies require HTTPS; enabling the Caddy profile satisfies this.
+
+**HTTP→HTTPS and HSTS**
+
+The Caddyfile redirects all HTTP (`:80`) requests to HTTPS and sets `Strict-Transport-Security` so browsers enforce HTTPS for all subsequent visits. Port 80 remains published only for Let's Encrypt HTTP-01 challenges and the redirect — no content is served over plain HTTP.
+
+**Routing table**
+
+| Path pattern | Upstream |
+|---|---|
+| `/api/*` | `backend:8000` |
+| `/*` | `frontend:3333` |
 
 ---
 

@@ -77,6 +77,16 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] For fail-safe LLM classifier guards, skip only on explicit `false` (string comparison `[ "$VAR" = "false" ]`); any other value — including empty string or garbled output — falls through to the safe direction (building the preview). This prevents wrongly skipped previews when the classifier errors. <!-- issue:#178 date:2026-06-04 expires:2026-12-04 source:implement -->
 
+## Docker Port Hardening
+
+- [PATTERN] All host-facing port bindings in `docker-compose.yml` should use the `"127.0.0.1:HOST:CONTAINER"` format to prevent inadvertent exposure on public interfaces even without a reverse proxy — this is defense-in-depth independent of whether a TLS profile is active. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] Profile-gated infra services (Caddy, forecaster, scheduler) follow the same restart pattern in `deploy.yml`: `docker compose --profile <name> up -d <service>`. Guard the Caddy step with `[ -n "${DOMAIN:-}" ]` so a missing `DOMAIN` emits a clear message rather than starting Caddy with an empty hostname. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
+
+- [FIX] In `deploy.yml` SSH scripts, variables from `.env` are NOT available in the shell — docker-compose reads `.env` automatically but the SSH session does not. Before any `if [ -n "${VAR:-}" ]` guard that depends on a `.env` var (e.g. `DOMAIN`), source it explicitly: `if [ -f .env ]; then export $(grep -E '^VAR=' .env || true); fi`. Skipping this makes the guard always false and silently skips the protected block. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
+
+- [PATTERN] `caddy/Caddyfile` must use `{$DOMAIN}` (no `:default` fallback) — adding `{$DOMAIN:localhost}` causes Caddy to silently serve via a self-signed local-CA cert on real deploys where `DOMAIN` is unset, producing broken TLS without an obvious error. Add an explicit `http://{$DOMAIN} { redir https://{$DOMAIN}{uri} permanent }` block and `Strict-Transport-Security` header so port 80 cannot serve content. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
+
 ## Environment and Credentials
 
 - [PATTERN] Every new environment variable introduced by a feature must be documented in `ENV_VARIABLES.md` with its default value and a one-line description. CLAUDE.md references ENV_VARIABLES.md as the authoritative env var reference. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->

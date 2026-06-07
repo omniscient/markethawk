@@ -42,6 +42,7 @@ These must be set before starting the stack. The application will start without 
 | `POLYGON_DELAYED` | `true` | When `true`, treats Polygon data as potentially delayed. Set to `false` if your plan provides real-time data. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | JWT access token lifetime in minutes. Short values improve security; longer values reduce refresh frequency. |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime in days. Stored in Redis; deleting the Redis key revokes the session. |
+| `COOKIE_SECURE` | `true` | When `true`, auth cookies are sent with the `Secure` flag (HTTPS only). Set to `false` only for local HTTP dev — `docker-compose.override.yml` does this automatically. |
 | `CORS_ORIGINS` | `["http://localhost:3333"]` | JSON array of allowed frontend origins (e.g. `["http://localhost:3333","https://your-domain.com"]`). Wildcard `*` is intentionally rejected; list explicit origins instead. |
 | `DB_POOL_SIZE` | `20` | SQLAlchemy connection pool size per process. Increase if you add more Celery workers. |
 | `DB_POOL_MAX_OVERFLOW` | `10` | Extra connections allowed above `DB_POOL_SIZE` during bursts. |
@@ -91,6 +92,16 @@ Set in the `frontend` service's environment block in `docker-compose.yml`, or in
 |----------|---------|---------|
 | `VITE_API_TARGET` | `http://backend:8000` | Backend base URL used by the Vite dev server proxy |
 | `VITE_SEQ_UI_URL` | `http://localhost:5380` | Seq UI base URL used by the "Trace in Seq" error toast button |
+
+---
+
+## TLS / Reverse Proxy (Caddy)
+
+Set when using the `--profile tls` Caddy service. See [deployment-guide.md — SSL/TLS](deployment-guide.md#ssl--tls) for setup instructions.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DOMAIN` | `localhost` | Fully-qualified domain name served by Caddy (e.g. `markethawk.example.com`). Caddy uses this to obtain a Let's Encrypt certificate automatically. Defaults to `localhost` (no certificate) when unset. |
 
 ---
 
