@@ -31,3 +31,8 @@ entries as higher-confidence than source:refine entries when the two conflict.
 - [AVOID] Using source:implement for memory entries written by conformance/code-review gate stages — this conflates gate-caught violations with runtime-proven patterns and makes confidence level ambiguous for future agents reading the memory. <!-- issue:#213 date:2026-06-05 expires:2026-12-05 source:refine -->
 
 - [PATTERN] For memory path-tag filtering in the dark factory, use string prefix matching (grep -q "^${path_tag}") rather than shell glob expansion or PCRE — the container ships mawk and POSIX grep, making PCRE and Bash 4+ glob features unavailable. Prefix matching is portable and sufficient for the common case. <!-- issue:#213 date:2026-06-05 expires:2026-12-05 source:refine -->
+
+## Gate-Memory Write Contract (issue #213 re-run)
+
+- [PATTERN] When wiring pipeline gates (conformance, code-review) to write memory entries, route all writes through #254's gated write function once it is finalized — correctness gate, caps, and invalidation enforced at the write boundary. Detail in current spec is illustrative; the actual implement must read #254's contract first. <!-- issue:#213 date:2026-06-07 expires:2026-12-07 source:refine -->
+- [AVOID] Implementing a parallel raw-append memory write path in a gate stage that bypasses the memory write contract defined by #254 — this re-introduces exactly the unverified, unbounded write problem #254 exists to fix. Any gate-stage memory write must go through #254's write function, not directly to the `>>` append pattern. <!-- issue:#213 date:2026-06-07 expires:2026-12-07 source:refine -->
