@@ -11,10 +11,12 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
+from app.core.auth import ws_get_current_user
 from app.core.cache import get_cached
 from app.core.database import SessionLocal, get_db
 from app.core.rate_limits import limiter
 from app.models.system_config import SystemConfig
+from app.models.user import User
 from app.services.system_service import SystemService
 
 router = APIRouter(prefix="/api/v1/system", tags=["system"])
@@ -24,7 +26,9 @@ logger = logging.getLogger(__name__)
 @router.get("/storage")
 def get_storage_stats(db: Session = Depends(get_db)):
     """Get storage usage statistics for major database tables."""
-    return get_cached("mh:system:storage", 300, lambda: SystemService.get_storage_stats(db))
+    return get_cached(
+        "mh:system:storage", 300, lambda: SystemService.get_storage_stats(db)
+    )
 
 
 @router.get("/info", response_model=Dict[str, Any])
@@ -106,7 +110,10 @@ def apply_split_adjustments(db: Session = Depends(get_db)):
 
 @router.websocket("/ws/tasks")
 @limiter.exempt
-async def system_tasks_websocket(websocket: WebSocket):
+async def system_tasks_websocket(
+    websocket: WebSocket,
+    _user: User = Depends(ws_get_current_user),
+):
     """
     WebSocket endpoint that aggregates and pushes active system tasks to clients every 2.5 seconds.
     """

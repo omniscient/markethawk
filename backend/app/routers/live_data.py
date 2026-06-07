@@ -3,11 +3,13 @@ import json
 import logging
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
+from app.core.auth import ws_get_current_user
 from app.core.config import settings
 from app.core.metrics import active_websocket_connections
 from app.core.rate_limits import limiter
+from app.models.user import User
 from app.services.websocket_manager import websocket_manager
 
 logger = logging.getLogger(__name__)
@@ -17,7 +19,12 @@ router = APIRouter(prefix="/api/v1/live", tags=["live"])
 
 @router.websocket("/ws/{ticker}/{resolution}")
 @limiter.exempt
-async def stock_live_websocket(websocket: WebSocket, ticker: str, resolution: str):
+async def stock_live_websocket(
+    websocket: WebSocket,
+    ticker: str,
+    resolution: str,
+    _user: User = Depends(ws_get_current_user),
+):
     """
     WebSocket endpoint for live stock updates with specific resolution (minute/second).
     Subscribes to Redis channel for the given ticker and resolution.
@@ -68,7 +75,10 @@ async def stock_live_websocket(websocket: WebSocket, ticker: str, resolution: st
 
 @router.websocket("/ws/watchlist")
 @limiter.exempt
-async def watchlist_live_websocket(websocket: WebSocket):
+async def watchlist_live_websocket(
+    websocket: WebSocket,
+    _user: User = Depends(ws_get_current_user),
+):
     """
     WebSocket endpoint that streams live tick data and alerts for all
     symbols currently in the active watchlist.
@@ -106,7 +116,11 @@ async def watchlist_live_websocket(websocket: WebSocket):
 
 @router.websocket("/ws/scan-task/{task_id}")
 @limiter.exempt
-async def scan_task_websocket(websocket: WebSocket, task_id: str):
+async def scan_task_websocket(
+    websocket: WebSocket,
+    task_id: str,
+    _user: User = Depends(ws_get_current_user),
+):
     """
     WebSocket endpoint that streams Celery task progress for a range scan.
     Subscribes to Redis channel scan_task:{task_id} and forwards messages to the client.

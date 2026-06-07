@@ -10,14 +10,16 @@ import logging
 from typing import Optional
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
+from app.core.auth import ws_get_current_user
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.rate_limits import limiter
 from app.models.monitored_account import MonitoredAccount
 from app.models.tweet_signal import TweetSignal
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,10 @@ router = APIRouter(prefix="/api/v1/tweets", tags=["tweets"])
 
 @router.websocket("/feed")
 @limiter.exempt
-async def tweet_feed_websocket(websocket: WebSocket):
+async def tweet_feed_websocket(
+    websocket: WebSocket,
+    _user: User = Depends(ws_get_current_user),
+):
     """WebSocket: streams real-time tweet signals from Redis channel tweet_signals:all."""
     await websocket.accept()
 
