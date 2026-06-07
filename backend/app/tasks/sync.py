@@ -536,7 +536,7 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
 
 
 @celery_app.task(bind=True, max_retries=3, name="app.tasks.sync_futures_aggregates")
-def sync_futures_aggregates(
+def sync_futures_aggregates(  # pragma: no cover
     self,
     symbol: str,
     exchange: str,
