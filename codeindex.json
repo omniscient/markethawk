@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 455,
-    "total_loc": 64896,
+    "total_files": 460,
+    "total_loc": 66134,
     "languages": [
       "python",
       "javascript",
@@ -6879,8 +6879,8 @@
       "id": "backend/app/tasks/scanning.py",
       "type": "module",
       "language": "python",
-      "size": 749,
-      "loc": 749,
+      "size": 759,
+      "loc": 759,
       "group": 9,
       "imports": [
         "asyncio",
@@ -6900,43 +6900,64 @@
       "imported_by": [],
       "symbols": [
         {
+          "name": "_evaluate_scanner_alerts_logic",
+          "line": 24,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of evaluate_scanner_alerts. No OTel/Celery context needed."
+        },
+        {
+          "name": "_run_range_scan_logic",
+          "line": 64,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of run_range_scan. Returns events_detected count."
+        },
+        {
+          "name": "_run_universe_scan_logic",
+          "line": 141,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
+        },
+        {
           "name": "evaluate_scanner_alerts",
-          "line": 20,
+          "line": 328,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 98,
+          "line": 361,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 234,
+          "line": 415,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 325,
+          "line": 504,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 596,
+          "line": 608,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
           "name": "validate_scheduled_scanner_configs",
-          "line": 687,
+          "line": 697,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
@@ -13943,17 +13964,177 @@
       ]
     },
     {
+      "id": "backend/tests/tasks/test_quality_tasks.py",
+      "type": "module",
+      "language": "python",
+      "size": 242,
+      "loc": 242,
+      "group": 21,
+      "imports": [
+        "unittest",
+        "pytest",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "_make_report",
+          "line": 8,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "TestAnalyzeUniverseQuality",
+          "line": 26,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_sets_report_complete_on_success",
+            "test_creates_report_when_none_exists",
+            "test_sets_report_error_on_exception",
+            "test_running_status_set_before_analysis"
+          ]
+        },
+        {
+          "name": "TestNormalizeUniverseQuality",
+          "line": 128,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_raises_when_no_quality_report_exists",
+            "test_raises_when_report_has_no_data",
+            "test_sets_complete_and_triggers_analysis_on_success",
+            "test_sets_normalization_error_on_failure"
+          ]
+        },
+        {
+          "name": "TestAnalyzeSignalFeatures",
+          "line": 200,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_insufficient_data_sets_failed_status"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "backend/tests/tasks/test_scanning_tasks.py",
+      "type": "module",
+      "language": "python",
+      "size": 360,
+      "loc": 360,
+      "group": 21,
+      "imports": [
+        "datetime",
+        "unittest",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "test_run_universe_scan_logic_is_importable",
+          "line": 11,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_run_range_scan_logic_is_importable",
+          "line": 17,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_evaluate_scanner_alerts_logic_is_importable",
+          "line": 23,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_run",
+          "line": 34,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_make_ticker",
+          "line": 43,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_make_db",
+          "line": 49,
+          "kind": "function",
+          "exported": false,
+          "doc": "Mock DB that returns run from first query().filter().first() and tickers from se"
+        },
+        {
+          "name": "TestRunUniverseScanLogic",
+          "line": 74,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_run_not_found_returns_early",
+            "test_no_tickers_publishes_failed",
+            "test_happy_path_publishes_started_and_completed",
+            "test_cancel_flag_sets_status_cancelled",
+            "test_day_error_continues_to_completion",
+            "test_weekends_excluded_from_trading_days",
+            "test_write_state_called_with_payload"
+          ]
+        },
+        {
+          "name": "TestEvaluateScannerAlertsLogic",
+          "line": 219,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_event_not_found_returns_without_dispatch",
+            "test_no_matching_rules_returns_without_dispatch",
+            "test_matching_rule_dispatches_notification",
+            "test_auto_trade_rule_queues_execute_auto_trade",
+            "test_dispatch_exception_does_not_abort_loop"
+          ]
+        },
+        {
+          "name": "TestRunRangeScanLogic",
+          "line": 324,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_weekends_skipped_in_trading_days",
+            "test_returns_event_count",
+            "test_completed_message_published"
+          ]
+        }
+      ]
+    },
+    {
       "id": "backend/tests/tasks/test_scheduled_scanner_tasks.py",
       "type": "module",
       "language": "python",
-      "size": 339,
-      "loc": 339,
+      "size": 428,
+      "loc": 428,
       "group": 21,
       "imports": [
-        "pytest",
         "unittest",
-        "app",
+        "pytest",
         "sqlalchemy",
+        "app",
         "os",
         "importlib",
         "celery",
@@ -13967,89 +14148,93 @@
       "symbols": [
         {
           "name": "test_scanner_config_has_universe_id_column",
-          "line": 10,
+          "line": 12,
           "kind": "function",
           "exported": true,
           "doc": "ScannerConfig must declare universe_id as a mapped column."
         },
         {
           "name": "test_scanner_config_universe_id_is_integer",
-          "line": 22,
+          "line": 25,
           "kind": "function",
           "exported": true,
           "doc": "universe_id must be an Integer column."
         },
         {
           "name": "test_scanner_config_universe_id_is_not_nullable",
-          "line": 31,
+          "line": 35,
           "kind": "function",
           "exported": true,
           "doc": "universe_id must be NOT NULL (nullable=False)."
         },
         {
           "name": "test_migration_file_exists",
-          "line": 43,
+          "line": 48,
           "kind": "function",
           "exported": true,
           "doc": "The add_universe_id migration file must exist at the expected path."
         },
         {
           "name": "test_migration_revision_chain",
-          "line": 56,
+          "line": 66,
           "kind": "function",
           "exported": true,
           "doc": "Migration must declare correct revision and a non-None down_revision."
         },
         {
           "name": "test_seed_liquidity_hunt_has_universe_id",
-          "line": 77,
+          "line": 96,
           "kind": "function",
           "exported": true,
           "doc": "The liquidity_hunt seed row (id=2) must include universe_id column and value."
         },
         {
           "name": "test_seed_pocket_pivot_row_exists",
-          "line": 92,
+          "line": 119,
           "kind": "function",
           "exported": true,
           "doc": "A pocket_pivot config row must be present in the seed SQL."
         },
         {
           "name": "_make_cfg",
-          "line": 114,
+          "line": 150,
           "kind": "function",
           "exported": false,
           "doc": "Return a MagicMock resembling a ScannerConfig ORM row."
         },
         {
           "name": "TestRunLiquidityHuntScheduledFixed",
-          "line": 129,
+          "line": 165,
           "kind": "class",
           "exported": true,
           "methods": [
             "_run_with_configs",
             "test_does_not_call_parameters_get",
             "test_logs_error_and_raises_when_zero_configs",
-            "test_logs_error_when_universe_id_is_null"
+            "test_logs_error_when_universe_id_is_null",
+            "test_no_tickers_logs_warning_and_does_not_raise",
+            "test_success_with_tickers_does_not_raise"
           ],
           "doc": "Tests for the fixed run_liquidity_hunt_scheduled task."
         },
         {
           "name": "TestRunPocketPivotScheduledFixed",
-          "line": 191,
+          "line": 250,
           "kind": "class",
           "exported": true,
           "methods": [
             "_run_with_configs",
             "test_does_not_call_parameters_get",
             "test_logs_error_and_raises_when_zero_configs",
-            "test_logs_error_when_universe_id_is_null"
+            "test_logs_error_when_universe_id_is_null",
+            "test_no_tickers_logs_warning_and_does_not_raise",
+            "test_success_with_tickers_does_not_raise"
           ],
           "doc": "Tests for the fixed run_pocket_pivot_scheduled task."
         },
         {
           "name": "TestValidateScheduledScannerConfigs",
-          "line": 253,
+          "line": 334,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -14064,7 +14249,7 @@
         },
         {
           "name": "test_worker_ready_signal_wired_in_celery_app",
-          "line": 328,
+          "line": 415,
           "kind": "function",
           "exported": true,
           "doc": "celery_app.py must import and wire validate_scheduled_scanner_configs."
@@ -14109,6 +14294,145 @@
             "test_no_strategy_bypasses_check",
             "test_no_entry_price_target_bypasses_check",
             "test_short_side_negative_slippage_is_caught"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "backend/tests/tasks/test_sync_tasks.py",
+      "type": "module",
+      "language": "python",
+      "size": 349,
+      "loc": 349,
+      "group": 21,
+      "imports": [
+        "datetime",
+        "unittest",
+        "pytest",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "TestPollMassiveNewsGuard",
+          "line": 13,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_check_db_reached",
+            "test_saturday_skips_db",
+            "test_sunday_skips_db",
+            "test_monday_before_2am_skips_db",
+            "test_friday_at_20_skips_db",
+            "test_force_bypasses_guard"
+          ],
+          "doc": "Verify the weekday/hour guard without hitting the DB."
+        },
+        {
+          "name": "TestSyncTickersBatch",
+          "line": 70,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_build_client",
+            "_run",
+            "test_upserts_ticker_row_for_each_result",
+            "test_skips_result_without_ticker_field",
+            "test_schedules_next_batch_when_next_url_present"
+          ]
+        },
+        {
+          "name": "TestSyncStockSplits",
+          "line": 166,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_build_client",
+            "_run",
+            "test_new_split_is_inserted",
+            "test_existing_split_is_not_duplicated",
+            "test_missing_required_fields_skipped"
+          ]
+        },
+        {
+          "name": "TestSyncStockAggregates",
+          "line": 241,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_no_aggs_returns_early_without_insert",
+            "test_aggs_are_bulk_inserted",
+            "test_existing_range_deleted_before_insert"
+          ]
+        },
+        {
+          "name": "TestTriggerTweetMonitor",
+          "line": 311,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_success_returns_response_json",
+            "test_http_error_triggers_retry"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "backend/tests/tasks/test_trading_task_shells.py",
+      "type": "module",
+      "language": "python",
+      "size": 172,
+      "loc": 172,
+      "group": 21,
+      "imports": [
+        "decimal",
+        "unittest",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "TestExecuteAutoTrade",
+          "line": 7,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_rule_not_found_returns_without_execute",
+            "test_event_not_found_returns_without_execute",
+            "test_success_calls_maybe_execute"
+          ]
+        },
+        {
+          "name": "TestSubmitApprovedOrder",
+          "line": 56,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_order_not_found_returns_without_submit",
+            "test_wrong_status_returns_without_submit",
+            "test_pending_order_calls_submit"
+          ]
+        },
+        {
+          "name": "TestPollAutoTradeFillsPaperPath",
+          "line": 120,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_no_pending_orders_returns_early",
+            "test_submitted_paper_order_calls_record_entry_fill",
+            "test_open_paper_order_calls_simulate_paper_exit"
           ]
         }
       ]
@@ -14184,6 +14508,31 @@
         {
           "name": "test_jwt_secret_key_field_exists",
           "line": 26,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
+      "id": "backend/tests/test_coverage_config.py",
+      "type": "module",
+      "language": "python",
+      "size": 16,
+      "loc": 16,
+      "group": 14,
+      "imports": [
+        "pathlib",
+        "tomllib"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "test_tasks_glob_not_in_coverage_omit",
+          "line": 7,
           "kind": "function",
           "exported": true
         }
@@ -15827,9 +16176,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 203,
+      "direct_dependents": 207,
       "transitive_dependents": 88,
-      "blast_score": 247.0,
+      "blast_score": 251.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/__init__.py",
@@ -16020,8 +16369,12 @@
         "backend/tests/tasks/test_metrics_instrumentation.py",
         "backend/tests/tasks/test_package_exports.py",
         "backend/tests/tasks/test_paper_exit.py",
+        "backend/tests/tasks/test_quality_tasks.py",
+        "backend/tests/tasks/test_scanning_tasks.py",
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
         "backend/tests/tasks/test_slippage.py",
+        "backend/tests/tasks/test_sync_tasks.py",
+        "backend/tests/tasks/test_trading_task_shells.py",
         "backend/tests/test_auth_core.py",
         "backend/tests/test_config.py",
         "backend/tests/test_exceptions.py",
@@ -16526,9 +16879,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 132,
+      "direct_dependents": 134,
       "transitive_dependents": 89,
-      "blast_score": 176.5,
+      "blast_score": 178.5,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/core/error_tracking.py",
@@ -16653,6 +17006,8 @@
         "backend/tests/services/test_session_utils.py",
         "backend/tests/services/test_stock_data_service_methods.py",
         "backend/tests/services/test_system_service.py",
+        "backend/tests/tasks/test_scanning_tasks.py",
+        "backend/tests/tasks/test_sync_tasks.py",
         "scripts/fetch_metrics.py",
         "services/tweet-monitor/app/browser.py",
         "services/tweet-monitor/app/classifier.py",
@@ -17312,9 +17667,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 15,
+      "direct_dependents": 16,
       "transitive_dependents": 0,
-      "blast_score": 15.0,
+      "blast_score": 16.0,
       "imported_by": [
         "backend/app/schemas/journal.py",
         "backend/app/services/auto_trade_service.py",
@@ -17330,7 +17685,8 @@
         "backend/tests/services/test_split_adjustment.py",
         "backend/tests/services/test_stock_data_service_methods.py",
         "backend/tests/tasks/test_paper_exit.py",
-        "backend/tests/tasks/test_slippage.py"
+        "backend/tests/tasks/test_slippage.py",
+        "backend/tests/tasks/test_trading_task_shells.py"
       ]
     },
     {
@@ -17705,9 +18061,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 30,
+      "direct_dependents": 34,
       "transitive_dependents": 0,
-      "blast_score": 30.0,
+      "blast_score": 34.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_analysis.py",
@@ -17737,8 +18093,12 @@
         "backend/tests/services/test_timeseries_forecast.py",
         "backend/tests/services/test_universe_stats_service.py",
         "backend/tests/tasks/test_paper_exit.py",
+        "backend/tests/tasks/test_quality_tasks.py",
+        "backend/tests/tasks/test_scanning_tasks.py",
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
-        "backend/tests/tasks/test_slippage.py"
+        "backend/tests/tasks/test_slippage.py",
+        "backend/tests/tasks/test_sync_tasks.py",
+        "backend/tests/tasks/test_trading_task_shells.py"
       ]
     },
     {
@@ -17769,9 +18129,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 32,
+      "direct_dependents": 34,
       "transitive_dependents": 0,
-      "blast_score": 32.0,
+      "blast_score": 34.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_alerts.py",
@@ -17799,7 +18159,9 @@
         "backend/tests/services/test_signal_ranker.py",
         "backend/tests/services/test_split_adjustment.py",
         "backend/tests/services/test_system_service.py",
+        "backend/tests/tasks/test_quality_tasks.py",
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
+        "backend/tests/tasks/test_sync_tasks.py",
         "backend/tests/test_settings.py",
         "services/tweet-monitor/tests/test_classifier.py",
         "services/tweet-monitor/tests/test_extractor.py",
@@ -18051,12 +18413,13 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 11,
+      "direct_dependents": 12,
       "transitive_dependents": 0,
-      "blast_score": 11.0,
+      "blast_score": 12.0,
       "imported_by": [
         "backend/tests/live_scanner/test_main_imports.py",
         "backend/tests/live_scanner/test_publisher.py",
+        "backend/tests/test_coverage_config.py",
         "dark-factory/tests/test_code_review_command.py",
         "dark-factory/tests/test_code_review_payload.py",
         "dark-factory/tests/test_code_review_prompt.py",
@@ -18066,6 +18429,22 @@
         "scripts/render_report.py",
         "tests/scripts/test_fetch_metrics.py",
         "tests/scripts/test_render_report.py"
+      ]
+    },
+    {
+      "id": "tomllib",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "backend/tests/test_coverage_config.py"
       ]
     },
     {
@@ -26744,43 +27123,64 @@
           "exported": true
         },
         {
+          "name": "_evaluate_scanner_alerts_logic",
+          "line": 24,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of evaluate_scanner_alerts. No OTel/Celery context needed."
+        },
+        {
+          "name": "_run_range_scan_logic",
+          "line": 64,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of run_range_scan. Returns events_detected count."
+        },
+        {
+          "name": "_run_universe_scan_logic",
+          "line": 141,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
+        },
+        {
           "name": "evaluate_scanner_alerts",
-          "line": 20,
+          "line": 328,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 98,
+          "line": 361,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 234,
+          "line": 415,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 325,
+          "line": 504,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 596,
+          "line": 608,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
           "name": "validate_scheduled_scanner_configs",
-          "line": 687,
+          "line": 697,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
@@ -31580,90 +31980,214 @@
           ]
         },
         {
+          "name": "_make_report",
+          "line": 8,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "TestAnalyzeUniverseQuality",
+          "line": 26,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_sets_report_complete_on_success",
+            "test_creates_report_when_none_exists",
+            "test_sets_report_error_on_exception",
+            "test_running_status_set_before_analysis"
+          ]
+        },
+        {
+          "name": "TestNormalizeUniverseQuality",
+          "line": 128,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_raises_when_no_quality_report_exists",
+            "test_raises_when_report_has_no_data",
+            "test_sets_complete_and_triggers_analysis_on_success",
+            "test_sets_normalization_error_on_failure"
+          ]
+        },
+        {
+          "name": "TestAnalyzeSignalFeatures",
+          "line": 200,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_insufficient_data_sets_failed_status"
+          ]
+        },
+        {
+          "name": "test_run_universe_scan_logic_is_importable",
+          "line": 11,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_run_range_scan_logic_is_importable",
+          "line": 17,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_evaluate_scanner_alerts_logic_is_importable",
+          "line": 23,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_run",
+          "line": 34,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_make_ticker",
+          "line": 43,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_make_db",
+          "line": 49,
+          "kind": "function",
+          "exported": false,
+          "doc": "Mock DB that returns run from first query().filter().first() and tickers from se"
+        },
+        {
+          "name": "TestRunUniverseScanLogic",
+          "line": 74,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_run_not_found_returns_early",
+            "test_no_tickers_publishes_failed",
+            "test_happy_path_publishes_started_and_completed",
+            "test_cancel_flag_sets_status_cancelled",
+            "test_day_error_continues_to_completion",
+            "test_weekends_excluded_from_trading_days",
+            "test_write_state_called_with_payload"
+          ]
+        },
+        {
+          "name": "TestEvaluateScannerAlertsLogic",
+          "line": 219,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_event_not_found_returns_without_dispatch",
+            "test_no_matching_rules_returns_without_dispatch",
+            "test_matching_rule_dispatches_notification",
+            "test_auto_trade_rule_queues_execute_auto_trade",
+            "test_dispatch_exception_does_not_abort_loop"
+          ]
+        },
+        {
+          "name": "TestRunRangeScanLogic",
+          "line": 324,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_weekends_skipped_in_trading_days",
+            "test_returns_event_count",
+            "test_completed_message_published"
+          ]
+        },
+        {
           "name": "test_scanner_config_has_universe_id_column",
-          "line": 10,
+          "line": 12,
           "kind": "function",
           "exported": true,
           "doc": "ScannerConfig must declare universe_id as a mapped column."
         },
         {
           "name": "test_scanner_config_universe_id_is_integer",
-          "line": 22,
+          "line": 25,
           "kind": "function",
           "exported": true,
           "doc": "universe_id must be an Integer column."
         },
         {
           "name": "test_scanner_config_universe_id_is_not_nullable",
-          "line": 31,
+          "line": 35,
           "kind": "function",
           "exported": true,
           "doc": "universe_id must be NOT NULL (nullable=False)."
         },
         {
           "name": "test_migration_file_exists",
-          "line": 43,
+          "line": 48,
           "kind": "function",
           "exported": true,
           "doc": "The add_universe_id migration file must exist at the expected path."
         },
         {
           "name": "test_migration_revision_chain",
-          "line": 56,
+          "line": 66,
           "kind": "function",
           "exported": true,
           "doc": "Migration must declare correct revision and a non-None down_revision."
         },
         {
           "name": "test_seed_liquidity_hunt_has_universe_id",
-          "line": 77,
+          "line": 96,
           "kind": "function",
           "exported": true,
           "doc": "The liquidity_hunt seed row (id=2) must include universe_id column and value."
         },
         {
           "name": "test_seed_pocket_pivot_row_exists",
-          "line": 92,
+          "line": 119,
           "kind": "function",
           "exported": true,
           "doc": "A pocket_pivot config row must be present in the seed SQL."
         },
         {
           "name": "_make_cfg",
-          "line": 114,
+          "line": 150,
           "kind": "function",
           "exported": false,
           "doc": "Return a MagicMock resembling a ScannerConfig ORM row."
         },
         {
           "name": "TestRunLiquidityHuntScheduledFixed",
-          "line": 129,
+          "line": 165,
           "kind": "class",
           "exported": true,
           "methods": [
             "_run_with_configs",
             "test_does_not_call_parameters_get",
             "test_logs_error_and_raises_when_zero_configs",
-            "test_logs_error_when_universe_id_is_null"
+            "test_logs_error_when_universe_id_is_null",
+            "test_no_tickers_logs_warning_and_does_not_raise",
+            "test_success_with_tickers_does_not_raise"
           ],
           "doc": "Tests for the fixed run_liquidity_hunt_scheduled task."
         },
         {
           "name": "TestRunPocketPivotScheduledFixed",
-          "line": 191,
+          "line": 250,
           "kind": "class",
           "exported": true,
           "methods": [
             "_run_with_configs",
             "test_does_not_call_parameters_get",
             "test_logs_error_and_raises_when_zero_configs",
-            "test_logs_error_when_universe_id_is_null"
+            "test_logs_error_when_universe_id_is_null",
+            "test_no_tickers_logs_warning_and_does_not_raise",
+            "test_success_with_tickers_does_not_raise"
           ],
           "doc": "Tests for the fixed run_pocket_pivot_scheduled task."
         },
         {
           "name": "TestValidateScheduledScannerConfigs",
-          "line": 253,
+          "line": 334,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -31678,7 +32202,7 @@
         },
         {
           "name": "test_worker_ready_signal_wired_in_celery_app",
-          "line": 328,
+          "line": 415,
           "kind": "function",
           "exported": true,
           "doc": "celery_app.py must import and wire validate_scheduled_scanner_configs."
@@ -31703,6 +32227,104 @@
             "test_no_strategy_bypasses_check",
             "test_no_entry_price_target_bypasses_check",
             "test_short_side_negative_slippage_is_caught"
+          ]
+        },
+        {
+          "name": "TestPollMassiveNewsGuard",
+          "line": 13,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_check_db_reached",
+            "test_saturday_skips_db",
+            "test_sunday_skips_db",
+            "test_monday_before_2am_skips_db",
+            "test_friday_at_20_skips_db",
+            "test_force_bypasses_guard"
+          ],
+          "doc": "Verify the weekday/hour guard without hitting the DB."
+        },
+        {
+          "name": "TestSyncTickersBatch",
+          "line": 70,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_build_client",
+            "_run",
+            "test_upserts_ticker_row_for_each_result",
+            "test_skips_result_without_ticker_field",
+            "test_schedules_next_batch_when_next_url_present"
+          ]
+        },
+        {
+          "name": "TestSyncStockSplits",
+          "line": 166,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_build_client",
+            "_run",
+            "test_new_split_is_inserted",
+            "test_existing_split_is_not_duplicated",
+            "test_missing_required_fields_skipped"
+          ]
+        },
+        {
+          "name": "TestSyncStockAggregates",
+          "line": 241,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_no_aggs_returns_early_without_insert",
+            "test_aggs_are_bulk_inserted",
+            "test_existing_range_deleted_before_insert"
+          ]
+        },
+        {
+          "name": "TestTriggerTweetMonitor",
+          "line": 311,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_success_returns_response_json",
+            "test_http_error_triggers_retry"
+          ]
+        },
+        {
+          "name": "TestExecuteAutoTrade",
+          "line": 7,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_rule_not_found_returns_without_execute",
+            "test_event_not_found_returns_without_execute",
+            "test_success_calls_maybe_execute"
+          ]
+        },
+        {
+          "name": "TestSubmitApprovedOrder",
+          "line": 56,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_order_not_found_returns_without_submit",
+            "test_wrong_status_returns_without_submit",
+            "test_pending_order_calls_submit"
+          ]
+        },
+        {
+          "name": "TestPollAutoTradeFillsPaperPath",
+          "line": 120,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_no_pending_orders_returns_early",
+            "test_submitted_paper_order_calls_record_entry_fill",
+            "test_open_paper_order_calls_simulate_paper_exit"
           ]
         },
         {
@@ -31738,6 +32360,12 @@
         {
           "name": "test_jwt_secret_key_field_exists",
           "line": 26,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_tasks_glob_not_in_coverage_omit",
+          "line": 7,
           "kind": "function",
           "exported": true
         },
@@ -37157,43 +37785,64 @@
           "exported": true
         },
         {
+          "name": "_evaluate_scanner_alerts_logic",
+          "line": 24,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of evaluate_scanner_alerts. No OTel/Celery context needed."
+        },
+        {
+          "name": "_run_range_scan_logic",
+          "line": 64,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of run_range_scan. Returns events_detected count."
+        },
+        {
+          "name": "_run_universe_scan_logic",
+          "line": 141,
+          "kind": "function",
+          "exported": false,
+          "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
+        },
+        {
           "name": "evaluate_scanner_alerts",
-          "line": 20,
+          "line": 328,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 98,
+          "line": 361,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 234,
+          "line": 415,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 325,
+          "line": 504,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 596,
+          "line": 608,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
           "name": "validate_scheduled_scanner_configs",
-          "line": 687,
+          "line": 697,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
@@ -41993,90 +42642,214 @@
           ]
         },
         {
+          "name": "_make_report",
+          "line": 8,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "TestAnalyzeUniverseQuality",
+          "line": 26,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_sets_report_complete_on_success",
+            "test_creates_report_when_none_exists",
+            "test_sets_report_error_on_exception",
+            "test_running_status_set_before_analysis"
+          ]
+        },
+        {
+          "name": "TestNormalizeUniverseQuality",
+          "line": 128,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_raises_when_no_quality_report_exists",
+            "test_raises_when_report_has_no_data",
+            "test_sets_complete_and_triggers_analysis_on_success",
+            "test_sets_normalization_error_on_failure"
+          ]
+        },
+        {
+          "name": "TestAnalyzeSignalFeatures",
+          "line": 200,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_insufficient_data_sets_failed_status"
+          ]
+        },
+        {
+          "name": "test_run_universe_scan_logic_is_importable",
+          "line": 11,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_run_range_scan_logic_is_importable",
+          "line": 17,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_evaluate_scanner_alerts_logic_is_importable",
+          "line": 23,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_run",
+          "line": 34,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_make_ticker",
+          "line": 43,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_make_db",
+          "line": 49,
+          "kind": "function",
+          "exported": false,
+          "doc": "Mock DB that returns run from first query().filter().first() and tickers from se"
+        },
+        {
+          "name": "TestRunUniverseScanLogic",
+          "line": 74,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_run_not_found_returns_early",
+            "test_no_tickers_publishes_failed",
+            "test_happy_path_publishes_started_and_completed",
+            "test_cancel_flag_sets_status_cancelled",
+            "test_day_error_continues_to_completion",
+            "test_weekends_excluded_from_trading_days",
+            "test_write_state_called_with_payload"
+          ]
+        },
+        {
+          "name": "TestEvaluateScannerAlertsLogic",
+          "line": 219,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_event_not_found_returns_without_dispatch",
+            "test_no_matching_rules_returns_without_dispatch",
+            "test_matching_rule_dispatches_notification",
+            "test_auto_trade_rule_queues_execute_auto_trade",
+            "test_dispatch_exception_does_not_abort_loop"
+          ]
+        },
+        {
+          "name": "TestRunRangeScanLogic",
+          "line": 324,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_logic",
+            "test_weekends_skipped_in_trading_days",
+            "test_returns_event_count",
+            "test_completed_message_published"
+          ]
+        },
+        {
           "name": "test_scanner_config_has_universe_id_column",
-          "line": 10,
+          "line": 12,
           "kind": "function",
           "exported": true,
           "doc": "ScannerConfig must declare universe_id as a mapped column."
         },
         {
           "name": "test_scanner_config_universe_id_is_integer",
-          "line": 22,
+          "line": 25,
           "kind": "function",
           "exported": true,
           "doc": "universe_id must be an Integer column."
         },
         {
           "name": "test_scanner_config_universe_id_is_not_nullable",
-          "line": 31,
+          "line": 35,
           "kind": "function",
           "exported": true,
           "doc": "universe_id must be NOT NULL (nullable=False)."
         },
         {
           "name": "test_migration_file_exists",
-          "line": 43,
+          "line": 48,
           "kind": "function",
           "exported": true,
           "doc": "The add_universe_id migration file must exist at the expected path."
         },
         {
           "name": "test_migration_revision_chain",
-          "line": 56,
+          "line": 66,
           "kind": "function",
           "exported": true,
           "doc": "Migration must declare correct revision and a non-None down_revision."
         },
         {
           "name": "test_seed_liquidity_hunt_has_universe_id",
-          "line": 77,
+          "line": 96,
           "kind": "function",
           "exported": true,
           "doc": "The liquidity_hunt seed row (id=2) must include universe_id column and value."
         },
         {
           "name": "test_seed_pocket_pivot_row_exists",
-          "line": 92,
+          "line": 119,
           "kind": "function",
           "exported": true,
           "doc": "A pocket_pivot config row must be present in the seed SQL."
         },
         {
           "name": "_make_cfg",
-          "line": 114,
+          "line": 150,
           "kind": "function",
           "exported": false,
           "doc": "Return a MagicMock resembling a ScannerConfig ORM row."
         },
         {
           "name": "TestRunLiquidityHuntScheduledFixed",
-          "line": 129,
+          "line": 165,
           "kind": "class",
           "exported": true,
           "methods": [
             "_run_with_configs",
             "test_does_not_call_parameters_get",
             "test_logs_error_and_raises_when_zero_configs",
-            "test_logs_error_when_universe_id_is_null"
+            "test_logs_error_when_universe_id_is_null",
+            "test_no_tickers_logs_warning_and_does_not_raise",
+            "test_success_with_tickers_does_not_raise"
           ],
           "doc": "Tests for the fixed run_liquidity_hunt_scheduled task."
         },
         {
           "name": "TestRunPocketPivotScheduledFixed",
-          "line": 191,
+          "line": 250,
           "kind": "class",
           "exported": true,
           "methods": [
             "_run_with_configs",
             "test_does_not_call_parameters_get",
             "test_logs_error_and_raises_when_zero_configs",
-            "test_logs_error_when_universe_id_is_null"
+            "test_logs_error_when_universe_id_is_null",
+            "test_no_tickers_logs_warning_and_does_not_raise",
+            "test_success_with_tickers_does_not_raise"
           ],
           "doc": "Tests for the fixed run_pocket_pivot_scheduled task."
         },
         {
           "name": "TestValidateScheduledScannerConfigs",
-          "line": 253,
+          "line": 334,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -42091,7 +42864,7 @@
         },
         {
           "name": "test_worker_ready_signal_wired_in_celery_app",
-          "line": 328,
+          "line": 415,
           "kind": "function",
           "exported": true,
           "doc": "celery_app.py must import and wire validate_scheduled_scanner_configs."
@@ -42116,6 +42889,104 @@
             "test_no_strategy_bypasses_check",
             "test_no_entry_price_target_bypasses_check",
             "test_short_side_negative_slippage_is_caught"
+          ]
+        },
+        {
+          "name": "TestPollMassiveNewsGuard",
+          "line": 13,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run_check_db_reached",
+            "test_saturday_skips_db",
+            "test_sunday_skips_db",
+            "test_monday_before_2am_skips_db",
+            "test_friday_at_20_skips_db",
+            "test_force_bypasses_guard"
+          ],
+          "doc": "Verify the weekday/hour guard without hitting the DB."
+        },
+        {
+          "name": "TestSyncTickersBatch",
+          "line": 70,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_build_client",
+            "_run",
+            "test_upserts_ticker_row_for_each_result",
+            "test_skips_result_without_ticker_field",
+            "test_schedules_next_batch_when_next_url_present"
+          ]
+        },
+        {
+          "name": "TestSyncStockSplits",
+          "line": 166,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_build_client",
+            "_run",
+            "test_new_split_is_inserted",
+            "test_existing_split_is_not_duplicated",
+            "test_missing_required_fields_skipped"
+          ]
+        },
+        {
+          "name": "TestSyncStockAggregates",
+          "line": 241,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_no_aggs_returns_early_without_insert",
+            "test_aggs_are_bulk_inserted",
+            "test_existing_range_deleted_before_insert"
+          ]
+        },
+        {
+          "name": "TestTriggerTweetMonitor",
+          "line": 311,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_success_returns_response_json",
+            "test_http_error_triggers_retry"
+          ]
+        },
+        {
+          "name": "TestExecuteAutoTrade",
+          "line": 7,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_rule_not_found_returns_without_execute",
+            "test_event_not_found_returns_without_execute",
+            "test_success_calls_maybe_execute"
+          ]
+        },
+        {
+          "name": "TestSubmitApprovedOrder",
+          "line": 56,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_run",
+            "test_order_not_found_returns_without_submit",
+            "test_wrong_status_returns_without_submit",
+            "test_pending_order_calls_submit"
+          ]
+        },
+        {
+          "name": "TestPollAutoTradeFillsPaperPath",
+          "line": 120,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_no_pending_orders_returns_early",
+            "test_submitted_paper_order_calls_record_entry_fill",
+            "test_open_paper_order_calls_simulate_paper_exit"
           ]
         },
         {
@@ -42151,6 +43022,12 @@
         {
           "name": "test_jwt_secret_key_field_exists",
           "line": 26,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_tasks_glob_not_in_coverage_omit",
+          "line": 7,
           "kind": "function",
           "exported": true
         },
@@ -49071,7 +49948,7 @@
     {
       "source": "backend/app/tasks/scanning.py",
       "target": "asyncio",
-      "weight": 2,
+      "weight": 1,
       "kind": "imports"
     },
     {
@@ -49095,7 +49972,7 @@
     {
       "source": "backend/app/tasks/scanning.py",
       "target": "datetime",
-      "weight": 5,
+      "weight": 3,
       "kind": "imports"
     },
     {
@@ -49113,7 +49990,7 @@
     {
       "source": "backend/app/tasks/scanning.py",
       "target": "app",
-      "weight": 26,
+      "weight": 27,
       "kind": "imports"
     },
     {
@@ -51343,9 +52220,39 @@
       "kind": "imports"
     },
     {
-      "source": "backend/tests/tasks/test_scheduled_scanner_tasks.py",
+      "source": "backend/tests/tasks/test_quality_tasks.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_quality_tasks.py",
       "target": "pytest",
       "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_quality_tasks.py",
+      "target": "app",
+      "weight": 9,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_scanning_tasks.py",
+      "target": "datetime",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_scanning_tasks.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_scanning_tasks.py",
+      "target": "app",
+      "weight": 12,
       "kind": "imports"
     },
     {
@@ -51356,14 +52263,20 @@
     },
     {
       "source": "backend/tests/tasks/test_scheduled_scanner_tasks.py",
-      "target": "app",
-      "weight": 12,
+      "target": "pytest",
+      "weight": 1,
       "kind": "imports"
     },
     {
       "source": "backend/tests/tasks/test_scheduled_scanner_tasks.py",
       "target": "sqlalchemy",
       "weight": 2,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_scheduled_scanner_tasks.py",
+      "target": "app",
+      "weight": 10,
       "kind": "imports"
     },
     {
@@ -51387,7 +52300,7 @@
     {
       "source": "backend/tests/tasks/test_scheduled_scanner_tasks.py",
       "target": "logging",
-      "weight": 8,
+      "weight": 10,
       "kind": "imports"
     },
     {
@@ -51406,6 +52319,48 @@
       "source": "backend/tests/tasks/test_slippage.py",
       "target": "app",
       "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_sync_tasks.py",
+      "target": "datetime",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_sync_tasks.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_sync_tasks.py",
+      "target": "pytest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_sync_tasks.py",
+      "target": "app",
+      "weight": 8,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_trading_task_shells.py",
+      "target": "decimal",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_trading_task_shells.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/tasks/test_trading_task_shells.py",
+      "target": "app",
+      "weight": 6,
       "kind": "imports"
     },
     {
@@ -51442,6 +52397,18 @@
       "source": "backend/tests/test_config.py",
       "target": "app",
       "weight": 3,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_coverage_config.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_coverage_config.py",
+      "target": "tomllib",
+      "weight": 1,
       "kind": "imports"
     },
     {
