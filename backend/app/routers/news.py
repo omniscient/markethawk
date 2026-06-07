@@ -72,10 +72,12 @@ def get_recent_news(ticker: str = None, db: Session = Depends(get_db)):
 import asyncio  # noqa: E402
 
 import redis.asyncio as aioredis  # noqa: E402
-from fastapi import WebSocket, WebSocketDisconnect  # noqa: E402
+from fastapi import Depends, WebSocket, WebSocketDisconnect  # noqa: E402
 
+from app.core.auth import ws_get_current_user  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.core.rate_limits import limiter  # noqa: E402
+from app.models.user import User  # noqa: E402
 
 
 @router.post("/refresh")
@@ -89,7 +91,10 @@ def trigger_news_refresh():
 
 @router.websocket("/ws")
 @limiter.exempt
-async def news_websocket(websocket: WebSocket):
+async def news_websocket(
+    websocket: WebSocket,
+    _user: User = Depends(ws_get_current_user),
+):
     await websocket.accept()
     # Connect to redis using async redis client
     redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)

@@ -13,7 +13,12 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+RUN addgroup --system --gid 1000 appuser \
+ && adduser --system --uid 1000 --ingroup appuser --no-create-home appuser
+
+COPY --chown=appuser:appuser . .
+
+USER appuser
 
 EXPOSE 8000
 

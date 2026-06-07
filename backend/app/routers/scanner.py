@@ -18,11 +18,13 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.auth import ws_get_current_user
 from app.core.cache import cache_response, get_cached
 from app.core.database import get_db
 from app.core.rate_limits import SCANNER_LIMIT, limiter
 from app.models import MonitoredStock, ScannerConfig, ScannerEvent, ScannerRun
 from app.models.signal_review import SignalReview
+from app.models.user import User
 from app.schemas import (
     ClearEventsResponse,
     PreMarketMoversResponse,
@@ -246,7 +248,11 @@ def cancel_scan(scan_id: str, db: Session = Depends(get_db)):
 
 @router.websocket("/ws/runs/{task_id}")
 @limiter.exempt
-async def scan_run_websocket(websocket: WebSocket, task_id: str):
+async def scan_run_websocket(
+    websocket: WebSocket,
+    task_id: str,
+    _user: User = Depends(ws_get_current_user),
+):
     """Stream progress messages for one running scan.
 
     On connect the most recent state is replayed once (so a page reload doesn't
@@ -541,11 +547,15 @@ def get_scanner_configs(
     db: Session = Depends(get_db),
 ):
     """Get all available scanner configurations."""
+
     # NOTE: No mutation endpoints exist for ScannerConfig (seeded, admin-only).
     # When mutation endpoints are added, they must call invalidate("mh:scanner:configs").
     def _fetch():
         configs = db.query(ScannerConfig).filter(ScannerConfig.is_active == True).all()
-        return [ScannerConfigResponse.model_validate(c).model_dump(mode="json") for c in configs]
+        return [
+            ScannerConfigResponse.model_validate(c).model_dump(mode="json")
+            for c in configs
+        ]
 
     return get_cached("mh:scanner:configs", 300, _fetch)
 

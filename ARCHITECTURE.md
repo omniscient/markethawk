@@ -27,6 +27,13 @@ graph TD
         jaeger["jaeger :16686/:4317"]
     end
 
+    subgraph factory["factory-network"]
+        proxy["docker-socket-proxy :2375"]
+        darkfactory["dark-factory (factory profile)"]
+        scheduler["backlog-scheduler (scheduler profile)"]
+    end
+
+    dockersock[/"Docker socket\n/var/run/docker.sock"\]
     polygon(["api.polygon.io"])
 
     Browser -->|"HTTPS :443"| caddy
@@ -62,6 +69,10 @@ graph TD
     jaeger -->|OTLP| backend
     jaeger -->|OTLP| celery
     jaeger -->|OTLP| beat
+
+    proxy -->|":ro"| dockersock
+    darkfactory -->|"tcp :2375"| proxy
+    scheduler -->|"tcp :2375"| proxy
 ```
 
 ## Scan Execution Flow
