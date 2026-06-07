@@ -1,9 +1,11 @@
 # Dark Factory Memory System Revamp — Design
 
-**Date:** 2026-06-06
+**Date:** 2026-06-06 (updated 2026-06-07)
 **Status:** Pending review
 **Author:** Brainstormed with Claude (Opus 4.8)
 **Issue:** [#254](https://github.com/omniscient/markethawk/issues/254)
+**Epic:** [#262 — Harden the Dark Factory self-improvement loop](https://github.com/omniscient/markethawk/issues/262)
+**Downstream:** [#213](https://github.com/omniscient/markethawk/issues/213) gate→memory write-paths must conform to R2–R6 (see Contract Ownership section)
 **Component:** `.archon/memory/`, `.archon/commands/dark-factory-implement.md`, `.archon/commands/dark-factory-refine.md`
 
 ## Problem
@@ -38,12 +40,21 @@ Deliver a single PR that:
    Phase 5, `dark-factory-refine.md` Phase 5) so the system stops accumulating noise
    going forward.
 
+## Contract Ownership — Epic #262 and #213
+
+This spec's requirements (R2–R6) constitute the **canonical memory write contract** for the Dark Factory. Per [Epic #262 — Harden the Dark Factory self-improvement loop](https://github.com/omniscient/markethawk/issues/262) sequencing (#213 audit → **#254** → #213 write-paths → #224/#215):
+
+- Any memory write path introduced or modified by [#213](https://github.com/omniscient/markethawk/issues/213) must emit entries conforming to this contract — same entry tags (`[PATTERN]`/`[PROVISIONAL]`/`[INVALID]`), same `evidence:` comment format (R2), same cap/dedup rules (R3/R4), same provisional-section placement (R2). #213 must not introduce a second write-format or categorisation scheme.
+- #213's `path:<prefix>` routing/relevance-filtering scheme is #213's mechanism to own; this spec does not implement it. However, any entries that #213's gate→memory writes produce must land in conforming format under this contract.
+- This spec's answer to "product lessons vs. factory-ops trivia separation" is **deletion**: ops trivia is dropped (R1/R3), not routed to a separate file. That resolves the overlap with #213's "path:<prefix>" concept — no ops-routing file will be created here; #213's implementation must reconcile with that decision.
+
 ## Non-Goals (v1)
 
 - A separate scheduled compaction task or new Docker service.
 - A "memory reviewer" subagent that runs on every issue.
 - A factory runbook file (non-injected trivia storage) — dropped entries are simply deleted.
 - Semantic similarity / vector search for deduplication.
+- Implementing `path:<prefix>` routing (that is #213's scope; it must conform to this contract).
 
 ## Requirements
 
