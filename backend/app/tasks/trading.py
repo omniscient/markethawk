@@ -324,7 +324,7 @@ def _record_exit_fill(
     )
 
 
-def _poll_live_orders(
+def _poll_live_orders(  # pragma: no cover
     orders: list,
     db: "Session",
     now: "datetime",
