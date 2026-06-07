@@ -534,6 +534,8 @@ services:
       - stockscanner-network
 
   # Caddy reverse proxy — provides HTTPS termination and auto-provisioned Let's Encrypt certs.
+  # REQUIRED for all networked deployments: COOKIE_SECURE defaults true, so session cookies are
+  # dropped by browsers over plain HTTP unless this profile is active.
   # Start with: docker compose --profile tls up -d
   # Requires DOMAIN env var (e.g. DOMAIN=markethawk.example.com) in .env.
   caddy:
