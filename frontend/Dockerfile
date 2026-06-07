@@ -10,10 +10,6 @@ COPY . .
 
 RUN npm run build
 
-RUN chown -R node:node /app
-
-USER node
-
 EXPOSE 3333
 
 CMD ["npm", "run", "dev", "--", "--host"]
