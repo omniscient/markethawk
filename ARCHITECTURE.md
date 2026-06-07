@@ -524,12 +524,11 @@ The test suite uses **pytest** with a transaction-rollback isolation model:
 
 ### Coverage configuration (`backend/pyproject.toml`)
 
-Coverage is measured with **pytest-cov** with a **60% minimum gate**. `app/tasks/` (Celery workers requiring a broker) and `app/services/futures_data.py` (requiring live IBKR) are excluded from measurement — both are tested via integration QA rather than unit tests.
-
-### Test layers
+Coverage is measured with **pytest-cov** with a **60% minimum gate**. `app/tasks/` business logic is covered by unit tests via injectable helper functions (e.g. `_run_universe_scan_logic`, `_run_range_scan_logic`, `_evaluate_scanner_alerts_logic`); only two broker-bound functions carry `# pragma: no cover` — `_poll_live_orders` (IBKR socket) in `trading.py` and `sync_futures_aggregates` (IBKR connection) in `sync.py`. `app/services/futures_data.py` (requiring live IBKR) is also excluded.
 
 | Layer | Location | Isolation strategy |
 |-------|----------|--------------------|
 | Router integration | `tests/api/` | DI override → test session; SAVEPOINT rollback |
 | Service unit | `tests/services/` | `db.flush()` only, or `MagicMock`/`fakeredis` for external deps |
+| Task unit | `tests/tasks/` | `SessionLocal` patched; Celery `.run()` called directly; `asyncio.run` patched |
 | Pure-function | `tests/services/test_*_helpers.py` | No DB or external deps |
