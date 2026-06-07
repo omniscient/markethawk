@@ -136,3 +136,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] When adding a non-root user to a Dockerfile, always grep scripts that run inside the container for hardcoded `/root/` paths — they silently fail when `$HOME` changes to `/home/<user>`. In `dark-factory/entrypoint.sh`, `DECONFLICT_ARTIFACTS_DIR` was the only offender (fixed: `/root/.archon/` → `${HOME}/.archon/`). <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 - [PATTERN] The `docker-socket-proxy` service must have no `profiles:` key so it is a lifecycle superset of both `factory` and `scheduler` profiles. Consumers (`dark-factory`, `backlog-scheduler`) drop their raw `/var/run/docker.sock` volumes and instead set `DOCKER_HOST: tcp://docker-socket-proxy:2375` with `depends_on: [docker-socket-proxy]`. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+## OR-Join Trigger Rules
+
+- [PATTERN] Any workflow node that depends on mutually-exclusive siblings (only one of which runs per intent) MUST declare `trigger_rule: none_failed_min_one_success` (or `one_success`). Without it, the Archon executor's default `all_success` treats a skipped sibling as non-success and silently skips the dependent — the run "finishes" with `anyFailed=false` but produces no PR. The four known OR-join nodes in `archon-dark-factory.yaml` are `validate`, `de-conflict`, `status-in-review`, and `report`. <!-- issue:#224 date:2026-06-07 expires:2026-12-07 source:refine -->
+
+- [AVOID] Do not use the default `trigger_rule` (which is `all_success`) on a node whose `depends_on` list mixes branches gated on different intents — e.g. `depends_on: [preview-up, preview-up-resolve]` where `preview-up` runs on `new/continue` and `preview-up-resolve` runs on `resolve`. One sibling is always skipped, and `all_success` will skip the dependent silently. <!-- issue:#224 date:2026-06-07 expires:2026-12-07 source:refine -->
