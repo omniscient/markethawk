@@ -2,8 +2,7 @@
 Tests for circuit-breaker integration in MassiveDataProvider and IBKRDataProvider.
 """
 
-import asyncio
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pybreaker
 import pytest
@@ -122,7 +121,7 @@ class TestMassiveProviderCircuitBreaker:
         assert len(result) == 1
         assert result[0]["close"] == 100.0
 
-    def test_get_snapshots_open_circuit_returns_empty_list(self):
+    def test_get_snapshots_open_circuit_raises_non_retryable_provider_error(self):
         p = _make_massive()
         open_breaker = _fresh_breaker(fail_max=2)
         for _ in range(open_breaker.fail_max):
@@ -132,10 +131,13 @@ class TestMassiveProviderCircuitBreaker:
                 pass
 
         with patch("app.providers.massive.POLYGON_BREAKER", open_breaker):
-            result = p.get_snapshots()
-        assert result == []
+            with pytest.raises(ProviderError) as exc_info:
+                p.get_snapshots()
+        err = exc_info.value
+        assert err.is_retryable is False
+        assert err.provider == "massive"
 
-    def test_get_ticker_details_open_circuit_returns_empty_dict(self):
+    def test_get_ticker_details_open_circuit_raises_non_retryable_provider_error(self):
         p = _make_massive()
         open_breaker = _fresh_breaker(fail_max=2)
         for _ in range(open_breaker.fail_max):
@@ -145,8 +147,11 @@ class TestMassiveProviderCircuitBreaker:
                 pass
 
         with patch("app.providers.massive.POLYGON_BREAKER", open_breaker):
-            result = p.get_ticker_details("AAPL")
-        assert result == {}
+            with pytest.raises(ProviderError) as exc_info:
+                p.get_ticker_details("AAPL")
+        err = exc_info.value
+        assert err.is_retryable is False
+        assert err.provider == "massive"
 
     def test_restclient_receives_timeout_settings(self):
         from app.core.config import Settings
@@ -185,7 +190,8 @@ class TestIBKRProviderCircuitBreaker:
                 pass
         return breaker
 
-    def test_get_futures_contracts_open_circuit_raises_non_retryable(self):
+    @pytest.mark.asyncio
+    async def test_get_futures_contracts_open_circuit_raises_non_retryable(self):
         try:
             from ib_insync import IB  # noqa: F401
 
@@ -199,22 +205,26 @@ class TestIBKRProviderCircuitBreaker:
         from app.providers.ibkr import IBKRDataProvider
 
         p = IBKRDataProvider.__new__(IBKRDataProvider)
-        p._ib = None
-        p._connected = False
+        p._ib = MagicMock()
+        p._connected = True
+        p._pacing = MagicMock()
 
         open_breaker = self._open_breaker()
         assert open_breaker.current_state == "open"
 
-        with patch("app.providers.ibkr.IBKR_BREAKER", open_breaker):
-            with pytest.raises(ProviderError) as exc_info:
-                asyncio.get_event_loop().run_until_complete(
-                    p.get_futures_contracts("ES", "CME")
-                )
+        mock_ib = MagicMock()
+        with patch.object(
+            p, "_get_connection", new_callable=AsyncMock, return_value=mock_ib
+        ):
+            with patch("app.providers.ibkr.IBKR_BREAKER", open_breaker):
+                with pytest.raises(ProviderError) as exc_info:
+                    await p.get_futures_contracts("ES", "CME")
         err = exc_info.value
         assert err.is_retryable is False
         assert err.provider == "ibkr"
 
-    def test_get_futures_bars_open_circuit_raises_non_retryable(self):
+    @pytest.mark.asyncio
+    async def test_get_futures_bars_open_circuit_raises_non_retryable(self):
         try:
             from ib_insync import IB  # noqa: F401
 
@@ -228,16 +238,19 @@ class TestIBKRProviderCircuitBreaker:
         from app.providers.ibkr import IBKRDataProvider
 
         p = IBKRDataProvider.__new__(IBKRDataProvider)
-        p._ib = None
-        p._connected = False
+        p._ib = MagicMock()
+        p._connected = True
+        p._pacing = MagicMock()
 
         open_breaker = self._open_breaker()
 
-        with patch("app.providers.ibkr.IBKR_BREAKER", open_breaker):
-            with pytest.raises(ProviderError) as exc_info:
-                asyncio.get_event_loop().run_until_complete(
-                    p.get_futures_bars("ES", "CME", "20260321")
-                )
+        mock_ib = MagicMock()
+        with patch.object(
+            p, "_get_connection", new_callable=AsyncMock, return_value=mock_ib
+        ):
+            with patch("app.providers.ibkr.IBKR_BREAKER", open_breaker):
+                with pytest.raises(ProviderError) as exc_info:
+                    await p.get_futures_bars("ES", "CME", "20260321")
         err = exc_info.value
         assert err.is_retryable is False
         assert err.provider == "ibkr"

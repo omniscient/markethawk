@@ -198,7 +198,14 @@ class MassiveDataProvider(BaseDataProvider):
 
         try:
             return POLYGON_BREAKER.call(self._get_ticker_details_impl, symbol)
-        except (pybreaker.CircuitBreakerError, Exception) as e:
+        except pybreaker.CircuitBreakerError as e:
+            raise ProviderError(
+                "Polygon circuit breaker open — provider temporarily unavailable",
+                provider="massive",
+                endpoint="get_ticker_details",
+                is_retryable=False,
+            ) from e
+        except Exception as e:
             logger.error(
                 f"MassiveDataProvider: Error fetching details for {symbol}: {e}"
             )
@@ -231,7 +238,14 @@ class MassiveDataProvider(BaseDataProvider):
             return []
         try:
             raw = POLYGON_BREAKER.call(self._fetch_snapshots_raw)
-        except (pybreaker.CircuitBreakerError, Exception) as e:
+        except pybreaker.CircuitBreakerError as e:
+            raise ProviderError(
+                "Polygon circuit breaker open — provider temporarily unavailable",
+                provider="massive",
+                endpoint="get_snapshots",
+                is_retryable=False,
+            ) from e
+        except Exception as e:
             logger.error(f"MassiveDataProvider: Error fetching snapshots: {e}")
             return []
 

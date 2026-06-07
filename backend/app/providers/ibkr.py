@@ -209,6 +209,15 @@ class IBKRDataProvider(BaseDataProvider):
         if not IB_INSYNC_AVAILABLE:
             return []
 
+        ib = await self._get_connection()
+        if not ib:
+            raise ProviderError(
+                "IBKR connection not available",
+                provider="ibkr",
+                endpoint="get_futures_contracts",
+                is_retryable=True,
+            )
+
         try:
             return await IBKR_BREAKER.call_async(
                 self._get_futures_contracts_impl, symbol, exchange, include_expired
@@ -228,13 +237,6 @@ class IBKRDataProvider(BaseDataProvider):
         include_expired: bool,
     ) -> List[Dict[str, Any]]:
         ib = await self._get_connection()
-        if not ib:
-            raise ProviderError(
-                "IBKR connection not available",
-                provider="ibkr",
-                endpoint="get_futures_contracts",
-                is_retryable=True,
-            )
 
         # Use a bare Future to request contract details for ALL expiries
         template = Future(symbol=symbol.upper(), exchange=exchange.upper())
@@ -319,6 +321,15 @@ class IBKRDataProvider(BaseDataProvider):
         if not IB_INSYNC_AVAILABLE:
             return []
 
+        ib = await self._get_connection()
+        if not ib:
+            raise ProviderError(
+                "IBKR connection not available",
+                provider="ibkr",
+                endpoint="get_futures_bars",
+                is_retryable=True,
+            )
+
         try:
             return await IBKR_BREAKER.call_async(
                 self._get_futures_bars_impl,
@@ -353,13 +364,6 @@ class IBKRDataProvider(BaseDataProvider):
         to_date: Optional[str],
     ) -> List[Dict[str, Any]]:
         ib = await self._get_connection()
-        if not ib:
-            raise ProviderError(
-                "IBKR connection not available",
-                provider="ibkr",
-                endpoint="get_futures_bars",
-                is_retryable=True,
-            )
 
         bar_size = self._resolve_bar_size(timespan, multiplier)
 
