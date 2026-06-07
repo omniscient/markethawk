@@ -49,6 +49,22 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Test a pydantic-settings validator by passing the invalid value as an init kwarg — `Settings(JWT_SECRET_KEY="")` — since init kwargs override env vars. This gives a clean, deterministic test without manipulating environment state. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+## Backend: Circuit Breakers
+
+- [PATTERN] Circuit breakers live in `app/core/circuit_breakers.py` as two module-level singletons (`POLYGON_BREAKER`, `IBKR_BREAKER`) built from `settings` at import time. Add new breakers here, not in provider files. <!-- issue:#205 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] For sync provider methods (e.g. Polygon), wrap with `POLYGON_BREAKER.call(self._impl, *args)` and catch `pybreaker.CircuitBreakerError` → `ProviderError(is_retryable=False)`. For async methods (e.g. IBKR), use `await IBKR_BREAKER.call_async(self._impl, *args)`. <!-- issue:#205 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [PATTERN] With pybreaker 1.x `fail_max=N`, the circuit opens when fail_counter reaches N; on the Nth call `CircuitBreakerError` is raised instead of the original exception (the breaker opens before re-raising). Test with `fail_max=2`: two real failures open the circuit on the 3rd call. <!-- issue:#205 date:2026-06-05 expires:2026-12-05 source:implement -->
+
+- [AVOID] Never place connection availability checks (e.g. `if not ib: raise ProviderError(is_retryable=True)`) inside `IBKR_BREAKER.call_async()` — transient disconnects will increment the failure counter and can open the breaker on non-provider faults. Move connection checks BEFORE the breaker call so only real provider failures count. <!-- issue:#205 date:2026-06-07 expires:2026-12-07 source:implement -->
+
+- [PATTERN] Circuit-open error handling must be consistent across all methods of the same provider: all three of `get_bars`, `get_snapshots`, `get_ticker_details` on `MassiveDataProvider` must raise `ProviderError(is_retryable=False)` on `CircuitBreakerError`. Do not silently return `[]`/`{}` for some methods and raise for others — callers need uniform behavior. <!-- issue:#205 date:2026-06-07 expires:2026-12-07 source:implement -->
+
+- [AVOID] Never use `except (pybreaker.CircuitBreakerError, Exception)` — `CircuitBreakerError` is an `Exception` subclass so the tuple is redundant, and the broad catch masks real defects as missing data. Use two separate handlers: `except pybreaker.CircuitBreakerError` → raise `ProviderError`, `except Exception` → log and return empty. <!-- issue:#205 date:2026-06-07 expires:2026-12-07 source:implement -->
+
+- [AVOID] Do not use `asyncio.get_event_loop().run_until_complete()` in pytest tests — deprecated on Python 3.10+ and inconsistent with `@pytest.mark.asyncio`. Use `async def test_...(self)` with `@pytest.mark.asyncio` decorator and `await` instead. <!-- issue:#205 date:2026-06-07 expires:2026-12-07 source:implement -->
+
 ## Backend: Middleware
 
 - [PATTERN] Pure-ASGI middleware classes (like `CSRFMiddleware`) should be defined at module level in `main.py`, not inside `create_app()` — module-level placement makes them importable by the test suite without triggering the full app factory. The `AuthMiddleware` is an exception because it closes over `EXEMPT_PREFIXES`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->

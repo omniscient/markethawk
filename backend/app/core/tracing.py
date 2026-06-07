@@ -38,12 +38,12 @@ def setup_otel(endpoint: str, service_name: str, engine: Optional[object]) -> No
     if not endpoint:
         return
 
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.celery import CeleryInstrumentor
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-    from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
     resource = Resource.create({"service.name": service_name})
     provider = TracerProvider(resource=resource)
@@ -57,6 +57,10 @@ def setup_otel(endpoint: str, service_name: str, engine: Optional[object]) -> No
 
     CeleryInstrumentor().instrument()
 
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
+    HTTPXClientInstrumentor().instrument()
+
 
 def instrument_fastapi(app: object) -> None:
     """Apply FastAPI auto-instrumentation to *app* (only when OTel is active)."""
@@ -66,4 +70,5 @@ def instrument_fastapi(app: object) -> None:
         return
 
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
     FastAPIInstrumentor.instrument_app(app)  # type: ignore[arg-type]

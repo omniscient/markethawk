@@ -17,6 +17,9 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+import pybreaker
+
+from app.core.circuit_breakers import IBKR_BREAKER
 from app.core.config import settings
 from app.core.metrics import ibkr_connection_status
 from app.exceptions import ProviderError
@@ -215,6 +218,26 @@ class IBKRDataProvider(BaseDataProvider):
                 is_retryable=True,
             )
 
+        try:
+            return await IBKR_BREAKER.call_async(
+                self._get_futures_contracts_impl, symbol, exchange, include_expired
+            )
+        except pybreaker.CircuitBreakerError as e:
+            raise ProviderError(
+                "IBKR circuit breaker open — provider temporarily unavailable",
+                provider="ibkr",
+                endpoint="get_futures_contracts",
+                is_retryable=False,
+            ) from e
+
+    async def _get_futures_contracts_impl(
+        self,
+        symbol: str,
+        exchange: str,
+        include_expired: bool,
+    ) -> List[Dict[str, Any]]:
+        ib = await self._get_connection()
+
         # Use a bare Future to request contract details for ALL expiries
         template = Future(symbol=symbol.upper(), exchange=exchange.upper())
         template.includeExpired = include_expired
@@ -306,6 +329,41 @@ class IBKRDataProvider(BaseDataProvider):
                 endpoint="get_futures_bars",
                 is_retryable=True,
             )
+
+        try:
+            return await IBKR_BREAKER.call_async(
+                self._get_futures_bars_impl,
+                symbol,
+                exchange,
+                contract_month,
+                timespan,
+                multiplier,
+                what_to_show,
+                use_rth,
+                from_date,
+                to_date,
+            )
+        except pybreaker.CircuitBreakerError as e:
+            raise ProviderError(
+                "IBKR circuit breaker open — provider temporarily unavailable",
+                provider="ibkr",
+                endpoint="get_futures_bars",
+                is_retryable=False,
+            ) from e
+
+    async def _get_futures_bars_impl(
+        self,
+        symbol: str,
+        exchange: str,
+        contract_month: str,
+        timespan: str,
+        multiplier: int,
+        what_to_show: str,
+        use_rth: bool,
+        from_date: Optional[str],
+        to_date: Optional[str],
+    ) -> List[Dict[str, Any]]:
+        ib = await self._get_connection()
 
         bar_size = self._resolve_bar_size(timespan, multiplier)
 

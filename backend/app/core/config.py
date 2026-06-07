@@ -64,6 +64,19 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = 3600
     DB_POOL_TIMEOUT: int = 30
 
+    # ── Outbound HTTP timeouts ─────────────────────────────────────────
+    # Applied to the Polygon RESTClient (connect and read phases).
+    POLYGON_CONNECT_TIMEOUT: float = 10.0
+    POLYGON_READ_TIMEOUT: float = 10.0
+
+    # ── Circuit-breaker parameters ─────────────────────────────────────
+    # Polygon breaker: open after 5 consecutive failures; retry after 60 s.
+    POLYGON_CB_FAIL_MAX: int = 5
+    POLYGON_CB_RESET_TIMEOUT: int = 60
+    # IBKR breaker: open after 3 consecutive failures; retry after 120 s.
+    IBKR_CB_FAIL_MAX: int = 3
+    IBKR_CB_RESET_TIMEOUT: int = 120
+
     # ── Interactive Brokers (IBKR) ─────────────────────────────────────
     # Host/port for TWS or IB Gateway:
     #   TWS live:    127.0.0.1:7496
