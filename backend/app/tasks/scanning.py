@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import time as _time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import redis
 from sqlalchemy.orm import Session
@@ -16,6 +16,314 @@ from app.models.monitored_stock import MonitoredStock
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Testable logic helpers — no Redis/Celery/OTel imports required
+# ---------------------------------------------------------------------------
+
+
+def _evaluate_scanner_alerts_logic(scanner_event_id: int, db: Session) -> None:
+    """Testable core of evaluate_scanner_alerts. No OTel/Celery context needed."""
+    from app.models.scanner_event import ScannerEvent
+    from app.services.alert_service import AlertRuleService, NotificationDispatcher
+
+    event = db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
+    if not event:
+        logger.warning(
+            f"evaluate_scanner_alerts: ScannerEvent id={scanner_event_id} not found."
+        )
+        return
+
+    matching_rules = AlertRuleService.get_matching_rules(event, db)
+    if not matching_rules:
+        return
+
+    logger.info(
+        f"🔔 {len(matching_rules)} alert rule(s) matched "
+        f"event={scanner_event_id} ticker={event.ticker} type={event.scanner_type}"
+    )
+
+    for rule in matching_rules:
+        try:
+            NotificationDispatcher.dispatch(rule, event, db)
+        except Exception as exc:
+            logger.error(f"❌ Dispatch failed for rule {rule.id}: {exc}")
+
+        if rule.auto_trade and rule.trading_strategy_id:
+            from app.tasks.trading import execute_auto_trade
+
+            execute_auto_trade.delay(
+                rule_id=rule.id,
+                scanner_event_id=scanner_event_id,
+            )
+            logger.info(
+                f"🤖 Auto-trade queued for rule={rule.id} "
+                f"strategy={rule.trading_strategy_id} ticker={event.ticker}"
+            )
+
+
+def _run_range_scan_logic(
+    ticker: str,
+    scanner_types: list,
+    start: date,
+    end: date,
+    fetch_missing_data: bool,
+    db: Session,
+    publish,
+) -> int:
+    """Testable core of run_range_scan. Returns events_detected count."""
+    from datetime import timedelta
+
+    from app.exceptions import DataFetchError, ProviderError
+    from app.services.liquidity_hunt import run_liquidity_hunt_scan_for_date as _lh_scan
+    from app.services.pocket_pivot import run_pocket_pivot_scan_for_date as _pp_scan
+    from app.services.scanner import ScannerService
+    from app.services.stock_data import StockDataService
+
+    trading_days = [
+        start + timedelta(days=i)
+        for i in range((end - start).days + 1)
+        if (start + timedelta(days=i)).weekday() < 5
+    ]
+    total = len(trading_days) * len(scanner_types)
+    events_detected = 0
+    done = 0
+
+    if fetch_missing_data:
+        daily_period_days = (date.today() - (start - timedelta(days=90))).days
+        try:
+            StockDataService.refresh_stock_data(
+                db, ticker, timespan="day", period=f"{daily_period_days}d"
+            )
+        except (DataFetchError, ProviderError) as exc:
+            logger.warning("refresh_stock_data (day) failed for %s: %s", ticker, exc)
+        minute_period_days = (date.today() - start).days + 5
+        try:
+            StockDataService.refresh_stock_data(
+                db, ticker, timespan="minute", period=f"{minute_period_days}d"
+            )
+        except (DataFetchError, ProviderError) as exc:
+            logger.warning("refresh_stock_data (minute) failed for %s: %s", ticker, exc)
+
+    scanner_map = {
+        "pre_market_volume_spike": ScannerService.run_pre_market_scan_for_date,
+        "liquidity_hunt": _lh_scan,
+        "liquidity_hunt_pre": _lh_scan,
+        "liquidity_hunt_post": _lh_scan,
+        "oversold_bounce": ScannerService.run_oversold_bounce_scan_for_date,
+        "pocket_pivot": _pp_scan,
+    }
+
+    async def _scan_day(day):
+        results = []
+        for st in scanner_types:
+            fn = scanner_map.get(st)
+            if fn:
+                results.extend(await fn(ticker, day, db))
+        return results
+
+    for day in trading_days:
+        day_results = asyncio.run(_scan_day(day))
+        events_detected += len(day_results)
+        done += len(scanner_types)
+        publish(
+            {
+                "status": "progress",
+                "day": day.isoformat(),
+                "done": done,
+                "total": total,
+            }
+        )
+
+    publish({"status": "completed", "events_detected": events_detected})
+    return events_detected
+
+
+def _run_universe_scan_logic(
+    scan_id: str,
+    scanner_type: str,
+    universe_id: int,
+    start: date,
+    end: date,
+    db: Session,
+    publish,
+    is_cancelled,
+    task_id: str,
+    write_state=None,
+) -> None:
+    """Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."""
+    from datetime import timedelta as _td
+
+    import app.services.liquidity_hunt  # noqa: F401
+    import app.services.oversold_bounce_scan  # noqa: F401
+    import app.services.pocket_pivot  # noqa: F401
+    import app.services.pre_market_scan  # noqa: F401 — triggers self-registration
+    import app.services.scan_orchestrator as _orchestrator
+    from app.models.scanner_run import ScannerRun
+
+    run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_id).first()
+    if run is None:
+        logger.error("run_universe_scan: ScannerRun %s not found", scan_id)
+        return
+
+    tickers = [
+        ms.ticker
+        for ms in db.query(MonitoredStock)
+        .filter(
+            MonitoredStock.universe_id == universe_id,
+            MonitoredStock.is_active.is_(True),
+        )
+        .all()
+    ]
+    if not tickers:
+        run.status = "failed"
+        run.error_message = "Universe has no active tickers"
+        db.commit()
+        publish({"type": "failed", "error": run.error_message})
+        return
+
+    trading_days = [
+        start + _td(days=i)
+        for i in range((end - start).days + 1)
+        if (start + _td(days=i)).weekday() < 5
+    ]
+
+    run.status = "running"
+    run.stocks_scanned = len(tickers)
+    run.scan_start_date = start
+    run.scan_end_date = end
+    db.commit()
+
+    started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    cum = {
+        "evaluated": 0,
+        "no_data": 0,
+        "no_prior_close": 0,
+        "no_baseline": 0,
+        "errors": 0,
+        "fired_pre": 0,
+        "fired_post": 0,
+    }
+    events_total = 0
+
+    def _state_payload(day_index: int) -> dict:
+        return {
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+            "started_at": started_at.replace(tzinfo=timezone.utc).isoformat(),
+            "tickers": len(tickers),
+            "total_days": len(trading_days),
+            "events_detected": events_total,
+            "day_index": day_index,
+            **cum,
+        }
+
+    if write_state:
+        write_state(_state_payload(0))
+    publish(
+        {
+            "type": "started",
+            "scan_id": scan_id,
+            "task_id": task_id,
+            "total_days": len(trading_days),
+            "total_tickers": len(tickers),
+            "estimated_pairs": len(tickers) * len(trading_days),
+            "scanner_type": scanner_type,
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+        }
+    )
+
+    for i, day in enumerate(trading_days, start=1):
+        if is_cancelled():
+            run.status = "cancelled"
+            run.events_detected = events_total
+            run.execution_time_ms = int(
+                (
+                    datetime.now(timezone.utc).replace(tzinfo=None) - started_at
+                ).total_seconds()
+                * 1000
+            )
+            db.commit()
+            publish(
+                {
+                    "type": "cancelled",
+                    "evaluated_so_far": cum["evaluated"],
+                    "events_detected_so_far": events_total,
+                }
+            )
+            return
+
+        publish(
+            {
+                "type": "day_started",
+                "date": day.isoformat(),
+                "day_index": i,
+                "total_days": len(trading_days),
+            }
+        )
+
+        try:
+            day_events = asyncio.run(
+                _orchestrator.run(
+                    scanner_type, tickers, db=db, event_date=day, scanner_run=run
+                )
+            )
+        except Exception as e:
+            cum["errors"] += 1
+            logger.exception("run_universe_scan: day %s failed", day)
+            publish({"type": "day_error", "date": day.isoformat(), "error": str(e)})
+            continue
+
+        events_total += len(day_events)
+        run.events_detected = events_total
+        db.commit()
+
+        if write_state:
+            write_state(_state_payload(i))
+        publish(
+            {
+                "type": "day_completed",
+                "date": day.isoformat(),
+                "day_index": i,
+                "total_days": len(trading_days),
+                "events": len(day_events),
+                "events_detected": events_total,
+                **cum,
+            }
+        )
+
+    run.status = "completed"
+    run.events_detected = events_total
+    run.execution_time_ms = int(
+        (datetime.now(timezone.utc).replace(tzinfo=None) - started_at).total_seconds()
+        * 1000
+    )
+    db.commit()
+    publish(
+        {
+            "type": "completed",
+            "events_detected": events_total,
+            "diagnostics": {
+                "tickers": len(tickers),
+                "days": len(trading_days),
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                **cum,
+            },
+            "execution_time_ms": run.execution_time_ms,
+        }
+    )
+    logger.info(
+        "run_universe_scan %s completed: type=%s universe=%s days=%d events=%d",
+        scan_id,
+        scanner_type,
+        universe_id,
+        len(trading_days),
+        events_total,
+    )
+
+
 @celery_app.task(bind=True, max_retries=2, name="app.tasks.evaluate_scanner_alerts")
 def evaluate_scanner_alerts(self, scanner_event_id: int):
     """
@@ -25,60 +333,15 @@ def evaluate_scanner_alerts(self, scanner_event_id: int):
     Called automatically when a new ScannerEvent is created.
     """
     from opentelemetry import trace as _otel_trace
-    from app.models.scanner_event import ScannerEvent
-    from app.services.alert_service import AlertRuleService, NotificationDispatcher
 
     _tracer = _otel_trace.get_tracer(__name__)
     _task_name = "evaluate_scanner_alerts"
     _start = _time.monotonic()
     db: Session = SessionLocal()
     try:
-        event = (
-            db.query(ScannerEvent).filter(ScannerEvent.id == scanner_event_id).first()
-        )
-        if not event:
-            logger.warning(
-                f"evaluate_scanner_alerts: ScannerEvent id={scanner_event_id} not found."
-            )
-            return
-
-        with _tracer.start_as_current_span("alerts.evaluate") as _eval_span:
-            _eval_span.set_attribute("event_id", scanner_event_id)
-            matching_rules = AlertRuleService.get_matching_rules(event, db)
-            _eval_span.set_attribute("rules_matched", len(matching_rules))
-
-        if not matching_rules:
-            return
-
-        logger.info(
-            f"🔔 {len(matching_rules)} alert rule(s) matched "
-            f"event={scanner_event_id} ticker={event.ticker} type={event.scanner_type}"
-        )
-
-        with _tracer.start_as_current_span("alerts.dispatch") as _dispatch_span:
-            _dispatch_span.set_attribute("event_id", scanner_event_id)
-            _dispatch_span.set_attribute("rules_matched", len(matching_rules))
-            for rule in matching_rules:
-                # Notification dispatch
-                try:
-                    NotificationDispatcher.dispatch(rule, event, db)
-                except Exception as exc:
-                    logger.error(f"❌ Dispatch failed for rule {rule.id}: {exc}")
-
-                # Auto-trade: queue a separate task so notification failures
-                # never block order placement, and vice versa.
-                if rule.auto_trade and rule.trading_strategy_id:
-                    from app.tasks.trading import execute_auto_trade
-
-                    execute_auto_trade.delay(
-                        rule_id=rule.id,
-                        scanner_event_id=scanner_event_id,
-                    )
-                    logger.info(
-                        f"🤖 Auto-trade queued for rule={rule.id} "
-                        f"strategy={rule.trading_strategy_id} ticker={event.ticker}"
-                    )
-
+        with _tracer.start_as_current_span("alerts.evaluate") as _span:
+            _span.set_attribute("event_id", scanner_event_id)
+            _evaluate_scanner_alerts_logic(scanner_event_id, db)
         celery_tasks_total.labels(task_name=_task_name, status="success").inc()
     except Exception as e:
         celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
@@ -103,107 +366,30 @@ def run_range_scan(
     fetch_missing_data: bool,
 ):
     """Background task: run selected scanners over a date range for one ticker."""
-    import asyncio
-    from datetime import date, timedelta
-
-    from app.exceptions import DataFetchError, ProviderError
-    from app.services.liquidity_hunt import run_liquidity_hunt_scan_for_date as _lh_scan
-    from app.services.pocket_pivot import run_pocket_pivot_scan_for_date as _pp_scan
-    from app.services.scanner import ScannerService
-    from app.services.stock_data import StockDataService
-
     _task_name = "run_range_scan"
     _start = _time.monotonic()
     task_id = run_range_scan.request.id
     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
     channel = f"scan_task:{task_id}"
 
-    from datetime import datetime as _dt
-
     r.set(
         f"scan:{ticker}:range",
-        json.dumps({"task_ids": [task_id], "started_at": _dt.utcnow().isoformat()}),
+        json.dumps(
+            {"task_ids": [task_id], "started_at": datetime.utcnow().isoformat()}
+        ),
         ex=14400,
     )
 
-    start = date.fromisoformat(start_date_str)
-    end = date.fromisoformat(end_date_str)
-
-    trading_days = [
-        start + timedelta(days=i)
-        for i in range((end - start).days + 1)
-        if (start + timedelta(days=i)).weekday() < 5
-    ]
-
-    total = len(trading_days) * len(scanner_types)
-    events_detected = 0
-    done = 0
-
     db: Session = SessionLocal()
     try:
-        if fetch_missing_data:
-            # Daily bars: need 90-day lookback before start for rolling metrics
-            daily_period_days = (date.today() - (start - timedelta(days=90))).days
-            try:
-                StockDataService.refresh_stock_data(
-                    db, ticker, timespan="day", period=f"{daily_period_days}d"
-                )
-            except (DataFetchError, ProviderError) as exc:
-                logger.warning(
-                    "refresh_stock_data (day) failed for %s: %s", ticker, exc
-                )
-            # Minute bars: cover just the requested range
-            minute_period_days = (date.today() - start).days + 5
-            try:
-                StockDataService.refresh_stock_data(
-                    db, ticker, timespan="minute", period=f"{minute_period_days}d"
-                )
-            except (DataFetchError, ProviderError) as exc:
-                logger.warning(
-                    "refresh_stock_data (minute) failed for %s: %s", ticker, exc
-                )
-
-        scanner_map = {
-            "pre_market_volume_spike": ScannerService.run_pre_market_scan_for_date,
-            "liquidity_hunt": _lh_scan,
-            "liquidity_hunt_pre": _lh_scan,
-            "liquidity_hunt_post": _lh_scan,
-            "oversold_bounce": ScannerService.run_oversold_bounce_scan_for_date,
-            "pocket_pivot": _pp_scan,
-        }
-
-        async def _scan_day(day):
-            results = []
-            for st in scanner_types:
-                fn = scanner_map.get(st)
-                if fn:
-                    results.extend(await fn(ticker, day, db))
-            return results
-
-        for day in trading_days:
-            day_results = asyncio.run(_scan_day(day))
-            events_detected += len(day_results)
-            done += len(scanner_types)
-            r.publish(
-                channel,
-                json.dumps(
-                    {
-                        "status": "progress",
-                        "day": day.isoformat(),
-                        "done": done,
-                        "total": total,
-                    }
-                ),
-            )
-
-        r.publish(
-            channel,
-            json.dumps(
-                {
-                    "status": "completed",
-                    "events_detected": events_detected,
-                }
-            ),
+        events_detected = _run_range_scan_logic(
+            ticker=ticker,
+            scanner_types=scanner_types,
+            start=date.fromisoformat(start_date_str),
+            end=date.fromisoformat(end_date_str),
+            fetch_missing_data=fetch_missing_data,
+            db=db,
+            publish=lambda p: r.publish(channel, json.dumps(p)),
         )
         logger.info(f"run_range_scan {task_id}: completed, {events_detected} events")
         celery_tasks_total.labels(task_name=_task_name, status="success").inc()
@@ -213,12 +399,7 @@ def run_range_scan(
         logger.error(f"run_range_scan {task_id} failed: {e}")
         r.publish(
             channel,
-            json.dumps(
-                {
-                    "status": "failed",
-                    "error": str(e),
-                }
-            ),
+            json.dumps({"status": "failed", "error": str(e)}),
         )
     finally:
         celery_task_duration_seconds.labels(task_name=_task_name).observe(
@@ -270,9 +451,7 @@ def run_liquidity_hunt_scheduled(self):
                     "c7d8e9f0a1b2_add_universe_id_to_scanner_configs to backfill.",
                     cfg.id,
                 )
-                raise RuntimeError(
-                    f"ScannerConfig id={cfg.id} has universe_id=NULL"
-                )
+                raise RuntimeError(f"ScannerConfig id={cfg.id} has universe_id=NULL")
 
             tickers = [
                 ms.ticker
@@ -339,18 +518,8 @@ def run_universe_scan(
     deleted in ``finally``; the system tasks aggregator at /api/system/ws/tasks
     discovers active scans by scanning ``universe:*:scan:*``.
     """
-    from datetime import date as _date
-    from datetime import timedelta as _td
-
     from opentelemetry import context as _otel_context
     from opentelemetry import trace as _otel_trace
-
-    import app.services.liquidity_hunt  # noqa: F401
-    import app.services.oversold_bounce_scan  # noqa: F401
-    import app.services.pre_market_scan  # noqa: F401 — triggers self-registration
-    import app.services.pocket_pivot  # noqa: F401 — triggers self-registration
-    import app.services.scan_orchestrator as _orchestrator
-    from app.models.scanner_run import ScannerRun
 
     _tracer = _otel_trace.get_tracer(__name__)
     _root_span = _tracer.start_span("scanner.universe_scan")
@@ -376,202 +545,47 @@ def run_universe_scan(
         except Exception:
             logger.exception("scan_task publish failed")
 
+    def _write_state(progress_extra: dict | None = None) -> None:
+        r.set(
+            state_key,
+            json.dumps(
+                {
+                    "task_ids": [task_id],
+                    "scan_id": scan_id,
+                    "scanner_type": scanner_type,
+                    "universe_id": universe_id,
+                    **(progress_extra or {}),
+                }
+            ),
+            ex=14400,
+        )
+
     db: Session = SessionLocal()
-    started_at = datetime.now(timezone.utc).replace(tzinfo=None)
     try:
-        run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_id).first()
-        if run is None:
-            logger.error("run_universe_scan: ScannerRun %s not found", scan_id)
-            return
-
-        tickers = [
-            ms.ticker
-            for ms in db.query(MonitoredStock)
-            .filter(
-                MonitoredStock.universe_id == universe_id,
-                MonitoredStock.is_active.is_(True),
-            )
-            .all()
-        ]
-        if not tickers:
-            run.status = "failed"
-            run.error_message = "Universe has no active tickers"
-            db.commit()
-            _publish({"type": "failed", "error": run.error_message})
-            return
-
-        start = _date.fromisoformat(start_date_iso)
-        end = _date.fromisoformat(end_date_iso)
-        trading_days = [
-            start + _td(days=i)
-            for i in range((end - start).days + 1)
-            if (start + _td(days=i)).weekday() < 5
-        ]
-
-        run.status = "running"
-        run.stocks_scanned = len(tickers)
-        run.scan_start_date = start
-        run.scan_end_date = end
-        db.commit()
-
-        cum = {
-            "evaluated": 0,
-            "no_data": 0,
-            "no_prior_close": 0,
-            "no_baseline": 0,
-            "errors": 0,
-            "fired_pre": 0,
-            "fired_post": 0,
-        }
-        events_total = 0
-
-        def _write_state(progress_extra: dict | None = None):
-            r.set(
-                state_key,
-                json.dumps(
-                    {
-                        "task_ids": [task_id],
-                        "scan_id": scan_id,
-                        "scanner_type": scanner_type,
-                        "universe_id": universe_id,
-                        "start_date": start.isoformat(),
-                        "end_date": end.isoformat(),
-                        "started_at": started_at.replace(
-                            tzinfo=timezone.utc
-                        ).isoformat(),
-                        "tickers": len(tickers),
-                        "total_days": len(trading_days),
-                        "events_detected": events_total,
-                        **cum,
-                        **(progress_extra or {}),
-                    }
-                ),
-                ex=14400,
-            )
-
-        _write_state({"day_index": 0})
-        _publish(
-            {
-                "type": "started",
-                "scan_id": scan_id,
-                "task_id": task_id,
-                "total_days": len(trading_days),
-                "total_tickers": len(tickers),
-                "estimated_pairs": len(tickers) * len(trading_days),
-                "scanner_type": scanner_type,
-                "start_date": start.isoformat(),
-                "end_date": end.isoformat(),
-            }
-        )
-
-        for i, day in enumerate(trading_days, start=1):
-            if _cancelled():
-                run.status = "cancelled"
-                run.events_detected = events_total
-                run.execution_time_ms = int(
-                    (
-                        datetime.now(timezone.utc).replace(tzinfo=None) - started_at
-                    ).total_seconds()
-                    * 1000
-                )
-                db.commit()
-                _publish(
-                    {
-                        "type": "cancelled",
-                        "evaluated_so_far": cum["evaluated"],
-                        "events_detected_so_far": events_total,
-                    }
-                )
-                return
-
-            _publish(
-                {
-                    "type": "day_started",
-                    "date": day.isoformat(),
-                    "day_index": i,
-                    "total_days": len(trading_days),
-                }
-            )
-
-            try:
-                day_events = asyncio.run(
-                    _orchestrator.run(
-                        scanner_type, tickers, db=db, event_date=day, scanner_run=run
-                    )
-                )
-            except Exception as e:
-                cum["errors"] += 1
-                logger.exception("run_universe_scan: day %s failed", day)
-                _publish(
-                    {"type": "day_error", "date": day.isoformat(), "error": str(e)}
-                )
-                continue
-
-            events_total += len(day_events)
-
-            run.events_detected = events_total
-            db.commit()
-
-            _write_state({"day_index": i})
-            _publish(
-                {
-                    "type": "day_completed",
-                    "date": day.isoformat(),
-                    "day_index": i,
-                    "total_days": len(trading_days),
-                    "events": len(day_events),
-                    "events_detected": events_total,
-                    **cum,
-                }
-            )
-
-        run.status = "completed"
-        run.events_detected = events_total
-        run.execution_time_ms = int(
-            (
-                datetime.now(timezone.utc).replace(tzinfo=None) - started_at
-            ).total_seconds()
-            * 1000
-        )
-        db.commit()
-        _publish(
-            {
-                "type": "completed",
-                "events_detected": events_total,
-                "diagnostics": {
-                    "tickers": len(tickers),
-                    "days": len(trading_days),
-                    "start_date": start.isoformat(),
-                    "end_date": end.isoformat(),
-                    **cum,
-                },
-                "execution_time_ms": run.execution_time_ms,
-            }
-        )
-        logger.info(
-            "run_universe_scan %s completed: type=%s universe=%s days=%d events=%d",
-            scan_id,
-            scanner_type,
-            universe_id,
-            len(trading_days),
-            events_total,
+        _run_universe_scan_logic(
+            scan_id=scan_id,
+            scanner_type=scanner_type,
+            universe_id=universe_id,
+            start=date.fromisoformat(start_date_iso),
+            end=date.fromisoformat(end_date_iso),
+            db=db,
+            publish=_publish,
+            is_cancelled=_cancelled,
+            task_id=task_id,
+            write_state=_write_state,
         )
         celery_tasks_total.labels(task_name=_task_name, status="success").inc()
-
     except Exception as exc:
         celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         logger.exception("run_universe_scan %s failed", scan_id)
         try:
-            run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_id).first()
-            if run is not None:
-                run.status = "failed"
-                run.error_message = str(exc)
-                run.execution_time_ms = int(
-                    (
-                        datetime.now(timezone.utc).replace(tzinfo=None) - started_at
-                    ).total_seconds()
-                    * 1000
-                )
+            from app.models.scanner_run import ScannerRun as _ScannerRun
+
+            _run = db.query(_ScannerRun).filter(_ScannerRun.uuid == scan_id).first()
+            if _run is not None:
+                _run.status = "failed"
+                _run.error_message = str(exc)
+                _run.execution_time_ms = int((_time.monotonic() - _perf_start) * 1000)
                 db.commit()
         except Exception:
             db.rollback()
@@ -590,9 +604,7 @@ def run_universe_scan(
         _otel_context.detach(_root_token)
 
 
-@celery_app.task(
-    bind=True, max_retries=1, name="app.tasks.run_pocket_pivot_scheduled"
-)
+@celery_app.task(bind=True, max_retries=1, name="app.tasks.run_pocket_pivot_scheduled")
 def run_pocket_pivot_scheduled(self):
     """
     Nightly 02:00 UTC task: run pocket_pivot for today's date over all active
@@ -632,9 +644,7 @@ def run_pocket_pivot_scheduled(self):
                     "c7d8e9f0a1b2_add_universe_id_to_scanner_configs to backfill.",
                     cfg.id,
                 )
-                raise RuntimeError(
-                    f"ScannerConfig id={cfg.id} has universe_id=NULL"
-                )
+                raise RuntimeError(f"ScannerConfig id={cfg.id} has universe_id=NULL")
 
             tickers = [
                 ms.ticker
