@@ -77,7 +77,13 @@ A Caddy reverse proxy service is included in `docker-compose.yml`, gated behind 
 
 **Cookie security**
 
+> **Warning:** `COOKIE_SECURE` defaults to `true`. Any networked deployment that does not enable the `tls` profile will have session cookies silently dropped by browsers over plain HTTP — users will be unable to log in. Enable the Caddy `tls` profile (steps above) for all deployments reachable over a network. Local dev is exempt because `docker-compose.override.yml` automatically sets `COOKIE_SECURE=false`.
+
 `COOKIE_SECURE` defaults to `true`. Local dev overrides this automatically via `docker-compose.override.yml` so cookies work over plain HTTP. In production the cookies require HTTPS; enabling the Caddy profile satisfies this.
+
+**HTTP→HTTPS and HSTS**
+
+The Caddyfile redirects all HTTP (`:80`) requests to HTTPS and sets `Strict-Transport-Security` so browsers enforce HTTPS for all subsequent visits. Port 80 remains published only for Let's Encrypt HTTP-01 challenges and the redirect — no content is served over plain HTTP.
 
 **Routing table**
 

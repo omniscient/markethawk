@@ -98,7 +98,7 @@ def test_cookie_secure_defaults_to_true():
     assert s.COOKIE_SECURE is True
 
 
-def test_login_cookies_have_strict_samesite(db):
+def test_login_cookies_have_correct_flags(db):
     client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
     response = client.post(
         "/api/auth/login",
@@ -108,4 +108,11 @@ def test_login_cookies_have_strict_samesite(db):
     set_cookie_headers = [
         v for k, v in response.headers.multi_items() if k.lower() == "set-cookie"
     ]
-    assert any("samesite=strict" in h.lower() for h in set_cookie_headers)
+    access_cookie = next(h for h in set_cookie_headers if "access_token=" in h)
+    refresh_cookie = next(h for h in set_cookie_headers if "refresh_token=" in h)
+    # access_token: Lax allows top-level cross-site navigation; refresh: Strict (narrower path)
+    assert "samesite=lax" in access_cookie.lower()
+    assert "samesite=strict" in refresh_cookie.lower()
+    # Secure flag must appear on both cookies (COOKIE_SECURE defaults True)
+    assert "secure" in access_cookie.lower()
+    assert "secure" in refresh_cookie.lower()

@@ -41,8 +41,12 @@ jobs:
             docker compose up -d \
               backend celery-worker celery-beat live-scanner flower frontend
 
-            # Restart Caddy if TLS profile is active
-            docker compose --profile tls up -d caddy
+            # Restart Caddy only when DOMAIN is set — fails loudly if DOMAIN is missing
+            if [ -n "${DOMAIN:-}" ]; then
+              docker compose --profile tls up -d caddy
+            else
+              echo "DOMAIN not set — skipping Caddy (TLS profile). Set DOMAIN in .env for HTTPS."
+            fi
 
             # Restart backlog-scheduler if deployed with the scheduler profile
             docker compose --profile scheduler up -d backlog-scheduler

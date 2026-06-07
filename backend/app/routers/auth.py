@@ -36,7 +36,7 @@ def _set_auth_cookies(
         key="access_token",
         value=access_token,
         httponly=True,
-        samesite="strict",
+        samesite="lax",
         secure=settings.COOKIE_SECURE,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
