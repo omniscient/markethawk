@@ -41,6 +41,12 @@ jobs:
             docker compose up -d \
               backend celery-worker celery-beat live-scanner flower frontend
 
+            # Source DOMAIN from .env — docker-compose reads it automatically, but the
+            # shell session does not; without this export ${DOMAIN:-} is always empty.
+            if [ -f .env ]; then
+              export $(grep -E '^DOMAIN=' .env || true)
+            fi
+
             # Restart Caddy only when DOMAIN is set — fails loudly if DOMAIN is missing
             if [ -n "${DOMAIN:-}" ]; then
               docker compose --profile tls up -d caddy
