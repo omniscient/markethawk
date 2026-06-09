@@ -34,6 +34,10 @@ Read the project rules:
 
 Apply these lessons as strong hints throughout implementation. If a lesson conflicts with `CLAUDE.md` or `ARCHITECTURE.md`, follow those documents instead and note the conflict in `$ARTIFACTS_DIR/implementation.md`.
 
+When reading memory files, skip entries tagged `[PROVISIONAL]` and `[INVALID]` — they are
+unverified or invalidated and must not be used as authoritative guidance. Treat the
+`<!-- PROVISIONAL -->` fenced section as advisory context only, never as settled fact.
+
 ### If intent is "continue"
 
 This is an iteration on existing work. **The latest comments on the issue and PR contain feedback that must drive your changes.** Do NOT re-implement from scratch. Instead:
@@ -159,58 +163,139 @@ If the change requires a new SQLAlchemy model:
 
 ## Phase 5: MEMORY UPDATE
 
-After Phase 4 DOCUMENT completes. Note on execution order: `$ARTIFACTS_DIR/implementation.md` is written during the Phase 3 IMPLEMENT checkpoint; Phase 4 DOCUMENT reads it; Phase 6 REPORT finalizes it. Phase 5 MEMORY UPDATE runs after Phase 4 and does not depend on Phase 6.
+After Phase 4 DOCUMENT completes. Note: `$ARTIFACTS_DIR/implementation.md` is written during
+Phase 3; Phase 4 reads it; Phase 6 finalizes it. Phase 5 runs after Phase 4 independently.
 
-1. Review the run: what patterns did you discover, what mistakes did you fix, what gotchas did you encounter that are not already in the memory files?
+### Write bar — default to nothing
 
-2. Before appending any new entries, run expiry cleanup on the target memory file:
-   - Read the file line by line.
-   - For each line matching `expires:(\d{4}-\d{2}-\d{2})`, parse the date.
-   - If the parsed date is strictly before today (`date +%Y-%m-%d`), drop the line.
-   - Write the remaining lines back to the file.
-   This runs with a simple shell loop — no Python required:
-   ```bash
-   TODAY=$(date +%Y-%m-%d)
-   TARGET=".archon/memory/backend-patterns.md"  # replace with the actual target file
-   awk -v today="$TODAY" '
-     /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
-       match($0, /expires:([0-9]{4}-[0-9]{2}-[0-9]{2})/, arr)
-       if (arr[1] < today) next
-     }
-     { print }
-   ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
+Before adding any entry, apply this filter in order and skip at the first "no":
+
+1. **Decision-changing?** Would a future agent make a materially different decision because
+   of this entry, compared to reading `CLAUDE.md` and `ARCHITECTURE.md` alone? If no → skip.
+2. **Not factory trivia?** Shell compatibility quirks, environment-specific workarounds,
+   container-local debugging steps → skip. These have no durability beyond the current image.
+3. **Not a near-duplicate?** `grep -F "<core sentence>" .archon/memory/*.md` — if any match → skip.
+4. **Not already in `CLAUDE.md` / `ARCHITECTURE.md`?** → skip.
+
+Most runs add zero entries. That is the correct default.
+
+### Entry types
+
+| Tag | When to use |
+|-----|-------------|
+| `[PATTERN]` | Design pattern or step that consistently works and should be repeated |
+| `[AVOID]` | Pattern that consistently fails or causes bugs |
+| `[FIX]` | Corrective action for a known failure mode |
+| `[PROVISIONAL]` | Runtime-behavior claim observed on this run only — goes in the provisional section |
+| `[INVALID: <reason>]` | Formerly-promoted `[PATTERN]` proven wrong — tombstone only, do not delete |
+
+### Target file
+
+| Topic | File |
+|-------|------|
+| Global workflow / checklist lesson | `.archon/memory/codebase-patterns.md` |
+| SQLAlchemy, Alembic, FastAPI, Celery | `.archon/memory/backend-patterns.md` |
+| React Query, TypeScript, components, Tailwind | `.archon/memory/frontend-patterns.md` |
+| Docker, preview stack, seed data, dark factory ops | `.archon/memory/dark-factory-ops.md` |
+| Architectural trade-offs (**refine agent only**) | `.archon/memory/architecture.md` — **do not write here** |
+
+### Expiry cleanup (run first, before appending to any file)
+
+```bash
+TODAY=$(date +%Y-%m-%d)
+TARGET=".archon/memory/backend-patterns.md"  # replace with actual target file
+awk -v today="$TODAY" '
+  /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
+    found=match($0, /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/)
+    if (found) { expiry_date=substr($0, RSTART+8, 10); if (expiry_date < today) next }
+  }
+  { print }
+' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
+```
+
+### Writing a `[PROVISIONAL]` entry (R2)
+
+Any claim about runtime behavior (container behavior, CLI tool output, framework quirk) that
+you observed on this run only must be provisional — NOT promoted directly to `[PATTERN]`:
+
+1. Add it to the `<!-- PROVISIONAL -->` fenced section at the bottom of the relevant file.
+   Create the section if it does not exist using this exact format:
+
+   ```markdown
+   ---
+   <!-- PROVISIONAL — entries below are from a single observed run; unverified.
+        Do not rely on these as authoritative guidance. They are excluded from
+        plan/implement prompt injection except as advisory context.
+        Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+   - [PROVISIONAL] <claim> <!-- evidence:<method> issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:implement -->
    ```
 
-3. For each insight that is not already in the memory files (check with `grep -F "<core sentence>" .archon/memory/*.md`):
-   a. Determine the appropriate memory file:
-      - Global workflow or checklist lesson → `.archon/memory/codebase-patterns.md`
-      - SQLAlchemy, Alembic, FastAPI, Celery → `.archon/memory/backend-patterns.md`
-      - React Query, TypeScript, components, Tailwind → `.archon/memory/frontend-patterns.md`
-      - Docker, preview stack, seed data, env vars → `.archon/memory/dark-factory-ops.md`
-   b. Determine the entry type:
-      - `[PATTERN]` — something that consistently works and should be repeated
-      - `[AVOID]` — something that consistently fails or causes bugs
-      - `[FIX]` — a corrective action for a known failure mode
-   c. Write a concise, actionable one-sentence bullet under the appropriate category section:
-      ```
-      - [PATTERN|AVOID|FIX] <concise actionable sentence referencing specific paths, commands, or names where relevant> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:implement -->
-      ```
-      For volatile patterns (e.g., a third-party API quirk expected to change soon), shorten the window by appending `ttl:30d` before the closing `-->`.
+   where `<method>` is how you observed the behavior: `docker-exec`, `curl-response`,
+   `test-output`, `log-inspection`, etc.
 
-4. If you added any memory entries, commit the updated memory files:
-   ```bash
-   git add .archon/memory/
-   git commit -m "memory: lessons from issue #$ISSUE_NUM"
-   ```
+2. Max 10 provisional entries per file. If already at 10, drop the oldest by date first.
 
-5. If no new insights were gained (everything was already in memory or the run produced no novel observations), skip the commit — do not create an empty commit.
+**Promotion to `[PATTERN]`:** A subsequent run with a *different issue number* independently
+observes the same behavior and adds its own `evidence:` comment. The promoting agent rewrites
+the entry as `[PATTERN]` (moves it out of the PROVISIONAL section) and adds the second
+evidence tag inline.
+
+**Expiry:** Provisional entries not promoted within 6 months are dropped during the next
+expiry cleanup. No manual review needed.
+
+### Writing authoritative entries
+
+Format:
+```
+- [PATTERN|AVOID|FIX] <concise actionable sentence, specific paths/commands/names where relevant> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:implement -->
+```
+
+### Per-file authoritative entry cap (R4)
+
+After appending, count authoritative entries in the target file:
+
+```bash
+COUNT=$(grep -c '^\- \[PATTERN\]\|^\- \[AVOID\]\|^\- \[FIX\]' "$TARGET" || true)
+if [ "$COUNT" -gt 30 ]; then
+  echo "WARNING: $TARGET has $COUNT authoritative entries (cap: 30). Drop before committing."
+  # Drop priority: (1) entries past TTL, (2) scope covered by a newer/broader entry,
+  # (3) oldest by date field. Read the file, choose candidates, delete their lines.
+fi
+```
+
+### Invalidating a wrong `[PATTERN]` (R5)
+
+When this run proves an existing `[PATTERN]` is wrong:
+
+1. Find the entry: `grep -n '^\- \[PATTERN\]' .archon/memory/<file>.md | grep "<phrase>"`
+2. Replace `[PATTERN]` with `[INVALID: <one-phrase reason>]` — keep the full line including
+   the inline comment, update only the tag.
+
+Example:
+```
+- [INVALID: Caddy binds :80/:443 even when DOMAIN is unset] The --profile tls caddy command
+  exits cleanly when DOMAIN is not set. <!-- issue:#202 date:2026-05-30 expires:2026-11-30 source:implement -->
+```
+
+The tombstone counts toward the 30-entry cap and expires on the original TTL. Do not delete
+it — it prevents the same wrong claim from being re-added during the TTL window.
+
+### Commit
+
+If any entries were added, updated, or invalidated:
+```bash
+git add .archon/memory/
+git commit -m "memory: lessons from issue #$ISSUE_NUM"
+```
+
+If no changes were made: skip the commit. Do not create an empty commit.
 
 **Memory quality rules:**
-- Entries must be concrete and actionable, not generic advice ("always write good code" is not an entry).
-- Reference specific file paths, function names, or CLI commands where relevant.
-- Prefer short, dense entries over long explanations — one sentence per bullet.
-- Do NOT add observations already covered by `CLAUDE.md` or `ARCHITECTURE.md`.
-- Do NOT add entries to `architecture.md` from the implement agent — that file is written by the refine agent only.
+- One sentence per bullet — dense and actionable. Reference specific paths, commands, names.
+- No generic advice.
+- Do NOT duplicate `CLAUDE.md` or `ARCHITECTURE.md`.
+- Do NOT write to `architecture.md` from the implement agent.
 
 ## Phase 6: REPORT
 

@@ -28,6 +28,10 @@ If the issue has any of these labels, STOP immediately and exit with code 0 (not
 8. Read `.archon/memory/architecture.md` — prior architectural decisions written by previous refine runs (if the file exists).
 9. Read area-specific memory files relevant to the issue's domain: if the issue touches backend code read `.archon/memory/backend-patterns.md`; if it touches frontend code read `.archon/memory/frontend-patterns.md`; if it touches Docker or infrastructure read `.archon/memory/dark-factory-ops.md`.
 
+When reading memory files, skip entries tagged `[PROVISIONAL]` and `[INVALID]` — treat them
+as unverified or invalidated. Do not base architectural decisions on provisional entries; they
+require cross-run confirmation before becoming authoritative.
+
 `AVOID` entries are especially relevant to spec decisions — if a memory entry marks an approach as AVOID, do not specify that approach in the spec without an explicit justification.
 
 ### If this is a re-run (feedback present in issue comments after a previous refinement report)
@@ -87,12 +91,19 @@ Follow the process in `orchestrator-prompt.md`:
    TARGET=".archon/memory/architecture.md"  # replace with actual target file
    awk -v today="$TODAY" '
      /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
-       match($0, /expires:([0-9]{4}-[0-9]{2}-[0-9]{2})/, arr)
-       if (arr[1] < today) next
+       found=match($0, /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/)
+       if (found) { expiry_date=substr($0, RSTART+8, 10); if (expiry_date < today) next }
      }
      { print }
    ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
    ```
+
+   **Write bar — default to nothing:**
+
+   Before adding any entry, ask: "Would a future agent make a materially different architectural
+   decision because of this entry, compared to reading `CLAUDE.md` and `ARCHITECTURE.md` alone?"
+   If no → skip. Do not add entries that record trivial Q&A or patterns already documented
+   elsewhere. Most refinement runs add zero memory entries.
 
    **What to write and where:**
 
@@ -101,6 +112,25 @@ Follow the process in `orchestrator-prompt.md`:
       - [PATTERN] <the chosen approach and why it is correct> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
       - [AVOID] <the rejected approach and the concrete reason it was rejected> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
       ```
+
+   **Provisional tier for empirical claims (R2):**
+
+   If an architectural decision depends on an empirically-observed runtime behavior (e.g.,
+   "this service behaves like X when Y"), write it as `[PROVISIONAL]` in the provisional
+   section at the bottom of the target file rather than as a top-level `[PATTERN]`. Include
+   an `evidence:` field in the inline comment describing how the behavior was observed
+   (e.g., `evidence:docker-exec`). Max 10 provisional entries per file. Provisional entries
+   are promoted to `[PATTERN]` only when a *different issue number* confirms the same behavior.
+
+   **Per-file entry cap (R4):**
+
+   After appending to any memory file, count authoritative entries:
+   ```bash
+   COUNT=$(grep -c '^\- \[PATTERN\]\|^\- \[AVOID\]\|^\- \[FIX\]' .archon/memory/architecture.md || true)
+   if [ "$COUNT" -gt 30 ]; then
+     echo "WARNING: architecture.md has $COUNT entries (cap: 30). Drop oldest/lowest-signal before committing."
+   fi
+   ```
 
    b. For any codebase convention discovered during Phase 3 context assembly that is absent from `CLAUDE.md` and absent from `ARCHITECTURE.md`: append a `[PATTERN]` entry to the relevant area file (`backend-patterns.md`, `frontend-patterns.md`, or `dark-factory-ops.md`) with `source:refine`.
 
