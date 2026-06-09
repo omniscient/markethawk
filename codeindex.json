@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 460,
-    "total_loc": 66134,
+    "total_files": 462,
+    "total_loc": 66642,
     "languages": [
       "python",
       "javascript",
@@ -1594,11 +1594,28 @@
       ]
     },
     {
+      "id": "backend/app/core/circuit_breakers.py",
+      "type": "module",
+      "language": "python",
+      "size": 27,
+      "loc": 27,
+      "group": 3,
+      "imports": [
+        "pybreaker",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": []
+    },
+    {
       "id": "backend/app/core/config.py",
       "type": "config",
       "language": "python",
-      "size": 140,
-      "loc": 140,
+      "size": 155,
+      "loc": 155,
       "group": 3,
       "imports": [
         "functools",
@@ -1627,7 +1644,7 @@
         },
         {
           "name": "get_settings",
-          "line": 134,
+          "line": 149,
           "kind": "function",
           "exported": true,
           "doc": "Get cached settings instance."
@@ -1771,8 +1788,8 @@
       "id": "backend/app/core/tracing.py",
       "type": "module",
       "language": "python",
-      "size": 70,
-      "loc": 70,
+      "size": 75,
+      "loc": 75,
       "group": 3,
       "imports": [
         "logging",
@@ -1804,7 +1821,7 @@
         },
         {
           "name": "instrument_fastapi",
-          "line": 61,
+          "line": 65,
           "kind": "function",
           "exported": true,
           "doc": "Apply FastAPI auto-instrumentation to *app* (only when OTel is active)."
@@ -2926,8 +2943,8 @@
       "id": "backend/app/providers/ibkr.py",
       "type": "module",
       "language": "python",
-      "size": 695,
-      "loc": 695,
+      "size": 753,
+      "loc": 753,
       "group": 5,
       "imports": [
         "asyncio",
@@ -2937,6 +2954,7 @@
         "collections",
         "datetime",
         "typing",
+        "pybreaker",
         "app",
         "ib_insync"
       ],
@@ -2948,7 +2966,7 @@
       "symbols": [
         {
           "name": "IBKRPacingGuard",
-          "line": 81,
+          "line": 84,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -2958,7 +2976,7 @@
         },
         {
           "name": "IBKRDataProvider",
-          "line": 124,
+          "line": 127,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -2969,7 +2987,9 @@
             "get_snapshots",
             "get_ticker_details",
             "get_futures_contracts",
+            "_get_futures_contracts_impl",
             "get_futures_bars",
+            "_get_futures_bars_impl",
             "connect",
             "disconnect",
             "_get_connection",
@@ -3047,13 +3067,14 @@
       "id": "backend/app/providers/massive.py",
       "type": "module",
       "language": "python",
-      "size": 272,
-      "loc": 272,
+      "size": 330,
+      "loc": 330,
       "group": 5,
       "imports": [
         "logging",
         "datetime",
         "typing",
+        "pybreaker",
         "polygon",
         "app"
       ],
@@ -3065,7 +3086,7 @@
       "symbols": [
         {
           "name": "MassiveDataProvider",
-          "line": 23,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -3074,8 +3095,11 @@
             "supported_asset_classes",
             "is_available",
             "get_bars",
+            "_get_bars_impl",
             "get_ticker_details",
+            "_get_ticker_details_impl",
             "get_snapshots",
+            "_fetch_snapshots_raw",
             "get_client",
             "get_snapshot_all",
             "get_snapshot_price"
@@ -3222,8 +3246,8 @@
       "id": "backend/app/routers/auth.py",
       "type": "module",
       "language": "python",
-      "size": 172,
-      "loc": 172,
+      "size": 171,
+      "loc": 171,
       "group": 6,
       "imports": [
         "uuid",
@@ -3257,55 +3281,55 @@
         },
         {
           "name": "RegisterRequest",
-          "line": 56,
+          "line": 55,
           "kind": "class",
           "exported": true
         },
         {
           "name": "LoginRequest",
-          "line": 61,
+          "line": 60,
           "kind": "class",
           "exported": true
         },
         {
           "name": "UserResponse",
-          "line": 66,
+          "line": 65,
           "kind": "class",
           "exported": true
         },
         {
           "name": "auth_status",
-          "line": 73,
+          "line": 72,
           "kind": "function",
           "exported": true
         },
         {
           "name": "register",
-          "line": 80,
+          "line": 79,
           "kind": "function",
           "exported": true
         },
         {
           "name": "login",
-          "line": 95,
+          "line": 94,
           "kind": "function",
           "exported": true
         },
         {
           "name": "logout",
-          "line": 121,
+          "line": 120,
           "kind": "function",
           "exported": true
         },
         {
           "name": "refresh",
-          "line": 137,
+          "line": 136,
           "kind": "function",
           "exported": true
         },
         {
           "name": "me",
-          "line": 166,
+          "line": 165,
           "kind": "function",
           "exported": true
         }
@@ -7979,8 +8003,8 @@
       "id": "backend/tests/api/test_auth.py",
       "type": "module",
       "language": "python",
-      "size": 87,
-      "loc": 87,
+      "size": 119,
+      "loc": 119,
       "group": 15,
       "imports": [
         "os",
@@ -7995,43 +8019,55 @@
       "symbols": [
         {
           "name": "test_auth_status_returns_bootstrapped_false_when_no_users",
-          "line": 15,
+          "line": 16,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_register_creates_first_user",
-          "line": 21,
+          "line": 22,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_register_blocked_when_user_exists",
-          "line": 32,
+          "line": 33,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_login_sets_cookies",
-          "line": 41,
+          "line": 42,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_login_wrong_password_returns_401",
-          "line": 51,
+          "line": 52,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_me_returns_current_user",
-          "line": 60,
+          "line": 61,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_logout_clears_cookies",
-          "line": 75,
+          "line": 76,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_cookie_secure_defaults_to_true",
+          "line": 90,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_login_cookies_have_correct_flags",
+          "line": 101,
           "kind": "function",
           "exported": true
         }
@@ -11110,6 +11146,77 @@
       "transitive_dependents": 0,
       "blast_score": 0.0,
       "imported_by": []
+    },
+    {
+      "id": "backend/tests/providers/test_circuit_breakers.py",
+      "type": "module",
+      "language": "python",
+      "size": 270,
+      "loc": 270,
+      "group": 19,
+      "imports": [
+        "unittest",
+        "pybreaker",
+        "pytest",
+        "app",
+        "ib_insync"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "_make_massive",
+          "line": 17,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_fresh_breaker",
+          "line": 25,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "TestCircuitBreakerSettings",
+          "line": 34,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_polygon_cb_defaults",
+            "test_ibkr_cb_defaults",
+            "test_polygon_cb_params_overrideable",
+            "test_ibkr_cb_params_overrideable"
+          ]
+        },
+        {
+          "name": "TestMassiveProviderCircuitBreaker",
+          "line": 87,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_get_bars_open_circuit_raises_non_retryable_provider_error",
+            "test_get_bars_success_path_uses_impl",
+            "test_get_snapshots_open_circuit_raises_non_retryable_provider_error",
+            "test_get_ticker_details_open_circuit_raises_non_retryable_provider_error",
+            "test_restclient_receives_timeout_settings"
+          ]
+        },
+        {
+          "name": "TestIBKRProviderCircuitBreaker",
+          "line": 183,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_open_breaker",
+            "test_get_futures_contracts_open_circuit_raises_non_retryable",
+            "test_get_futures_bars_open_circuit_raises_non_retryable",
+            "test_ibkr_call_async_happy_path"
+          ]
+        }
+      ]
     },
     {
       "id": "backend/tests/providers/test_get_historical_bars_pagination.py",
@@ -16176,15 +16283,16 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 207,
+      "direct_dependents": 209,
       "transitive_dependents": 88,
-      "blast_score": 251.0,
+      "blast_score": 253.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/__init__.py",
         "backend/app/core/auth.py",
         "backend/app/core/cache.py",
         "backend/app/core/celery_app.py",
+        "backend/app/core/circuit_breakers.py",
         "backend/app/core/database.py",
         "backend/app/core/error_tracking.py",
         "backend/app/core/rate_limits.py",
@@ -16332,6 +16440,7 @@
         "backend/tests/fixtures/stocks.py",
         "backend/tests/fixtures/system.py",
         "backend/tests/live_scanner/test_bar_aggregator_imports.py",
+        "backend/tests/providers/test_circuit_breakers.py",
         "backend/tests/providers/test_get_historical_bars_pagination.py",
         "backend/tests/providers/test_ibkr_orders.py",
         "backend/tests/providers/test_ibkr_provider.py",
@@ -17216,6 +17325,25 @@
       ]
     },
     {
+      "id": "pybreaker",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 4,
+      "transitive_dependents": 0,
+      "blast_score": 4.0,
+      "imported_by": [
+        "backend/app/core/circuit_breakers.py",
+        "backend/app/providers/ibkr.py",
+        "backend/app/providers/massive.py",
+        "backend/tests/providers/test_circuit_breakers.py"
+      ]
+    },
+    {
       "id": "pydantic",
       "type": "import",
       "language": "python",
@@ -17521,13 +17649,14 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 3,
+      "direct_dependents": 4,
       "transitive_dependents": 0,
-      "blast_score": 3.0,
+      "blast_score": 4.0,
       "imported_by": [
         "backend/app/providers/ibkr.py",
         "backend/app/providers/ibkr_orders.py",
-        "backend/live_scanner/ibkr_adapter.py"
+        "backend/live_scanner/ibkr_adapter.py",
+        "backend/tests/providers/test_circuit_breakers.py"
       ]
     },
     {
@@ -18061,9 +18190,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 34,
+      "direct_dependents": 35,
       "transitive_dependents": 0,
-      "blast_score": 34.0,
+      "blast_score": 35.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_analysis.py",
@@ -18074,6 +18203,7 @@
         "backend/tests/api/test_ws_auth.py",
         "backend/tests/fixtures/providers.py",
         "backend/tests/live_scanner/test_ibkr_adapter.py",
+        "backend/tests/providers/test_circuit_breakers.py",
         "backend/tests/providers/test_get_historical_bars_pagination.py",
         "backend/tests/providers/test_ibkr_orders.py",
         "backend/tests/services/test_auto_trade_service.py",
@@ -18129,9 +18259,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 34,
+      "direct_dependents": 35,
       "transitive_dependents": 0,
-      "blast_score": 34.0,
+      "blast_score": 35.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_alerts.py",
@@ -18145,6 +18275,7 @@
         "backend/tests/fixtures/providers.py",
         "backend/tests/live_scanner/test_ibkr_adapter.py",
         "backend/tests/live_scanner/test_mock_adapter.py",
+        "backend/tests/providers/test_circuit_breakers.py",
         "backend/tests/services/test_auto_trade_service.py",
         "backend/tests/services/test_chart_indicators.py",
         "backend/tests/services/test_feature_enrichment.py",
@@ -24350,7 +24481,7 @@
         },
         {
           "name": "get_settings",
-          "line": 134,
+          "line": 149,
           "kind": "function",
           "exported": true,
           "doc": "Get cached settings instance."
@@ -24429,7 +24560,7 @@
         },
         {
           "name": "instrument_fastapi",
-          "line": 61,
+          "line": 65,
           "kind": "function",
           "exported": true,
           "doc": "Apply FastAPI auto-instrumentation to *app* (only when OTel is active)."
@@ -24773,7 +24904,7 @@
         },
         {
           "name": "IBKRPacingGuard",
-          "line": 81,
+          "line": 84,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -24783,7 +24914,7 @@
         },
         {
           "name": "IBKRDataProvider",
-          "line": 124,
+          "line": 127,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -24794,7 +24925,9 @@
             "get_snapshots",
             "get_ticker_details",
             "get_futures_contracts",
+            "_get_futures_contracts_impl",
             "get_futures_bars",
+            "_get_futures_bars_impl",
             "connect",
             "disconnect",
             "_get_connection",
@@ -24844,7 +24977,7 @@
         },
         {
           "name": "MassiveDataProvider",
-          "line": 23,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -24853,8 +24986,11 @@
             "supported_asset_classes",
             "is_available",
             "get_bars",
+            "_get_bars_impl",
             "get_ticker_details",
+            "_get_ticker_details_impl",
             "get_snapshots",
+            "_fetch_snapshots_raw",
             "get_client",
             "get_snapshot_all",
             "get_snapshot_price"
@@ -24965,55 +25101,55 @@
         },
         {
           "name": "RegisterRequest",
-          "line": 56,
+          "line": 55,
           "kind": "class",
           "exported": true
         },
         {
           "name": "LoginRequest",
-          "line": 61,
+          "line": 60,
           "kind": "class",
           "exported": true
         },
         {
           "name": "UserResponse",
-          "line": 66,
+          "line": 65,
           "kind": "class",
           "exported": true
         },
         {
           "name": "auth_status",
-          "line": 73,
+          "line": 72,
           "kind": "function",
           "exported": true
         },
         {
           "name": "register",
-          "line": 80,
+          "line": 79,
           "kind": "function",
           "exported": true
         },
         {
           "name": "login",
-          "line": 95,
+          "line": 94,
           "kind": "function",
           "exported": true
         },
         {
           "name": "logout",
-          "line": 121,
+          "line": 120,
           "kind": "function",
           "exported": true
         },
         {
           "name": "refresh",
-          "line": 137,
+          "line": 136,
           "kind": "function",
           "exported": true
         },
         {
           "name": "me",
-          "line": 166,
+          "line": 165,
           "kind": "function",
           "exported": true
         },
@@ -27744,43 +27880,55 @@
         },
         {
           "name": "test_auth_status_returns_bootstrapped_false_when_no_users",
-          "line": 15,
+          "line": 16,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_register_creates_first_user",
-          "line": 21,
+          "line": 22,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_register_blocked_when_user_exists",
-          "line": 32,
+          "line": 33,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_login_sets_cookies",
-          "line": 41,
+          "line": 42,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_login_wrong_password_returns_401",
-          "line": 51,
+          "line": 52,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_me_returns_current_user",
-          "line": 60,
+          "line": 61,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_logout_clears_cookies",
-          "line": 75,
+          "line": 76,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_cookie_secure_defaults_to_true",
+          "line": 90,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_login_cookies_have_correct_flags",
+          "line": 101,
           "kind": "function",
           "exported": true
         },
@@ -29911,6 +30059,55 @@
           "kind": "function",
           "exported": true,
           "doc": "publisher.py must not import create_engine (uses SessionLocal instead)."
+        },
+        {
+          "name": "_make_massive",
+          "line": 17,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_fresh_breaker",
+          "line": 25,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "TestCircuitBreakerSettings",
+          "line": 34,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_polygon_cb_defaults",
+            "test_ibkr_cb_defaults",
+            "test_polygon_cb_params_overrideable",
+            "test_ibkr_cb_params_overrideable"
+          ]
+        },
+        {
+          "name": "TestMassiveProviderCircuitBreaker",
+          "line": 87,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_get_bars_open_circuit_raises_non_retryable_provider_error",
+            "test_get_bars_success_path_uses_impl",
+            "test_get_snapshots_open_circuit_raises_non_retryable_provider_error",
+            "test_get_ticker_details_open_circuit_raises_non_retryable_provider_error",
+            "test_restclient_receives_timeout_settings"
+          ]
+        },
+        {
+          "name": "TestIBKRProviderCircuitBreaker",
+          "line": 183,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_open_breaker",
+            "test_get_futures_contracts_open_circuit_raises_non_retryable",
+            "test_get_futures_bars_open_circuit_raises_non_retryable",
+            "test_ibkr_call_async_happy_path"
+          ]
         },
         {
           "name": "_make_provider",
@@ -35012,7 +35209,7 @@
         },
         {
           "name": "get_settings",
-          "line": 134,
+          "line": 149,
           "kind": "function",
           "exported": true,
           "doc": "Get cached settings instance."
@@ -35091,7 +35288,7 @@
         },
         {
           "name": "instrument_fastapi",
-          "line": 61,
+          "line": 65,
           "kind": "function",
           "exported": true,
           "doc": "Apply FastAPI auto-instrumentation to *app* (only when OTel is active)."
@@ -35435,7 +35632,7 @@
         },
         {
           "name": "IBKRPacingGuard",
-          "line": 81,
+          "line": 84,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -35445,7 +35642,7 @@
         },
         {
           "name": "IBKRDataProvider",
-          "line": 124,
+          "line": 127,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -35456,7 +35653,9 @@
             "get_snapshots",
             "get_ticker_details",
             "get_futures_contracts",
+            "_get_futures_contracts_impl",
             "get_futures_bars",
+            "_get_futures_bars_impl",
             "connect",
             "disconnect",
             "_get_connection",
@@ -35506,7 +35705,7 @@
         },
         {
           "name": "MassiveDataProvider",
-          "line": 23,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -35515,8 +35714,11 @@
             "supported_asset_classes",
             "is_available",
             "get_bars",
+            "_get_bars_impl",
             "get_ticker_details",
+            "_get_ticker_details_impl",
             "get_snapshots",
+            "_fetch_snapshots_raw",
             "get_client",
             "get_snapshot_all",
             "get_snapshot_price"
@@ -35627,55 +35829,55 @@
         },
         {
           "name": "RegisterRequest",
-          "line": 56,
+          "line": 55,
           "kind": "class",
           "exported": true
         },
         {
           "name": "LoginRequest",
-          "line": 61,
+          "line": 60,
           "kind": "class",
           "exported": true
         },
         {
           "name": "UserResponse",
-          "line": 66,
+          "line": 65,
           "kind": "class",
           "exported": true
         },
         {
           "name": "auth_status",
-          "line": 73,
+          "line": 72,
           "kind": "function",
           "exported": true
         },
         {
           "name": "register",
-          "line": 80,
+          "line": 79,
           "kind": "function",
           "exported": true
         },
         {
           "name": "login",
-          "line": 95,
+          "line": 94,
           "kind": "function",
           "exported": true
         },
         {
           "name": "logout",
-          "line": 121,
+          "line": 120,
           "kind": "function",
           "exported": true
         },
         {
           "name": "refresh",
-          "line": 137,
+          "line": 136,
           "kind": "function",
           "exported": true
         },
         {
           "name": "me",
-          "line": 166,
+          "line": 165,
           "kind": "function",
           "exported": true
         },
@@ -38406,43 +38608,55 @@
         },
         {
           "name": "test_auth_status_returns_bootstrapped_false_when_no_users",
-          "line": 15,
+          "line": 16,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_register_creates_first_user",
-          "line": 21,
+          "line": 22,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_register_blocked_when_user_exists",
-          "line": 32,
+          "line": 33,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_login_sets_cookies",
-          "line": 41,
+          "line": 42,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_login_wrong_password_returns_401",
-          "line": 51,
+          "line": 52,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_me_returns_current_user",
-          "line": 60,
+          "line": 61,
           "kind": "function",
           "exported": true
         },
         {
           "name": "test_logout_clears_cookies",
-          "line": 75,
+          "line": 76,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_cookie_secure_defaults_to_true",
+          "line": 90,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_login_cookies_have_correct_flags",
+          "line": 101,
           "kind": "function",
           "exported": true
         },
@@ -40573,6 +40787,55 @@
           "kind": "function",
           "exported": true,
           "doc": "publisher.py must not import create_engine (uses SessionLocal instead)."
+        },
+        {
+          "name": "_make_massive",
+          "line": 17,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_fresh_breaker",
+          "line": 25,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "TestCircuitBreakerSettings",
+          "line": 34,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_polygon_cb_defaults",
+            "test_ibkr_cb_defaults",
+            "test_polygon_cb_params_overrideable",
+            "test_ibkr_cb_params_overrideable"
+          ]
+        },
+        {
+          "name": "TestMassiveProviderCircuitBreaker",
+          "line": 87,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_get_bars_open_circuit_raises_non_retryable_provider_error",
+            "test_get_bars_success_path_uses_impl",
+            "test_get_snapshots_open_circuit_raises_non_retryable_provider_error",
+            "test_get_ticker_details_open_circuit_raises_non_retryable_provider_error",
+            "test_restclient_receives_timeout_settings"
+          ]
+        },
+        {
+          "name": "TestIBKRProviderCircuitBreaker",
+          "line": 183,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "_open_breaker",
+            "test_get_futures_contracts_open_circuit_raises_non_retryable",
+            "test_get_futures_bars_open_circuit_raises_non_retryable",
+            "test_ibkr_call_async_happy_path"
+          ]
         },
         {
           "name": "_make_provider",
@@ -45323,6 +45586,25 @@
       "imported_by": []
     },
     {
+      "id": "caddy",
+      "type": "service",
+      "language": "docker",
+      "image": "caddy:2-alpine",
+      "size": 60,
+      "loc": 0,
+      "group": 47,
+      "imports": [
+        "caddy"
+      ],
+      "layer": "infrastructure",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "caddy"
+      ]
+    },
+    {
       "id": "backend/Dockerfile",
       "type": "service",
       "language": "docker",
@@ -45613,6 +45895,24 @@
       "blast_score": 1.0,
       "imported_by": [
         "jaeger"
+      ]
+    },
+    {
+      "id": "caddy",
+      "type": "import",
+      "language": "docker",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [
+        "caddy"
+      ],
+      "layer": "infrastructure",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "caddy"
       ]
     },
     {
@@ -46712,6 +47012,18 @@
       "kind": "imports"
     },
     {
+      "source": "backend/app/core/circuit_breakers.py",
+      "target": "pybreaker",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/core/circuit_breakers.py",
+      "target": "app",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "backend/app/core/config.py",
       "target": "functools",
       "weight": 1,
@@ -46816,7 +47128,7 @@
     {
       "source": "backend/app/core/tracing.py",
       "target": "opentelemetry",
-      "weight": 9,
+      "weight": 10,
       "kind": "imports"
     },
     {
@@ -47631,8 +47943,14 @@
     },
     {
       "source": "backend/app/providers/ibkr.py",
+      "target": "pybreaker",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/providers/ibkr.py",
       "target": "app",
-      "weight": 4,
+      "weight": 5,
       "kind": "imports"
     },
     {
@@ -47703,6 +48021,12 @@
     },
     {
       "source": "backend/app/providers/massive.py",
+      "target": "pybreaker",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/providers/massive.py",
       "target": "polygon",
       "weight": 1,
       "kind": "imports"
@@ -47710,7 +48034,7 @@
     {
       "source": "backend/app/providers/massive.py",
       "target": "app",
-      "weight": 4,
+      "weight": 5,
       "kind": "imports"
     },
     {
@@ -50500,7 +50824,7 @@
     {
       "source": "backend/tests/api/test_auth.py",
       "target": "app",
-      "weight": 4,
+      "weight": 5,
       "kind": "imports"
     },
     {
@@ -51449,6 +51773,36 @@
       "source": "backend/tests/live_scanner/test_publisher.py",
       "target": "pathlib",
       "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/providers/test_circuit_breakers.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/providers/test_circuit_breakers.py",
+      "target": "pybreaker",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/providers/test_circuit_breakers.py",
+      "target": "pytest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/providers/test_circuit_breakers.py",
+      "target": "app",
+      "weight": 10,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/providers/test_circuit_breakers.py",
+      "target": "ib_insync",
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -56070,6 +56424,12 @@
       "target": "jaegertracing/all-in-one",
       "weight": 1,
       "kind": "depends"
+    },
+    {
+      "source": "caddy",
+      "target": "caddy",
+      "weight": 1,
+      "kind": "imports"
     },
     {
       "source": "backend/Dockerfile",
