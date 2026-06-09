@@ -16,6 +16,13 @@ RUN pip install --upgrade pip && \
 RUN addgroup --system --gid 1000 appuser \
  && adduser --system --uid 1000 --ingroup appuser --no-create-home appuser
 
+# Prometheus multiprocess metrics dir. Owned by appuser so that when the
+# (non-tmpfs, root-owned) prometheus_multiproc named volume is first mounted
+# here, Docker initializes the empty volume with appuser ownership — otherwise
+# the non-root container user cannot write the PID-named .db files.
+RUN mkdir -p /tmp/prometheus_multiproc \
+ && chown appuser:appuser /tmp/prometheus_multiproc
+
 COPY --chown=appuser:appuser . .
 
 USER appuser
