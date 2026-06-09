@@ -154,4 +154,85 @@ Exit `0`. `status-in-review` and `report` proceed.
 
    <contents of $ARTIFACTS_DIR/review_findings.md>
    ```
-5. Exit non-zero (`exit 1`) — this halts `status-in-review` (the issue stays Blocked instead of moving to In Review).
+5. Write blocking findings back to memory so future runs learn from this gate failure:
+
+```bash
+# Memory write: only when STATUS=BLOCKED (blocking findings confirmed)
+route_memory_file() {
+  local FILE="$1"
+  case "$FILE" in
+    backend/app/*)            echo ".archon/memory/backend-patterns.md" ;;
+    frontend/src/*)           echo ".archon/memory/frontend-patterns.md" ;;
+    .archon/*|dark-factory/*) echo ".archon/memory/dark-factory-ops.md" ;;
+    ARCHITECTURE.md)          echo ".archon/memory/architecture.md" ;;
+    *)                        echo ".archon/memory/codebase-patterns.md" ;;
+  esac
+}
+
+write_memory_entry() {
+  # Usage: write_memory_entry TARGET PATH_PREFIX VIOLATION_TEXT SOURCE ISSUE_NUM
+  local TARGET="$1" PATH_PREFIX="$2" TEXT="$3" SOURCE="$4" ISSUE="$5"
+
+  # Dedup: skip if core sentence already present
+  if grep -qF "$TEXT" "$TARGET" 2>/dev/null; then
+    echo "memory-write: duplicate entry skipped — already in $TARGET"
+    return 0
+  fi
+
+  # Expiry cleanup (mawk-compatible two-argument match form)
+  TODAY=$(date +%Y-%m-%d)
+  awk -v today="$TODAY" '
+    /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
+      found=match($0, /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/)
+      if (found) { expiry_date=substr($0, RSTART+8, 10); if (expiry_date < today) next }
+    }
+    { print }
+  ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
+
+  # Cap check (30 authoritative entries per file)
+  COUNT=$(grep -c '^\- \[PATTERN\]\|^\- \[AVOID\]\|^\- \[FIX\]' "$TARGET" 2>/dev/null || echo 0)
+  if [ "$COUNT" -ge 30 ]; then
+    echo "memory-write: cap reached ($COUNT entries) in $TARGET — skipping write"
+    return 0
+  fi
+
+  EXPIRES=$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d)
+  ENTRY="- [AVOID] $TEXT <!-- issue:#$ISSUE date:$(date +%Y-%m-%d) expires:$EXPIRES source:$SOURCE path:$PATH_PREFIX -->"
+
+  # Insert before the PROVISIONAL section delimiter (or append if no delimiter)
+  if grep -q '^---$' "$TARGET" 2>/dev/null; then
+    sed -i "/^---$/i $ENTRY" "$TARGET"
+  else
+    echo "$ENTRY" >> "$TARGET"
+  fi
+}
+
+# Extract blocker file paths from review_result.json
+BLOCKER_FILES=$(jq -r '.blockers[].path // empty' "$ARTIFACTS_DIR/review_result.json" 2>/dev/null | sort -u)
+MEMORY_WRITTEN=0
+
+for BLOCKER_FILE in $BLOCKER_FILES; do
+  # head -1 guards against multi-line description output
+  FINDING_TEXT=$(jq -r --arg p "$BLOCKER_FILE" \
+    '.blockers[] | select(.path == $p) | .description' \
+    "$ARTIFACTS_DIR/review_result.json" 2>/dev/null | head -1)
+
+  [ -z "$FINDING_TEXT" ] && continue
+
+  TARGET=$(route_memory_file "$BLOCKER_FILE")
+  PATH_PREFIX=$(dirname "$BLOCKER_FILE")/
+
+  write_memory_entry "$TARGET" "$PATH_PREFIX" "$FINDING_TEXT" code-review "${ISSUE_NUM:-unknown}"
+  MEMORY_WRITTEN=$((MEMORY_WRITTEN + 1))
+  echo "memory-write: wrote [AVOID] to $TARGET"
+done
+
+if [ "$MEMORY_WRITTEN" -gt 0 ]; then
+  git add .archon/memory/
+  git commit -m "memory: code-review lesson from #${ISSUE_NUM:-unknown}"
+else
+  echo "memory-write: no novel entries — skipping commit"
+fi
+```
+
+6. Exit non-zero (`exit 1`) — this halts `status-in-review` (the issue stays Blocked instead of moving to In Review).
