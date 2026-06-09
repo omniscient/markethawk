@@ -43,25 +43,31 @@ Before spawning the architect subagent, build `$MEMORY_CONTEXT` by selecting the
 ```bash
 MEMORY_CONTEXT=""
 
+# Filter out [PROVISIONAL] and [INVALID] lines so unverified/invalidated entries
+# are excluded from authoritative prompt context (R6).
+_filter_memory() {
+  grep -v '^\- \[PROVISIONAL\]\|^\- \[INVALID\]' "$1"
+}
+
 # architecture.md is always included if it exists
 if [ -f ".archon/memory/architecture.md" ]; then
-  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/architecture.md\n$(cat .archon/memory/architecture.md)"
+  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/architecture.md\n$(_filter_memory .archon/memory/architecture.md)"
 fi
 
 # Backend area — extract the Component field from the spec file header
 SPEC_COMPONENT=$(grep -m1 '^\*\*Component' "$SPEC_FILE" | sed 's/.*: //')
 if echo "$SPEC_COMPONENT" | grep -qE "models/|routers/|services/|tasks/"; then
-  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/backend-patterns.md\n$(cat .archon/memory/backend-patterns.md)"
+  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/backend-patterns.md\n$(_filter_memory .archon/memory/backend-patterns.md)"
 fi
 
 # Frontend area
 if echo "$SPEC_COMPONENT" | grep -q "frontend/src/"; then
-  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/frontend-patterns.md\n$(cat .archon/memory/frontend-patterns.md)"
+  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/frontend-patterns.md\n$(_filter_memory .archon/memory/frontend-patterns.md)"
 fi
 
 # Docker / infrastructure area
 if echo "$SPEC_COMPONENT" | grep -qE "docker-compose|Dockerfile|dark-factory/"; then
-  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/dark-factory-ops.md\n$(cat .archon/memory/dark-factory-ops.md)"
+  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/dark-factory-ops.md\n$(_filter_memory .archon/memory/dark-factory-ops.md)"
 fi
 ```
 
