@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketHawk — Architecture &amp; Quality Report v3</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+    --text:#e2e8f0;--text-dim:#94a3b8;--accent:#0ea5e9;
+    --green:#22c55e;--yellow:#eab308;--red:#ef4444;--orange:#f97316;--purple:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+  .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+  h1{font-size:2rem;font-weight:700;color:#f8fafc;margin-bottom:.25rem}
+  h2{font-size:1.5rem;font-weight:600;color:#f8fafc;margin:2.5rem 0 1rem;padding-bottom:.5rem;border-bottom:2px solid var(--accent)}
+  h3{font-size:1.15rem;font-weight:600;color:#f1f5f9;margin:1.5rem 0 .5rem}
+  h4{font-size:1rem;font-weight:600;color:var(--accent);margin:1rem 0 .4rem}
+  p,li{color:var(--text)} a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .subtitle{color:var(--text-dim);font-size:.95rem;margin-bottom:2rem}
+  .badge{display:inline-block;padding:2px 10px;border-radius:9999px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+  .badge-yellow{background:rgba(234,179,8,.15);color:var(--yellow)}
+  .badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+  .badge-orange{background:rgba(249,115,22,.15);color:var(--orange)}
+  .badge-blue{background:rgba(14,165,233,.15);color:var(--accent)}
+  .badge-purple{background:rgba(167,139,250,.15);color:var(--purple)}
+  .header-banner{background:linear-gradient(135deg,#0c4a6e 0%,#1e293b 100%);padding:2.5rem 2rem;border-radius:12px;margin-bottom:2rem;border:1px solid var(--border)}
+  .header-banner .meta{display:flex;gap:2rem;flex-wrap:wrap;margin-top:.5rem}
+  .header-banner .meta span{color:var(--text-dim);font-size:.85rem}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+  .score-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;text-align:center;position:relative}
+  .score-big{font-size:2.5rem;font-weight:800}
+  .score-label{font-size:.85rem;color:var(--text-dim);margin-top:.25rem}
+  .delta-pill{position:absolute;top:.6rem;right:.6rem;font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:9999px;background:rgba(34,197,94,.18);color:var(--green)}
+  .delta-pill.flat{background:rgba(148,163,184,.18);color:var(--text-dim)}
+  .delta-pill.down{background:rgba(239,68,68,.18);color:var(--red)}
+  .score-5{color:var(--green)}.score-4{color:#4ade80}.score-3{color:var(--yellow)}.score-2{color:var(--orange)}.score-1{color:var(--red)}.score-0{color:#6b7280}
+  table{width:100%;border-collapse:collapse;margin:.75rem 0 1.5rem;font-size:.9rem}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--surface2);color:#cbd5e1;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+  tr:hover td{background:rgba(14,165,233,.04)}
+  td code,p code,li code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:.82rem}
+  .toc{columns:2;column-gap:2rem}.toc li{break-inside:avoid;margin-bottom:.3rem;font-size:.9rem}
+  .meter{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:.3rem 0}
+  .meter-fill{height:100%;border-radius:4px}
+  .meter-green .meter-fill{background:var(--green)}.meter-yellow .meter-fill{background:var(--yellow)}
+  .meter-orange .meter-fill{background:var(--orange)}.meter-red .meter-fill{background:var(--red)}
+  .sev-critical{color:var(--red);font-weight:700}.sev-high{color:var(--orange);font-weight:600}
+  .sev-medium{color:var(--yellow);font-weight:600}.sev-low{color:var(--green)}
+  ul,ol{padding-left:1.3rem;margin:.5rem 0}li{margin-bottom:.3rem}
+  .dimrow{display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;margin:.35rem 0}
+  .dimbar{display:flex;align-items:center;gap:.5rem}
+  .deltaup{color:var(--green);font-weight:700}.deltaflat{color:var(--text-dim);font-weight:700}.deltadown{color:var(--red);font-weight:700}
+  .callout{border-left:4px solid var(--accent);background:var(--surface2);padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.8rem 0}
+  .callout-red{border-color:var(--red)}.callout-green{border-color:var(--green)}.callout-yellow{border-color:var(--yellow)}
+  .mermaid{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;margin:1rem 0;text-align:center}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem}
+  .kpi .v{font-size:2rem;font-weight:800;color:#f8fafc}
+  .kpi .l{font-size:.8rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}
+  .kpi .s{font-size:.78rem;color:var(--text-dim);margin-top:.3rem}
+  @media(max-width:768px){.toc{columns:1}.card-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header-banner">
+  <h1>MarketHawk &mdash; Architecture &amp; Quality Report <span style="color:var(--accent)">v3</span></h1>
+  <div class="subtitle">Re-assessment following round-2 remediation tickets #190&ndash;#205 (label <code>architecture-audit-v2</code>) spawned by the v2 report</div>
+  <div class="meta">
+    <span>Repository: <strong>omniscient/markethawk</strong></span>
+    <span>Branch: <strong>main</strong> @ <strong>e54e19a</strong></span>
+    <span>Commits: <strong>849</strong> (+214 since v2)</span>
+    <span>Generated: <strong>2026-06-09</strong></span>
+    <span>Prior report: <strong>2026-06-03 (v2)</strong></span>
+  </div>
+</div>
+
+<div class="callout callout-green">
+  <strong>How to read this report.</strong> Identical scoring rubric to v1 and v2 &mdash; every number is
+  directly comparable. Scored items carry a <span class="badge badge-green">Δ vs v2</span> pill.
+  Scores were verified against live code on <code>main</code>, including running
+  <code>tsc --noEmit</code> (exit 0), <code>eslint</code> (exit 0), and <code>ruff check</code> (exit 1, 65 errors)
+  &mdash; not inferred from commit messages or ticket states. One closed ticket was found to have
+  shipped no artifacts (§14).
+</div>
+
+<h2 id="toc">Table of Contents</h2>
+<ol class="toc">
+  <li><a href="#exec-summary">Executive Summary</a></li>
+  <li><a href="#tech-overview">Repository &amp; Technology Overview</a></li>
+  <li><a href="#arch-assessment">Architecture Assessment</a></li>
+  <li><a href="#maintain">Maintainability Assessment</a></li>
+  <li><a href="#test">Testability &amp; Code Coverage</a></li>
+  <li><a href="#reliability">Reliability &amp; Operational Readiness</a></li>
+  <li><a href="#security">Security &amp; Compliance Review</a></li>
+  <li><a href="#perf">Performance &amp; Scalability</a></li>
+  <li><a href="#api-data">API, Data &amp; Integration Quality</a></li>
+  <li><a href="#devx">Developer Experience</a></li>
+  <li><a href="#code-health">Code Health Deep-Dive</a></li>
+  <li><a href="#dora">Delivery Performance (DORA)</a></li>
+  <li><a href="#trend">Score Trend</a></li>
+  <li><a href="#traceability">Ticket &rarr; Outcome Traceability</a></li>
+  <li><a href="#risk-register">Risk Register (v3)</a></li>
+  <li><a href="#scorecard">Quality Scorecard</a></li>
+  <li><a href="#roadmap">Prioritized Improvement Roadmap</a></li>
+  <li><a href="#final">Final Recommendations</a></li>
+  <li><a href="#evidence">Evidence Index</a></li>
+  <li><a href="#limitations">Limitations</a></li>
+</ol>
+
+<!-- ============ 1 EXEC SUMMARY ============ -->
+<h2 id="exec-summary">1. Executive Summary</h2>
+<div class="card-grid">
+  <div class="score-card"><span class="delta-pill">+7</span><div class="score-big score-4">90</div><div class="score-label">Overall Quality Score (0&ndash;100)</div><div style="font-size:.75rem;color:var(--text-dim)">was 83</div></div>
+  <div class="score-card"><span class="delta-pill">+0.4</span><div class="score-big score-4">4.3</div><div class="score-label">Architecture Quality (0&ndash;5)</div><div style="font-size:.75rem;color:var(--text-dim)">was 3.9</div></div>
+  <div class="score-card"><span class="delta-pill">+0.31</span><div class="score-big score-4">4.06</div><div class="score-label">Weighted Scorecard (0&ndash;5)</div><div style="font-size:.75rem;color:var(--text-dim)">was 3.75</div></div>
+  <div class="score-card"><span class="delta-pill flat">15/17</span><div class="score-big" style="color:var(--purple)">14</div><div class="score-label">Round-2 tickets verified Done</div><div style="font-size:.75rem;color:var(--text-dim)">1 broken &middot; 1 partial &middot; 1 open + epic</div></div>
+</div>
+
+<div class="card">
+<h3>Overall Health</h3>
+<p>In the six days since v2, MarketHawk closed <strong>15 of 17 round-2 tickets</strong> (#190&ndash;#205, label <code>architecture-audit-v2</code>) and &mdash; unlike most teams &mdash; the fixes are real: the empty JWT signing key now fails startup via a <code>field_validator</code> (<code>config.py:137-145</code>), all WebSocket routes authenticate <em>before</em> <code>accept()</code> (<code>core/auth.py:84-99</code>), CSRF and login brute-force limits are enforced, the frontend <code>tsc</code> gate is verifiably green (exit 0, run during this review), worker Prometheus metrics flow through a shared multiproc volume, and circuit breakers + outbound timeouts landed with a 256-line test suite (PR #248). The defining v2 maintainability defect was also closed: <code>services/scanner.py</code> (1,033 lines) and <code>services/futures_data.py</code> (1,086) are now thin facades over <strong>ten focused submodules</strong>, with every prior circular import eliminated.</p>
+<p>The character of the risk has shifted again. v1 was <em>missing foundations</em>; v2 was <em>unfinished edges</em>; v3's risk is <strong>process honesty at autonomous speed</strong>: one closed ticket shipped no artifacts at all (#195 automated backups &mdash; the repo still has only a manual <code>pg_dump</code>), <code>ruff</code> is red on <code>main</code> with 65 errors that no CI gate catches, decomposition moved complexity without always reducing it (<code>run_screen</code> is still CC&asymp;43), and the worker-metrics fix is verified by code reading, not by observing a live scrape. With 66% of commits now authored by the factory, the gates &mdash; not the reviewers &mdash; are the quality system, and two of them have holes.</p>
+</div>
+
+<h3>Top 5 Strengths (new since v2)</h3>
+<ol>
+  <li><strong>God-module decomposition, verified</strong> &mdash; <code>scanner.py</code> 1,033&rarr;206 and <code>futures_data.py</code> 1,086&rarr;90, logic relocated into <code>pre_market_scan</code> (387), <code>oversold_bounce_scan</code> (237), <code>session_metrics</code> (144), <code>scan_enrichment</code> (217), and four futures services (138&ndash;473 each); originals are backward-compatible facades; dependency graph fully acyclic.</li>
+  <li><strong>Security finish-work complete</strong> &mdash; all five v2 sharp edges closed and verified in code: JWT key validator, pre-accept WebSocket auth on all 3 WS routes, <code>X-Requested-With</code> CSRF middleware on mutating routes, 5/min auth rate limits, secure cookies default-on with an optional Caddy TLS profile (HSTS, HTTP&rarr;HTTPS).</li>
+  <li><strong>Resilience toolkit landed</strong> &mdash; pybreaker circuit breakers on Polygon (5 fails/60s) and IBKR (3/120s) mapped into the typed exception hierarchy, explicit Polygon connect/read timeouts, and <code>HTTPXClientInstrumentor</code> closing the v2 outbound-tracing gap.</li>
+  <li><strong>CI gates now honest</strong> &mdash; <code>tsc --noEmit</code> exit 0 (verified), ESLint TS ruleset actually loads (spread bug fixed, <code>eslint.config.js:44-46</code>), pip-audit/npm-audit blocking, frontend coverage measured app-wide with thresholds set from measured reality (~21%) instead of a hand-pinned 7-file include.</li>
+  <li><strong>Container hardening</strong> &mdash; direct Docker socket mounts replaced by a restricted socket-proxy (EXEC/AUTH/SECRETS blocked), backend and factory run as non-root users, management of the multiproc dir handled via Dockerfile <code>chown</code>.</li>
+</ol>
+
+<h3>Top 5 Risks</h3>
+<ol>
+  <li><span class="sev-high">HIGH</span> <strong>Backups ticket closed with no implementation</strong> &mdash; #195 is closed, but the repo contains no backup service, cron, script, or workflow; only the manual <code>pg_dump</code> line in <code>deployment-guide.md</code>. The v1-era existential data-loss risk persists, now hidden behind a green ticket. (R01)</li>
+  <li><span class="sev-medium">MEDIUM</span> <strong><code>ruff check</code> is red on <code>main</code></strong> &mdash; 65 errors (verified, exit 1); backend lint runs in pre-commit but not CI, and factory commits bypass pre-commit (known spillover, #275/#276). A documented gate that doesn't gate. (R02)</li>
+  <li><span class="sev-medium">MEDIUM</span> <strong>New duplication epidemic</strong> &mdash; <code>.astimezone(timezone.utc).replace(tzinfo=None)</code> now appears ~96 times (the older naive-UTC pattern improved 87&rarr;53 files, but its cousin grew unchecked); still no <code>to_utc_naive()</code>/<code>utc_now()</code> helper, no <code>get_or_404</code> (404 pattern 26&rarr;28). (R03)</li>
+  <li><span class="sev-medium">MEDIUM</span> <strong>Complexity moved, not reduced</strong> &mdash; <code>DiscoveryService.run_screen</code> remains the worst function (217 lines, CC&asymp;43, untouched across three reviews); <code>run_pre_market_scan</code> is a 346-line CC&asymp;37 function inside its new module. (R04)</li>
+  <li><span class="sev-medium">MEDIUM</span> <strong>Deploy-path gaps</strong> &mdash; <code>/api/health</code> is still liveness-only (no DB/Redis readiness), and migrations don't auto-run on container start; a rolling update with a pending migration can serve traffic against a stale schema. (R05)</li>
+</ol>
+
+<h3>Top 5 Recommended Actions</h3>
+<ol>
+  <li>Reopen #195 and implement real backups: pg_dump sidecar on cron + retention + a restore smoke-test &mdash; <em>Effort: M, closes R01 and a three-review-old High</em>.</li>
+  <li>Add <code>ruff check</code> to the CI backend job and run <code>ruff --fix</code> once (all 65 are auto-fixable) &mdash; <em>Effort: S, closes R02</em>.</li>
+  <li>Create <code>app/utils/time.py</code> (<code>utc_now()</code>, <code>to_utc_naive()</code>) and codemod the ~149 combined call sites; add <code>get_or_404()</code> for the 28 router instances &mdash; <em>Effort: M, closes R03</em>.</li>
+  <li>Decompose <code>run_screen</code> into per-asset-class screeners behind one interface &mdash; <em>Effort: M, closes the CC&asymp;43 hotspot (R04)</em>.</li>
+  <li>Add a readiness endpoint (DB/Redis probes) and an explicit migration gate in the deploy path &mdash; <em>Effort: S&ndash;M, closes R05</em>.</li>
+</ol>
+
+<!-- ============ 2 TECH OVERVIEW ============ -->
+<h2 id="tech-overview">2. Repository &amp; Technology Overview</h2>
+<h3>What Changed in the Stack</h3>
+<table>
+  <tr><th>Area</th><th>v2 (2026-06-03)</th><th>v3 (2026-06-09)</th></tr>
+  <tr><td>Circuit breakers</td><td>None</td><td>pybreaker on Polygon + IBKR, config-driven (<code>core/circuit_breakers.py</code>)</td></tr>
+  <tr><td>Outbound timeouts</td><td>None</td><td>Polygon connect/read 10s (<code>config.py:69-70</code>); IBKR hardcoded asyncio waits</td></tr>
+  <tr><td>WebSocket auth</td><td>Bypassed middleware</td><td><code>ws_get_current_user</code> pre-accept on all WS routes</td></tr>
+  <tr><td>CSRF</td><td>None</td><td><code>X-Requested-With</code> header middleware on POST/PUT/PATCH/DELETE</td></tr>
+  <tr><td>TLS</td><td>None</td><td>Caddy reverse proxy (<code>--profile tls</code>) with HSTS + auto-certs</td></tr>
+  <tr><td>Docker socket</td><td>Direct mount in 2 services</td><td>Restricted <code>docker-socket-proxy</code> (EXEC/AUTH/SECRETS blocked)</td></tr>
+  <tr><td>Container users</td><td>root</td><td>Non-root <code>appuser</code>/<code>factory</code> (UID 1000)</td></tr>
+  <tr><td>Worker metrics</td><td>Recorded, never scraped</td><td>Shared multiproc volume + <code>MultiProcessCollector</code> on /metrics</td></tr>
+  <tr><td>Outbound tracing</td><td>Untraced</td><td><code>HTTPXClientInstrumentor</code> active</td></tr>
+  <tr><td>Service layout</td><td>2 god modules (1,033 / 1,086 lines)</td><td>2 facades (206 / 90) + 10 focused submodules</td></tr>
+  <tr><td>Frontend coverage</td><td>7 hand-pinned files @ 20%</td><td>App-wide (<code>all: true, include: src/**</code>) @ measured ~21%, thresholds 18&ndash;19</td></tr>
+  <tr><td>Celery task coverage</td><td>Excluded</td><td>Included + 10 dedicated task test files</td></tr>
+</table>
+
+<h3>Codebase Metrics</h3>
+<table>
+  <tr><th>Metric</th><th>v2</th><th>v3</th></tr>
+  <tr><td>Total commits</td><td>635</td><td>849 (+214)</td></tr>
+  <tr><td>Backend Python files (excl. migrations)</td><td>&mdash;</td><td>125</td></tr>
+  <tr><td>Frontend TS/TSX files</td><td>&mdash;</td><td>113</td></tr>
+  <tr><td>Backend test files / functions</td><td>71 / 675</td><td>85 / 608</td></tr>
+  <tr><td>Frontend test files</td><td>8</td><td>21 (9/32 page files, 5/35 components)</td></tr>
+  <tr><td>Alembic migrations</td><td>42</td><td>43</td></tr>
+  <tr><td>Service modules</td><td>30</td><td>~33 (incl. 10 new submodules, 2 facades)</td></tr>
+  <tr><td>Frontend <code>: any</code> occurrences</td><td>125</td><td>63 (&minus;50%)</td></tr>
+  <tr><td>Docker services</td><td>20</td><td>22 (adds <code>docker-socket-proxy</code>, <code>caddy</code>)</td></tr>
+  <tr><td>ADRs</td><td>11</td><td>11 (numbering collision #201 still open)</td></tr>
+</table>
+
+<h3>Architectural Pattern</h3>
+<p><strong>Layered monolith with verified facade decomposition.</strong> Router &rarr; service &rarr; provider &rarr; model layering intact and now enforced by genuinely smaller modules. Scanner strategies self-register into the scan-orchestrator registry via importlib side-effect imports (<code>main.py:428-434</code>). New cross-cutting protections (CSRF, breakers) are pure-ASGI middleware / wrapped provider calls.</p>
+<div class="mermaid">
+flowchart LR
+  CADDY["Caddy :443 (tls profile)<br/>HSTS, auto-cert"] --> FE["React SPA :3333"]
+  CADDY --> BE
+  FE -->|/api/v1 + WS cookie-auth| BE["FastAPI :8000<br/>auth + CSRF + rate-limit + metrics + OTel"]
+  BE --> PG[("PostgreSQL<br/>pooled")]
+  BE --> RS[("Redis<br/>broker + cache + tokens")]
+  BE -->|breaker + 10s timeouts| POLY["Polygon.io"]
+  BE -->|breaker| IBKR["IBKR Gateway"]
+  CW["Celery worker/beat"] --> PG
+  CW --> RS
+  CW -. shared multiproc vol .-> BE
+  BE -->|/metrics MultiProcessCollector| PROM["Prometheus"]
+  PROM --> GRAF["Grafana + alerts"]
+  BE -->|OTLP incl. httpx spans| JAEG["Jaeger"]
+  DF["dark-factory / scheduler"] -->|tcp 2375| SOCK["docker-socket-proxy<br/>EXEC/AUTH/SECRETS blocked"]
+</div>
+
+<!-- ============ 3 ARCHITECTURE ASSESSMENT ============ -->
+<h2 id="arch-assessment">3. Architecture Assessment</h2>
+
+<h3>3.1 Separation of Concerns</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> The v2 finding &mdash; "router-thinning relocated complexity into the service layer" &mdash; is resolved: the absorbing god module was decomposed (#199). Routers stayed thin (<code>system.py</code> 140, <code>scanner.py</code> 708).</p>
+  <p><strong>Finding (caps the score):</strong> <code>alerts.py</code> (21 <code>db.query</code> calls) and <code>auto_trading.py</code> (20) still have no service layer and keep hand-rolled <code>_rule_to_dict</code>/<code>_strategy_to_dict</code> serializers &mdash; CRUD logic and response shaping live in the HTTP layer for two domains.</p>
+</div>
+
+<h3>3.2 Module Boundaries</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> Ten new focused submodules with clean seams; facades preserve the old import surface; futures domain split by responsibility (contracts / aggregates / rollovers / series).</p>
+  <p><strong>Finding (caps the score):</strong> the v2 cross-layer leak persists &mdash; <code>services/universe_export.py:51,59</code> still raises <code>HTTPException</code> from the service layer (defensible as input validation, but it is the one place a web type crosses the seam).</p>
+</div>
+
+<h3>3.3 Dependency Direction</h3>
+<div class="card">
+  <strong>Score: 3/5</strong> <span class="badge badge-yellow">Acceptable</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-yellow"><div class="meter-fill" style="width:60%"></div></div>
+  <p><strong>Change:</strong> All circular imports eliminated &mdash; <code>scanner&harr;alert_service</code> and <code>stock_data&harr;futures_data</code> are now method-level lazy imports (<code>scanner.py:146</code>, <code>stock_data.py:247</code>); no service imports a router (verified).</p>
+  <p><strong>Finding (caps the score):</strong> the registry is still populated by side-effect <code>importlib</code> imports in <code>main.py:428-434</code> and the beat schedule still references tasks by string name &mdash; both work, but renames break silently at runtime, not import time.</p>
+</div>
+
+<h3>3.4 Coupling and Cohesion</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill">Δ +1</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> The defining improvement of v3. Each scanner strategy is its own cohesive module registering a descriptor; futures concerns are separated; <code>session_metrics</code> and <code>scan_enrichment</code> extract the shared logic that v1 flagged as duplicated inside the monolith. Dependency graph acyclic end-to-end.</p>
+  <p><strong>Finding (caps the score):</strong> cohesion inside the new modules is uneven &mdash; <code>pre_market_scan.py</code> is one 346-line function doing detection + enrichment + persistence in a single loop; <code>liquidity_hunt.py</code> (708) remains the largest strategy.</p>
+</div>
+
+<h3>3.5 API Design</h3>
+<div class="card">
+  <strong>Score: 5/5</strong> <span class="badge badge-green">Excellent</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:100%"></div></div>
+  <p><strong>Finding:</strong> No drift. All 13 app routers under <code>/api/v1</code>; auth (<code>/api/auth</code>) and health (<code>/api</code>) intentionally unversioned per ADR-0010; frontend mirrors via versioned + unversioned clients; an ESLint rule now <em>forbids raw <code>/api/</code> strings outside the api layer</em> (<code>eslint.config.js:58-76</code>) &mdash; the convention is machine-enforced.</p>
+</div>
+
+<h3>3.6 Data Access Patterns</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Finding (caps the score):</strong> Eager loading remains confined to two files (<code>routers/scanner.py:376</code>, <code>journal_service.py:20-22</code>); the v2-flagged <code>joinedload</code>-on-one-to-many with <code>limit/offset</code> pagination pattern is still present; <code>journal_service.get_trade_stats()</code> loads every Trade and aggregates in Python instead of SQL. JSONB event columns remain schema-free on write.</p>
+</div>
+
+<h3>3.7 Error Handling Architecture</h3>
+<div class="card">
+  <strong>Score: 5/5</strong> <span class="badge badge-green">Excellent</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:100%"></div></div>
+  <p><strong>Change:</strong> The typed hierarchy gained a productive consumer: <code>CircuitBreakerError</code> maps to <code>ProviderError(is_retryable=False)</code>, so an open breaker correctly suppresses Celery retries instead of hammering a failing provider. Structured context flows to Seq; deterministic error IDs unchanged.</p>
+</div>
+
+<h3>3.8 Configuration Management</h3>
+<div class="card">
+  <strong>Score: 5/5</strong> <span class="badge badge-green">Excellent</span> <span class="delta-pill">Δ +1</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:100%"></div></div>
+  <p><strong>Change:</strong> The v2 cap is gone: <code>JWT_SECRET_KEY</code> now has a <code>field_validator</code> rejecting keys &lt;32 chars with a generation hint (<code>config.py:137-145</code>), and is a required field with no default. Breaker/timeout/pool settings are all typed, validated, env-tunable. No raw <code>os.getenv</code> anywhere in app code (verified).</p>
+</div>
+
+<h3>3.9 Observability Architecture</h3>
+<div class="card">
+  <strong>Score: 5/5</strong> <span class="badge badge-green">Excellent</span> <span class="delta-pill">Δ +1</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:100%"></div></div>
+  <p><strong>Change:</strong> Both v2 caps closed. Workers write to a shared <code>prometheus_multiproc</code> volume (compose lines 132/203) owned by <code>appuser</code> (Dockerfile 23-24), aggregated by <code>MultiProcessCollector</code> on the scraped <code>/metrics</code> endpoint (<code>main.py:399-409</code>), with <code>mark_process_dead</code> cleanup on worker shutdown. Outbound HTTP is traced via <code>HTTPXClientInstrumentor</code>; trace IDs flow into Seq logs.</p>
+  <p><strong>Finding:</strong> pipeline correctness is verified statically (code + config), not by observing a live scrape &mdash; see Limitations. Live-scanner process metrics remain the one unexported corner.</p>
+</div>
+
+<h3>3.10 Security Architecture</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill">Δ +1</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> Every v2 sharp edge verified closed: key validation (#190), pre-accept WS auth on all 3 routes (#191), CSRF header middleware exempting only <code>/api/auth/*</code> (#192), 5/min limits on login/register/refresh (#196), secure cookies default-on + SameSite=Strict + Caddy TLS profile (#202), socket-proxy + non-root containers (#203).</p>
+  <p><strong>Finding (caps the score):</strong> no password policy on register, authorization is still authenticated-vs-not (no roles &mdash; deliberate single-user design with registration closing after first user), Trivy image scans are <code>continue-on-error</code>, no audit trail for sensitive actions, and the default compose still sets <code>ENVIRONMENT=development</code> (traces exposed on a default stack).</p>
+</div>
+
+<h3>3.11 Deployment Architecture</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> TLS termination now exists (Caddy, opt-in profile), Docker socket exposure is proxied and scoped, app containers run non-root.</p>
+  <p><strong>Finding (caps the score):</strong> TLS is an optional profile rather than the default path; migrations are not part of the deploy path (manual <code>alembic upgrade</code>); <code>/api/health</code> gives a green liveness signal before DB/Redis are usable &mdash; together these leave a deployment-ordering trap.</p>
+</div>
+
+<!-- ============ 4 MAINTAINABILITY ============ -->
+<h2 id="maintain">4. Maintainability Assessment</h2>
+
+<div class="card">
+  <h4>Code Organization &mdash; 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span></h4>
+  <p>The facade + submodule layout is a textbook decomposition and the futures split is by responsibility, not by size. Offset by: <code>main.py</code> grew further (469&rarr;506 lines; CSRF + Prometheus middleware defined inline), and <code>ruff</code> &mdash; the organization enforcer &mdash; is red on <code>main</code> (65 errors, exit 1, verified) because pre-commit doesn't bind factory commits and CI doesn't run it.</p>
+</div>
+
+<h3>Complexity Hotspots <span class="badge badge-green">Score 4/5 — recovered from 2/5</span></h3>
+<p>The two modules that <em>grew</em> through v2 are gone as god files. What remains is function-level: complexity was relocated into well-named modules but the worst functions inside them are intact.</p>
+<table>
+  <tr><th>File</th><th>v1</th><th>v2</th><th>v3</th><th>Δ v2&rarr;v3</th><th>Note</th></tr>
+  <tr><td><code>services/scanner.py</code></td><td>804</td><td>1,033</td><td>206</td><td class="deltaup">&minus;827</td><td>Facade; logic in 4 submodules (#199)</td></tr>
+  <tr><td><code>services/futures_data.py</code></td><td>1,039</td><td>1,086</td><td>90</td><td class="deltaup">&minus;996</td><td>Facade; 4 futures services (138&ndash;473 each)</td></tr>
+  <tr><td><code>services/liquidity_hunt.py</code></td><td>646</td><td>&mdash;</td><td>708</td><td>&mdash;</td><td>Largest strategy module; cohesive</td></tr>
+  <tr><td><code>tasks/scanning.py</code></td><td>&mdash;</td><td>748</td><td>758</td><td class="deltadown">+10</td><td>Orchestration; stable</td></tr>
+  <tr><td><code>providers/ibkr.py</code></td><td>679</td><td>694</td><td>752</td><td class="deltadown">+58</td><td>Breaker integration added</td></tr>
+  <tr><td><code>routers/scanner.py</code></td><td>857</td><td>698</td><td>708</td><td class="deltadown">+10</td><td>Stable post-#96</td></tr>
+  <tr><td><code>routers/system.py</code></td><td>480</td><td>133</td><td>140</td><td class="deltadown">+7</td><td>Stable</td></tr>
+  <tr><td><code>main.py</code></td><td>265</td><td>469</td><td>506</td><td class="deltadown">+37</td><td>Inline middleware accumulating</td></tr>
+  <tr><td><code>frontend api/scanner.ts</code></td><td>&mdash;</td><td>787</td><td>787</td><td class="deltaflat">0</td><td>Undecomposed (R10)</td></tr>
+  <tr><td><code>components/QualityReportModal.tsx</code></td><td>753</td><td>753</td><td>753</td><td class="deltaflat">0</td><td>Three reviews untouched (R10)</td></tr>
+</table>
+
+<div class="card">
+  <h4>Naming 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span> &nbsp; Duplication 3/5 <span class="delta-pill flat" style="position:static">Δ 0</span> &nbsp; Framework Usage 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span></h4>
+  <p>New module names are exemplary (<code>session_metrics</code>, <code>scan_enrichment</code>, <code>futures_rollovers</code>). Duplication is a mixed ledger: naive-UTC normalization improved 87&rarr;53 files, but the <code>.astimezone(timezone.utc).replace(tzinfo=None)</code> variant reached ~96 occurrences, 404 boilerplate ticked up 26&rarr;28, and inline Redis JSON handling is flat at 14 files &mdash; the three standing consolidation targets (<code>utils/time</code>, <code>get_or_404</code>, cache util) remain unbuilt. Sync ORM stays per ADR-0004.</p>
+</div>
+
+<h3>Exemplary Files</h3>
+<table>
+  <tr><th>File</th><th>Why</th></tr>
+  <tr><td><code>core/circuit_breakers.py</code></td><td>Config-driven singletons, clean error mapping into the typed hierarchy, 256-line test suite</td></tr>
+  <tr><td><code>services/futures_data.py</code> (v3)</td><td>90-line backward-compatible facade &mdash; decomposition without breaking callers</td></tr>
+  <tr><td><code>core/auth.py:84-99</code></td><td><code>ws_get_current_user</code> rejects at handshake (1008) before <code>accept()</code> &mdash; the correct WS auth shape</td></tr>
+  <tr><td><code>frontend/eslint.config.js:58-76</code></td><td>Custom regression guard banning raw <code>/api/</code> strings outside the api layer</td></tr>
+</table>
+
+<h3>Problematic Files</h3>
+<table>
+  <tr><th>File</th><th>Why</th></tr>
+  <tr><td><code>services/discovery_service.py</code></td><td><code>run_screen</code>: 217 lines, CC&asymp;43 &mdash; worst function three reviews running, never refactored</td></tr>
+  <tr><td><code>services/pre_market_scan.py</code></td><td>346-line single function (CC&asymp;37) &mdash; module boundaries improved, function boundaries didn't</td></tr>
+  <tr><td><code>routers/alerts.py</code> / <code>auto_trading.py</code></td><td>No service layer; 20+ direct queries each; hand-rolled dict serializers</td></tr>
+  <tr><td><code>components/QualityReportModal.tsx</code></td><td>753 lines, unchanged across v1/v2/v3</td></tr>
+</table>
+
+<!-- ============ 5 TESTABILITY ============ -->
+<h2 id="test">5. Testability &amp; Code Coverage</h2>
+<div class="card">
+  <h4>Backend Testing &mdash; 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span></h4>
+  <p>85 test files / 608 test functions. The v1-era coverage fiction is finally closed: <strong><code>app/tasks/*</code> is in the coverage denominator</strong> with 10 dedicated task test files (<code>tests/tasks/</code>), and circuit breakers shipped with their own suite. Threshold still 60% (<code>--cov-fail-under=60</code>); <code>futures_data.py</code> remains omitted (live-IBKR rationale documented); no mypy.</p>
+</div>
+<div class="card">
+  <h4>Frontend Testing &mdash; 4/5 <span class="badge badge-green">was 3/5</span> <span class="delta-pill" style="position:static">Δ +1</span></h4>
+  <p>21 test files (~161 test blocks). Pages 0/15 &rarr; <strong>9 of 32 page files</strong>; components 1/37 &rarr; 5/35. The v2 "gameable threshold" finding is fixed: <code>vitest.config.ts</code> measures <code>src/**</code> with <code>all: true</code> and sets thresholds (18&ndash;19%) just below <em>measured</em> reality (~21&ndash;22%), with the ratchet tracked in #250. Breadth is still thin in absolute terms &mdash; that, plus measured coverage &asymp;21%, caps the score.</p>
+</div>
+<table>
+  <tr><th>Signal</th><th>v1</th><th>v2</th><th>v3</th></tr>
+  <tr><td>Backend test isolation (SAVEPOINT)</td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-green">Yes</span></td></tr>
+  <tr><td>Frontend framework / page coverage</td><td><span class="badge badge-red">None</span></td><td><span class="badge badge-yellow">Vitest, 0/15 pages</span></td><td><span class="badge badge-green">9/32 pages, 5/35 components</span></td></tr>
+  <tr><td>Celery tasks in coverage</td><td><span class="badge badge-red">Excluded</span></td><td><span class="badge badge-red">Excluded</span></td><td><span class="badge badge-green">Included + tested</span></td></tr>
+  <tr><td>Coverage thresholds honest</td><td>&mdash;</td><td><span class="badge badge-red">7-file include</span></td><td><span class="badge badge-green">App-wide, measured</span></td></tr>
+  <tr><td>Python type checker (mypy)</td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td></tr>
+</table>
+
+<!-- ============ 6 RELIABILITY ============ -->
+<h2 id="reliability">6. Reliability &amp; Operational Readiness</h2>
+<table>
+  <tr><th>Capability</th><th>v1</th><th>v2</th><th>v3</th><th>Evidence / Note</th></tr>
+  <tr><td>Logging</td><td>4</td><td>5</td><td>5</td><td>Seq + GELF + OTel trace IDs in records; unchanged</td></tr>
+  <tr><td>Health Checks</td><td>4</td><td>4</td><td>4</td><td><code>/api/health</code> still liveness-only; no DB/Redis readiness probe (R05)</td></tr>
+  <tr><td>Retry Behavior</td><td>3</td><td>3</td><td><span class="deltaup">4</span></td><td><code>is_retryable</code> drives Celery retries; open breaker &rarr; non-retryable (correct interplay)</td></tr>
+  <tr><td>Timeout Handling</td><td>2</td><td>2</td><td><span class="deltaup">3</span></td><td>Polygon connect/read 10s configured; IBKR waits hardcoded; no route-level timeout</td></tr>
+  <tr><td>Graceful Degradation</td><td>3</td><td>4</td><td>4</td><td>Breakers fail fast into 503s; provider availability checks; Seq/OTel fail-open</td></tr>
+  <tr><td>Startup/Shutdown</td><td>4</td><td>4</td><td>4</td><td>+ <code>mark_process_dead</code> multiproc cleanup on worker shutdown</td></tr>
+  <tr><td>Database Migrations</td><td>3</td><td>4</td><td>4</td><td><code>alembic check</code> gates CI; auto-generated schema doc; deploy-time run still manual</td></tr>
+  <tr><td>Connection Pooling</td><td>1</td><td>5</td><td>5</td><td>Pool fully configured + exported as gauges</td></tr>
+  <tr><td>Metrics</td><td>0</td><td>3</td><td><span class="deltaup">4</span></td><td>#194 fixed: shared multiproc volume + collector; verified statically; live-scanner gap remains</td></tr>
+  <tr><td>Distributed Tracing</td><td>0</td><td>4</td><td><span class="deltaup">5</span></td><td><code>HTTPXClientInstrumentor</code> closes the outbound gap</td></tr>
+  <tr><td>Circuit Breakers</td><td>0</td><td>0</td><td><span class="deltaup">5</span></td><td>pybreaker: Polygon 5/60s, IBKR 3/120s; tested (PR #248)</td></tr>
+  <tr><td>Backup/Recovery</td><td>1</td><td>1</td><td><span class="sev-critical">1</span></td><td><strong>Ticket #195 closed with zero artifacts</strong> &mdash; manual pg_dump only (R01)</td></tr>
+  <tr><td>Feature Flags</td><td>0</td><td>0</td><td>1</td><td><code>RATE_LIMITING_ENABLED</code> only; no rollout/kill-switch system</td></tr>
+</table>
+
+<!-- ============ 7 SECURITY ============ -->
+<h2 id="security">7. Security &amp; Compliance Review</h2>
+<table>
+  <tr><th>Area</th><th>v1</th><th>v2</th><th>v3</th><th>Finding (file:line)</th></tr>
+  <tr><td>Authentication</td><td>0</td><td>3</td><td><span class="deltaup">4</span></td><td>WS pre-accept auth (<code>auth.py:84-99</code>); refresh rotation; brute-force limits; no password policy</td></tr>
+  <tr><td>Authorization</td><td>0</td><td>1</td><td><span class="deltaup">2</span></td><td>Registration closes after first user (<code>auth.py:80-84</code>); still no roles &mdash; single-user by design</td></tr>
+  <tr><td>CORS</td><td>1</td><td>4</td><td>4</td><td>Env allowlist; methods/headers still <code>*</code> (acceptable with strict origins)</td></tr>
+  <tr><td>Input Validation</td><td>4</td><td>4</td><td>4</td><td>Pydantic throughout; register accepts any password (no length/complexity)</td></tr>
+  <tr><td>Secrets Management</td><td>3</td><td>2</td><td><span class="deltaup">4</span></td><td>v2 regression reversed: JWT key required + validated &ge;32 chars (<code>config.py:137-145</code>)</td></tr>
+  <tr><td>Rate Limiting</td><td>0</td><td>3</td><td><span class="deltaup">4</span></td><td>Route-class limits: AUTH 5/min, SCANNER 5/min, TRADING 10/min (<code>rate_limits.py:12-15</code>)</td></tr>
+  <tr><td>Dependency Vulnerabilities</td><td>3</td><td>4</td><td>4</td><td>pip-audit + npm audit now <em>blocking</em>; Trivy <code>continue-on-error: true</code> (advisory)</td></tr>
+  <tr><td>Transport Security</td><td>2</td><td>2</td><td><span class="deltaup">3</span></td><td>Caddy TLS profile + HSTS + secure cookies default-on; TLS opt-in, not default</td></tr>
+  <tr><td>Docker Security</td><td>2</td><td>3</td><td><span class="deltaup">4</span></td><td>Socket-proxy (EXEC/AUTH/SECRETS=0), non-root appuser/factory, :ro mounts; no seccomp profiles</td></tr>
+  <tr><td>Sensitive Data in Logs</td><td>3</td><td>3</td><td>3</td><td>DEBUG SQL still interpolates params (dev-gated, <code>main.py:189-248</code>); compose defaults to development env</td></tr>
+</table>
+
+<!-- ============ 8 PERFORMANCE ============ -->
+<h2 id="perf">8. Performance &amp; Scalability</h2>
+<div class="card">
+  <h4>Resolved since v2</h4>
+  <ul>
+    <li><strong>Provider failure cost</strong> &mdash; open breakers fail fast (no thread-blocking on a dead Polygon/IBKR), explicit Polygon timeouts bound worst-case latency.</li>
+    <li><strong>Frontend type debt</strong> &mdash; <code>: any</code> halved (125&rarr;63), strict mode genuinely enforced now that <code>tsc</code> gates green.</li>
+  </ul>
+</div>
+<div class="card">
+  <h4>Still open</h4>
+  <ul>
+    <li><strong>Sync ORM</strong> (ADR-0004, by design) &mdash; requests block threads on DB access.</li>
+    <li><strong><code>get_trade_stats</code> loads all trades into Python</strong> for counting (<code>journal_service.py:64</code>) &mdash; trivial SQL aggregate fix.</li>
+    <li><strong>Eager-loading coverage thin</strong> (2 files); <code>joinedload</code> + limit/offset pagination pattern persists (<code>routers/scanner.py:376</code>).</li>
+    <li><strong>15s hard-coded discovery delays</strong>; dashboard polling on non-scan views; single API instance / single DB.</li>
+  </ul>
+</div>
+<div class="card">
+  <p><strong>Scalability model:</strong> unchanged from v2 &mdash; Celery scales horizontally; API is single-instance with WS affinity unsolved; one Postgres, no replicas. Adequate for the single-user design point; the new breakers make provider-side degradation graceful rather than cascading.</p>
+</div>
+
+<!-- ============ 9 API/DATA ============ -->
+<h2 id="api-data">9. API, Data &amp; Integration Quality</h2>
+<table>
+  <tr><th>Dimension</th><th>v1</th><th>v2</th><th>v3</th><th>Note</th></tr>
+  <tr><td>API Consistency</td><td>4</td><td>5</td><td>5</td><td>Convention now lint-enforced (raw <code>/api/</code> ban outside api layer)</td></tr>
+  <tr><td>Data Model Clarity</td><td>4</td><td>4</td><td>4</td><td>JSONB still write-unvalidated; <code>severity</code> not enum-enforced (frontend types it as a union)</td></tr>
+  <tr><td>Migration Approach</td><td>3</td><td>4</td><td>4</td><td>43 migrations; <code>alembic check</code> in CI; <code>env.py</code> auto-regenerates <code>docs/database-schema.md</code></td></tr>
+</table>
+<p><strong>External integrations:</strong> Polygon and IBKR are now wrapped in breakers with typed failure semantics &mdash; the most material integration improvement since the pacing guard. The tweet-monitor's cookie-based X.com auth (30-day manual rotation) remains the most fragile dependency, still unticketed after three reviews. One minor frontend/backend drift: <code>AlertRule.channel_config</code> is free-form JSON server-side but typed with specific keys client-side &mdash; malformed config fails silently.</p>
+
+<!-- ============ 10 DEVX ============ -->
+<h2 id="devx">10. Developer Experience</h2>
+<table>
+  <tr><th>Aspect</th><th>v1</th><th>v2</th><th>v3</th><th>Evidence</th></tr>
+  <tr><td>Local Setup</td><td>4</td><td>4</td><td>4</td><td>One-command compose; dev/live override split</td></tr>
+  <tr><td>Documentation</td><td>3</td><td>4</td><td>4</td><td>#201 (drift/ADR numbering/casing) still open; codeindex claims now true (#200)</td></tr>
+  <tr><td>Build Simplicity</td><td>4</td><td>3</td><td><span class="deltaup">4</span></td><td><code>tsc --noEmit</code> exit 0 verified; v2's red build gate is green</td></tr>
+  <tr><td>Linting/Formatting</td><td>2</td><td>4</td><td><span class="deltadown">3</span></td><td><span class="sev-medium">Regression</span> &mdash; ESLint fixed, but <code>ruff check</code> exit 1 with 65 errors on <code>main</code>; ruff absent from CI; factory bypasses pre-commit (R02)</td></tr>
+  <tr><td>Type Checking</td><td>2</td><td>3</td><td><span class="deltaup">4</span></td><td>tsc green + strict; <code>any</code> 125&rarr;63 (warn-enforced); mypy still absent</td></tr>
+  <tr><td>CI Feedback</td><td>2</td><td>4</td><td>4</td><td>pytest/tsc/build/eslint/audits/migration-check all blocking; ruff missing; Trivy advisory</td></tr>
+  <tr><td>Debugging Support</td><td>4</td><td>5</td><td>5</td><td>Metrics + traces + Seq error IDs; outbound spans now visible</td></tr>
+  <tr><td>Onboarding Friction</td><td>3</td><td>4</td><td>4</td><td>Unchanged; IBKR creds still needed for full function</td></tr>
+</table>
+
+<!-- ============ 11 CODE HEALTH ============ -->
+<h2 id="code-health">11. Code Health Deep-Dive</h2>
+<p class="subtitle">Unscored evidence section (new in v3). Tracks complexity, duplication, and coupling longitudinally.</p>
+
+<h3>Cyclomatic complexity — top 10</h3>
+<table>
+  <tr><th>Function</th><th>File</th><th>Lines</th><th>CC est.</th><th>Primary issue</th></tr>
+  <tr><td><code>run_screen</code></td><td>services/discovery_service.py</td><td>217</td><td><span class="sev-critical">~43</span></td><td>11+ nested criteria conditionals; stocks/futures paths interleaved; <strong>untouched across v1/v2/v3</strong></td></tr>
+  <tr><td><code>run_pre_market_scan</code></td><td>services/pre_market_scan.py</td><td>346</td><td><span class="sev-high">~37</span></td><td>Single per-ticker loop doing detection + enrichment + persistence; nesting to 5 levels</td></tr>
+  <tr><td><code>refresh_stock_data</code></td><td>services/stock_data.py</td><td>183</td><td><span class="sev-high">~30</span></td><td>Date-range if/elif chains; per-timespan dedup branches</td></tr>
+  <tr><td><code>scan_run_websocket</code></td><td>routers/scanner.py</td><td>85</td><td>~22</td><td>Message-type dispatch with nested try/except; implicit state machine</td></tr>
+  <tr><td><code>_run_universe_scan_logic</code></td><td>tasks/scanning.py</td><td>118</td><td>~18</td><td>Per-day loop with cancel checks, span management, state publishing</td></tr>
+  <tr><td><code>poll_massive_news</code></td><td>tasks/sync.py</td><td>145</td><td>~18</td><td>Trading-hours guard + nested fetch fn + per-article dedup</td></tr>
+  <tr><td><code>get_pre_market_data</code></td><td>services/stock_data.py</td><td>54</td><td>~14</td><td>Timespan/period branching + boundary detection</td></tr>
+  <tr><td><code>get_scanner_results</code></td><td>routers/scanner.py</td><td>66</td><td>~13</td><td>Filter conditional accretion in query building</td></tr>
+  <tr><td><code>run_oversold_bounce_scan</code></td><td>services/oversold_bounce_scan.py</td><td>237</td><td>~13</td><td>Chained criteria + volatility regime branches</td></tr>
+  <tr><td><code>add_indicators</code></td><td>services/chart_indicators.py</td><td>211</td><td>~12</td><td>20+ inline column computations; no composition</td></tr>
+</table>
+<p>Movement vs v2: module-level complexity collapsed (the decomposition), function-level complexity is static. The top-3 functions are the same three reviews running.</p>
+
+<h3>Duplication — top 8</h3>
+<table>
+  <tr><th>Pattern</th><th>v2 count</th><th>v3 count</th><th>Layer</th><th>Consolidation</th></tr>
+  <tr><td>Naive-UTC normalization (<code>datetime.now(timezone.utc).replace(...)</code>)</td><td>87 files</td><td><span class="deltaup">53 files</span></td><td>Backend</td><td><code>utils/time.py: utc_now()</code> &mdash; still unbuilt</td></tr>
+  <tr><td>TZ-aware&rarr;naive conversion (<code>.astimezone(timezone.utc).replace(...)</code>)</td><td>&mdash;</td><td><span class="deltadown">~96 instances</span></td><td>Backend</td><td><code>to_utc_naive()</code> &mdash; new epidemic (R03)</td></tr>
+  <tr><td>404 handler boilerplate</td><td>26</td><td><span class="deltadown">28</span></td><td>Routers</td><td><code>get_or_404(db, Model, id)</code></td></tr>
+  <tr><td>Inline Redis JSON read/write</td><td>14 files</td><td>14 files</td><td>Routers/tasks</td><td>Extend <code>core/cache.py</code> to a general util</td></tr>
+  <tr><td>docker-compose env blocks</td><td>~15</td><td>~17</td><td>Infra</td><td>YAML anchors / <code>x-common-env</code></td></tr>
+  <tr><td>Hand-rolled model&rarr;dict serializers</td><td>3 fns</td><td>3 fns</td><td>Routers</td><td>Pydantic <code>model_validate</code></td></tr>
+  <tr><td>Severity/status color logic (frontend)</td><td>~6</td><td>~6</td><td>Frontend</td><td><code>severityColor()</code> util</td></tr>
+  <tr><td>Modal open/close state (frontend)</td><td>15+</td><td><span class="deltaup">~0 (isOpen-prop pattern)</span></td><td>Frontend</td><td>Resolved by convention</td></tr>
+</table>
+
+<h3>Coupling map</h3>
+<div class="mermaid">
+flowchart LR
+  subgraph strategies["Scanner strategies (self-registering)"]
+    PMS[pre_market_scan]
+    OBS[oversold_bounce_scan]
+    LH[liquidity_hunt]
+    PP[pocket_pivot]
+  end
+  REG[scan_orchestrator registry] --- strategies
+  PMS --> SM[session_metrics]
+  OBS --> SM
+  PMS --> SE[scan_enrichment]
+  SCF[scanner.py facade] -.lazy.-> AS[alert_service]
+  strategies --> SCF
+  SD[stock_data] -.lazy.-> FDF[futures_data facade]
+  FDF --> FC[futures_contracts]
+  FDF --> FA[futures_aggregates]
+  FDF --> FR[futures_rollovers]
+  FDF --> FS[futures_series]
+  UE[universe_export] -. HTTPException leak .-> WEB((web layer))
+  style UE fill:#7f1d1d,stroke:#ef4444
+  style WEB fill:#7f1d1d,stroke:#ef4444
+  style SCF fill:#14532d,stroke:#22c55e
+  style FDF fill:#14532d,stroke:#22c55e
+</div>
+<p>Dashed = lazy (method-level) imports; the only red edge is the lone surviving cross-layer leak. No cycles anywhere (verified by import sweep).</p>
+
+<h3>Module depth candidates</h3>
+<div class="card">
+  <h4>1. Trading-time module <span class="badge badge-green">Strong</span></h4>
+  <p><strong>Files:</strong> ~149 call sites across services/tasks/routers. <strong>Problem:</strong> two duplicated time-normalization idioms (53 + 96 sites) and trading-calendar math with no owner. <strong>Deepening:</strong> <code>app/utils/time.py</code> with <code>utc_now()</code>, <code>to_utc_naive()</code>, <code>last_trading_day()</code> &mdash; a 3-function interface absorbing ~150 sites' worth of implementation. Highest leverage-per-effort in the codebase; bugs in session boundaries gain locality.</p>
+</div>
+<div class="card">
+  <h4>2. <code>get_or_404</code> router helper <span class="badge badge-green">Strong</span></h4>
+  <p><strong>Files:</strong> 28 sites across 7+ routers. <strong>Deepening:</strong> one helper collapses the lookup-or-404 idiom; pairs naturally with giving alerts/auto_trading a thin service layer (§3.1 cap).</p>
+</div>
+<div class="card">
+  <h4>3. Asset-class screeners <span class="badge badge-yellow">Worth exploring</span></h4>
+  <p><strong>Files:</strong> <code>discovery_service.py</code>. <strong>Problem:</strong> <code>run_screen</code> interleaves stock and futures paths for 217 lines (CC&asymp;43). <strong>Deepening:</strong> <code>StockScreener</code>/<code>FuturesScreener</code> adapters behind one screening interface; the registry pattern already proven by the scan-orchestrator applies directly.</p>
+</div>
+<div class="card">
+  <h4>4. Per-ticker scan pipeline <span class="badge badge-yellow">Worth exploring</span></h4>
+  <p><strong>Files:</strong> <code>pre_market_scan.py</code>. <strong>Problem:</strong> the 346-line function fuses detect&rarr;enrich&rarr;persist. <strong>Deepening:</strong> three composable stages; <code>session_metrics</code>/<code>scan_enrichment</code> already exist as natural seams &mdash; the function just doesn't use them as stages.</p>
+</div>
+<div class="card">
+  <h4>5. QualityReportModal decomposition <span class="badge badge-yellow">Worth exploring</span></h4>
+  <p><strong>Files:</strong> <code>QualityReportModal.tsx</code> (753, three reviews static). <strong>Deepening:</strong> follow the proven page-decomposition pattern (panel subcomponents + extracted hook).</p>
+</div>
+
+<!-- ============ 12 DORA ============ -->
+<h2 id="dora">12. Delivery Performance (DORA)</h2>
+<p class="subtitle">Window: 2026-06-03 &rarr; 2026-06-09 (6 days). All four are <strong>proxies</strong> &mdash; single repo, no production deploy telemetry; derivations stated per metric. New in v3; this becomes the trend baseline.</p>
+<div class="card-grid">
+  <div class="kpi"><div class="l">Deployment Frequency</div><div class="v">&asymp;54/wk</div><div class="s">46 merges to main in 6 days &middot; proxy: merge commits &middot; band: Elite (on-demand)</div></div>
+  <div class="kpi"><div class="l">Lead Time for Changes</div><div class="v">1.8 h</div><div class="s">median PR open&rarr;merge, n=45 &middot; band: Elite (&lt;1 day)</div></div>
+  <div class="kpi"><div class="l">Change Failure Rate</div><div class="v">19%</div><div class="s">42 fix/revert-typed of 221 commits &middot; coarse proxy &middot; band: Medium</div></div>
+  <div class="kpi"><div class="l">MTTR</div><div class="v">16.1 h</div><div class="s">median bug-issue open&rarr;close, n=7 &middot; band: High (&lt;1 day)</div></div>
+</div>
+<table>
+  <tr><th>Delivery extra</th><th>Value</th><th>Note</th></tr>
+  <tr><td>Commit cadence</td><td>221 commits / 6 days (&asymp;37/day)</td><td>+214 on main since v2</td></tr>
+  <tr><td>Factory vs human share</td><td>146 : 75 (66% factory)</td><td>Up from ~30% at v1 &mdash; the factory is now the primary author</td></tr>
+  <tr><td>Merged PRs / median size</td><td>45 PRs &middot; 239 lines</td><td>Small-batch delivery; healthy</td></tr>
+</table>
+<p><strong>Reading:</strong> the proxies sketch an elite-tempo, small-batch pipeline whose weak spot is the failure-feedback loop: a ~19% fix-commit share is consistent with the known factory pattern of post-merge correction commits, and with quality gates (ruff) that don't fire where the work happens. The DORA bands assume production deployment, which this repo's merge-to-main proxy does not measure &mdash; treat bands as directional only.</p>
+
+<!-- ============ 13 SCORE TREND ============ -->
+<h2 id="trend">13. Score Trend</h2>
+<div class="card" id="trendchart"></div>
+<table>
+  <tr><th>Dimension</th><th>v1</th><th>v2</th><th>v3</th><th>Trajectory</th></tr>
+  <tr><td>Architecture Clarity</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">high-flat</td></tr>
+  <tr><td>Modularity</td><td>4</td><td>4</td><td>5</td><td class="deltaup">▲ v3</td></tr>
+  <tr><td>Separation of Concerns</td><td>3</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Maintainability</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">high-flat</td></tr>
+  <tr><td>Testability</td><td>3</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Code Coverage Maturity</td><td>2</td><td>3</td><td>4</td><td class="deltaup">▲▲ steady climb</td></tr>
+  <tr><td>Reliability</td><td>3</td><td>4</td><td>5</td><td class="deltaup">▲▲ steady climb</td></tr>
+  <tr><td>Security Posture</td><td>1</td><td>3</td><td>4</td><td class="deltaup">▲▲▲ strongest arc</td></tr>
+  <tr><td>Observability</td><td>3</td><td>4</td><td>5</td><td class="deltaup">▲▲ steady climb</td></tr>
+  <tr><td>Performance Readiness</td><td>2</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Scalability Readiness</td><td>2</td><td>3</td><td>3</td><td class="deltadown">structurally stuck</td></tr>
+  <tr><td>Deployment Readiness</td><td>3</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Developer Experience</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">high-flat</td></tr>
+  <tr><td>Documentation</td><td>3</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Dependency Hygiene</td><td>3</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Operational Readiness</td><td>2</td><td>3</td><td>3</td><td class="deltadown">structurally stuck</td></tr>
+</table>
+<p><strong>Structurally stuck:</strong> <em>Scalability Readiness</em> (single API instance, single DB, WS affinity unsolved &mdash; partly a deliberate single-user design point) and <em>Operational Readiness</em> (backups, runbooks, incident process &mdash; the backups failure in #195 keeps this pinned). These two are where the next roadmap should concentrate if the trajectory is production multi-user; otherwise document the single-user ceiling in an ADR and re-scope the rubric expectation.</p>
+
+<!-- ============ 14 TRACEABILITY ============ -->
+<h2 id="traceability">14. Ticket &rarr; Outcome Traceability</h2>
+<p>All 17 <code>architecture-audit-v2</code> items, verified against code &mdash; not ticket state.</p>
+<table>
+  <tr><th>#</th><th>Ticket</th><th>Maps to v2</th><th>Verified outcome</th></tr>
+  <tr><td>190</td><td>Reject empty/weak JWT_SECRET_KEY</td><td>R01 (Critical)</td><td><span class="badge badge-green">Done</span> validator &ge;32 chars, required field (<code>config.py:137-145</code>)</td></tr>
+  <tr><td>191</td><td>Authenticate WebSockets</td><td>R02 (High)</td><td><span class="badge badge-green">Done</span> pre-accept rejection (1008) on all 3 WS routes</td></tr>
+  <tr><td>192</td><td>CSRF protection</td><td>R03 (High)</td><td><span class="badge badge-green">Done</span> header-check middleware, auth-prefix exempt (<code>main.py:51-81</code>)</td></tr>
+  <tr><td>193</td><td>Fix red frontend tsc</td><td>R04 (High)</td><td><span class="badge badge-green">Done</span> exit 0 <em>verified live</em>; tests excluded from prod tsc</td></tr>
+  <tr><td>194</td><td>Worker metrics scrape</td><td>R06 (High)</td><td><span class="badge badge-green">Done</span> shared volume + MultiProcessCollector; statically verified</td></tr>
+  <tr><td>195</td><td>Automated DB backups</td><td>v1 R08 (High)</td><td><span class="badge badge-red">Broken</span> <strong>closed with no artifacts</strong> &mdash; no service/cron/script exists (R01)</td></tr>
+  <tr><td>196</td><td>Login brute-force limit</td><td>R08 (Med)</td><td><span class="badge badge-green">Done</span> 5/min on login/register/refresh</td></tr>
+  <tr><td>197</td><td>CI lint/audit enforcement</td><td>R07/R14</td><td><span class="badge badge-yellow">Partial</span> ESLint fixed + audits block; Trivy advisory; <strong>ruff absent from CI, red on main</strong></td></tr>
+  <tr><td>198</td><td>Frontend test breadth</td><td>R05 (Med)</td><td><span class="badge badge-green">Done</span> 9/32 pages, 5/35 components, honest app-wide thresholds (#250 ratchet)</td></tr>
+  <tr><td>199</td><td>Decompose god modules</td><td>R10 (Med)</td><td><span class="badge badge-green">Done</span> facades 206/90 lines; 10 submodules verified</td></tr>
+  <tr><td>200</td><td>Codeindex artifacts</td><td>R09 (Med)</td><td><span class="badge badge-green">Done</span> both files in <code>git ls-files</code></td></tr>
+  <tr><td>201</td><td>Documentation hygiene</td><td>R11/R13</td><td><span class="badge badge-blue">Open</span> drift/numbering/casing pending</td></tr>
+  <tr><td>202</td><td>Secure cookies + TLS</td><td>R12 (Med)</td><td><span class="badge badge-green">Done</span> COOKIE_SECURE default true; Caddy profile + HSTS</td></tr>
+  <tr><td>203</td><td>Docker socket + non-root</td><td>v1 R07 (High)</td><td><span class="badge badge-green">Done</span> socket-proxy (EXEC=0); appuser/factory UID 1000</td></tr>
+  <tr><td>204</td><td>Celery tasks in coverage</td><td>v1 R12 (Med)</td><td><span class="badge badge-green">Done</span> omit removed + 10 task test files</td></tr>
+  <tr><td>205</td><td>Circuit breakers + timeouts</td><td>carried (Med)</td><td><span class="badge badge-green">Done</span> pybreaker + Polygon timeouts + httpx tracing, tested (PR #248)</td></tr>
+  <tr><td>272</td><td>Epic: container/deploy hardening</td><td>&mdash;</td><td><span class="badge badge-blue">Open</span> parent epic for remaining items</td></tr>
+</table>
+<div class="callout callout-yellow">
+  <strong>Coverage gap in the follow-through:</strong> still never ticketed after three reviews &mdash;
+  <strong>tweet-monitor cookie auth</strong> (v1 R10), <strong>mypy adoption</strong>, <strong>readiness probe</strong>,
+  and a real <strong>feature-flag mechanism</strong>. And one anti-pattern new to v3: a ticket (#195) closed
+  without its deliverable &mdash; the same failure mode v2 caught with codeindex (#107), now on a
+  data-loss-critical item.
+</div>
+
+<!-- ============ 15 RISK REGISTER ============ -->
+<h2 id="risk-register">15. Risk Register (v3)</h2>
+<h3>Newly identified</h3>
+<table>
+  <tr><th>ID</th><th>Description</th><th>Sev</th><th>Evidence</th><th>Mitigation</th></tr>
+  <tr><td>R01</td><td>#195 closed without implementation &mdash; no automated backups exist; risk now masked by green ticket</td><td><span class="sev-high">High</span></td><td>No backup service/cron/script in repo; <code>deployment-guide.md</code> manual pg_dump only</td><td>Reopen #195; pg_dump sidecar + retention + restore test</td></tr>
+  <tr><td>R02</td><td><code>ruff check</code> red on main (65 errors); ruff not in CI; factory bypasses pre-commit</td><td><span class="sev-medium">Medium</span></td><td>Exit 1 verified 2026-06-09; <code>ci.yml</code> has no ruff step; #275/#276</td><td>Add ruff to CI backend job; one-shot <code>ruff --fix</code></td></tr>
+  <tr><td>R03</td><td>TZ-conversion duplication: ~96 <code>.astimezone(utc).replace(tzinfo=None)</code> sites + 53 naive-UTC files; no time utility</td><td><span class="sev-medium">Medium</span></td><td>Grep counts, services/tasks-wide</td><td><code>utils/time.py</code> + codemod</td></tr>
+  <tr><td>R04</td><td>Top-3 complexity functions unchanged 3 reviews (<code>run_screen</code> CC&asymp;43; <code>run_pre_market_scan</code> 346 lines)</td><td><span class="sev-medium">Medium</span></td><td>discovery_service.py; pre_market_scan.py</td><td>Asset-class screeners; staged scan pipeline</td></tr>
+  <tr><td>R05</td><td>Liveness-only health + manual migrations &rarr; rolling-update schema-drift trap</td><td><span class="sev-medium">Medium</span></td><td><code>routers/health.py:15-23</code>; no migrate step in entrypoint/deploy</td><td>Readiness probe; migration gate in deploy path</td></tr>
+  <tr><td>R06</td><td>In-Python aggregation + thin eager loading (<code>get_trade_stats</code>; joinedload+offset pagination)</td><td><span class="sev-low">Low</span></td><td><code>journal_service.py:64</code>; <code>routers/scanner.py:376</code></td><td>SQL aggregates; selectinload</td></tr>
+  <tr><td>R07</td><td>JSONB write-side unvalidated; <code>severity</code>/<code>channel_config</code> looser than frontend types</td><td><span class="sev-low">Low</span></td><td><code>models/scanner_event.py:47-53</code></td><td>Field validators on write paths</td></tr>
+  <tr><td>R08</td><td>Trivy advisory-only; no password policy; no audit logging</td><td><span class="sev-low">Low</span></td><td><code>ci-publish.yml:107</code>; <code>routers/auth.py</code></td><td>Block on HIGH/CRITICAL; min-length policy</td></tr>
+  <tr><td>R09</td><td>Default compose runs ENVIRONMENT=development (trace exposure) with COOKIE_SECURE off in override</td><td><span class="sev-low">Low</span></td><td><code>docker-compose.yml:100</code>; override comments</td><td>Document prod posture; consider safer default</td></tr>
+  <tr><td>R10</td><td>Frontend god files static 3 reviews: <code>api/scanner.ts</code> 787, <code>QualityReportModal.tsx</code> 753</td><td><span class="sev-low">Low</span></td><td>Line counts v1=v2=v3</td><td>Apply proven page-decomposition pattern</td></tr>
+</table>
+<h3>Carried over (not yet addressed)</h3>
+<table>
+  <tr><th>Prior ID</th><th>Description</th><th>Sev</th><th>Status</th></tr>
+  <tr><td>R10 (v1)</td><td>Tweet-monitor cookie auth, 30-day manual rotation</td><td><span class="sev-medium">Medium</span></td><td>Open &mdash; never ticketed, 3 reviews</td></tr>
+  <tr><td>&mdash;</td><td>No mypy; no feature-flag system; no readiness probe; sync ORM (by ADR-0004)</td><td><span class="sev-medium">Medium</span></td><td>Open</td></tr>
+  <tr><td>R11 (v2)</td><td>Doc/reality drift + ADR-0010 numbering collision + docs/ casing</td><td><span class="sev-low">Low</span></td><td>Open &mdash; ticket #201 exists</td></tr>
+</table>
+
+<!-- ============ 16 SCORECARD ============ -->
+<h2 id="scorecard">16. Quality Scorecard</h2>
+<p>Same 16 dimensions and rubric as v1/v2. Bars show v3; pills show movement vs v2.</p>
+<div class="card" id="scorebars"></div>
+<div class="card" style="text-align:center;margin-top:1.5rem">
+  <div style="font-size:.9rem;color:var(--text-dim)">Weighted Average Score</div>
+  <div class="score-big score-4" style="font-size:3rem">4.06 / 5</div>
+  <div style="font-size:.85rem;color:var(--text-dim)">was 3.75 / 5 &mdash; <span class="deltaup">+0.31</span> &mdash; "Good-to-strong; production-credible for its single-user design point, with operational follow-through as the gap"</div>
+</div>
+
+<!-- ============ 17 ROADMAP ============ -->
+<h2 id="roadmap">17. Prioritized Improvement Roadmap (v3)</h2>
+<h3>Immediate (0&ndash;1 week) &mdash; close the honesty gaps</h3>
+<table>
+  <tr><th>Action</th><th>Closes</th><th>Effort</th></tr>
+  <tr><td>Reopen #195; implement pg_dump sidecar + retention + restore smoke-test</td><td>R01 (High, 3 reviews old)</td><td>M</td></tr>
+  <tr><td>Add <code>ruff check</code> to CI; run <code>ruff --fix</code> once (65/65 auto-fixable)</td><td>R02</td><td>S</td></tr>
+  <tr><td>Readiness endpoint with DB/Redis probes</td><td>R05 (half)</td><td>S</td></tr>
+  <tr><td>Make Trivy block on HIGH/CRITICAL; add password min-length</td><td>R08</td><td>S</td></tr>
+</table>
+<h3>Short-term (2&ndash;4 weeks)</h3>
+<table>
+  <tr><th>Action</th><th>Closes</th><th>Effort</th></tr>
+  <tr><td><code>app/utils/time.py</code> (+<code>get_or_404</code>) and codemod ~150 call sites</td><td>R03</td><td>M</td></tr>
+  <tr><td>Decompose <code>run_screen</code> into asset-class screeners</td><td>R04 (worst function)</td><td>M</td></tr>
+  <tr><td>Stage the <code>run_pre_market_scan</code> pipeline (detect/enrich/persist)</td><td>R04</td><td>M</td></tr>
+  <tr><td>Migration gate in deploy path (entrypoint check or deploy step)</td><td>R05 (other half)</td><td>S&ndash;M</td></tr>
+  <tr><td>SQL aggregates in <code>get_trade_stats</code>; selectinload pagination fix</td><td>R06</td><td>S</td></tr>
+  <tr><td>Finish #201 (doc drift, ADR renumber, casing)</td><td>v2 R11/R13</td><td>S</td></tr>
+</table>
+<h3>Medium / Strategic</h3>
+<table>
+  <tr><th>Action</th><th>Benefit</th><th>Effort</th></tr>
+  <tr><td>Ticket + solve tweet-monitor auth (official API or expiry alerting)</td><td>Closes the oldest unticketed risk</td><td>M</td></tr>
+  <tr><td>Service layer for alerts/auto_trading routers; Pydantic serializers</td><td>§3.1 cap; kills hand-rolled dicts</td><td>M</td></tr>
+  <tr><td>Decompose <code>api/scanner.ts</code> + <code>QualityReportModal.tsx</code></td><td>R10; last god files</td><td>M</td></tr>
+  <tr><td>mypy on backend (incremental, core/ first)</td><td>Type safety where money moves</td><td>L</td></tr>
+  <tr><td>Decide the multi-user question: RBAC + scalability work, or ADR the single-user ceiling</td><td>Unsticks the two flat dimensions honestly</td><td>&mdash;</td></tr>
+</table>
+
+<!-- ============ 18 FINAL ============ -->
+<h2 id="final">18. Final Recommendations</h2>
+<div class="card"><h4>Most important decision to make next</h4>
+<p><strong>Decide what "done" means in an autonomous pipeline.</strong> #195 closed with zero artifacts &mdash; the second fictional completion in two reviews (#107 was the first). With the factory authoring 66% of commits, ticket state is no longer evidence. Add a verification step to the factory's close path (the validate stage already exists) or adopt the rule that risk-register items close only on artifact-verified review.</p></div>
+<div class="card"><h4>Most important practice to improve next</h4>
+<p><strong>Put every documented gate where the work actually happens.</strong> The repo's stated quality system includes ruff &mdash; but ruff runs only in pre-commit, which factory commits bypass, so <code>main</code> sits at 65 lint errors while CI shows green. One CI step closes the gap; the deeper habit is auditing each gate for "can the primary author bypass this?"</p></div>
+<div class="card"><h4>Most important operational risk to reduce next</h4>
+<p><strong>Backups, for the third consecutive review.</strong> Every scanner event, review verdict, trade journal, and the users table live in one Postgres volume with no automation. This is now the single largest gap between the 90/100 score and reality &mdash; hours of work, existential downside, and a ticket history that falsely says it's handled.</p></div>
+<div class="card"><h4>Conclusion</h4>
+<p>v3 confirms the pattern v2 established: this codebase converts findings into shipped fixes at remarkable speed &mdash; 15 of 17 round-2 tickets genuinely closed in six days, including the marquee decomposition that v1 first asked for. Overall quality rose <strong>83&rarr;90</strong>, architecture <strong>3.9&rarr;4.3</strong>, and for the first time no dimension sits below 3.</p>
+<p>The trajectory's new constraint is trust calibration. The system now improves itself faster than a human can audit it, and the two defects that matter most in v3 &mdash; a fictional ticket closure and a bypassed lint gate &mdash; are both failures of <em>verification</em>, not of engineering. Harden the close-the-loop machinery (artifact-verified ticket closure, gates in CI rather than pre-commit, runtime confirmation of statically-verified fixes) and the score takes care of itself.</p></div>
+
+<!-- ============ 19 EVIDENCE ============ -->
+<h2 id="evidence">19. Evidence Index</h2>
+<table>
+  <tr><th>File / Directory</th><th>Purpose</th></tr>
+  <tr><td><code>backend/app/core/config.py</code></td><td>JWT validator (137-145), breaker/timeout/pool settings</td></tr>
+  <tr><td><code>backend/app/core/auth.py</code> + <code>routers/auth.py</code></td><td>WS auth (84-99), cookie flags, auth rate limits</td></tr>
+  <tr><td><code>backend/app/main.py</code></td><td>CSRF middleware (51-81), Prometheus middleware, multiproc /metrics (399-409), registry imports (428-434)</td></tr>
+  <tr><td><code>backend/app/core/circuit_breakers.py</code> + <code>tests/providers/test_circuit_breakers.py</code></td><td>Breaker singletons + 256-line suite</td></tr>
+  <tr><td><code>backend/app/services/</code> (scanner facade + 10 submodules)</td><td>Decomposition verification, line counts, lazy imports</td></tr>
+  <tr><td><code>backend/app/services/discovery_service.py</code>, <code>pre_market_scan.py</code>, <code>stock_data.py</code></td><td>Complexity top-10</td></tr>
+  <tr><td><code>backend/pyproject.toml</code>, <code>frontend/vitest.config.ts</code>, <code>frontend/tsconfig.app.json</code></td><td>Coverage/threshold honesty, test exclusions</td></tr>
+  <tr><td><code>.github/workflows/ci.yml</code>, <code>ci-publish.yml</code></td><td>Gate inventory; blocking vs advisory</td></tr>
+  <tr><td><code>frontend/eslint.config.js</code></td><td>TS ruleset spread fix (44-46); /api/ ban (58-76)</td></tr>
+  <tr><td><code>docker-compose.yml</code>, <code>backend/Dockerfile</code>, <code>dark-factory/Dockerfile</code>, <code>caddy/Caddyfile</code></td><td>Socket-proxy, non-root, multiproc volume, TLS profile</td></tr>
+  <tr><td><code>monitoring/prometheus/prometheus.yml</code>, <code>core/metrics.py</code>, <code>core/tracing.py</code></td><td>Metrics/tracing pipeline wiring</td></tr>
+  <tr><td><code>gh issue list</code> (label <code>architecture-audit-v2</code>), <code>gh pr list</code>, <code>git log</code></td><td>Traceability + DORA window data</td></tr>
+</table>
+
+<!-- ============ 20 LIMITATIONS ============ -->
+<h2 id="limitations">20. Limitations</h2>
+<div class="card"><ul>
+  <li><strong>Executed vs inferred.</strong> Run live during this review: <code>tsc --noEmit</code> (exit 0), <code>eslint</code> (exit 0, 131 warnings), <code>ruff check</code> (exit 1, 65 errors), all <code>git</code>/<code>gh</code> DORA queries. <em>Not</em> executed: pytest, <code>npm run build</code>, pip-audit/npm-audit locally, and the Docker stack &mdash; the worker-metrics fix (#194) and TLS profile are verified from code and config, not from a live scrape or handshake.</li>
+  <li><strong>Coverage numbers from configuration + CI assertions</strong>, not a measured run in this review. Frontend ~21% figures come from comments in <code>vitest.config.ts</code> recording the post-implementation measurement.</li>
+  <li><strong>Complexity figures are estimates</strong> from agent code reading (branch counting), not a radon/lizard run; treat CC values as ranks, not absolutes.</li>
+  <li><strong>DORA metrics are proxies</strong> in a repo with no production deploy telemetry; the "fix-commit share" CFR proxy over-counts factory iteration commits and under-counts silent failures. Bands are directional.</li>
+  <li><strong>#195 judgment.</strong> "Broken" is asserted from repo contents only &mdash; if backups were implemented host-side outside the repo, reclassify to Partial and document the mechanism in the deployment guide.</li>
+  <li><strong>Scoring is comparative-rubric, not absolute.</strong> The 0&ndash;100 score maps the 16-dimension mean onto v1's calibration (2.8&rarr;62); it is a relative health indicator, not a certification.</li>
+</ul></div>
+
+<div style="text-align:center;margin-top:3rem;padding:1.5rem;color:var(--text-dim);font-size:.85rem">
+  <p>Report generated 2026-06-09 by Claude Fable 5 &mdash; verified against <code>main</code> @ e54e19a</p>
+  <p>MarketHawk &mdash; Architecture &amp; Quality Report v3.0 &mdash; companion to v2 (2026-06-03) and v1 (2026-05-26)</p>
+</div>
+
+</div>
+
+<script>
+mermaid.initialize({startOnLoad:true,theme:'dark',themeVariables:{primaryColor:'#1e293b',primaryBorderColor:'#334155',lineColor:'#64748b',fontSize:'13px'}});
+
+/* §16 scorebars: [name, v2, v3] */
+const dims = [
+  ["Architecture Clarity",4,4],["Modularity",4,5],["Separation of Concerns",4,4],
+  ["Maintainability",4,4],["Testability",4,4],["Code Coverage Maturity",3,4],
+  ["Reliability",4,5],["Security Posture",3,4],["Observability",4,5],
+  ["Performance Readiness",4,4],["Scalability Readiness",3,3],["Deployment Readiness",4,4],
+  ["Developer Experience",4,4],["Documentation",4,4],["Dependency Hygiene",4,4],
+  ["Operational Readiness",3,3]
+];
+const col = v => v>=5?'#22c55e':v>=4?'#4ade80':v>=3?'#eab308':v>=2?'#f97316':'#ef4444';
+let html = '';
+for(const [name,vp,vn] of dims){
+  const d = vn-vp;
+  const dcls = d>0?'deltaup':d<0?'deltadown':'deltaflat';
+  const dtxt = d>0?('+'+d):d<0?(''+d):'0';
+  html += `<div class="dimrow">
+    <div>${name} <span style="color:var(--text-dim);font-size:.8rem">(v2 ${vp})</span></div>
+    <div class="dimbar">
+      <div style="width:160px;background:var(--surface2);border-radius:4px;height:14px;overflow:hidden">
+        <div style="width:${vn/5*100}%;height:100%;background:${col(vn)}"></div>
+      </div>
+      <strong style="width:28px;text-align:right">${vn}</strong>
+      <span class="${dcls}" style="width:34px;text-align:right">${dtxt}</span>
+    </div>
+  </div>`;
+}
+document.getElementById('scorebars').innerHTML = html;
+
+/* §13 trend chart */
+const overall = [["v1 2026-05-26",62],["v2 2026-06-03",83],["v3 2026-06-09",90]];
+const max = 100;
+let t = '<div style="display:flex;align-items:flex-end;gap:1.2rem;height:170px;padding:0 .5rem">';
+for(const [l,v] of overall){
+  t += `<div style="flex:1;text-align:center">
+    <div style="font-weight:800;color:#f8fafc">${v}</div>
+    <div style="height:${v/max*120}px;background:linear-gradient(180deg,#0ea5e9,#22c55e);border-radius:6px 6px 0 0;margin:0 auto;max-width:90px"></div>
+    <div style="font-size:.72rem;color:var(--text-dim);margin-top:.4rem">${l}</div>
+  </div>`;
+}
+t += '</div>';
+document.getElementById('trendchart').innerHTML = t;
+</script>
+</body>
+</html>

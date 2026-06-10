@@ -13,19 +13,22 @@ Open the `.html` files in a browser — they are self-contained (Tailwind/Mermai
 | 1 | [`2026-05-26-architecture-quality-report-v1.html`](2026-05-26-architecture-quality-report-v1.html) | 2026-05-26 | **v1** — the first full assessment. Overall **62/100**, architecture **3.2/5**, scorecard **2.8/5**. Its findings spawned remediation tickets #84–#107. |
 | 2 | [`2026-06-03-architecture-quality-report-v2.html`](2026-06-03-architecture-quality-report-v2.html) | 2026-06-03 | **v2** — re-assessment after those tickets shipped, using the identical rubric. Overall **83/100**, architecture **3.9/5**, scorecard **3.75/5**. Includes a refreshed risk register and a ticket→outcome traceability matrix. |
 | 3 | [`2026-06-03-architecture-quality-comparison-v1-vs-v2.html`](2026-06-03-architecture-quality-comparison-v1-vs-v2.html) | 2026-06-03 | **Comparison** — visual v1→v2 side-by-side: a diverging delta chart across all 16 dimensions, "dramatically improved" vs "cold spots & regressions", and the new defects the remediation introduced. |
+| 4 | [`2026-06-09-architecture-quality-report-v3.html`](2026-06-09-architecture-quality-report-v3.html) | 2026-06-09 | **v3** — re-assessment after round-2 tickets #190–#205. Overall **90/100**, architecture **4.3/5**, scorecard **4.06/5**. First report with the Code Health Deep-Dive, DORA-proxy, and Score Trend sections. Caught one ticket (#195 backups) closed with no implementation. |
 
-## Headline movement (v1 → v2)
+## Headline movement
 
-| Metric | v1 | v2 | Δ |
+| Metric | v1 | v2 | v3 |
 |---|---|---|---|
-| Overall Quality (0–100) | 62 | 83 | **+21 (+34%)** |
-| Architecture Quality (0–5) | 3.2 | 3.9 | **+0.7** |
-| Weighted Scorecard (0–5) | 2.8 | 3.75 | **+0.95** |
+| Overall Quality (0–100) | 62 | 83 | **90** |
+| Architecture Quality (0–5) | 3.2 | 3.9 | **4.3** |
+| Weighted Scorecard (0–5) | 2.8 | 3.75 | **4.06** |
 
-**22 of 24** remediation tickets (#84–#107) closed. The two defining v1 weaknesses — no
-authentication and no observability — were genuinely resolved (JWT cookie auth; Prometheus +
-Grafana + OpenTelemetry/Jaeger). One ticket (#101 async SQLAlchemy) was deliberately **declined**
-and documented in ADR-0004.
+**v1 → v2:** 22 of 24 remediation tickets (#84–#107) closed; auth + observability foundations built.
+One ticket (#101 async SQLAlchemy) deliberately **declined** (ADR-0004).
+**v2 → v3:** 15 of 17 round-2 tickets (`architecture-audit-v2`) verified done — including the
+scanner/futures god-module decomposition, circuit breakers, WebSocket auth, CSRF, and worker-metrics
+fix. One closure (#195 automated backups) was **broken** — closed with no artifacts in the repo;
+v3 follow-ups carry the `architecture-audit-v3` label.
 
 ## Reproducing these reports
 
