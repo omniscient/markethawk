@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 462,
-    "total_loc": 66642,
+    "total_files": 463,
+    "total_loc": 66807,
     "languages": [
       "python",
       "javascript",
@@ -23102,6 +23102,24 @@
       ]
     },
     {
+      "id": "frontend/src/utils/indicators.test.ts",
+      "type": "module",
+      "language": "typescript",
+      "framework": null,
+      "size": 165,
+      "loc": 165,
+      "group": 46,
+      "imports": [
+        "vitest",
+        "frontend/src/utils/indicators.ts"
+      ],
+      "layer": "frontend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": []
+    },
+    {
       "id": "frontend/src/utils/indicators.ts",
       "type": "module",
       "language": "typescript",
@@ -23111,11 +23129,12 @@
       "group": 46,
       "imports": [],
       "layer": "frontend",
-      "direct_dependents": 1,
+      "direct_dependents": 2,
       "transitive_dependents": 7,
-      "blast_score": 4.5,
+      "blast_score": 5.5,
       "imported_by": [
-        "frontend/src/components/ui/StockChart.tsx"
+        "frontend/src/components/ui/StockChart.tsx",
+        "frontend/src/utils/indicators.test.ts"
       ],
       "symbols": [
         {
@@ -23491,9 +23510,9 @@
       "group": 9000,
       "imports": [],
       "layer": "frontend",
-      "direct_dependents": 22,
+      "direct_dependents": 23,
       "transitive_dependents": 0,
-      "blast_score": 22.0,
+      "blast_score": 23.0,
       "imported_by": [
         "frontend/src/api/client.test.ts",
         "frontend/src/components/Layout.test.tsx",
@@ -23516,6 +23535,7 @@
         "frontend/src/pages/Login/Login.test.tsx",
         "frontend/src/pages/Scanner/ScanConfigPanel.test.tsx",
         "frontend/src/pages/Scanner/Scanner.test.tsx",
+        "frontend/src/utils/indicators.test.ts",
         "frontend/vitest.config.ts"
       ]
     },
@@ -56140,6 +56160,18 @@
     {
       "source": "frontend/src/test-utils/renderWithQuery.tsx",
       "target": "react",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "frontend/src/utils/indicators.test.ts",
+      "target": "vitest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "frontend/src/utils/indicators.test.ts",
+      "target": "frontend/src/utils/indicators.ts",
       "weight": 1,
       "kind": "imports"
     },
