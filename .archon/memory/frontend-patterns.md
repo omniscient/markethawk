@@ -67,6 +67,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Coverage threshold formula (issue #250 ratchet series): `floor(actual) - 3`, clamped to min 30 for statements/lines and 22 for branches/functions. Run `npx vitest run --coverage` to get actuals; update `frontend/vitest.config.ts` thresholds block. CI gate = threshold ≤ actual, so if clamped threshold exceeds actual, add more tests first. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:implement -->
 
+- [AVOID] Do not rely on spec line-count yield estimates to predict which priority files will be sufficient for a coverage ratchet — with `all: true` and a large untested denominator, actual coverage yield per file can be 30–40% lower than estimated; always run `npx vitest run --coverage` after each batch and continue past the spec's priority list per D1 until the gate clears. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:conformance path:frontend/src/ -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
