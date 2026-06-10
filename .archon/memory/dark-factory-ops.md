@@ -81,6 +81,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Gate commands (conformance, code-review) that need to write `[AVOID]` memory entries should define `route_memory_file()` and `write_memory_entry()` as inline shell functions using: dedup via `grep -qF`, 30-entry cap check, mawk-compatible two-arg awk expiry cleanup, and `sed -i "/^---$/i ENTRY"` to insert before the PROVISIONAL section delimiter. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
 
+## Scope Enforcement — Formatter Noise
+
+- [AVOID] Never suppress formatter-only changes in the conformance pre-triage diff at file-level granularity — every documented spillover case (issue #276) involved files that ALSO contained in-scope feature changes; file-level exclusion hides those legitimate changes from the reviewer and creates the inverse failure mode (genuine OOS changes in a coincidentally-reformatted file become invisible). Use hunk-level stripping instead. <!-- issue:#276 date:2026-06-10 expires:2026-12-10 source:refine -->
+
+- [PATTERN] Suppress formatter-only changes in the conformance pre-triage diff with two layers: (1) a deterministic hunk-level filter in Phase 3 Step 3.0 (get base version, run `ruff format` + `ruff check --fix --select I` on a throwaway copy, subtract formatter-delta hunks from the actual diff) and (2) an explicit reviewer-prompt carve-out as a backstop for interleaved hunks that can't be cleanly separated. Layer 1 is load-bearing; Layer 2 absorbs the residual. Python-only (ruff is the formatter; no TS autoformatter exists). <!-- issue:#276 date:2026-06-10 expires:2026-12-10 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
