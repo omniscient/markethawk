@@ -59,6 +59,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When fixing `eslint.config.js` to enforce warning-level rules that produce many pre-existing warnings, update the pre-commit hook in `.pre-commit-config.yaml` to use `npx eslint . --report-unused-disable-directives-severity error` (errors only) rather than `npm run lint` — otherwise the hook blocks all commits until every warning is cleaned up. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+## Frontend: Testing Route Params
+
+- [PATTERN] Components using `useParams` from react-router-dom need `vi.mock('react-router-dom', async (importOriginal) => ({ ...await importOriginal(), useParams: () => ({ paramName: value }) }))` in tests — `renderWithQuery` uses `MemoryRouter` without param-aware route patterns, so `useParams` returns `{}` by default. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:implement -->
+
+## Frontend: Coverage Thresholds
+
+- [PATTERN] Coverage threshold formula (issue #250 ratchet series): `floor(actual) - 3`, clamped to min 30 for statements/lines and 22 for branches/functions. Run `npx vitest run --coverage` to get actuals; update `frontend/vitest.config.ts` thresholds block. CI gate = threshold ≤ actual, so if clamped threshold exceeds actual, add more tests first. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:implement -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
