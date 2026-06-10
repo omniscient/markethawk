@@ -27,6 +27,16 @@ authentication and no observability — were genuinely resolved (JWT cookie auth
 Grafana + OpenTelemetry/Jaeger). One ticket (#101 async SQLAlchemy) was deliberately **declined**
 and documented in ADR-0004.
 
+## Reproducing these reports
+
+The whole format is codified as the project skill **`.claude/skills/architecture-review/`** —
+frozen rubric ([RUBRIC.md](../../.claude/skills/architecture-review/RUBRIC.md)), canonical section
+spec, evidence-gathering playbook, and the HTML shell template. To produce v(N+1), ask Claude Code
+to "run an architecture review"; it reads this README for the baseline, scores against the same
+rubric, writes the next date-prefixed report here, and updates this index. From v3 on, reports also
+include three unscored evidence sections: a Code Health Deep-Dive (complexity / duplication /
+coupling), Delivery Performance (DORA proxies), and a Score Trend across all reviews.
+
 ## Methodology
 
 - **Same rubric both times.** 16 scorecard dimensions + an 11-part architecture assessment

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<!--
+  Shell template for MarketHawk Architecture & Quality reports.
+  Replace every {{placeholder}}. Keep the CSS untouched so the series stays visually consistent
+  with v1 (2026-05-26) and v2 (2026-06-03). Section order per SECTIONS.md.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketHawk — Architecture &amp; Quality Report v{{N}}</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+    --text:#e2e8f0;--text-dim:#94a3b8;--accent:#0ea5e9;
+    --green:#22c55e;--yellow:#eab308;--red:#ef4444;--orange:#f97316;--purple:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+  .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+  h1{font-size:2rem;font-weight:700;color:#f8fafc;margin-bottom:.25rem}
+  h2{font-size:1.5rem;font-weight:600;color:#f8fafc;margin:2.5rem 0 1rem;padding-bottom:.5rem;border-bottom:2px solid var(--accent)}
+  h3{font-size:1.15rem;font-weight:600;color:#f1f5f9;margin:1.5rem 0 .5rem}
+  h4{font-size:1rem;font-weight:600;color:var(--accent);margin:1rem 0 .4rem}
+  p,li{color:var(--text)} a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .subtitle{color:var(--text-dim);font-size:.95rem;margin-bottom:2rem}
+  .badge{display:inline-block;padding:2px 10px;border-radius:9999px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+  .badge-yellow{background:rgba(234,179,8,.15);color:var(--yellow)}
+  .badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+  .badge-orange{background:rgba(249,115,22,.15);color:var(--orange)}
+  .badge-blue{background:rgba(14,165,233,.15);color:var(--accent)}
+  .badge-purple{background:rgba(167,139,250,.15);color:var(--purple)}
+  .header-banner{background:linear-gradient(135deg,#0c4a6e 0%,#1e293b 100%);padding:2.5rem 2rem;border-radius:12px;margin-bottom:2rem;border:1px solid var(--border)}
+  .header-banner .meta{display:flex;gap:2rem;flex-wrap:wrap;margin-top:.5rem}
+  .header-banner .meta span{color:var(--text-dim);font-size:.85rem}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+  .score-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;text-align:center;position:relative}
+  .score-big{font-size:2.5rem;font-weight:800}
+  .score-label{font-size:.85rem;color:var(--text-dim);margin-top:.25rem}
+  .delta-pill{position:absolute;top:.6rem;right:.6rem;font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:9999px;background:rgba(34,197,94,.18);color:var(--green)}
+  .delta-pill.flat{background:rgba(148,163,184,.18);color:var(--text-dim)}
+  .delta-pill.down{background:rgba(239,68,68,.18);color:var(--red)}
+  .score-5{color:var(--green)}.score-4{color:#4ade80}.score-3{color:var(--yellow)}.score-2{color:var(--orange)}.score-1{color:var(--red)}.score-0{color:#6b7280}
+  table{width:100%;border-collapse:collapse;margin:.75rem 0 1.5rem;font-size:.9rem}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--surface2);color:#cbd5e1;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+  tr:hover td{background:rgba(14,165,233,.04)}
+  td code,p code,li code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:.82rem}
+  .toc{columns:2;column-gap:2rem}.toc li{break-inside:avoid;margin-bottom:.3rem;font-size:.9rem}
+  .meter{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:.3rem 0}
+  .meter-fill{height:100%;border-radius:4px}
+  .meter-green .meter-fill{background:var(--green)}.meter-yellow .meter-fill{background:var(--yellow)}
+  .meter-orange .meter-fill{background:var(--orange)}.meter-red .meter-fill{background:var(--red)}
+  .sev-critical{color:var(--red);font-weight:700}.sev-high{color:var(--orange);font-weight:600}
+  .sev-medium{color:var(--yellow);font-weight:600}.sev-low{color:var(--green)}
+  ul,ol{padding-left:1.3rem;margin:.5rem 0}li{margin-bottom:.3rem}
+  .fp{color:var(--purple);font-family:'JetBrains Mono',monospace;font-size:.82rem}
+  .dimrow{display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;margin:.35rem 0}
+  .dimbar{display:flex;align-items:center;gap:.5rem}
+  .deltaup{color:var(--green);font-weight:700}.deltaflat{color:var(--text-dim);font-weight:700}.deltadown{color:var(--red);font-weight:700}
+  .callout{border-left:4px solid var(--accent);background:var(--surface2);padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.8rem 0}
+  .callout-red{border-color:var(--red)}.callout-green{border-color:var(--green)}.callout-yellow{border-color:var(--yellow)}
+  .mermaid{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;margin:1rem 0;text-align:center}
+  /* KPI cards for the DORA section */
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem}
+  .kpi .v{font-size:2rem;font-weight:800;color:#f8fafc}
+  .kpi .l{font-size:.8rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}
+  .kpi .s{font-size:.78rem;color:var(--text-dim);margin-top:.3rem}
+  /* Trend table coloring */
+  .trend-flat{color:var(--text-dim)} .trend-up{color:var(--green)} .trend-down{color:var(--red)}
+  @media(max-width:768px){.toc{columns:1}.card-grid{grid-template-columns:1fr}}
+  @media print{body{background:#fff;color:#111}.card,th{background:#f3f4f6}.header-banner{background:#e0f2fe}h2{border-color:#0284c7}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header-banner">
+  <h1>MarketHawk &mdash; Architecture &amp; Quality Report <span style="color:var(--accent)">v{{N}}</span></h1>
+  <div class="subtitle">{{one-line framing, e.g. "Re-assessment following remediation tickets #X–#Y"}}</div>
+  <div class="meta">
+    <span>Repository: <strong>omniscient/markethawk</strong></span>
+    <span>Branch: <strong>main</strong> @ <strong>{{short-sha}}</strong></span>
+    <span>Commits: <strong>{{total}}</strong> (+{{delta}} since v{{N-1}})</span>
+    <span>Generated: <strong>{{YYYY-MM-DD}}</strong></span>
+    <span>Prior report: <strong>{{prior-date}} (v{{N-1}})</strong></span>
+  </div>
+</div>
+
+<div class="callout callout-green">
+  <strong>How to read this report.</strong> Identical scoring rubric to all prior reviews — every
+  number is directly comparable. Scored items carry a <span class="badge badge-green">Δ vs v{{N-1}}</span>
+  pill. Scores were verified against live code on <code>main</code>, including running
+  {{verified-commands}}, not inferred from commit messages.
+</div>
+
+<h2 id="toc">Table of Contents</h2>
+<ol class="toc">
+  <li><a href="#exec-summary">Executive Summary</a></li>
+  <li><a href="#tech-overview">Repository &amp; Technology Overview</a></li>
+  <li><a href="#arch-assessment">Architecture Assessment</a></li>
+  <li><a href="#maintain">Maintainability Assessment</a></li>
+  <li><a href="#test">Testability &amp; Code Coverage</a></li>
+  <li><a href="#reliability">Reliability &amp; Operational Readiness</a></li>
+  <li><a href="#security">Security &amp; Compliance Review</a></li>
+  <li><a href="#perf">Performance &amp; Scalability</a></li>
+  <li><a href="#api-data">API, Data &amp; Integration Quality</a></li>
+  <li><a href="#devx">Developer Experience</a></li>
+  <li><a href="#code-health">Code Health Deep-Dive</a></li>
+  <li><a href="#dora">Delivery Performance (DORA)</a></li>
+  <li><a href="#trend">Score Trend</a></li>
+  <li><a href="#traceability">Ticket &rarr; Outcome Traceability</a></li>
+  <li><a href="#risk-register">Risk Register (v{{N}})</a></li>
+  <li><a href="#scorecard">Quality Scorecard</a></li>
+  <li><a href="#roadmap">Prioritized Improvement Roadmap</a></li>
+  <li><a href="#final">Final Recommendations</a></li>
+  <li><a href="#evidence">Evidence Index</a></li>
+  <li><a href="#limitations">Limitations</a></li>
+</ol>
+
+<!-- ================= §1 EXEC SUMMARY ================= -->
+<h2 id="exec-summary">1. Executive Summary</h2>
+<div class="card-grid">
+  <!-- 4 score-cards; pattern: -->
+  <div class="score-card"><span class="delta-pill">{{+Δ}}</span><div class="score-big score-4">{{overall}}</div><div class="score-label">Overall Quality Score (0&ndash;100)</div><div style="font-size:.75rem;color:var(--text-dim)">was {{prior}}</div></div>
+  {{...3 more}}
+</div>
+<div class="card"><h3>Overall Health</h3>{{2 paragraphs}}</div>
+<h3>Top 5 Strengths (new since v{{N-1}})</h3><ol>{{...}}</ol>
+<h3>Top 5 Risks</h3><ol>{{<li><span class="sev-critical">CRITICAL</span> <strong>title</strong> — finding with file:line</li>}}</ol>
+<h3>Top 5 Recommended Actions</h3><ol>{{<li>action — <em>Effort: S/M/L, closes Rxx</em></li>}}</ol>
+
+<!-- ================= §2 TECH OVERVIEW ================= -->
+<h2 id="tech-overview">2. Repository &amp; Technology Overview</h2>
+{{What-changed table (Area | vN-1 | vN), Codebase Metrics table, Architectural Pattern para}}
+<div class="mermaid">
+flowchart LR
+  {{system topology}}
+</div>
+
+<!-- ================= §3 ARCHITECTURE ASSESSMENT ================= -->
+<h2 id="arch-assessment">3. Architecture Assessment</h2>
+<!-- 11 cards; pattern: -->
+<h3>3.1 Separation of Concerns</h3>
+<div class="card">
+  <strong>Score: {{x}}/5</strong> <span class="badge badge-green">{{badge}}</span> <span class="delta-pill flat">Δ {{d}}</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:{{x*20}}%"></div></div>
+  <p><strong>Change:</strong> {{...}}</p>
+  <p><strong>Finding:</strong> {{... what caps the score}}</p>
+</div>
+{{...3.2 through 3.11}}
+
+<!-- ================= §4–§10 ================= -->
+{{Maintainability (incl. god-module trend table) · Testability · Reliability 13-row table ·
+  Security 10-row table · Performance · API/Data · DevX 9-row table — per SECTIONS.md}}
+
+<!-- ================= §11 CODE HEALTH DEEP-DIVE ================= -->
+<h2 id="code-health">11. Code Health Deep-Dive</h2>
+<h3>Cyclomatic complexity — top 10</h3>
+<table><tr><th>Function</th><th>File</th><th>Lines</th><th>Branches</th><th>Primary issue</th></tr>{{rows}}</table>
+<h3>Duplication — top 8</h3>
+<table><tr><th>Pattern</th><th>Occurrences</th><th>Layer</th><th>Consolidation</th></tr>{{rows}}</table>
+<h3>Coupling map</h3>
+<div class="mermaid">flowchart LR
+  {{service import graph; circular/cross-layer edges styled red}}
+</div>
+<h3>Module depth candidates</h3>
+{{up to 5 cards: files, problem, proposed deepening, Strong/Worth exploring/Speculative badge}}
+
+<!-- ================= §12 DORA ================= -->
+<h2 id="dora">12. Delivery Performance (DORA)</h2>
+<p class="subtitle">Window: {{prior-date}} &rarr; {{date}}. All four are proxies (single repo, no production telemetry) — derivations shown per metric.</p>
+<div class="card-grid">
+  <div class="kpi"><div class="l">Deployment Frequency</div><div class="v">{{x}}/wk</div><div class="s">merges to main · was {{prior}} · proxy: merge commits</div></div>
+  <div class="kpi"><div class="l">Lead Time for Changes</div><div class="v">{{x}}h</div><div class="s">median PR open&rarr;merge · n={{count}}</div></div>
+  <div class="kpi"><div class="l">Change Failure Rate</div><div class="v">{{x}}%</div><div class="s">fix/revert within 7d of merge · proxy</div></div>
+  <div class="kpi"><div class="l">MTTR</div><div class="v">{{x}}h</div><div class="s">median bug-issue open&rarr;close · n={{count}}</div></div>
+</div>
+{{delivery extras table: commits/wk, factory vs human share, median PR size, PR count}}
+{{1 paragraph: trend + DORA band mapping with proxy caveat}}
+
+<!-- ================= §13 SCORE TREND ================= -->
+<h2 id="trend">13. Score Trend</h2>
+<div class="card" id="trendchart"></div>
+<table id="trendtable"><tr><th>Dimension</th><th>v1</th><th>v2</th><th>v{{N}}</th><th>Trajectory</th></tr>{{rows; mark dims flat ≥3 reviews}}</table>
+{{paragraph: structurally stuck dimensions}}
+
+<!-- ================= §14 TRACEABILITY ================= -->
+<h2 id="traceability">14. Ticket &rarr; Outcome Traceability</h2>
+<table><tr><th>#</th><th>Ticket</th><th>Maps to v{{N-1}}</th><th>Verified outcome</th></tr>{{rows with Done/Partial/Declined/Broken badges}}</table>
+<div class="callout callout-yellow"><strong>Coverage gap in the follow-through:</strong> {{prior risks that never got a ticket}}</div>
+
+<!-- ================= §15 RISK REGISTER ================= -->
+<h2 id="risk-register">15. Risk Register (v{{N}})</h2>
+<h3>Newly introduced</h3>
+<table><tr><th>ID</th><th>Description</th><th>Sev</th><th>Evidence</th><th>Mitigation</th></tr>{{rows}}</table>
+<h3>Carried over (not yet addressed)</h3>
+<table><tr><th>Prior ID</th><th>Description</th><th>Sev</th><th>Status</th></tr>{{rows}}</table>
+
+<!-- ================= §16 SCORECARD ================= -->
+<h2 id="scorecard">16. Quality Scorecard</h2>
+<p>Same 16 dimensions and rubric as every prior review. Bars show v{{N}}; pills show movement.</p>
+<div class="card" id="scorebars"></div>
+<div class="card" style="text-align:center;margin-top:1.5rem">
+  <div style="font-size:.9rem;color:var(--text-dim)">Weighted Average Score</div>
+  <div class="score-big score-4" style="font-size:3rem">{{mean}} / 5</div>
+  <div style="font-size:.85rem;color:var(--text-dim)">was {{prior}} / 5 &mdash; <span class="deltaup">{{Δ}}</span> &mdash; "{{one-line characterization}}"</div>
+</div>
+
+<!-- ================= §17 ROADMAP ================= -->
+<h2 id="roadmap">17. Prioritized Improvement Roadmap (v{{N}})</h2>
+<h3>Immediate (0&ndash;1 week) — {{theme}}</h3>
+<table><tr><th>Action</th><th>Closes</th><th>Effort</th></tr>{{rows}}</table>
+<h3>Short-term (2&ndash;4 weeks)</h3>
+<table>{{rows}}</table>
+<h3>Medium / Strategic</h3>
+<table><tr><th>Action</th><th>Benefit</th><th>Effort</th></tr>{{rows}}</table>
+
+<!-- ================= §18 FINAL ================= -->
+<h2 id="final">18. Final Recommendations</h2>
+<div class="card"><h4>Most important decision to make next</h4><p>{{...}}</p></div>
+<div class="card"><h4>Most important practice to improve next</h4><p>{{...}}</p></div>
+<div class="card"><h4>Most important operational risk to reduce next</h4><p>{{...}}</p></div>
+<div class="card"><h4>Conclusion</h4><p>{{trajectory, not just state}}</p></div>
+
+<!-- ================= §19 EVIDENCE ================= -->
+<h2 id="evidence">19. Evidence Index</h2>
+<table><tr><th>File / Directory</th><th>Purpose</th></tr>{{rows}}</table>
+
+<!-- ================= §20 LIMITATIONS ================= -->
+<h2 id="limitations">20. Limitations</h2>
+<div class="card"><ul>
+  <li><strong>{{what was executed vs inferred}}</strong></li>
+  <li><strong>Coverage numbers from configuration.</strong> {{...}}</li>
+  <li><strong>Scoring is comparative-rubric, not absolute.</strong> The 0&ndash;100 score maps the
+      16-dimension mean onto v1's calibration (2.8&rarr;62); it is a relative health indicator,
+      not a certification.</li>
+</ul></div>
+
+<div style="text-align:center;margin-top:3rem;padding:1.5rem;color:var(--text-dim);font-size:.85rem">
+  <p>Report generated {{date}} by {{model}} &mdash; verified against <code>main</code> @ {{sha}}</p>
+  <p>MarketHawk &mdash; Architecture &amp; Quality Report v{{N}} &mdash; companion to v{{N-1}} ({{prior-date}})</p>
+</div>
+
+</div>
+
+<script>
+mermaid.initialize({startOnLoad:true,theme:'dark',themeVariables:{primaryColor:'#1e293b',primaryBorderColor:'#334155',lineColor:'#64748b',fontSize:'13px'}});
+
+/* §16 scorebars — fill with real data: [name, vPrior, vNow] */
+const dims = [
+  ["Architecture Clarity",0,0],["Modularity",0,0],["Separation of Concerns",0,0],
+  ["Maintainability",0,0],["Testability",0,0],["Code Coverage Maturity",0,0],
+  ["Reliability",0,0],["Security Posture",0,0],["Observability",0,0],
+  ["Performance Readiness",0,0],["Scalability Readiness",0,0],["Deployment Readiness",0,0],
+  ["Developer Experience",0,0],["Documentation",0,0],["Dependency Hygiene",0,0],
+  ["Operational Readiness",0,0]
+];
+const col = v => v>=5?'#22c55e':v>=4?'#4ade80':v>=3?'#eab308':v>=2?'#f97316':'#ef4444';
+let html = '';
+for(const [name,vp,vn] of dims){
+  const d = vn-vp;
+  const dcls = d>0?'deltaup':d<0?'deltadown':'deltaflat';
+  const dtxt = d>0?('+'+d):d<0?(''+d):'0';
+  html += `<div class="dimrow">
+    <div>${name} <span style="color:var(--text-dim);font-size:.8rem">(prev ${vp})</span></div>
+    <div class="dimbar">
+      <div style="width:160px;background:var(--surface2);border-radius:4px;height:14px;overflow:hidden">
+        <div style="width:${vn/5*100}%;height:100%;background:${col(vn)}"></div>
+      </div>
+      <strong style="width:28px;text-align:right">${vn}</strong>
+      <span class="${dcls}" style="width:34px;text-align:right">${dtxt}</span>
+    </div>
+  </div>`;
+}
+document.getElementById('scorebars').innerHTML = html;
+
+/* §13 trend chart — overall score per review: [label, value] */
+const overall = [["v1 2026-05-26",62],["v2 2026-06-03",83]/*,["v{{N}} {{date}}",{{x}}]*/];
+const max = 100;
+let t = '<div style="display:flex;align-items:flex-end;gap:1.2rem;height:160px;padding:0 .5rem">';
+for(const [l,v] of overall){
+  t += `<div style="flex:1;text-align:center">
+    <div style="font-weight:800;color:#f8fafc">${v}</div>
+    <div style="height:${v/max*120}px;background:linear-gradient(180deg,#0ea5e9,#22c55e);border-radius:6px 6px 0 0;margin:0 auto;max-width:90px"></div>
+    <div style="font-size:.72rem;color:var(--text-dim);margin-top:.4rem">${l}</div>
+  </div>`;
+}
+t += '</div>';
+document.getElementById('trendchart').innerHTML = t;
+</script>
+</body>
+</html>
