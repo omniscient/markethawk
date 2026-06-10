@@ -25,6 +25,8 @@ graph TD
         prometheus["prometheus :9090"]
         grafana["grafana :3001"]
         jaeger["jaeger :16686/:4317"]
+        seqgelf["seq-gelf :12201/udp"]
+        forecastworker["forecast-worker (profile: forecasting)"]
     end
 
     subgraph factory["factory-network"]
@@ -73,6 +75,10 @@ graph TD
     proxy -->|":ro"| dockersock
     darkfactory -->|"tcp :2375"| proxy
     scheduler -->|"tcp :2375"| proxy
+
+    seqgelf -->|"GELF → HTTP"| seq
+    forecastworker --> postgres
+    forecastworker --> redis
 ```
 
 ## Scan Execution Flow
@@ -138,7 +144,7 @@ sequenceDiagram
 | File | Responsibility |
 |------|---------------|
 | `config.py` | `Settings` class; reads all env vars with typed defaults. Accessed via `get_settings()` (cached). |
-| `database.py` | Async SQLAlchemy engine and session factory (`AsyncSession`). `get_db()` dependency. |
+| `database.py` | Synchronous SQLAlchemy engine and session factory (`Session`, `SessionLocal`, psycopg2-binary). `get_db()` dependency yields a `Session` and closes it after use. |
 | `celery_app.py` | Celery instance; beat schedule definitions (scan times, sync intervals). |
 | `error_tracking.py` | `ErrorTracker` protocol; `SeqErrorTracker` and `StdoutErrorTracker` implementations; MD5-based `ErrorId` generation. |
 | `rate_limits.py` | SlowAPI `limiter` instance + four tier constants: `GLOBAL_LIMIT` (100/min), `SCANNER_LIMIT` (5/min), `TRADING_LIMIT` (10/min), `AUTH_LIMIT` (5/min). Lives in `core/` (not `main.py`) to break the circular import from routers importing `limiter`. Redis db 1 storage when `RATE_LIMITING_ENABLED=true`. |
@@ -217,6 +223,8 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `system.py` | `/api/v1/system/*` — configuration, status |
 | `outcomes.py` | `/api/v1/outcomes/*` — scorecard, intervals, distribution, edge decay, signals, event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
 | `tweets.py` | `GET /api/v1/tweets/recent` — recent TweetSignals (filter by classification/promoted); `WS /api/v1/tweets/feed` — live WebSocket stream of all new tweet signals from Redis `tweet_signals:all` channel |
+| `alerts.py` | `GET /api/v1/alerts/stats` (dashboard header cards), `GET/POST /api/v1/alerts/rules` (list / create), `PATCH/DELETE /api/v1/alerts/rules/{id}`, `POST /api/v1/alerts/rules/{id}/test` (dry-run match against recent events), `GET /api/v1/alerts/logs` (delivery audit trail), `GET/POST /api/v1/alerts/push/vapid-key`, `GET /api/v1/alerts/push/generate-keys`, `POST /api/v1/alerts/push/subscribe`, `DELETE /api/v1/alerts/push/unsubscribe`, `POST /api/v1/alerts/infrastructure` (Grafana alerting webhook) |
+| `auto_trading.py` | `GET/POST /api/v1/trading/strategies` (list / create), `GET/PATCH/DELETE /api/v1/trading/strategies/{id}`, `GET /api/v1/trading/orders` (list with status filter), `GET /api/v1/trading/orders/{id}`, `POST /api/v1/trading/orders/{id}/approve`, `POST /api/v1/trading/orders/{id}/reject`, `POST /api/v1/trading/orders/{id}/cancel`, `GET /api/v1/trading/account` (IBKR account summary), `GET /api/v1/trading/stats` (P&L, win rate, status breakdown), `GET/PATCH /api/v1/trading/config` |
 
 ### Database Models (`app/models/`)
 
@@ -247,6 +255,14 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `MonitoredAccount` | `monitored_accounts` | X (Twitter) accounts tracked by the tweet-monitor service. Stores `handle`, `platform`, `poll_interval_seconds`, `last_tweet_id` for dedup, and per-account `classification_config` JSONB for keyword overrides. |
 | `TweetSignal` | `tweet_signals` | One row per scraped tweet. Records `classification` (CALLOUT/CELEBRATION/UPDATE/RETWEET/UNKNOWN), `confidence` score, extracted `tickers`/`price_levels` JSONB, `direction`, and `promoted` flag. FK to `scanner_events` when promoted. |
 | `User` | `users` | Operator account. Fields: `id` (UUID PK), `username` (unique), `password_hash` (bcrypt), `created_at`, `is_active`. First user created via bootstrap endpoint; additional users blocked at the application layer. |
+| `AlertRule` | `alert_rules` | User-defined rule that triggers notifications when scanner events match. Filters by `scanner_types` (JSONB list), `severity_filter`, and ticker lists. Carries `auto_trade` flag and optional FK to `TradingStrategy`. |
+| `AlertDeliveryLog` | `alert_delivery_logs` | Immutable audit trail for every notification attempt (success or failure). FK to `alert_rules` and `scanner_events` (both SET NULL on delete). Stores `channel`, `status`, and `error_message`. |
+| `AutoTradeOrder` | `auto_trade_orders` | Immutable audit record for every automated trade decision, tracking the full lifecycle from decision → submission → fill → exit. Stores sizing, entry/exit prices, P&L, and IBKR order IDs. |
+| `TradingStrategy` | `trading_strategies` | Defines risk/reward parameters for automated trade execution (position size, stop-loss, take-profit, entry type, eligible sessions). One strategy can be referenced by many `AlertRule`s. |
+| `PushSubscription` | `push_subscriptions` | Browser Web Push subscription (endpoint URL, ECDH `p256dh` key, auth secret). One row per browser/device that has granted push permission. |
+| `ScannerOutcomeSnapshot` | `scanner_outcome_snapshots` | Captures price action at a specific time offset (`interval_key`) from a scanner signal. FK → `scanner_events.id`. Unique on `(scanner_event_id, interval_key)`. |
+| `ScannerOutcomeSummary` | `scanner_outcome_summaries` | Derived signal-quality metrics (MFE %, MAE %, MFE/MAE ratio, time-to-MFE/MAE) computed from a signal's snapshots. One-to-one FK → `scanner_events.id`. |
+| `SystemConfig` | `system_config` | Key/value store for system-wide runtime settings (e.g. signal ranker weights, feature flags). `key` is the PK; `value` is a string. Updated without redeploy. |
 
 ## Frontend Architecture
 
