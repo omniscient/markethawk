@@ -19,14 +19,14 @@ export default defineConfig({
         'src/**/*.test.{ts,tsx}',
         'src/**/*.d.ts',
       ],
-      // Spec target: 35%/25%. Actual post-implementation coverage: 21.6%/21.1%/16.7%/22.3%.
-      // Spec assumption: if actuals land below 35%, set honestly and file a ratchet follow-up.
-      // Thresholds set ~3pp below actuals for stable CI headroom. See issue #250.
+      // Spec target: 35%/25%. Intermediate milestone (issue #250): 30%/22%.
+      // Actuals post-ratchet: ~30.4% stmts / ~30.7% branches / ~24.3% funcs / ~31.4% lines.
+      // Thresholds = floor(actual) - 3, clamped to 30/22 floor. See issue #250.
       thresholds: {
-        statements: 18,
-        branches: 18,
-        functions: 13,
-        lines: 19,
+        statements: 30,
+        branches: 27,
+        functions: 22,
+        lines: 30,
       },
     },
   },
