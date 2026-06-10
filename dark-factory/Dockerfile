@@ -38,7 +38,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --quiet "git+https://github.com/scheidydude/codeindex.git" pre-commit
 
 # Bun — install to /opt/bun so it is accessible to non-root users
-RUN BUN_INSTALL=/opt/bun curl -fsSL https://bun.sh/install | bash
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/opt/bun bash
 ENV PATH="/opt/bun/bin:${PATH}"
 
 # GitHub CLI
