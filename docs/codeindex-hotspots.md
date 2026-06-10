@@ -1,4 +1,4 @@
-Files with blast score ≥ 5.0  (29 found)
+Files with blast score ≥ 5.0  (30 found)
 
     74.0  redis  (30d / 88t)
     53.5  frontend/src/api/client.ts  (20d / 67t)
@@ -27,5 +27,6 @@ Files with blast score ≥ 5.0  (29 found)
      6.0  frontend/src/hooks/useScorecard.ts  (5d / 2t)
      5.5  backend/app/routers/news.py  (1d / 9t)
      5.5  frontend/src/api/news.ts  (2d / 7t)
+     5.5  frontend/src/utils/indicators.ts  (2d / 7t)
      5.0  frontend/src/api/alerts.ts  (3d / 4t)
      5.0  frontend/src/hooks/useWatchlistLive.ts  (4d / 2t)
