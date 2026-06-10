@@ -46,6 +46,9 @@ export default [
       ...reactHooks.configs['recommended-latest'].rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 
+      // Enforce const for variables that are never reassigned
+      'prefer-const': 'error',
+
       // TypeScript handles unused-vars better than the base rule
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
