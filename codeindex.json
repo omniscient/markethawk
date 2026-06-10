@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 463,
-    "total_loc": 66836,
+    "total_files": 464,
+    "total_loc": 66838,
     "languages": [
       "python",
       "javascript",
@@ -23156,6 +23156,21 @@
           "exported": true
         }
       ]
+    },
+    {
+      "id": "frontend/src/vite-env.d.ts",
+      "type": "module",
+      "language": "typescript",
+      "framework": null,
+      "size": 2,
+      "loc": 2,
+      "group": 32,
+      "imports": [],
+      "layer": "frontend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": []
     },
     {
       "id": "frontend/vite.config.ts",
