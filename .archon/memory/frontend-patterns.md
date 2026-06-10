@@ -59,6 +59,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When fixing `eslint.config.js` to enforce warning-level rules that produce many pre-existing warnings, update the pre-commit hook in `.pre-commit-config.yaml` to use `npx eslint . --report-unused-disable-directives-severity error` (errors only) rather than `npm run lint` — otherwise the hook blocks all commits until every warning is cleaned up. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+## Frontend: Testing — Chart Libraries
+
+- [AVOID] Do not vi.mock chart libraries (Lightweight Charts, Recharts) to make chart-rendering components testable in jsdom — this produces thin wrappers that hit coverage counters without asserting real behavior. Skip chart-rendering files in coverage ratchets; test only pure data-shaping logic that can be extracted as standalone helpers. Affected files: `ChartPanel.tsx`, `DistributionChart.tsx`, `EdgeDecayChart.tsx`. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
