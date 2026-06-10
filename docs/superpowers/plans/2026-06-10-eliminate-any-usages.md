@@ -1019,14 +1019,26 @@ For each file, the pattern is:
 14. **`QualityReportModal.tsx`** — `onError: (err: any)` (3 occurrences at lines 399, 451, 452) → `onError: (err: unknown)` with the same narrowing pattern as step 6.
 
 15. **`StockChart.tsx`** — 2 `any`s:
-    - **Line 101**: `const seriesRef = useRef<ISeriesApi<any> | null>(null)`. The existing comment explains the library limitation: `ISeriesApi<SeriesType>` as a union makes `.setData()` unsatisfiable because TypeScript requires the argument to match ALL union members simultaneously. Fix by using a **single** concrete type for the ref (candlestick, the dominant path), then casting through `unknown` at the specific call sites that use a different series type:
+    - **Line 99–101**: Delete the stale comment and retype the ref. The comment at lines 99–100 says "`ISeriesApi<SeriesType>` as a union makes `.setData()` unsatisfiable — keep `ISeriesApi<any>` per spec Req 7". This is now resolved — use a single concrete type for the ref and cast through `unknown` at each cross-series site. Delete the comment and retype:
       ```diff
+      -  // lightweight-charts has no base series interface; ISeriesApi<SeriesType> makes setData unsatisfiable at call sites — keep ISeriesApi<any> per spec Req 7 (library limitation).
       -  const seriesRef = useRef<ISeriesApi<any> | null>(null);
       +  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
       ```
-      Four call sites to update:
+      **Assignment sites** — `seriesRef.current` is also assigned `areaSeries` and `lineSeries`; cast those through `unknown` too:
+      - **Line 247** (area series assignment):
+        ```diff
+        -  seriesRef.current = areaSeries;
+        +  seriesRef.current = areaSeries as unknown as ISeriesApi<'Candlestick'>;
+        ```
+      - **Line 254** (line series assignment):
+        ```diff
+        -  seriesRef.current = lineSeries;
+        +  seriesRef.current = lineSeries as unknown as ISeriesApi<'Candlestick'>;
+        ```
+      **Call sites** (4 total):
       - **Line 326** (`seriesRef.current.setData(candleData)`): No change — `candleData` is `CandlestickData[]`, compatible with `ISeriesApi<'Candlestick'>`.
-      - **Line 450** (`seriesRef.current.setData(uniqueData)`, in the `else`/line–area branch): `uniqueData` is `(LineData | AreaData)[]` — not assignable to `CandlestickData[]`. Cast through `unknown`:
+      - **Line 450** (`seriesRef.current.setData(uniqueData)`, in the `else`/line–area branch): `uniqueData` is `(LineData | AreaData)[]` — cast through `unknown`:
         ```diff
         -  seriesRef.current.setData(uniqueData);
         +  (seriesRef.current as unknown as ISeriesApi<'Line'>).setData(uniqueData as LineData[]);
