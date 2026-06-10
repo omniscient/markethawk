@@ -5,6 +5,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Docker Volume Sharing
 
+- [PATTERN] When a non-root container user needs write access to a named Docker volume, pre-create the target directory in the Dockerfile (as root, before `USER <non-root>`) and chown it to the container user: `RUN mkdir -p /path/to/dir && chown user:user /path/to/dir`. Docker initializes an empty named volume from the image directory's ownership on first mount; if the path does not exist in the image, Docker creates it as root:root (mode 0755) and the non-root user gets read-only access. <!-- issue:#266 date:2026-06-10 expires:2026-12-10 source:refine -->
+- [AVOID] Do not mount a named volume at a path that a non-root container user needs to write to without first pre-creating that path in the Dockerfile with the correct ownership — the volume will initialize as root:root and the service will crash under `set -euo pipefail` when it attempts to write state files. Affected services use `restart: unless-stopped` and will restart-loop silently without actionable error output. <!-- issue:#266 date:2026-06-10 expires:2026-12-10 source:refine -->
+
 - [AVOID] Never define a Docker named volume with `driver_opts: type: tmpfs` when the intent is to share files across containers — Docker tmpfs mounts are per-container; each container that mounts the volume gets its own independent tmpfs, making writes from one container invisible to another. Use a regular named volume (no `driver_opts`) for shared-directory patterns like prometheus-client multiprocess mode. <!-- issue:#194 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 ## Preview Stack
