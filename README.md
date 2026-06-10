@@ -29,7 +29,7 @@ Session boundaries are computed in `America/New_York` and mapped to UTC for stor
 
 ## Tech Stack
 
-**Backend**: FastAPI · SQLAlchemy 2.0 (async) · PostgreSQL 15 · Redis 7 · Celery  
+**Backend**: FastAPI · SQLAlchemy 2.0 (sync, psycopg2) · PostgreSQL 15 · Redis 7 · Celery  
 **Frontend**: React 18 · TypeScript · Vite · Tailwind CSS · React Query · Recharts · Lightweight Charts  
 **Market Data**: Polygon.io (primary) · Interactive Brokers via IB Gateway (secondary)  
 **Logging**: Seq (structured, centralized)
