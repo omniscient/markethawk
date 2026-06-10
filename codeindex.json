@@ -2,7 +2,7 @@
   "meta": {
     "root": "markethawk/",
     "total_files": 462,
-    "total_loc": 66680,
+    "total_loc": 66668,
     "languages": [
       "python",
       "javascript",
@@ -45609,8 +45609,8 @@
       "type": "service",
       "language": "docker",
       "image": "",
-      "size": 26,
-      "loc": 26,
+      "size": 33,
+      "loc": 33,
       "group": 12,
       "imports": [
         "python"
