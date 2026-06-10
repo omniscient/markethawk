@@ -24,9 +24,33 @@ If the issue has any of these labels, STOP immediately and exit with code 0 (not
 4. Read `/opt/refinement-skills/orchestrator-prompt.md` for your process instructions
 5. Read `/opt/refinement-skills/product-owner-prompt.md` — you will pass this to subagents
 6. Read `/opt/refinement-skills/config.yaml` for pipeline configuration
-7. Read `.archon/memory/codebase-patterns.md` — global lessons from past runs.
-8. Read `.archon/memory/architecture.md` — prior architectural decisions written by previous refine runs (if the file exists).
-9. Read area-specific memory files relevant to the issue's domain: if the issue touches backend code read `.archon/memory/backend-patterns.md`; if it touches frontend code read `.archon/memory/frontend-patterns.md`; if it touches Docker or infrastructure read `.archon/memory/dark-factory-ops.md`.
+7. Compute the affected file set and define `load_memory` for path-tag filtering:
+
+```bash
+AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
+
+# load_memory: reads a memory file; path-tagged entries are filtered against AFFECTED.
+# Entries without a path: tag are always included (backward-compatible).
+# When AFFECTED is empty (new branch, nothing implemented yet), all entries are included.
+load_memory() {
+  local MEMFILE=".archon/memory/$1"
+  [ -f "$MEMFILE" ] || return
+  while IFS= read -r line; do
+    if echo "$line" | grep -q 'path:'; then
+      PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
+      if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then
+        echo "$line"
+      fi
+    else
+      echo "$line"
+    fi
+  done < "$MEMFILE"
+}
+```
+
+8. Run `load_memory codebase-patterns.md` and include its filtered output in context — global lessons from past runs.
+9. Run `load_memory architecture.md` and include its filtered output in context — prior architectural decisions written by previous refine runs (if the file exists).
+10. Run area-specific memory filtering relevant to the issue's domain: if the issue touches backend code run `load_memory backend-patterns.md`; if it touches frontend code run `load_memory frontend-patterns.md`; if it touches Docker or infrastructure run `load_memory dark-factory-ops.md`.
 
 When reading memory files, skip entries tagged `[PROVISIONAL]` and `[INVALID]` — treat them
 as unverified or invalidated. Do not base architectural decisions on provisional entries; they

@@ -26,11 +26,36 @@ Read the project rules:
 2. Read `ARCHITECTURE.md` for service topology and module map.
 3. The issue context has been fetched by the workflow. It is available in the conversation.
 4. **Check the `intent` field** in the issue context: `"new"` or `"continue"`.
-5. Read `.archon/memory/codebase-patterns.md` — global lessons from past runs.
-6. Read `.archon/memory/architecture.md` — prior architectural decisions (if the file exists).
-7. If the issue touches backend code (`backend/app/models/`, `routers/`, `services/`, `tasks/`): read `.archon/memory/backend-patterns.md`.
-8. If the issue touches frontend code (`frontend/src/`): read `.archon/memory/frontend-patterns.md`.
-9. If the issue touches Docker or infrastructure files (`docker-compose`, `Dockerfile`, `dark-factory/`): read `.archon/memory/dark-factory-ops.md`.
+5. Compute the affected file set and define `load_memory` for path-tag filtering:
+
+```bash
+AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
+
+# load_memory: reads a memory file, including entries without a path: tag unconditionally,
+# and path-tagged entries only when their prefix matches an affected file.
+# Uses sed (POSIX) for tag extraction and grep -q "^PREFIX" for prefix matching.
+# When AFFECTED is empty (new branch), all path-tagged entries are included.
+load_memory() {
+  local MEMFILE=".archon/memory/$1"
+  [ -f "$MEMFILE" ] || return
+  while IFS= read -r line; do
+    if echo "$line" | grep -q 'path:'; then
+      PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
+      if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then
+        echo "$line"
+      fi
+    else
+      echo "$line"
+    fi
+  done < "$MEMFILE"
+}
+```
+
+6. Run `load_memory codebase-patterns.md` and include its filtered output in context — global lessons from past runs.
+7. Run `load_memory architecture.md` and include its filtered output in context — prior architectural decisions (if the file exists).
+8. If the issue touches backend code (`backend/app/models/`, `routers/`, `services/`, `tasks/`): run `load_memory backend-patterns.md` and include its filtered output in context.
+9. If the issue touches frontend code (`frontend/src/`): run `load_memory frontend-patterns.md` and include its filtered output in context.
+10. If the issue touches Docker or infrastructure files (`docker-compose`, `Dockerfile`, `dark-factory/`): run `load_memory dark-factory-ops.md` and include its filtered output in context.
 
 Apply these lessons as strong hints throughout implementation. If a lesson conflicts with `CLAUDE.md` or `ARCHITECTURE.md`, follow those documents instead and note the conflict in `$ARTIFACTS_DIR/implementation.md`.
 

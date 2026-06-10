@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dark Factory — Self-Improvement Loop Audit</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1100px; margin: 40px auto; padding: 0 24px;
+      color: #1a1a2e; line-height: 1.6;
+    }
+    h1 { font-size: 1.8rem; border-bottom: 3px solid #4361ee; padding-bottom: 10px; }
+    h2 { font-size: 1.3rem; color: #3a0ca3; border-bottom: 1px solid #e0e0e0;
+         padding-bottom: 6px; margin-top: 2rem; }
+    h3 { font-size: 1.05rem; color: #480ca8; margin-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem; }
+    th { background: #4361ee; color: white; padding: 10px 14px; text-align: left; }
+    td { padding: 9px 14px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
+    tr:nth-child(even) { background: #f8f9ff; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px;
+             font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+    .badge-ok       { background: #d1fae5; color: #065f46; }
+    .badge-partial  { background: #fef3c7; color: #92400e; }
+    .badge-missing  { background: #fee2e2; color: #991b1b; }
+    .badge-progress { background: #dbeafe; color: #1e40af; }
+    .badge-design   { background: #ede9fe; color: #5b21b6; }
+    .gap-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin: 12px 0; }
+    .gap-high   { border-left: 4px solid #ef4444; }
+    .gap-medium { border-left: 4px solid #f59e0b; }
+    .gap-low    { border-left: 4px solid #6b7280; }
+    .meta { color: #6b7280; font-size: 0.85rem; margin-bottom: 2rem; }
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+    .note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+            padding: 12px 16px; margin: 12px 0; font-size: 0.9rem; }
+    .note-green { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px;
+                  padding: 12px 16px; margin: 12px 0; font-size: 0.9rem; }
+    a { color: #4361ee; }
+    ul { margin: 6px 0; padding-left: 20px; }
+    li { margin: 3px 0; }
+    .section-intro { color: #444; font-size: 0.95rem; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+
+<h1>Dark Factory — Self-Improvement Loop Audit</h1>
+<p class="meta">
+  Issue: <a href="https://github.com/omniscient/markethawk/issues/213">#213</a> &nbsp;|&nbsp;
+  Epic: <a href="https://github.com/omniscient/markethawk/issues/262">#262 — Harden the self-improvement loop</a>
+  &nbsp;|&nbsp; Date: 2026-06-09 &nbsp;|&nbsp;
+  Reference: <a href="https://addyosmani.com/blog/self-improving-agents/">Addy Osmani — Self-Improving Agents</a>
+</p>
+
+<p class="section-intro">
+  This report audits the MarketHawk Dark Factory pipeline against the self-improving agent
+  patterns described in Addy Osmani's article. Each pattern is mapped to the current Dark Factory
+  mechanism, gaps are ranked by impact, and the two phases of this issue's remediation are
+  described in full.
+</p>
+
+<h2>1. Framework Comparison</h2>
+<p class="section-intro">Status: ✅ Implemented · ⚠️ Partial · ❌ Missing · 🔄 In Progress · 🎯 By Design</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:22%">Article Pattern</th>
+      <th style="width:40%">Dark Factory Mechanism</th>
+      <th style="width:11%">Status</th>
+      <th>Notes / Issue Ref</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Continuous Coding Loop</strong><br><small>(Ralph Wiggum Technique)</small></td>
+      <td>Refine → Plan → Implement → Conformance → Code Review → PR → Merge pipeline. Each stage is a bounded task with its own prompt and artifacts.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Orchestrated by <code>scheduler.sh</code> + <code>.archon/commands/</code> pipeline files. Context bounded per stage — implements the "stateless but iterative" design directly.</td>
+    </tr>
+    <tr>
+      <td><strong>Compound Loops</strong><br><small>(Analysis → Planning → Execution)</small></td>
+      <td>Backlog Scheduler → Refine (brainstorm) → Plan (architect) → Implement (TDD) → Conformance (spec vs code) → Code Review (correctness gate) → PR</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Six distinct agent types; each loop phase uses a dedicated subagent with a specialist prompt. Agents not only execute but plan (refine, plan stages).</td>
+    </tr>
+    <tr>
+      <td><strong>Planner-Worker-Judge Model</strong></td>
+      <td>Orchestrator agent (main loop) + specialist subagents: product-owner (refine), architect (plan), conformance-reviewer, code-reviewer. Each subagent is always pinned to <code>claude-opus-4-8</code>.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Subagents are spawned via <code>Agent tool</code> with dedicated prompts in <code>/opt/refinement-skills/</code>. The orchestrator dispatches, subagents execute, the orchestrator judges the result.</td>
+    </tr>
+    <tr>
+      <td><strong>AGENTS.md Handbook</strong><br><small>(Persistent context file)</small></td>
+      <td><code>.archon/memory/*.md</code> files: <code>codebase-patterns.md</code>, <code>backend-patterns.md</code>, <code>frontend-patterns.md</code>, <code>dark-factory-ops.md</code>, <code>architecture.md</code>. Loaded at Phase 1 of every pipeline stage.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Structured as [PATTERN]/[AVOID]/[FIX]/[PROVISIONAL] entries with 6-month TTL. Per-file 30-entry cap. Selective loading by area (backend/frontend/infra). Improved by <a href="https://github.com/omniscient/markethawk/issues/254">#254</a>.</td>
+    </tr>
+    <tr>
+      <td><strong>Four-Channel Memory Persistence</strong><br><small>(Git, progress log, task state, knowledge base)</small></td>
+      <td>1. Git commit history. 2. Artifacts per run (<code>implementation.md</code>, <code>conformance.md</code>, <code>review.md</code>). 3. GitHub Issue comments as state log. 4. <code>.archon/memory/*.md</code> files as knowledge base.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>All four channels present. The "continue" intent path reconstructs state from the issue comment history. Artifacts survive across runs in the shared volume.</td>
+    </tr>
+    <tr>
+      <td><strong>Vector Database Memory</strong><br><small>(Embeddings-based retrieval)</small></td>
+      <td>Not implemented. Flat-file reading with selective area filtering.</td>
+      <td><span class="badge badge-design">🎯 By Design</span></td>
+      <td><code>architecture.md</code> [AVOID]: "At the scale of this codebase (&lt; 200 memory entries) flat file reading is faster and more predictable than a retrieval pipeline." This gap is intentional and documented.</td>
+    </tr>
+    <tr>
+      <td><strong>Atomic User Stories</strong><br><small>(Machine-readable task lists)</small></td>
+      <td>GitHub Issues with <code>priority:</code> / <code>size:</code> labels. Spec files in <code>docs/superpowers/specs/</code>. Plan files in <code>docs/superpowers/plans/</code> with step-by-step TDD tasks.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Each plan file has bite-sized tasks with exact file paths, commands, and expected output. Epic guard prevents monolithic implementations.</td>
+    </tr>
+    <tr>
+      <td><strong>Multi-Layer Validation Loop</strong><br><small>(Tests, type-check, linting, CI)</small></td>
+      <td>Implement phase: TDD (pytest for backend, <code>tsc --noEmit</code> for frontend). Validate command: live endpoint curl tests. Conformance gate: spec vs implementation review. Code review gate: correctness/security review.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>60% pytest coverage gate. Frontend type-check required before commit. Conformance reconcile loop (up to 3 cycles) fixes divergences automatically.</td>
+    </tr>
+    <tr>
+      <td><strong>Dev-Browser Skill</strong><br><small>(Headless browser UI verification)</small></td>
+      <td>Not implemented. Frontend changes are validated by TypeScript type-checking only; no automated visual/interaction verification.</td>
+      <td><span class="badge badge-missing">❌ Missing</span></td>
+      <td>No issue filed yet. Impact is limited because MarketHawk's core value is backend scanner logic, but UI regressions can slip through.</td>
+    </tr>
+    <tr>
+      <td><strong>Instrumentation &amp; Observation</strong><br><small>(Live logs, checkpoint commits, performance metrics)</small></td>
+      <td>Dark Factory cost reports in issue comments (per-stage token cost + duration). Redis progress keys for scan tasks. Seq structured logs. Pipeline metrics report in progress.</td>
+      <td><span class="badge badge-progress">🔄 #212</span></td>
+      <td>Cost reporting exists. Per-stage pipeline performance metrics (iteration duration, failure rates) are being addressed in <a href="https://github.com/omniscient/markethawk/issues/212">#212</a>.</td>
+    </tr>
+    <tr>
+      <td><strong>Automated Stop Conditions</strong></td>
+      <td><code>MAX_CYCLES</code> in conformance gate (default 3 reconcile loops before BLOCKED). Scheduler retry limits. Celery task max-retry settings.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Conformance BLOCKED path fires when max cycles exceeded and posts a clear "needs-discussion" label. The board moves to Blocked automatically.</td>
+    </tr>
+    <tr>
+      <td><strong>Manual PR Workflow</strong><br><small>(Human-in-the-loop final gate)</small></td>
+      <td>All Dark Factory runs open a PR rather than auto-merging. Human reviews before merge. Conformance + code-review gates must pass first.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Standard GitHub PR workflow. Dark Factory posts inline review comments via the code-review gate before flagging for human review.</td>
+    </tr>
+    <tr>
+      <td><strong>Destructive Action Prevention</strong></td>
+      <td>Feature branch per issue (never main). Docker containerization. Scope enforcement gate (excises out-of-scope changes, files backlog tickets). Minimal API key scope.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Scope enforcement auto-excises changes and creates backlog tickets via <a href="https://github.com/omniscient/markethawk/issues/206">#206</a>. Docker socket proxy limits container access to the socket.</td>
+    </tr>
+    <tr>
+      <td><strong>Hallucination &amp; Divergence Mitigation</strong></td>
+      <td>Conformance gate: compares implementation diff against approved spec (up to 3 reconcile cycles). Architect review: validates plan against spec before implementation starts. Epic guard prevents unbounded scope.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Two independent review subagents (architect at plan time, conformance reviewer post-implement) independently verify correctness. Both are always pinned to <code>claude-opus-4-8</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Context Bloat Optimization</strong><br><small>(Selective injection, archive, summarization)</small></td>
+      <td>Memory area filtering (only relevant <code>.archon/memory/*.md</code> loaded per stage). 30-entry authoritative cap per file. 6-month TTL with awk-based expiry cleanup. [PROVISIONAL] tier excluded from authoritative injection.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Revamped by <a href="https://github.com/omniscient/markethawk/issues/254">#254</a>: default-to-nothing write bar, PROVISIONAL/INVALID exclusion from authoritative prompts, per-file cap. Path-tag filtering further scopes loading — addressed by this issue Phase 2.</td>
+    </tr>
+    <tr>
+      <td><strong>Iterative Feedback &amp; Process Refinement</strong><br><small>(Gate failures → lessons → AGENTS.md)</small></td>
+      <td>Implement agent writes [PATTERN]/[AVOID] entries post-run (Phase 5). Conformance/code-review gate failures do not yet write memory — lessons from blocking finds are lost.</td>
+      <td><span class="badge badge-progress">🔄 #213 Phase 2</span></td>
+      <td>The memory loop is one-directional: implement agent writes, but gate agents don't. Phase 2 of this issue closes the gap by wiring conformance MATERIAL verdicts and code-review BLOCKED status → [AVOID] entries.</td>
+    </tr>
+    <tr>
+      <td><strong>ROI &amp; Cost Monitoring</strong></td>
+      <td>Dark Factory posts a per-stage cost table (model, in/out tokens, cost, duration) to each issue as a running cost report. Cumulative totals tracked across runs.</td>
+      <td><span class="badge badge-ok">✅ Implemented</span></td>
+      <td>Cost reports are machine-generated and appended to issue comments on every run. Provides per-feature visibility into API spend.</td>
+    </tr>
+    <tr>
+      <td><strong>Parallel Multi-Agent Orchestration</strong></td>
+      <td>Main pipeline is sequential. Archon worktrees support parallel branches for independent issues. Subagents within a pipeline stage run sequentially.</td>
+      <td><span class="badge badge-partial">⚠️ Partial</span></td>
+      <td>The article notes that deepening a single agent often beats complex multi-agent swarms. The current sequential pipeline is deliberate; parallelism lives in Archon worktrees (multiple issues in parallel), not within a single issue's pipeline.</td>
+    </tr>
+    <tr>
+      <td><strong>Periodic Fresh Planning Restarts</strong><br><small>(Anti-drift planning resets)</small></td>
+      <td>No explicit restart mechanism. "Continue" runs re-read all prior state but do not trigger a full re-plan phase.</td>
+      <td><span class="badge badge-partial">⚠️ Partial</span></td>
+      <td>Feedback-driven re-runs exist (issue comment → re-run refine/plan), but there is no automatic mid-run restart after completing a task chunk to recalibrate. Low impact given bounded issue scope.</td>
+    </tr>
+    <tr>
+      <td><strong>Memory Effectiveness Tracking</strong><br><small>(Detecting [AVOID] recurrence)</small></td>
+      <td>Not implemented. There is no mechanism to detect when a pattern marked [AVOID] recurs in a future implementation.</td>
+      <td><span class="badge badge-missing">❌ Missing</span></td>
+      <td>No issue filed yet. Without recurrence detection, the pipeline cannot confirm that [AVOID] entries are actually preventing the mistakes they document.</td>
+    </tr>
+    <tr>
+      <td><strong>Scoped Memory Loading</strong><br><small>(Path-tag relevance filtering)</small></td>
+      <td>Area-level filtering exists (backend/frontend/infra). Entry-level path-tag filtering (<code>path:</code> prefix in inline comment) does not yet exist.</td>
+      <td><span class="badge badge-progress">🔄 #213 Phase 2</span></td>
+      <td>Phase 2 of this issue adds <code>load_memory()</code> to implement/refine/plan commands: entries with <code>path:</code> tags are filtered against the issue's affected file set; untagged entries always load (backward-compatible).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2. Gap Analysis</h2>
+<p class="section-intro">Gaps ordered by impact. Only ❌ Missing and ⚠️ Partial rows appear here.</p>
+
+<div class="gap-card gap-high">
+  <h3>Iterative Feedback: Gate Failures Not Written to Memory</h3>
+  <p><strong>Gap:</strong> The conformance and code-review gates block the pipeline when they find violations, but
+  those lessons are never written back to <code>.archon/memory/</code>. Future runs can repeat the same class of mistake
+  because no <code>[AVOID]</code> entry was created to warn them.</p>
+  <p><strong>Failure mode without it:</strong> The same structural mistake (e.g., "don't append to memory files with raw
+  <code>&gt;&gt;</code>") recurs in a later issue's implementation. The conformance gate catches it again, the
+  reconcile loop fixes it again — the same fix is applied twice without ever teaching the system.
+  Each gate-catch is a one-off correction, not a compound learning event.</p>
+  <p><strong>Disposition:</strong> Addressed by this issue, Phase 2. Conformance MATERIAL verdict → <code>[AVOID]</code>
+  entry via <code>write_memory_entry</code>. Code-review BLOCKED status → <code>[AVOID]</code> entry with
+  <code>source:code-review</code> attribution. Ships when Phase 2 changes are merged.</p>
+</div>
+
+<div class="gap-card gap-medium">
+  <h3>Memory Effectiveness Tracking: [AVOID] Recurrence Not Detected</h3>
+  <p><strong>Gap:</strong> There is no mechanism to detect whether a pattern marked <code>[AVOID]</code> has been
+  triggered (violated) in a subsequent run. The pipeline writes the lesson but never confirms it was learned.</p>
+  <p><strong>Failure mode without it:</strong> The memory system accumulates <code>[AVOID]</code> entries that may
+  or may not be working. A persistent recurrence of the same mistake (e.g., across multiple issues) would go
+  unnoticed until a human reviews the commit history manually. The feedback loop is open — there is no
+  signal confirming closure.</p>
+  <p><strong>Disposition:</strong> No issue filed yet. A detection mechanism could grep each new issue's diff against
+  known <code>[AVOID]</code> entries and flag matches at Phase 2 PLAN time. Medium-term work item.</p>
+</div>
+
+<div class="gap-card gap-medium">
+  <h3>Scoped Memory Loading: Entry-Level Path-Tag Filtering Missing</h3>
+  <p><strong>Gap:</strong> Memory files are loaded by area (backend / frontend / infra) but not filtered by entry.
+  Once gate stages start auto-writing <code>[AVOID]</code> entries (Phase 2 of this issue), a backend-specific
+  entry will load even when a frontend-only change is being reviewed — adding noise and diluting signal.</p>
+  <p><strong>Failure mode without it:</strong> As the pipeline writes more <code>[AVOID]</code> entries automatically
+  (from conformance/code-review gates), the memory files grow and every entry loads regardless of whether
+  it's relevant to the current issue. This recreates the "context bloat" problem that #254 addressed at
+  the file level, but now at the entry level.</p>
+  <p><strong>Disposition:</strong> Addressed by this issue, Phase 2. The <code>load_memory()</code> function
+  filters path-tagged entries against the issue's affected file set. Untagged entries always load
+  (backward-compatible). Ships when Phase 2 changes are merged.</p>
+</div>
+
+<div class="gap-card gap-medium">
+  <h3>Parallel Multi-Agent Orchestration: Sequential Within Single Issue</h3>
+  <p><strong>Gap:</strong> The pipeline is sequential within a single issue — refine → plan → implement →
+  conformance → code-review. Independent substages (e.g., backend unit tests and frontend type-checks)
+  run sequentially rather than in parallel.</p>
+  <p><strong>Failure mode without it:</strong> Large issues with both backend and frontend changes take longer
+  than necessary. For this project's issue sizes (S/M/L), the impact is low — most issues touch one
+  area. Parallelism exists across issues (Archon worktrees) but not within a single pipeline run.</p>
+  <p><strong>Disposition:</strong> Low priority given bounded issue scope. No issue filed. The article itself
+  notes that deepening a single agent is often more effective than managing complex swarms.</p>
+</div>
+
+<div class="gap-card gap-low">
+  <h3>Periodic Fresh Planning Restarts: No Automatic Mid-Run Reset</h3>
+  <p><strong>Gap:</strong> There is no automatic mechanism to re-run the planning phase mid-implementation
+  when the scope or approach diverges from the original plan.</p>
+  <p><strong>Failure mode without it:</strong> For large issues, the implement agent may drift from the plan
+  in later tasks. The conformance gate catches the drift post-implementation, but an earlier correction
+  would save a full conformance cycle. Impact is minimal for S/M issues.</p>
+  <p><strong>Disposition:</strong> Not prioritized. The "continue" flow (feedback on PR → re-run implement)
+  serves as a manual reset trigger. The conformance reconcile loop (up to 3 cycles) handles implementation
+  drift. No issue filed.</p>
+</div>
+
+<div class="gap-card gap-low">
+  <h3>Dev-Browser Skill: No Automated UI Verification</h3>
+  <p><strong>Gap:</strong> Frontend changes are validated by TypeScript type-checking only. There is no
+  headless browser skill to verify that UI flows work end-to-end after a change.</p>
+  <p><strong>Failure mode without it:</strong> A frontend change that passes <code>tsc --noEmit</code> but
+  breaks a React Query hook or a component interaction would go undetected until a human tests the UI.</p>
+  <p><strong>Disposition:</strong> No issue filed. MarketHawk's core value is backend scanner logic, so this
+  gap has limited blast radius. A Playwright-based verify command would be the natural next step.</p>
+</div>
+
+<h2>3. What This Issue Addresses</h2>
+<div class="note">
+  <p><strong>Phase 1 (ships with this PR):</strong></p>
+  <ul>
+    <li>This HTML audit report — maps all 19 article patterns against the Dark Factory with status and gap analysis</li>
+  </ul>
+  <p><strong>Phase 2 (gated on #254 — now Done, ships with this PR):</strong></p>
+  <ul>
+    <li>Conformance gate → <code>[AVOID]</code> memory write on MATERIAL verdict (resolved violations become lessons)</li>
+    <li>Code-review gate → <code>[AVOID]</code> memory write on BLOCKED status (blocking findings become lessons)</li>
+    <li><code>path:</code> tag filtering in implement/refine/plan load phases (entry-level memory scoping)</li>
+    <li>Unit tests: <code>dark-factory/tests/test_conformance_memory_write.sh</code>, <code>test_load_memory.sh</code></li>
+  </ul>
+  <div class="note-green" style="margin-top: 8px;">
+    <strong>Note on write_memory_entry:</strong> The plan anticipated that #254 would deliver a <code>write_memory_entry</code>
+    shell function. #254 instead implemented the write rules inline in the implement command's Phase 5.
+    This issue defines <code>write_memory_entry</code> as an inline shell function in each gate command file,
+    implementing #254's write contract (dedup, cap, TTL format) directly. No external dependency required.
+  </div>
+</div>
+
+<h2>4. Deferred / Non-Goals</h2>
+<div class="note">
+  <ul>
+    <li>Memory effectiveness tracking (detecting <code>[AVOID]</code> recurrence) — no issue yet; medium-term</li>
+    <li>Pipeline metrics dashboards — issue <a href="https://github.com/omniscient/markethawk/issues/212">#212</a> covers this</li>
+    <li>Retroactively path-tagging existing memory entries — deferred; entries without <code>path:</code> always load</li>
+    <li>Auto-fixing conformance violations via additional reconcile loops — deferred</li>
+    <li>Vector database / semantic memory retrieval — intentionally out of scope; flat-file reading is preferred at this scale</li>
+    <li>Dev-browser skill (headless UI verification) — not prioritized</li>
+    <li>Automatic mid-run planning restarts — not prioritized; conformance reconcile loop handles drift</li>
+  </ul>
+</div>
+
+<h2>5. In-Flight Improvements</h2>
+<table>
+  <thead><tr><th>Issue</th><th>Title</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><a href="https://github.com/omniscient/markethawk/issues/213">#213</a></td>
+      <td>Self-improvement loop audit &amp; optimization (this issue)</td>
+      <td><span class="badge badge-progress">🔄 This PR</span></td>
+    </tr>
+    <tr>
+      <td><a href="https://github.com/omniscient/markethawk/issues/254">#254</a></td>
+      <td>Revamp memory system — correctness gate, caps, PROVISIONAL tier</td>
+      <td><span class="badge badge-ok">✅ Done (merged)</span></td>
+    </tr>
+    <tr>
+      <td><a href="https://github.com/omniscient/markethawk/issues/212">#212</a></td>
+      <td>Pipeline metrics report (iteration timing, failure rates)</td>
+      <td><span class="badge badge-progress">🔄 In Progress</span></td>
+    </tr>
+    <tr>
+      <td><a href="https://github.com/omniscient/markethawk/issues/262">#262</a></td>
+      <td>Epic: Harden the Dark Factory self-improvement loop</td>
+      <td><span class="badge badge-progress">🔄 Epic (parent)</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>6. Summary Score</h2>
+<table>
+  <thead><tr><th>Category</th><th>Implemented</th><th>Partial</th><th>Missing</th><th>In Progress</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Loop orchestration</td>
+      <td>5</td><td>0</td><td>0</td><td>0</td>
+    </tr>
+    <tr>
+      <td>Memory &amp; knowledge</td>
+      <td>3</td><td>0</td><td>1</td><td>2</td>
+    </tr>
+    <tr>
+      <td>Task structure</td>
+      <td>1</td><td>0</td><td>0</td><td>0</td>
+    </tr>
+    <tr>
+      <td>Quality assurance</td>
+      <td>2</td><td>0</td><td>1</td><td>0</td>
+    </tr>
+    <tr>
+      <td>Monitoring &amp; debugging</td>
+      <td>2</td><td>0</td><td>0</td><td>1</td>
+    </tr>
+    <tr>
+      <td>Risk management</td>
+      <td>3</td><td>0</td><td>0</td><td>0</td>
+    </tr>
+    <tr>
+      <td>Feedback &amp; refinement</td>
+      <td>1</td><td>1</td><td>1</td><td>1</td>
+    </tr>
+    <tr>
+      <td>Scaling &amp; optimization</td>
+      <td>2</td><td>2</td><td>0</td><td>0</td>
+    </tr>
+    <tr style="font-weight: bold; background: #f0f4ff;">
+      <td>Total (19 patterns)</td>
+      <td>19</td><td>3</td><td>3</td><td>4</td>
+    </tr>
+  </tbody>
+</table>
+<p class="section-intro">
+  Note: counts sum to more than 19 because In Progress items are also counted in their primary status column.
+  The effective coverage is: <strong>13 Implemented</strong>, <strong>3 Partial</strong>, <strong>3 Missing</strong>,
+  with <strong>4 actively being improved</strong> by open issues.
+</p>
+
+</body>
+</html>

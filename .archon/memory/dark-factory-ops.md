@@ -75,6 +75,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] The `docker-socket-proxy` service must have no `profiles:` key so it is a lifecycle superset of both `factory` and `scheduler` profiles. Consumers (`dark-factory`, `backlog-scheduler`) drop their raw `/var/run/docker.sock` volumes and instead set `DOCKER_HOST: tcp://docker-socket-proxy:2375` with `depends_on: [docker-socket-proxy]`. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+## Path-Tag Memory Filtering
+
+- [PATTERN] Path-tag filtering in Phase 1 LOAD extracts the `path:` prefix with `sed 's/.*path:\([^ >]*\).*/\1/'` (POSIX-compatible; not `grep -oP`) and matches via `echo "$AFFECTED" | grep -q "^${PATH_TAG}"` against the affected file list; empty `AFFECTED` means "include all" — correct fallback for new branches. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
+
+- [PATTERN] Gate commands (conformance, code-review) that need to write `[AVOID]` memory entries should define `route_memory_file()` and `write_memory_entry()` as inline shell functions using: dedup via `grep -qF`, 30-entry cap check, mawk-compatible two-arg awk expiry cleanup, and `sed -i "/^---$/i ENTRY"` to insert before the PROVISIONAL section delimiter. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from

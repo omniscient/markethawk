@@ -16,12 +16,36 @@ argument-hint: (no arguments - reads issue context from workflow)
 3. Read `/opt/refinement-skills/architect-prompt.md` — you will pass this to the review subagent
 4. Find the spec file: look in `docs/superpowers/specs/` for a file matching this issue's topic, or check the issue comments for a "Refinement Pipeline — Spec Generated" report that names the spec path
 5. Read the spec file
-6. Read `.archon/memory/codebase-patterns.md` — global lessons applicable to any change.
-7. Read `.archon/memory/architecture.md` — prior architectural decisions (if the file exists). If a memory entry marks an approach as AVOID, do not plan steps that use that approach.
-8. Read area-specific memory files based on the spec's `Component` field:
-   - Component touches `backend/app/models/`, `routers/`, `services/`, or `tasks/` → read `.archon/memory/backend-patterns.md`
-   - Component touches `frontend/src/` → read `.archon/memory/frontend-patterns.md`
-   - Component touches `docker-compose`, `Dockerfile`, or `dark-factory/` → read `.archon/memory/dark-factory-ops.md`
+6. Compute the affected file set and define `load_memory` for path-tag filtering:
+
+```bash
+AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
+
+# load_memory: reads a memory file; path-tagged entries are filtered against AFFECTED.
+# Entries without a path: tag are always included (backward-compatible).
+# When AFFECTED is empty (new branch, spec not yet implemented), all entries are included.
+load_memory() {
+  local MEMFILE=".archon/memory/$1"
+  [ -f "$MEMFILE" ] || return
+  while IFS= read -r line; do
+    if echo "$line" | grep -q 'path:'; then
+      PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
+      if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then
+        echo "$line"
+      fi
+    else
+      echo "$line"
+    fi
+  done < "$MEMFILE"
+}
+```
+
+7. Run `load_memory codebase-patterns.md` and include its filtered output in context — global lessons applicable to any change.
+8. Run `load_memory architecture.md` and include its filtered output in context — prior architectural decisions (if the file exists). If a memory entry marks an approach as AVOID, do not plan steps that use that approach.
+9. Run area-specific memory filtering based on the spec's `Component` field:
+   - Component touches `backend/app/models/`, `routers/`, `services/`, or `tasks/` → run `load_memory backend-patterns.md`
+   - Component touches `frontend/src/` → run `load_memory frontend-patterns.md`
+   - Component touches `docker-compose`, `Dockerfile`, or `dark-factory/` → run `load_memory dark-factory-ops.md`
 
   Bake relevant memory lessons directly into the plan task steps — do not leave them as a separate advisory section. For example, if `backend-patterns.md` contains a `[PATTERN]` about the `__init__.py` import requirement, the plan's "add model" task must explicitly include an `__init__.py` import step.
 
