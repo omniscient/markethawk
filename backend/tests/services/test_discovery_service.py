@@ -6,10 +6,13 @@ Patch target: app.services.discovery_service.RESTClient
 name must be patched, not `polygon.RESTClient` directly.)
 """
 
+import datetime
 from unittest.mock import MagicMock, patch
 
 from sqlalchemy.orm import Session
 
+from app.models.futures_contract import FuturesContract
+from app.models.ticker_reference import TickerReference
 from app.services.discovery_service import DiscoveryService
 
 # ── sync_fundamental_data ──────────────────────────────────────────────────
@@ -60,3 +63,36 @@ def test_update_daily_metrics_skips_unknown_tickers(db: Session):
         service = DiscoveryService(db)
         # Should not raise even though ticker is not in DB
         service.update_daily_metrics_snapshot()
+
+
+# ── run_screen — integration smoke test ───────────────────────────────────
+
+
+def test_run_screen_dispatches_stocks_and_futures(db: Session):
+    """run_screen dispatches to both StockScreener and FuturesScreener when both asset classes requested."""
+    # Seed a stock ticker
+    db.add(TickerReference(ticker="SMKE", name="Smoke Test Corp", sector="Technology"))
+    # Seed a futures contract
+    db.add(
+        FuturesContract(
+            symbol="CL",
+            exchange="NYMEX",
+            contract_month="20260321",
+            expiry_date=datetime.date(2026, 3, 21),
+        )
+    )
+    db.flush()
+
+    with patch("app.services.discovery_service.RESTClient"):
+        service = DiscoveryService(db)
+        results = service.run_screen(
+            {"asset_classes": ["stocks", "futures"], "futures_symbols": "CL"}
+        )
+
+    tickers = {r["ticker"] for r in results}
+    assert "SMKE" in tickers
+    assert "CL" in tickers
+
+    asset_classes = {r["asset_class"] for r in results}
+    assert "stocks" in asset_classes
+    assert "futures" in asset_classes

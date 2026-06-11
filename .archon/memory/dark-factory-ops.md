@@ -90,3 +90,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+- [PROVISIONAL] The `docker-socket-proxy` blocks `exec` operations (HTTP 403), so testcontainers healthchecks fail inside the factory container; use `TEST_DATABASE_URL=postgresql://postgres:<pw>@postgres:5432/test_markethawk` instead (create DB via SQLAlchemy AUTOCOMMIT before running pytest). <!-- evidence:curl-response issue:#287 date:2026-06-11 expires:2026-12-11 source:implement -->
+
+- [PROVISIONAL] When `.env` is absent, retrieve the running postgres password via `curl -s "http://docker-socket-proxy:2375/v1.54/containers/stockscanner-db/json" | python3 -c "import json,sys; [print(e) for e in json.load(sys.stdin)['Config']['Env'] if 'PASSWORD' in e]"`. <!-- evidence:curl-response issue:#287 date:2026-06-11 expires:2026-12-11 source:implement -->

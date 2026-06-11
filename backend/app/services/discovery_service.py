@@ -1,6 +1,6 @@
 import logging
 from datetime import date, timedelta
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 from polygon import RESTClient
 from sqlalchemy.orm import Session
@@ -10,6 +10,21 @@ from app.models.stock_metric import StockMetric
 from app.models.ticker_reference import TickerReference
 
 logger = logging.getLogger(__name__)
+
+ScreenerFn = Callable[[Session, Dict[str, Any]], List[Dict[str, Any]]]
+
+_SCREENER_REGISTRY: Dict[str, ScreenerFn] = {}
+
+
+def register_screener(asset_class: str, fn: ScreenerFn) -> None:
+    _SCREENER_REGISTRY[asset_class] = fn
+
+
+def _apply_shared_filters(
+    results: List[Dict[str, Any]], criteria: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    # Seam for future cross-asset filters; currently a no-op.
+    return results
 
 
 class DiscoveryService:
@@ -126,214 +141,19 @@ class DiscoveryService:
         Returns list of matching tickers with their fundamental data.
         """
         asset_classes = criteria.get("asset_classes", ["stocks"])
-        data_source_stocks = criteria.get("data_source_stocks", "massive")
-        data_source_futures = criteria.get("data_source_futures", "ibkr")
+
+        # Lazy-import to trigger self-registration of screener adapters.
+        import app.services.futures_screener  # noqa: F401
+        import app.services.stock_screener  # noqa: F401
+
         output = []
-        has_metric_filters = False
-
-        if "stocks" in asset_classes:
-            # Determine if we need to filter by metrics
-            # Currently only min_volume is handled in this logic
-            has_metric_filters = "min_volume" in criteria and criteria["min_volume"] > 0
-
-            if has_metric_filters:
-                # Need metrics -> Inner Join
-                # Using inner join because if we filter by volume, we MUST have the volume data
-                query = self.db.query(TickerReference, StockMetric).join(
-                    StockMetric, TickerReference.ticker == StockMetric.ticker
+        for asset_class in asset_classes:
+            screener_fn = _SCREENER_REGISTRY.get(asset_class)
+            if screener_fn is None:
+                logger.warning(
+                    f"No screener registered for asset_class={asset_class!r}"
                 )
-            else:
-                # No metric filters -> Query only Reference for performance
-                # No need to join metrics table
-                query = self.db.query(TickerReference)
+                continue
+            output.extend(screener_fn(self.db, criteria))
 
-            # Apply Fundamental Filters
-            # Only apply filters if value is non-default/truthy
-            if "min_market_cap" in criteria and criteria["min_market_cap"] > 0:
-                query = query.filter(
-                    TickerReference.market_cap >= criteria["min_market_cap"]
-                )
-
-            if "max_market_cap" in criteria and criteria["max_market_cap"] > 0:
-                query = query.filter(
-                    TickerReference.market_cap <= criteria["max_market_cap"]
-                )
-
-            if (
-                "min_outstanding_shares" in criteria
-                and criteria["min_outstanding_shares"] > 0
-            ):
-                query = query.filter(
-                    TickerReference.outstanding_shares
-                    >= criteria["min_outstanding_shares"]
-                )
-
-            if "sector" in criteria and criteria["sector"]:
-                if isinstance(criteria["sector"], list):
-                    if len(criteria["sector"]) > 0:
-                        query = query.filter(
-                            TickerReference.sector.in_(criteria["sector"])
-                        )
-                elif criteria["sector"]:  # Single value not empty string
-                    query = query.filter(TickerReference.sector == criteria["sector"])
-
-            if "primary_exchange" in criteria and criteria["primary_exchange"]:
-                if isinstance(criteria["primary_exchange"], list):
-                    if len(criteria["primary_exchange"]) > 0:
-                        query = query.filter(
-                            TickerReference.primary_exchange.in_(
-                                criteria["primary_exchange"]
-                            )
-                        )
-                elif criteria["primary_exchange"]:
-                    query = query.filter(
-                        TickerReference.primary_exchange == criteria["primary_exchange"]
-                    )
-
-            if "sic_code" in criteria and criteria["sic_code"]:
-                query = query.filter(TickerReference.sic_code == criteria["sic_code"])
-
-            if "description_contains" in criteria and criteria["description_contains"]:
-                query = query.filter(
-                    TickerReference.description.ilike(
-                        f"%{criteria['description_contains']}%"
-                    )
-                )
-
-            # Range Filters for new numeric fields
-            if "min_employees" in criteria and criteria["min_employees"] > 0:
-                query = query.filter(
-                    TickerReference.total_employees >= criteria["min_employees"]
-                )
-
-            if "max_employees" in criteria and criteria["max_employees"] > 0:
-                query = query.filter(
-                    TickerReference.total_employees <= criteria["max_employees"]
-                )
-
-            if (
-                "min_share_class_shares" in criteria
-                and criteria["min_share_class_shares"] > 0
-            ):
-                query = query.filter(
-                    TickerReference.share_class_shares_outstanding
-                    >= criteria["min_share_class_shares"]
-                )
-
-            if (
-                "max_share_class_shares" in criteria
-                and criteria["max_share_class_shares"] > 0
-            ):
-                query = query.filter(
-                    TickerReference.share_class_shares_outstanding
-                    <= criteria["max_share_class_shares"]
-                )
-
-            if has_metric_filters:
-                if "min_volume" in criteria and criteria["min_volume"] > 0:
-                    query = query.filter(StockMetric.volume >= criteria["min_volume"])
-
-            # Debug Logging
-            if settings.LOG_LEVEL == "DEBUG":
-                try:
-                    # Compile query with literal binds for readability
-                    statement = query.statement.compile(
-                        compile_kwargs={"literal_binds": True}
-                    )
-                    logger.info(f"🔍 Discovery Screen Query: {statement}")
-                except Exception as e:
-                    logger.error(f"Failed to log debug query: {e}")
-
-            # Execute
-            results = query.all()  # No limit as requested by user
-
-            for row in results:
-                if has_metric_filters:
-                    ref, metric = row
-                else:
-                    ref = row
-                    metric = None
-
-                output.append(
-                    {
-                        "ticker": ref.ticker,
-                        "name": ref.name,
-                        "market_cap": ref.market_cap,
-                        "close_price": metric.close_price if metric else None,
-                        "volume": metric.volume if metric else None,
-                        "sector": ref.sector,
-                        "primary_exchange": ref.primary_exchange,
-                        "employees": ref.total_employees,
-                        "sic_code": ref.sic_code,
-                        "description": ref.description,
-                        "asset_class": "stocks",
-                        "data_source": data_source_stocks,
-                    }
-                )
-
-        if "futures" in asset_classes:
-            futures_input = criteria.get("futures_symbols", "")
-            if isinstance(futures_input, str):
-                futures_symbols = [
-                    s.strip().upper() for s in futures_input.split(",") if s.strip()
-                ]
-            else:
-                futures_symbols = [
-                    s.strip().upper()
-                    for s in futures_input
-                    if isinstance(s, str) and s.strip()
-                ]
-
-            if futures_symbols:
-                from app.models.futures_contract import FuturesContract
-
-                # Find found symbols
-                found_futures = (
-                    self.db.query(FuturesContract.symbol, FuturesContract.exchange)
-                    .filter(FuturesContract.symbol.in_(futures_symbols))
-                    .distinct()
-                    .all()
-                )
-
-                found_symbols = {f.symbol for f in found_futures}
-
-                # Add found ones
-                for fut in found_futures:
-                    output.append(
-                        {
-                            "ticker": fut.symbol,
-                            "name": f"{fut.symbol} Futures",
-                            "market_cap": None,
-                            "close_price": None,
-                            "volume": None,
-                            "sector": "Futures",
-                            "primary_exchange": fut.exchange,
-                            "employees": None,
-                            "sic_code": None,
-                            "description": f"Futures contract for {fut.symbol}",
-                            "asset_class": "futures",
-                            "data_source": data_source_futures,
-                        }
-                    )
-
-                # Add missing ones as placeholders
-                for symbol in futures_symbols:
-                    if symbol not in found_symbols:
-                        output.append(
-                            {
-                                "ticker": symbol,
-                                "name": f"{symbol} Futures",
-                                "market_cap": None,
-                                "close_price": None,
-                                "volume": None,
-                                "sector": "Futures",
-                                "primary_exchange": "Unknown",  # Will be resolved on first data sync
-                                "employees": None,
-                                "sic_code": None,
-                                "description": f"Requested Futures contract for {symbol} (Sync pending)",
-                                "asset_class": "futures",
-                                "data_source": data_source_futures,
-                            }
-                        )
-
-        return output
+        return _apply_shared_filters(output, criteria)
