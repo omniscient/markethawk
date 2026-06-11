@@ -196,6 +196,8 @@ def build_scorecard(
 # ── subprocess wrappers (not unit-tested; validated by live run) ──────────────
 def _gh(*args: str, paginate: bool = False) -> list | dict:
     # gh emits UTF-8; force it so Windows' locale codec (cp1252) doesn't choke.
+    # paginate relies on gh merging JSON-array pages into one array (verified
+    # on gh 2.92; very old gh versions concatenated arrays instead).
     cmd = ["gh", *args] + (["--paginate"] if paginate else [])
     result = subprocess.run(
         cmd,
@@ -241,7 +243,11 @@ def _fetch_pr_commits_rest(pr_number: int) -> list[dict]:
     co-authors is an acceptable approximation.
     Commits with a null author block (deleted accounts, some bots) yield an empty email.
     """
-    raw: list[dict] = _gh("api", f"repos/{_OWNER_REPO}/pulls/{pr_number}/commits")
+    raw: list[dict] = _gh(
+        "api",
+        f"repos/{_OWNER_REPO}/pulls/{pr_number}/commits?per_page=100",
+        paginate=True,
+    )
     return [{"authors": [{"email": _commit_email(c)}]} for c in raw]
 
 

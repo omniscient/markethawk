@@ -21,7 +21,16 @@ scripts/render_report.py    → docs/pipeline-report.html
 scripts/generate.sh           gains the scorecard stage
 ```
 
-`fetch_metrics.py` stays issue-centric; the scorecard is PR/git-centric with different data sources (`gh pr list` + git history), so it gets its own module.
+`fetch_metrics.py` stays issue-centric; the scorecard is PR/git-centric with different data sources (GitHub PR data + git history), so it gets its own module.
+
+**Data transport (amended during implementation):** REST v3 via `gh api
+--paginate`, not `gh pr list --json commits` — fetching `commits.authors`
+inline for hundreds of PRs exceeds GraphQL node limits and exhausts the
+hourly GraphQL quota. Commit authors come from a per-PR REST call returning
+the *primary* author only; co-authors (`Co-Authored-By:` trailers such as
+`noreply@anthropic.com`) never appear in REST payloads and need no filtering.
+The factory fingerprint is unaffected: factory commits are always
+primary-authored `factory@markethawk`.
 
 ## Key design decisions
 
