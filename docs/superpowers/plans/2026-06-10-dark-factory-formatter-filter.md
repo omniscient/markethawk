@@ -71,7 +71,7 @@ Expected: FAIL — `formatter rule not inserted`.
 
 - [ ] **Step 3: Insert the rule**
 
-In `.claude/skills/refinement/conformance-reviewer-prompt.md`, find the `## Out-of-Scope Changes` section. The current text ends with:
+In `.claude/skills/refinement/conformance-reviewer-prompt.md`, locate the `## Out-of-Scope Changes` section (search for that exact heading). Within that section, find this exact two-element block (the paragraph + bullet that close the section):
 
 ```
 List every change in the diff that is NOT (a) spec-named, (b) supporting housekeeping directly backing an (a) change, or (c) strictly required for the in-scope work to compile/run. Include fixes to pre-existing defects even if they appear beneficial.
@@ -79,7 +79,7 @@ List every change in the diff that is NOT (a) spec-named, (b) supporting houseke
 - [OOS] <file or area> — <one-sentence description of the unrelated change>
 ```
 
-Insert the following block between the paragraph ending "even if they appear beneficial." and the `- [OOS] <file or area>` line:
+Insert the formatter exception block between those two lines — i.e., after the "even if they appear beneficial." paragraph **inside `## Out-of-Scope Changes`** and before the `- [OOS]` bullet. (Note: the phrase "even if they appear beneficial" also appears earlier in the file in a different section; the insertion target is the occurrence inside `## Out-of-Scope Changes` only.)
 
 ```markdown
 **Formatter / import-ordering exception:** Reformatting and import re-ordering produced by
@@ -506,16 +506,26 @@ def is_formatter_only(actual, fmt_hunks, base_lines):
 
 
 def _run_formatter(content):
-    """Apply ruff format + ruff check --fix --select I to content, return result."""
+    """Apply ruff format + ruff check --fix --select I to content, return result.
+
+    Passes --config backend/pyproject.toml so the formatter uses the project's
+    line-length (88) and rule-set — temp files in /tmp/ are outside the project
+    tree and ruff won't auto-discover the config from there.
+    """
     with tempfile.NamedTemporaryFile(
         suffix=".py", mode="w", delete=False, encoding="utf-8"
     ) as f:
         f.write(content)
         tmp = f.name
     try:
-        subprocess.run(["ruff", "format", tmp], capture_output=True)
         subprocess.run(
-            ["ruff", "check", "--fix", "--select", "I", tmp], capture_output=True
+            ["ruff", "format", "--config", "backend/pyproject.toml", tmp],
+            capture_output=True,
+        )
+        subprocess.run(
+            ["ruff", "check", "--fix", "--select", "I",
+             "--config", "backend/pyproject.toml", tmp],
+            capture_output=True,
         )
         with open(tmp, encoding="utf-8") as f:
             return f.read()
@@ -895,6 +905,17 @@ docker compose --profile factory config --services 2>/dev/null | grep dark-facto
 ```
 
 Expected: `dark-factory` appears in the list.
+
+- [ ] **Step 1.5: Verify ruff is available in the container (spec Open Question)**
+
+The spec notes that `ruff` availability in the factory container is an open question (it lands via `pip install -r requirements.txt`). The filter degrades gracefully to a no-op if ruff is absent, but Layer 1 is load-bearing — confirm ruff is present before shipping:
+
+```bash
+docker compose --profile factory run --rm dark-factory \
+  bash -c "command -v ruff && echo 'ruff OK' || echo 'WARNING: ruff not found — Layer 1 will be a no-op'"
+```
+
+Expected: `ruff OK` (path to ruff binary printed). If ruff is missing, investigate `requirements.txt` and rebuild.
 
 - [ ] **Step 2: Rebuild the image**
 
