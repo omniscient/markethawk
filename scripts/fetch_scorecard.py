@@ -105,7 +105,6 @@ def count_surviving_lines(blame_output: str, sha: str) -> int:
     return sum(1 for line in blame_output.splitlines() if line.startswith(prefix))
 
 
-
 # ── aggregation ────────────────────────────────────────────────────────────────
 _TRIAD_KEYS = ("merged_clean", "merged_with_edits", "closed", "open")
 
@@ -195,10 +194,11 @@ def build_scorecard(
 
 
 # ── subprocess wrappers (not unit-tested; validated by live run) ──────────────
-def _gh(*args: str) -> list | dict:
+def _gh(*args: str, paginate: bool = False) -> list | dict:
     # gh emits UTF-8; force it so Windows' locale codec (cp1252) doesn't choke.
+    cmd = ["gh", *args] + (["--paginate"] if paginate else [])
     result = subprocess.run(
-        ["gh", *args],
+        cmd,
         capture_output=True,
         text=True,
         check=True,
@@ -222,6 +222,13 @@ def _git(repo_root: str, *args: str) -> str:
 
 _OWNER_REPO = REPO  # "omniscient/markethawk"
 
+_STATE_MAP = {"open": "OPEN", "closed": "CLOSED"}
+
+
+def _commit_email(c: dict) -> str:
+    author = (c.get("commit") or {}).get("author") or {}
+    return author.get("email") or ""
+
 
 def _fetch_pr_commits_rest(pr_number: int) -> list[dict]:
     """Fetch commits for a PR via REST API, returning ``[{authors: [{email}]}]``.
@@ -232,15 +239,10 @@ def _fetch_pr_commits_rest(pr_number: int) -> list[dict]:
     (``Co-Authored-By:``) are NOT included; however factory PRs always have
     ``factory@markethawk`` as the *primary* commit author, so omitting
     co-authors is an acceptable approximation.
+    Commits with a null author block (deleted accounts, some bots) yield an empty email.
     """
-    raw: list[dict] = _gh(
-        "api", f"repos/{_OWNER_REPO}/pulls/{pr_number}/commits",
-        "--method", "GET",
-    )
-    return [
-        {"authors": [{"email": c["commit"]["author"]["email"]}]}
-        for c in raw
-    ]
+    raw: list[dict] = _gh("api", f"repos/{_OWNER_REPO}/pulls/{pr_number}/commits")
+    return [{"authors": [{"email": _commit_email(c)}]} for c in raw]
 
 
 def fetch_prs() -> list[dict]:
@@ -250,21 +252,14 @@ def fetch_prs() -> list[dict]:
     limits that arise when fetching ``commits.authors`` inline) and a separate
     REST call per PR for commit-author data.
     """
-    result = subprocess.run(
-        ["gh", "api", "--paginate",
-         f"repos/{_OWNER_REPO}/pulls?state=all&per_page=100"],
-        capture_output=True,
-        text=True,
-        check=True,
-        encoding="utf-8",
+    raw_prs: list[dict] = _gh(
+        "api", f"repos/{_OWNER_REPO}/pulls?state=all&per_page=100", paginate=True
     )
-    raw_prs: list[dict] = json.loads(result.stdout)
 
     prs: list[dict] = []
     for i, rp in enumerate(raw_prs, 1):
         print(f"  [commits {i}/{len(raw_prs)}] PR #{rp['number']}", file=sys.stderr)
-        state_map = {"open": "OPEN", "closed": "CLOSED"}
-        state = "MERGED" if rp.get("merged_at") else state_map.get(rp["state"], rp["state"].upper())
+        state = "MERGED" if rp.get("merged_at") else _STATE_MAP.get(rp["state"], rp["state"].upper())
         labels = [{"name": lbl["name"]} for lbl in rp.get("labels", [])]
         commits = _fetch_pr_commits_rest(rp["number"])
         prs.append({
@@ -283,15 +278,9 @@ def fetch_prs() -> list[dict]:
 
 def fetch_issues() -> list[dict]:
     """Fetch all issues via the REST v3 API (avoids GraphQL quota)."""
-    result = subprocess.run(
-        ["gh", "api", "--paginate",
-         f"repos/{_OWNER_REPO}/issues?state=all&per_page=100"],
-        capture_output=True,
-        text=True,
-        check=True,
-        encoding="utf-8",
+    raw: list[dict] = _gh(
+        "api", f"repos/{_OWNER_REPO}/issues?state=all&per_page=100", paginate=True
     )
-    raw: list[dict] = json.loads(result.stdout)
     # The REST issues endpoint returns both issues and pull requests; filter to
     # issues only (PRs have a 'pull_request' key).
     issues_only = [item for item in raw if "pull_request" not in item]
@@ -317,7 +306,8 @@ def compute_churn(repo_root: str, since: datetime, until: datetime) -> dict:
     cutoff = until - timedelta(days=CHURN_WINDOW_DAYS)
     log = _git(
         repo_root, "log", "main", "--no-merges",
-        f"--author={FACTORY_EMAIL}",
+        # angle brackets anchor the regex to the exact email field
+        f"--author=<{FACTORY_EMAIL}>",
         f"--since={since.isoformat()}", f"--until={until.isoformat()}",
         "--format=%H|%cI",
     )
@@ -340,7 +330,11 @@ def compute_churn(repo_root: str, since: datetime, until: datetime) -> dict:
         added = parse_numstat(_git(repo_root, "show", "--numstat", "--format=", sha))
         if not added:
             continue
-        horizon = (cdt + timedelta(days=CHURN_WINDOW_DAYS)).isoformat()
+        # normalize to UTC; offset-bearing ISO strings have had parsing quirks
+        # in git-for-Windows
+        horizon = (cdt.astimezone(timezone.utc) + timedelta(days=CHURN_WINDOW_DAYS)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         rev = _git(repo_root, "rev-list", "-1", f"--before={horizon}", "main").strip()
         if not rev:
             continue
