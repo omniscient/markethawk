@@ -43,6 +43,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Pre-commit hooks that invoke advisory/optional tools (e.g. `codeindex-blast`) must always exit 0 — use `|| true` or `; exit 0`. A non-zero exit from a pre-commit hook blocks the commit and will abort an autonomous factory run. <!-- issue:#159 date:2026-06-03 expires:2026-12-03 source:implement -->
 
+- [AVOID] `codeindex symbols . --inline` embeds all symbols into `codeindex.json` rather than producing a standalone file — use `codeindex symbols . --output symbolindex.json` to write the symbol index as a separate `symbolindex.json` artifact. <!-- issue:#264 date:2026-06-10 expires:2026-12-10 source:implement -->
+
+- [PATTERN] Write `codeindex high-blast` output to a temp file then atomically rename: `codeindex high-blast > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"` — direct `>` truncates the file before writing, so a crash mid-run leaves a zero-byte artifact; the temp+mv pattern ensures the file is either fully written or unchanged. <!-- issue:#264 date:2026-06-10 expires:2026-12-10 source:implement -->
+
 ## Docker Port Hardening
 
 - [PATTERN] All host-facing port bindings in `docker-compose.yml` should use the `"127.0.0.1:HOST:CONTAINER"` format to prevent inadvertent exposure on public interfaces even without a reverse proxy — defense-in-depth independent of whether a TLS profile is active. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->

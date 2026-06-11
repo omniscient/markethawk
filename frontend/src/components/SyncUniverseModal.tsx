@@ -72,8 +72,9 @@ const SyncUniverseModal: React.FC<SyncUniverseModalProps> = ({
             if (universe) onSyncStarted?.(universe.id);
             onClose();
         },
-        onError: (error: any) => {
-            const msg = error?.response?.data?.detail ?? error?.message ?? 'Failed to start sync';
+        onError: (error: unknown) => {
+            const e = error as { response?: { data?: { detail?: string } }; message?: string };
+            const msg = e?.response?.data?.detail ?? e?.message ?? 'Failed to start sync';
             setSyncError(msg);
             queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
         },

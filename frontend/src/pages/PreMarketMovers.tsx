@@ -34,8 +34,8 @@ const PreMarketMovers: React.FC = () => {
       setMovers(response.movers);
       setLastUpdated(new Date(response.timestamp));
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch movers');
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Failed to fetch movers');
     } finally {
       setLoading(false);
     }
@@ -103,19 +103,19 @@ const PreMarketMovers: React.FC = () => {
           <MetricCard 
             title={`Top Gainer: ${topGainer?.ticker || ''}`}
             value={topGainer ? `+${topGainer.change_percent.toFixed(2)}%` : 'N/A'}
-            icon={TrendingUp as any}
+            icon={TrendingUp}
             color="green"
           />
           <MetricCard 
             title={`Top Loser: ${topLoser?.ticker || ''}`}
             value={topLoser ? `${topLoser.change_percent.toFixed(2)}%` : 'N/A'}
-            icon={TrendingDown as any}
+            icon={TrendingDown}
             color="red"
           />
           <MetricCard 
             title={`Highest Volume: ${maxVolume?.ticker || ''}`}
             value={maxVolume ? maxVolume.volume.toLocaleString() : 'N/A'}
-            icon={Volume2 as any}
+            icon={Volume2}
             color="blue"
           />
         </div>

@@ -49,23 +49,23 @@ const Dashboard: React.FC = () => {
   }
 
   const recentEvents = scannerResults || [];
-  const recentAlerts = (scannerResults?.slice(0, 5) || []).map((event: any) => ({
+  const recentAlerts = (scannerResults?.slice(0, 5) || []).map((event) => ({
     id: event.uuid || String(event.id),
     ticker: event.ticker,
-    type: event.severity === 'high' ? 'volume_spike' : 'news', // Default icons for now
+    type: (event.severity === 'high' ? 'volume_spike' : 'news') as 'volume_spike' | 'news' | 'price_movement',
     message: event.summary || `${event.ticker} triggered a ${event.scanner_type} alert`,
     timestamp: event.created_at || event.event_date || new Date().toISOString(),
     severity: event.severity || 'low',
   }));
   const totalEvents = scannerResults?.length || 0;
   const todayEvents = scannerResults?.filter(
-    (event: any) => event.event_date === format(new Date(), 'yyyy-MM-dd')
+    (event) => event.event_date === format(new Date(), 'yyyy-MM-dd')
   ).length || 0;
 
   const lastScanTime = scannerResults && scannerResults.length > 0 
     ? new Date(Math.max(...scannerResults
-        .map((e: any) => e.created_at ? new Date(e.created_at).getTime() : 0)
-        .filter((t: number) => !isNaN(t) && t > 0)
+        .map((e) => e.created_at ? new Date(e.created_at).getTime() : 0)
+        .filter((t) => !isNaN(t) && t > 0)
       ))
     : null;
   
@@ -97,28 +97,28 @@ const Dashboard: React.FC = () => {
           title="Today's Events"
           value={todayEvents}
           change={12}
-          icon={Activity as any}
+          icon={Activity}
           color="blue"
         />
         <MetricCard
           title="Total Events"
           value={totalEvents}
           change={8}
-          icon={TrendingUp as any}
+          icon={TrendingUp}
           color="green"
         />
         <MetricCard
           title="Active Alerts"
           value={marketStats?.activeAlerts || 0}
           change={-3}
-          icon={Bell as any}
+          icon={Bell}
           color="yellow"
         />
         <MetricCard
           title="Avg Volume Spike"
           value={`${marketStats?.avgVolumeSpike || 0}x`}
           change={15}
-          icon={TrendingDown as any}
+          icon={TrendingDown}
           color="purple"
         />
       </div>
@@ -127,7 +127,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Volume Spike Chart */}
         <div className="lg:col-span-2">
-          <Card title="Volume Spike Trends" icon={TrendingUp as any}>
+          <Card title="Volume Spike Trends" icon={TrendingUp}>
             <Chart
               data={scannerResults || []}
               type="area"
@@ -140,17 +140,17 @@ const Dashboard: React.FC = () => {
 
         {/* Recent Alerts */}
         <div>
-          <Card title="Recent Alerts" icon={Bell as any}>
-            <AlertList alerts={recentAlerts as any} />
+          <Card title="Recent Alerts" icon={Bell}>
+            <AlertList alerts={recentAlerts} />
           </Card>
         </div>
       </div>
 
       {/* Recent Events Table */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Recent Volume Events" icon={Activity as any}>
-          <RecentEvents 
-            events={recentEvents as any} 
+        <Card title="Recent Volume Events" icon={Activity}>
+          <RecentEvents
+            events={recentEvents}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSort={(column) => {
@@ -165,7 +165,7 @@ const Dashboard: React.FC = () => {
         </Card>
 
         {/* Market Overview */}
-        <Card title="Market Overview" icon={Calendar as any}>
+        <Card title="Market Overview" icon={Calendar}>
           <div className="space-y-4">
             <div className="flex justify-between items-center p-3 bg-gray-800 rounded-lg">
               <span className="text-gray-400">Market Status</span>

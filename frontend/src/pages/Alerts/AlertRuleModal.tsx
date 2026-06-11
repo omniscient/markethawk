@@ -86,7 +86,7 @@ export function AlertRuleModal({
               {SEVERITIES.map(sev => (
                 <button
                   key={sev.id}
-                  onClick={() => onFormState({ ...formState, severity_filter: sev.id as any })}
+                  onClick={() => onFormState({ ...formState, severity_filter: sev.id as AlertRule['severity_filter'] })}
                   className={`p-2 rounded-lg border text-xs font-bold uppercase transition-all ${
                     formState.severity_filter === sev.id
                       ? 'bg-blue-600 border-blue-500 text-white'
@@ -179,7 +179,7 @@ export function AlertRuleModal({
                   <input
                     type={ch.inputType}
                     placeholder={ch.placeholder}
-                    value={(formState.channel_config as any)?.[ch.field] ?? ''}
+                    value={((formState.channel_config ?? {}) as Record<string, unknown>)[ch.field] as string ?? ''}
                     onChange={e => onFormState({ ...formState, channel_config: { ...formState.channel_config, [ch.field]: e.target.value } })}
                     className={`w-full bg-gray-900 border border-${ch.color}-500/20 rounded p-2 text-sm text-white focus:ring-1 focus:ring-${ch.color}-500 outline-none`}
                   />

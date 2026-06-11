@@ -58,7 +58,7 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
     }
   };
 
-  const renderIndicator = (key: string, val: any) => {
+  const renderIndicator = (key: string, val: unknown) => {
     if (typeof val === 'number') {
       if (key.includes('pct')) return `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
       if (key.includes('volume') || key.includes('ratio')) return `${val.toFixed(1)}x`;
@@ -83,7 +83,7 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
   };
 
   return (
-    <Card title="Scanner Results" icon={Eye as any}>
+    <Card title="Scanner Results" icon={Eye}>
       {/* Results Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg p-4 text-center">
@@ -162,7 +162,7 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
           <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Severity</label>
           <select 
             value={severityFilter}
-            onChange={(e) => setSeverityFilter(e.target.value as any)}
+            onChange={(e) => setSeverityFilter(e.target.value as 'all' | 'high' | 'medium' | 'low')}
             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-financial-light focus:outline-none focus:ring-1 focus:ring-financial-blue transition-all"
           >
             <option value="all">All Severities</option>
@@ -367,7 +367,7 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({
 
 interface ScoreQualityBadgeProps {
   score: number | null | undefined;
-  criteriaMet: Record<string, any>;
+  criteriaMet: Record<string, unknown>;
 }
 
 const ScoreQualityBadge: React.FC<ScoreQualityBadgeProps> = ({ score, criteriaMet }) => {

@@ -570,6 +570,47 @@ export -f check_pr_mergeable gh
 _RESULT=$(check_pr_mergeable "99")
 assert_eq "K7: check_pr_mergeable returns value from gh" "CONFLICTING" "$_RESULT"
 
+> "$STUB_LOG"; DISPATCHED=""
+
+# K8: P1.5-1 — increment_retry recorded after CONFLICTING dispatch
+echo '{}' > "$STATE_FILE"
+check_pr_mergeable() { echo "CONFLICTING"; }
+is_issue_running() { return 1; }
+export -f check_pr_mergeable is_issue_running
+
+ISSUE=$(get_issue_number "$_ITEM_REVIEW_A")
+PR_NUM=$(get_pr_for_issue "$ISSUE")
+MERGEABLE=$(check_pr_mergeable "$PR_NUM")
+case "$MERGEABLE" in
+  CONFLICTING)
+    if ! is_issue_running "$ISSUE"; then
+      increment_retry "${ISSUE}:resolve" || true
+      dispatch "Deconflict issue #${ISSUE}" || true
+    fi
+    ;;
+esac
+assert_eq "K8: increment_retry recorded after CONFLICTING dispatch" \
+  "1" "$(get_retry_count "60:resolve")"
+
+> "$STUB_LOG"; DISPATCHED=""
+
+# K9: P1.5-5 — trip_to_blocked called at MAX_RETRIES
+echo "{\"60:resolve\": $MAX_RETRIES}" > "$STATE_FILE"
+
+ISSUE=$(get_issue_number "$_ITEM_REVIEW_A")
+RETRIES=$(get_retry_count "${ISSUE}:resolve")
+if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+  trip_to_blocked "$ISSUE" "resolve" "retry limit of ${MAX_RETRIES} reached for conflict resolution"
+else
+  dispatch "Deconflict issue #${ISSUE}" || true
+fi
+assert_eq "K9: set_board_status Blocked logged" \
+  "1" "$(grep -c "set_board_status 60 ${STATUS_BLOCKED}" "$STUB_LOG" || echo 0)"
+assert_eq "K9: no dispatch on trip" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+assert_eq "K9: retry counter reset to 0" \
+  "0" "$(get_retry_count "60:resolve")"
+
 # Restore stubs
 gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
 get_pr_for_issue() { echo ""; }

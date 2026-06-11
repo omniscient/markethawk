@@ -48,8 +48,10 @@ cd backend && python -m pytest --no-cov -v
 
 ### Frontend validation (if frontend was modified — always run)
 ```bash
-cd frontend && npx tsc --noEmit
+cd frontend && npx tsc -p tsconfig.app.json
 ```
+
+> **Why `tsconfig.app.json` not `--noEmit`:** the root `tsconfig.json` only defines project references (`"files": []`) and checks nothing on its own. `tsconfig.app.json` applies the real compiler options including `noUnusedLocals`, `noUnusedParameters`, and `strict`, which is what `npm run build` uses. These flags catch errors that `npx tsc --noEmit` silently skips.
 
 ### Endpoint validation against preview (skip when PREVIEW_SKIPPED=true)
 

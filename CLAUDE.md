@@ -8,7 +8,7 @@ Full-stack stock scanning platform that identifies pre-market volume spikes and 
 
 ## Tech Stack
 
-**Backend**: FastAPI + SQLAlchemy 2.0 (async) + PostgreSQL + Redis + Celery  
+**Backend**: FastAPI + SQLAlchemy 2.0 (sync) + PostgreSQL + Redis + Celery  
 **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + React Query  
 **Market Data**: Polygon.io API (primary), Interactive Brokers (ib_insync)  
 **Logging**: Seq (structured/centralized)

@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button';
 import ScannerConfig from '../../components/ScannerConfig';
 import { todayIso } from '../../hooks/useScannerState';
 import { ScanStatusCard } from './ScanStatusCard';
+import type { ScannerConfig as ScannerConfigType, StockUniverse, ScannerStatusBlock, ScannerRunResponse } from '../../api/scanner';
 
 const DateRangePresets: React.FC<{
   onSelect: (_start: string, _end: string) => void;
@@ -38,9 +39,9 @@ const DateRangePresets: React.FC<{
 };
 
 export interface ScanConfigPanelProps {
-  configs: any[];
+  configs: ScannerConfigType[];
   loadingConfigs: boolean;
-  universes: any[];
+  universes: StockUniverse[];
   loadingUniverses: boolean;
   selectedConfig: string;
   onSelectConfig: (v: string) => void;
@@ -53,8 +54,8 @@ export interface ScanConfigPanelProps {
   isScanning: boolean;
   onRunScan: () => void;
   onCancelScan: () => void;
-  statusBlock: any;
-  scanHistory: any[];
+  statusBlock: ScannerStatusBlock | undefined;
+  scanHistory: ScannerRunResponse[];
   loadingHistory: boolean;
   scanError: string | null;
   onDismissError: () => void;
@@ -97,9 +98,9 @@ export function ScanConfigPanel({
           </div>
           <DateRangePresets disabled={isScanning} onSelect={(start, end) => { onScanStartDate(start); onScanEndDate(end); }} />
           {isScanning ? (
-            <Button variant="danger" onClick={onCancelScan} icon={X as any}>Cancel Scan</Button>
+            <Button variant="danger" onClick={onCancelScan} icon={X}>Cancel Scan</Button>
           ) : (
-            <Button variant="primary" onClick={onRunScan} icon={Play as any} loading={scannerMutationPending} disabled={loadingConfigs}>
+            <Button variant="primary" onClick={onRunScan} icon={Play} loading={scannerMutationPending} disabled={loadingConfigs}>
               Run Scanner
             </Button>
           )}
@@ -122,7 +123,7 @@ export function ScanConfigPanel({
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <Card title="Scanner Configuration" icon={Settings as any}>
+          <Card title="Scanner Configuration" icon={Settings}>
             <ScannerConfig
               configs={configs || []} universes={universes || []}
               selectedConfig={selectedConfig} selectedUniverse={selectedUniverse}
@@ -133,21 +134,21 @@ export function ScanConfigPanel({
         </div>
         <div className="space-y-4">
           <ScanStatusCard isScanning={isScanning} statusBlock={statusBlock} selectedUniverse={selectedUniverse} universes={universes} />
-          <Card title="Quick Actions" icon={Zap as any}>
+          <Card title="Quick Actions" icon={Zap}>
             <div className="space-y-2">
-              <Button variant="secondary" size="sm" fullWidth icon={Clock as any}>Schedule Scan</Button>
-              <Button variant="secondary" size="sm" fullWidth icon={Download as any}>Export Results</Button>
+              <Button variant="secondary" size="sm" fullWidth icon={Clock}>Schedule Scan</Button>
+              <Button variant="secondary" size="sm" fullWidth icon={Download}>Export Results</Button>
             </div>
           </Card>
         </div>
       </div>
 
-      <Card title="Recent Scan History" icon={Clock as any}>
+      <Card title="Recent Scan History" icon={Clock}>
         <div className="space-y-4">
           {loadingHistory ? (
             <div className="text-center py-4 text-gray-400">Loading history...</div>
           ) : scanHistory && scanHistory.length > 0 ? (
-            scanHistory.map((scan: any, index: number) => (
+            scanHistory.map((scan, index) => (
               <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">

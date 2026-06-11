@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 479,
-    "total_loc": 68071,
+    "total_files": 464,
+    "total_loc": 66838,
     "languages": [
       "python",
       "javascript",
@@ -1916,8 +1916,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 44,
-      "blast_score": 23.0,
+      "transitive_dependents": 37,
+      "blast_score": 19.5,
       "imported_by": [
         "frontend/src/api/scanner.ts"
       ],
@@ -3260,8 +3260,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 100,
-      "blast_score": 52.0,
+      "transitive_dependents": 86,
+      "blast_score": 45.0,
       "imported_by": [
         "frontend/src/api/auth.ts",
         "frontend/src/api/client.ts"
@@ -3352,8 +3352,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 16,
-      "blast_score": 9.0,
+      "transitive_dependents": 14,
+      "blast_score": 8.0,
       "imported_by": [
         "frontend/src/api/trading.ts"
       ],
@@ -3473,8 +3473,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 44,
-      "blast_score": 23.0,
+      "transitive_dependents": 37,
+      "blast_score": 19.5,
       "imported_by": [
         "frontend/src/api/scanner.ts"
       ],
@@ -3687,8 +3687,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 11,
-      "blast_score": 6.5,
+      "transitive_dependents": 9,
+      "blast_score": 5.5,
       "imported_by": [
         "frontend/src/api/news.ts"
       ],
@@ -3745,8 +3745,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 15,
-      "blast_score": 8.5,
+      "transitive_dependents": 10,
+      "blast_score": 6.0,
       "imported_by": [
         "frontend/src/api/outcomes.ts"
       ],
@@ -3844,8 +3844,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 43,
-      "blast_score": 23.5,
+      "transitive_dependents": 36,
+      "blast_score": 20.0,
       "imported_by": [
         "frontend/src/api/scanner.ts",
         "frontend/src/pages/EdgeExplorer.tsx"
@@ -4067,8 +4067,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 46,
-      "blast_score": 25.0,
+      "transitive_dependents": 39,
+      "blast_score": 21.5,
       "imported_by": [
         "frontend/src/api/scanner.ts",
         "frontend/src/api/system.ts"
@@ -4183,8 +4183,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 44,
-      "blast_score": 23.0,
+      "transitive_dependents": 37,
+      "blast_score": 19.5,
       "imported_by": [
         "frontend/src/api/scanner.ts"
       ],
@@ -4365,8 +4365,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 5,
-      "blast_score": 3.5,
+      "transitive_dependents": 4,
+      "blast_score": 3.0,
       "imported_by": [
         "frontend/src/api/watchlist.ts"
       ],
@@ -15536,8 +15536,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 46,
-      "blast_score": 25.0,
+      "transitive_dependents": 39,
+      "blast_score": 21.5,
       "imported_by": [
         "frontend/src/api/scanner.ts",
         "frontend/src/api/system.ts"
@@ -16159,8 +16159,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 53,
-      "transitive_dependents": 71,
-      "blast_score": 88.5,
+      "transitive_dependents": 61,
+      "blast_score": 83.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/error_tracking.py",
@@ -16284,8 +16284,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 209,
-      "transitive_dependents": 102,
-      "blast_score": 260.0,
+      "transitive_dependents": 88,
+      "blast_score": 253.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/__init__.py",
@@ -16508,8 +16508,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 155,
-      "transitive_dependents": 102,
-      "blast_score": 206.0,
+      "transitive_dependents": 88,
+      "blast_score": 199.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -16678,8 +16678,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 20,
-      "transitive_dependents": 48,
-      "blast_score": 44.0,
+      "transitive_dependents": 41,
+      "blast_score": 40.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/celery_app.py",
@@ -16755,8 +16755,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 124,
-      "transitive_dependents": 85,
-      "blast_score": 166.5,
+      "transitive_dependents": 72,
+      "blast_score": 160.0,
       "imported_by": [
         "backend/app/alembic/versions/0b4b1c3739b4_add_missing_model_tables.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -16894,8 +16894,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 28,
-      "transitive_dependents": 51,
-      "blast_score": 53.5,
+      "transitive_dependents": 44,
+      "blast_score": 50.0,
       "imported_by": [
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
         "backend/app/alembic/versions/e9bd09ec24b0_seed_outcome_config_and_data_requirements.py",
@@ -16953,8 +16953,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 21,
-      "transitive_dependents": 102,
-      "blast_score": 72.0,
+      "transitive_dependents": 88,
+      "blast_score": 65.0,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/models/news_article.py",
@@ -16989,8 +16989,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 134,
-      "transitive_dependents": 103,
-      "blast_score": 185.5,
+      "transitive_dependents": 89,
+      "blast_score": 178.5,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/core/error_tracking.py",
@@ -17154,8 +17154,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 43,
-      "transitive_dependents": 102,
-      "blast_score": 94.0,
+      "transitive_dependents": 88,
+      "blast_score": 87.0,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/main.py",
@@ -17212,8 +17212,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 4,
-      "transitive_dependents": 48,
-      "blast_score": 28.0,
+      "transitive_dependents": 41,
+      "blast_score": 24.5,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/main.py",
@@ -17250,8 +17250,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 30,
-      "transitive_dependents": 102,
-      "blast_score": 81.0,
+      "transitive_dependents": 88,
+      "blast_score": 74.0,
       "imported_by": [
         "backend/app/core/cache.py",
         "backend/app/main.py",
@@ -17315,8 +17315,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 4,
-      "transitive_dependents": 45,
-      "blast_score": 26.5,
+      "transitive_dependents": 38,
+      "blast_score": 23.0,
       "imported_by": [
         "backend/app/core/celery_app.py",
         "backend/app/core/metrics.py",
@@ -17353,8 +17353,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 17,
-      "transitive_dependents": 102,
-      "blast_score": 68.0,
+      "transitive_dependents": 88,
+      "blast_score": 61.0,
       "imported_by": [
         "backend/app/core/config.py",
         "backend/app/routers/auth.py",
@@ -17402,8 +17402,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 28,
-      "transitive_dependents": 54,
-      "blast_score": 55.0,
+      "transitive_dependents": 46,
+      "blast_score": 51.0,
       "imported_by": [
         "backend/app/core/error_tracking.py",
         "backend/app/main.py",
@@ -17463,8 +17463,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 3,
-      "transitive_dependents": 45,
-      "blast_score": 25.5,
+      "transitive_dependents": 38,
+      "blast_score": 22.0,
       "imported_by": [
         "backend/app/core/rate_limits.py",
         "backend/app/main.py",
@@ -17501,8 +17501,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 45,
-      "blast_score": 23.5,
+      "transitive_dependents": 38,
+      "blast_score": 20.0,
       "imported_by": [
         "backend/app/main.py"
       ]
@@ -17517,8 +17517,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 12,
-      "transitive_dependents": 48,
-      "blast_score": 36.0,
+      "transitive_dependents": 41,
+      "blast_score": 32.5,
       "imported_by": [
         "backend/app/main.py",
         "backend/app/providers/ibkr.py",
@@ -17544,8 +17544,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 45,
-      "blast_score": 24.5,
+      "transitive_dependents": 38,
+      "blast_score": 21.0,
       "imported_by": [
         "backend/app/main.py",
         "backend/app/routers/stocks.py"
@@ -17561,8 +17561,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 3,
-      "transitive_dependents": 48,
-      "blast_score": 27.0,
+      "transitive_dependents": 41,
+      "blast_score": 23.5,
       "imported_by": [
         "backend/app/main.py",
         "backend/tests/conftest.py",
@@ -17579,8 +17579,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 4,
-      "transitive_dependents": 45,
-      "blast_score": 26.5,
+      "transitive_dependents": 38,
+      "blast_score": 23.0,
       "imported_by": [
         "backend/app/main.py",
         "backend/tests/tasks/test_package_exports.py",
@@ -17598,8 +17598,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 45,
-      "blast_score": 24.5,
+      "transitive_dependents": 38,
+      "blast_score": 21.0,
       "imported_by": [
         "backend/app/main.py",
         "backend/run.py"
@@ -17767,8 +17767,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 15,
-      "transitive_dependents": 45,
-      "blast_score": 37.5,
+      "transitive_dependents": 38,
+      "blast_score": 34.0,
       "imported_by": [
         "backend/app/routers/futures.py",
         "backend/app/routers/stocks.py",
@@ -19052,8 +19052,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 20,
-      "transitive_dependents": 81,
-      "blast_score": 60.5,
+      "transitive_dependents": 67,
+      "blast_score": 53.5,
       "imported_by": [
         "frontend/src/api/alerts.ts",
         "frontend/src/api/analysis.ts",
@@ -19193,8 +19193,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 2,
-      "transitive_dependents": 9,
-      "blast_score": 6.5,
+      "transitive_dependents": 7,
+      "blast_score": 5.5,
       "imported_by": [
         "frontend/src/components/NewsFeed.tsx",
         "frontend/src/components/NewsSettings.tsx"
@@ -19251,18 +19251,15 @@
         "backend/app/routers/outcomes.py"
       ],
       "layer": "frontend",
-      "direct_dependents": 9,
-      "transitive_dependents": 6,
-      "blast_score": 12.0,
+      "direct_dependents": 6,
+      "transitive_dependents": 4,
+      "blast_score": 8.0,
       "imported_by": [
         "frontend/src/components/scorecard/DistributionChart.tsx",
         "frontend/src/components/scorecard/EdgeDecayChart.tsx",
-        "frontend/src/components/scorecard/HeroMetrics.test.tsx",
         "frontend/src/components/scorecard/HeroMetrics.tsx",
-        "frontend/src/components/scorecard/IntervalTable.test.tsx",
         "frontend/src/components/scorecard/IntervalTable.tsx",
         "frontend/src/components/scorecard/ScannerSummaryCard.tsx",
-        "frontend/src/components/scorecard/SignalTable.test.tsx",
         "frontend/src/hooks/useScorecard.test.ts"
       ],
       "symbols": [
@@ -19413,8 +19410,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 22,
-      "transitive_dependents": 22,
-      "blast_score": 33.0,
+      "transitive_dependents": 15,
+      "blast_score": 29.5,
       "imported_by": [
         "frontend/src/components/CreateUniverseModal.tsx",
         "frontend/src/components/NewsSettings.tsx",
@@ -19982,8 +19979,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 3,
-      "transitive_dependents": 4,
-      "blast_score": 5.0,
+      "transitive_dependents": 3,
+      "blast_score": 4.5,
       "imported_by": [
         "frontend/src/components/Layout.tsx",
         "frontend/src/pages/Settings.tsx",
@@ -20060,15 +20057,14 @@
         "backend/app/routers/auto_trading.py"
       ],
       "layer": "frontend",
-      "direct_dependents": 8,
-      "transitive_dependents": 8,
-      "blast_score": 12.0,
+      "direct_dependents": 7,
+      "transitive_dependents": 7,
+      "blast_score": 10.5,
       "imported_by": [
         "frontend/src/pages/Alerts/AlertRuleModal.tsx",
         "frontend/src/pages/Alerts/index.tsx",
         "frontend/src/pages/AutoTrading/ConfigPanel.test.tsx",
         "frontend/src/pages/AutoTrading/ConfigPanel.tsx",
-        "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
         "frontend/src/pages/AutoTrading/OrdersPanel.tsx",
         "frontend/src/pages/AutoTrading/StrategyPanel.tsx",
         "frontend/src/pages/AutoTrading/components.tsx"
@@ -20233,8 +20229,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 2,
-      "transitive_dependents": 3,
-      "blast_score": 3.5,
+      "transitive_dependents": 2,
+      "blast_score": 3.0,
       "imported_by": [
         "frontend/src/pages/ActiveWatchlist/WatchlistTable.tsx",
         "frontend/src/pages/ActiveWatchlist/index.tsx"
@@ -20384,8 +20380,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 1,
-      "transitive_dependents": 4,
-      "blast_score": 3.0,
+      "transitive_dependents": 3,
+      "blast_score": 2.5,
       "imported_by": [
         "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx"
       ]
@@ -20451,8 +20447,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 2,
-      "transitive_dependents": 5,
-      "blast_score": 4.5,
+      "transitive_dependents": 4,
+      "blast_score": 4.0,
       "imported_by": [
         "frontend/src/pages/Dashboard.tsx",
         "frontend/src/pages/StockDetailPage/MetadataPanel.tsx"
@@ -20475,8 +20471,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 2,
-      "transitive_dependents": 4,
-      "blast_score": 4.0,
+      "transitive_dependents": 3,
+      "blast_score": 3.5,
       "imported_by": [
         "frontend/src/pages/Dashboard.tsx",
         "frontend/src/pages/Settings.tsx"
@@ -20547,8 +20543,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 2,
-      "transitive_dependents": 5,
-      "blast_score": 4.5,
+      "transitive_dependents": 4,
+      "blast_score": 4.0,
       "imported_by": [
         "frontend/src/pages/Dashboard.tsx",
         "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx"
@@ -20570,8 +20566,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 2,
-      "transitive_dependents": 11,
-      "blast_score": 7.5,
+      "transitive_dependents": 10,
+      "blast_score": 7.0,
       "imported_by": [
         "frontend/src/components/RecentEvents.tsx",
         "frontend/src/components/ScannerResults.tsx"
@@ -20733,8 +20729,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 6,
-      "transitive_dependents": 14,
-      "blast_score": 13.0,
+      "transitive_dependents": 12,
+      "blast_score": 12.0,
       "imported_by": [
         "frontend/src/components/AlertList.tsx",
         "frontend/src/components/QualityReportModal.tsx",
@@ -20837,26 +20833,6 @@
       ]
     },
     {
-      "id": "frontend/src/components/scorecard/BackfillPanel.test.tsx",
-      "type": "component",
-      "language": "typescript",
-      "framework": null,
-      "size": 67,
-      "loc": 67,
-      "group": 35,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/components/scorecard/BackfillPanel.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/components/scorecard/BackfillPanel.tsx",
       "type": "component",
       "language": "typescript",
@@ -20870,11 +20846,10 @@
         "frontend/src/hooks/useScorecard.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
-      "transitive_dependents": 3,
-      "blast_score": 3.5,
+      "direct_dependents": 1,
+      "transitive_dependents": 2,
+      "blast_score": 2.0,
       "imported_by": [
-        "frontend/src/components/scorecard/BackfillPanel.test.tsx",
         "frontend/src/pages/ScorecardDetail.tsx"
       ]
     },
@@ -20892,8 +20867,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 1,
-      "transitive_dependents": 3,
-      "blast_score": 2.5,
+      "transitive_dependents": 2,
+      "blast_score": 2.0,
       "imported_by": [
         "frontend/src/pages/ScorecardDetail.tsx"
       ]
@@ -20912,31 +20887,11 @@
       ],
       "layer": "frontend",
       "direct_dependents": 1,
-      "transitive_dependents": 3,
-      "blast_score": 2.5,
+      "transitive_dependents": 2,
+      "blast_score": 2.0,
       "imported_by": [
         "frontend/src/pages/ScorecardDetail.tsx"
       ]
-    },
-    {
-      "id": "frontend/src/components/scorecard/HeroMetrics.test.tsx",
-      "type": "component",
-      "language": "typescript",
-      "framework": null,
-      "size": 105,
-      "loc": 105,
-      "group": 35,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/components/scorecard/HeroMetrics.tsx",
-        "frontend/src/api/outcomes.ts"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
     },
     {
       "id": "frontend/src/components/scorecard/HeroMetrics.tsx",
@@ -20951,33 +20906,12 @@
         "frontend/src/api/outcomes.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
-      "transitive_dependents": 3,
-      "blast_score": 3.5,
+      "direct_dependents": 1,
+      "transitive_dependents": 2,
+      "blast_score": 2.0,
       "imported_by": [
-        "frontend/src/components/scorecard/HeroMetrics.test.tsx",
         "frontend/src/pages/ScorecardDetail.tsx"
       ]
-    },
-    {
-      "id": "frontend/src/components/scorecard/IntervalTable.test.tsx",
-      "type": "component",
-      "language": "typescript",
-      "framework": null,
-      "size": 101,
-      "loc": 101,
-      "group": 35,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/components/scorecard/IntervalTable.tsx",
-        "frontend/src/api/outcomes.ts"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
     },
     {
       "id": "frontend/src/components/scorecard/IntervalTable.tsx",
@@ -20992,11 +20926,10 @@
         "frontend/src/api/outcomes.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
-      "transitive_dependents": 3,
-      "blast_score": 3.5,
+      "direct_dependents": 1,
+      "transitive_dependents": 2,
+      "blast_score": 2.0,
       "imported_by": [
-        "frontend/src/components/scorecard/IntervalTable.test.tsx",
         "frontend/src/pages/ScorecardDetail.tsx"
       ]
     },
@@ -21016,32 +20949,11 @@
       ],
       "layer": "frontend",
       "direct_dependents": 1,
-      "transitive_dependents": 3,
-      "blast_score": 2.5,
+      "transitive_dependents": 2,
+      "blast_score": 2.0,
       "imported_by": [
         "frontend/src/pages/ScorecardOverview.tsx"
       ]
-    },
-    {
-      "id": "frontend/src/components/scorecard/SignalTable.test.tsx",
-      "type": "component",
-      "language": "typescript",
-      "framework": null,
-      "size": 146,
-      "loc": 146,
-      "group": 35,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/components/scorecard/SignalTable.tsx",
-        "frontend/src/api/outcomes.ts"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
     },
     {
       "id": "frontend/src/components/scorecard/SignalTable.tsx",
@@ -21058,11 +20970,10 @@
         "frontend/src/hooks/useScorecard.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
-      "transitive_dependents": 3,
-      "blast_score": 3.5,
+      "direct_dependents": 1,
+      "transitive_dependents": 2,
+      "blast_score": 2.0,
       "imported_by": [
-        "frontend/src/components/scorecard/SignalTable.test.tsx",
         "frontend/src/pages/ScorecardDetail.tsx"
       ]
     },
@@ -21080,8 +20991,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 20,
-      "transitive_dependents": 14,
-      "blast_score": 27.0,
+      "transitive_dependents": 11,
+      "blast_score": 25.5,
       "imported_by": [
         "frontend/src/components/CreateUniverseModal.tsx",
         "frontend/src/components/ExportUniverseModal.tsx",
@@ -21119,8 +21030,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 21,
-      "transitive_dependents": 20,
-      "blast_score": 31.0,
+      "transitive_dependents": 13,
+      "blast_score": 27.5,
       "imported_by": [
         "frontend/src/components/ScannerResults.tsx",
         "frontend/src/components/SignalReviewStats.tsx",
@@ -21228,8 +21139,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 6,
-      "transitive_dependents": 6,
-      "blast_score": 9.0,
+      "transitive_dependents": 5,
+      "blast_score": 8.5,
       "imported_by": [
         "frontend/src/pages/Alerts/index.tsx",
         "frontend/src/pages/AutoTrading/index.tsx",
@@ -21268,25 +21179,6 @@
       ]
     },
     {
-      "id": "frontend/src/components/ui/PageLoader.test.tsx",
-      "type": "component",
-      "language": "typescript",
-      "framework": null,
-      "size": 16,
-      "loc": 16,
-      "group": 36,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/components/ui/PageLoader.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/components/ui/PageLoader.tsx",
       "type": "component",
       "language": "typescript",
@@ -21296,12 +21188,11 @@
       "group": 36,
       "imports": [],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 1,
-      "blast_score": 2.5,
+      "blast_score": 1.5,
       "imported_by": [
-        "frontend/src/App.tsx",
-        "frontend/src/components/ui/PageLoader.test.tsx"
+        "frontend/src/App.tsx"
       ],
       "symbols": [
         {
@@ -21649,8 +21540,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 5,
-      "transitive_dependents": 6,
-      "blast_score": 8.0,
+      "transitive_dependents": 2,
+      "blast_score": 6.0,
       "imported_by": [
         "frontend/src/components/scorecard/BackfillPanel.tsx",
         "frontend/src/components/scorecard/SignalTable.tsx",
@@ -21736,12 +21627,11 @@
         "frontend/src/api/client.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 5,
-      "transitive_dependents": 3,
-      "blast_score": 6.5,
+      "direct_dependents": 4,
+      "transitive_dependents": 2,
+      "blast_score": 5.0,
       "imported_by": [
         "frontend/src/hooks/useWatchlistLive.test.ts",
-        "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
         "frontend/src/pages/ActiveWatchlist/AlertBadges.tsx",
         "frontend/src/pages/ActiveWatchlist/WatchlistTable.tsx",
         "frontend/src/pages/ActiveWatchlist/index.tsx"
@@ -21812,46 +21702,6 @@
       "imported_by": []
     },
     {
-      "id": "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 55,
-      "loc": 55,
-      "group": 38,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/pages/ActiveWatchlist/index.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
-      "id": "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 65,
-      "loc": 65,
-      "group": 38,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/pages/ActiveWatchlist/AlertBadges.tsx",
-        "frontend/src/hooks/useWatchlistLive.ts"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/pages/ActiveWatchlist/AlertBadges.tsx",
       "type": "route",
       "language": "typescript",
@@ -21863,11 +21713,10 @@
         "frontend/src/hooks/useWatchlistLive.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
-      "transitive_dependents": 4,
-      "blast_score": 4.0,
+      "direct_dependents": 1,
+      "transitive_dependents": 3,
+      "blast_score": 2.5,
       "imported_by": [
-        "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
         "frontend/src/pages/ActiveWatchlist/WatchlistTable.tsx"
       ],
       "symbols": [
@@ -21897,8 +21746,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 1,
-      "transitive_dependents": 3,
-      "blast_score": 2.5,
+      "transitive_dependents": 2,
+      "blast_score": 2.0,
       "imported_by": [
         "frontend/src/pages/ActiveWatchlist/index.tsx"
       ],
@@ -21935,12 +21784,11 @@
         "frontend/src/pages/ActiveWatchlist/WatchlistTable.tsx"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 1,
-      "blast_score": 2.5,
+      "blast_score": 1.5,
       "imported_by": [
-        "frontend/src/App.tsx",
-        "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx"
+        "frontend/src/App.tsx"
       ],
       "symbols": [
         {
@@ -22174,26 +22022,6 @@
       ]
     },
     {
-      "id": "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 138,
-      "loc": 138,
-      "group": 40,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/pages/AutoTrading/AccountPanel.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/pages/AutoTrading/AccountPanel.tsx",
       "type": "route",
       "language": "typescript",
@@ -22208,11 +22036,10 @@
         "frontend/src/pages/AutoTrading/components.tsx"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 3,
-      "blast_score": 3.5,
+      "blast_score": 2.5,
       "imported_by": [
-        "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
         "frontend/src/pages/AutoTrading/index.tsx"
       ],
       "symbols": [
@@ -22310,27 +22137,6 @@
       ]
     },
     {
-      "id": "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 113,
-      "loc": 113,
-      "group": 40,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/pages/AutoTrading/OrdersPanel.tsx",
-        "frontend/src/api/trading.ts"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/pages/AutoTrading/OrdersPanel.tsx",
       "type": "route",
       "language": "typescript",
@@ -22345,11 +22151,10 @@
         "frontend/src/api/trading.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 3,
-      "blast_score": 3.5,
+      "blast_score": 2.5,
       "imported_by": [
-        "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
         "frontend/src/pages/AutoTrading/index.tsx"
       ],
       "symbols": [
@@ -22435,8 +22240,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 5,
-      "transitive_dependents": 6,
-      "blast_score": 8.0,
+      "transitive_dependents": 4,
+      "blast_score": 7.0,
       "imported_by": [
         "frontend/src/pages/AutoTrading/AccountPanel.tsx",
         "frontend/src/pages/AutoTrading/ConfigPanel.tsx",
@@ -22725,26 +22530,6 @@
       ]
     },
     {
-      "id": "frontend/src/pages/PreMarketMovers.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 26,
-      "loc": 26,
-      "group": 41,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/pages/PreMarketMovers.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/pages/PreMarketMovers.tsx",
       "type": "route",
       "language": "typescript",
@@ -22760,12 +22545,11 @@
         "frontend/src/api/scanner.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 1,
-      "blast_score": 2.5,
+      "blast_score": 1.5,
       "imported_by": [
-        "frontend/src/App.tsx",
-        "frontend/src/pages/PreMarketMovers.test.tsx"
+        "frontend/src/App.tsx"
       ]
     },
     {
@@ -22980,27 +22764,6 @@
       ]
     },
     {
-      "id": "frontend/src/pages/ScorecardDetail.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 73,
-      "loc": 73,
-      "group": 41,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/pages/ScorecardDetail.tsx",
-        "react-router-dom"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/pages/ScorecardDetail.tsx",
       "type": "route",
       "language": "typescript",
@@ -23021,33 +22784,12 @@
         "frontend/src/components/scorecard/SignalTable.tsx"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 1,
-      "blast_score": 2.5,
+      "blast_score": 1.5,
       "imported_by": [
-        "frontend/src/App.tsx",
-        "frontend/src/pages/ScorecardDetail.test.tsx"
+        "frontend/src/App.tsx"
       ]
-    },
-    {
-      "id": "frontend/src/pages/ScorecardOverview.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 63,
-      "loc": 63,
-      "group": 41,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/pages/ScorecardOverview.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
     },
     {
       "id": "frontend/src/pages/ScorecardOverview.tsx",
@@ -23063,33 +22805,12 @@
         "frontend/src/components/scorecard/ScannerSummaryCard.tsx"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 1,
-      "blast_score": 2.5,
+      "blast_score": 1.5,
       "imported_by": [
-        "frontend/src/App.tsx",
-        "frontend/src/pages/ScorecardOverview.test.tsx"
+        "frontend/src/App.tsx"
       ]
-    },
-    {
-      "id": "frontend/src/pages/Settings.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 47,
-      "loc": 47,
-      "group": 41,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/pages/Settings.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
     },
     {
       "id": "frontend/src/pages/Settings.tsx",
@@ -23110,12 +22831,11 @@
         "frontend/src/api/system.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 1,
-      "blast_score": 2.5,
+      "blast_score": 1.5,
       "imported_by": [
-        "frontend/src/App.tsx",
-        "frontend/src/pages/Settings.test.tsx"
+        "frontend/src/App.tsx"
       ]
     },
     {
@@ -23154,25 +22874,6 @@
       ]
     },
     {
-      "id": "frontend/src/pages/StockDetailPage/MetadataPanel.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 67,
-      "loc": 67,
-      "group": 44,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/pages/StockDetailPage/MetadataPanel.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
       "type": "route",
       "language": "typescript",
@@ -23186,11 +22887,10 @@
         "frontend/src/components/NewsFeed.tsx"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 2,
-      "blast_score": 3.0,
+      "blast_score": 2.0,
       "imported_by": [
-        "frontend/src/pages/StockDetailPage/MetadataPanel.test.tsx",
         "frontend/src/pages/StockDetailPage/index.tsx"
       ],
       "symbols": [
@@ -23209,26 +22909,6 @@
       ]
     },
     {
-      "id": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
-      "type": "route",
-      "language": "typescript",
-      "framework": null,
-      "size": 151,
-      "loc": 151,
-      "group": 44,
-      "imports": [
-        "vitest",
-        "@testing-library/react",
-        "frontend/src/test-utils/renderWithQuery.tsx",
-        "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx"
-      ],
-      "layer": "frontend",
-      "direct_dependents": 0,
-      "transitive_dependents": 0,
-      "blast_score": 0.0,
-      "imported_by": []
-    },
-    {
       "id": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx",
       "type": "route",
       "language": "typescript",
@@ -23243,11 +22923,10 @@
         "frontend/src/components/ForceScanDialog.tsx"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 2,
-      "blast_score": 3.0,
+      "blast_score": 2.0,
       "imported_by": [
-        "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
         "frontend/src/pages/StockDetailPage/index.tsx"
       ],
       "symbols": [
@@ -23396,32 +23075,22 @@
         "react"
       ],
       "layer": "frontend",
-      "direct_dependents": 22,
+      "direct_dependents": 12,
       "transitive_dependents": 0,
-      "blast_score": 22.0,
+      "blast_score": 12.0,
       "imported_by": [
         "frontend/src/components/Layout.test.tsx",
         "frontend/src/components/QualityReportModal.test.tsx",
         "frontend/src/components/ScannerResults.test.tsx",
         "frontend/src/components/UniverseFormModal.test.tsx",
-        "frontend/src/components/scorecard/BackfillPanel.test.tsx",
-        "frontend/src/components/scorecard/SignalTable.test.tsx",
-        "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx",
         "frontend/src/pages/Alerts/AlertRuleModal.test.tsx",
         "frontend/src/pages/Alerts/Alerts.test.tsx",
-        "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
         "frontend/src/pages/AutoTrading/AutoTrading.test.tsx",
         "frontend/src/pages/AutoTrading/ConfigPanel.test.tsx",
-        "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
         "frontend/src/pages/Dashboard.test.tsx",
         "frontend/src/pages/Login/Login.test.tsx",
-        "frontend/src/pages/PreMarketMovers.test.tsx",
         "frontend/src/pages/Scanner/ScanConfigPanel.test.tsx",
-        "frontend/src/pages/Scanner/Scanner.test.tsx",
-        "frontend/src/pages/ScorecardDetail.test.tsx",
-        "frontend/src/pages/ScorecardOverview.test.tsx",
-        "frontend/src/pages/Settings.test.tsx",
-        "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx"
+        "frontend/src/pages/Scanner/Scanner.test.tsx"
       ],
       "symbols": [
         {
@@ -23697,8 +23366,8 @@
       "imports": [],
       "layer": "frontend",
       "direct_dependents": 63,
-      "transitive_dependents": 43,
-      "blast_score": 84.5,
+      "transitive_dependents": 29,
+      "blast_score": 77.5,
       "imported_by": [
         "frontend/src/App.tsx",
         "frontend/src/components/AlertList.tsx",
@@ -23774,9 +23443,9 @@
       "group": 9000,
       "imports": [],
       "layer": "frontend",
-      "direct_dependents": 11,
-      "transitive_dependents": 35,
-      "blast_score": 28.5,
+      "direct_dependents": 10,
+      "transitive_dependents": 26,
+      "blast_score": 23.0,
       "imported_by": [
         "frontend/src/App.tsx",
         "frontend/src/components/Layout.tsx",
@@ -23785,7 +23454,6 @@
         "frontend/src/components/scorecard/SignalTable.tsx",
         "frontend/src/pages/ActiveWatchlist/WatchlistTable.tsx",
         "frontend/src/pages/Login/index.tsx",
-        "frontend/src/pages/ScorecardDetail.test.tsx",
         "frontend/src/pages/ScorecardDetail.tsx",
         "frontend/src/pages/StockDetailPage/index.tsx",
         "frontend/src/test-utils/renderWithQuery.tsx"
@@ -23801,8 +23469,8 @@
       "imports": [],
       "layer": "frontend",
       "direct_dependents": 26,
-      "transitive_dependents": 42,
-      "blast_score": 47.0,
+      "transitive_dependents": 32,
+      "blast_score": 42.0,
       "imported_by": [
         "frontend/src/App.tsx",
         "frontend/src/api/alerts.ts",
@@ -23857,46 +23525,31 @@
       "group": 9000,
       "imports": [],
       "layer": "frontend",
-      "direct_dependents": 38,
+      "direct_dependents": 23,
       "transitive_dependents": 0,
-      "blast_score": 38.0,
+      "blast_score": 23.0,
       "imported_by": [
         "frontend/src/api/client.test.ts",
         "frontend/src/components/Layout.test.tsx",
         "frontend/src/components/QualityReportModal.test.tsx",
         "frontend/src/components/ScannerResults.test.tsx",
         "frontend/src/components/UniverseFormModal.test.tsx",
-        "frontend/src/components/scorecard/BackfillPanel.test.tsx",
-        "frontend/src/components/scorecard/HeroMetrics.test.tsx",
-        "frontend/src/components/scorecard/IntervalTable.test.tsx",
-        "frontend/src/components/scorecard/SignalTable.test.tsx",
         "frontend/src/components/ui/GlobalErrorToast.test.tsx",
-        "frontend/src/components/ui/PageLoader.test.tsx",
         "frontend/src/hooks/useLiveStockData.test.ts",
         "frontend/src/hooks/useScanTask.test.ts",
         "frontend/src/hooks/useScannerState.test.ts",
         "frontend/src/hooks/useScannerWs.test.ts",
         "frontend/src/hooks/useScorecard.test.ts",
         "frontend/src/hooks/useWatchlistLive.test.ts",
-        "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx",
-        "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
         "frontend/src/pages/Alerts/AlertRuleModal.test.tsx",
         "frontend/src/pages/Alerts/Alerts.test.tsx",
-        "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
         "frontend/src/pages/AutoTrading/AutoTrading.test.tsx",
         "frontend/src/pages/AutoTrading/ConfigPanel.test.tsx",
-        "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
         "frontend/src/pages/AutoTrading/components.test.tsx",
         "frontend/src/pages/Dashboard.test.tsx",
         "frontend/src/pages/Login/Login.test.tsx",
-        "frontend/src/pages/PreMarketMovers.test.tsx",
         "frontend/src/pages/Scanner/ScanConfigPanel.test.tsx",
         "frontend/src/pages/Scanner/Scanner.test.tsx",
-        "frontend/src/pages/ScorecardDetail.test.tsx",
-        "frontend/src/pages/ScorecardOverview.test.tsx",
-        "frontend/src/pages/Settings.test.tsx",
-        "frontend/src/pages/StockDetailPage/MetadataPanel.test.tsx",
-        "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
         "frontend/src/utils/indicators.test.ts",
         "frontend/vitest.config.ts"
       ]
@@ -23911,8 +23564,8 @@
       "imports": [],
       "layer": "frontend",
       "direct_dependents": 1,
-      "transitive_dependents": 101,
-      "blast_score": 51.5,
+      "transitive_dependents": 87,
+      "blast_score": 44.5,
       "imported_by": [
         "frontend/src/api/client.ts"
       ]
@@ -23927,8 +23580,8 @@
       "imports": [],
       "layer": "frontend",
       "direct_dependents": 38,
-      "transitive_dependents": 40,
-      "blast_score": 58.0,
+      "transitive_dependents": 30,
+      "blast_score": 53.0,
       "imported_by": [
         "frontend/src/components/AlertList.tsx",
         "frontend/src/components/ExportUniverseModal.tsx",
@@ -23980,8 +23633,8 @@
       "imports": [],
       "layer": "frontend",
       "direct_dependents": 8,
-      "transitive_dependents": 10,
-      "blast_score": 13.0,
+      "transitive_dependents": 8,
+      "blast_score": 12.0,
       "imported_by": [
         "frontend/src/components/AlertList.tsx",
         "frontend/src/components/NewsFeed.tsx",
@@ -24002,44 +23655,29 @@
       "group": 9000,
       "imports": [],
       "layer": "frontend",
-      "direct_dependents": 35,
+      "direct_dependents": 20,
       "transitive_dependents": 0,
-      "blast_score": 35.0,
+      "blast_score": 20.0,
       "imported_by": [
         "frontend/src/components/Layout.test.tsx",
         "frontend/src/components/QualityReportModal.test.tsx",
         "frontend/src/components/ScannerResults.test.tsx",
         "frontend/src/components/UniverseFormModal.test.tsx",
-        "frontend/src/components/scorecard/BackfillPanel.test.tsx",
-        "frontend/src/components/scorecard/HeroMetrics.test.tsx",
-        "frontend/src/components/scorecard/IntervalTable.test.tsx",
-        "frontend/src/components/scorecard/SignalTable.test.tsx",
         "frontend/src/components/ui/GlobalErrorToast.test.tsx",
-        "frontend/src/components/ui/PageLoader.test.tsx",
         "frontend/src/hooks/useLiveStockData.test.ts",
         "frontend/src/hooks/useScanTask.test.ts",
         "frontend/src/hooks/useScannerState.test.ts",
         "frontend/src/hooks/useScannerWs.test.ts",
         "frontend/src/hooks/useScorecard.test.ts",
         "frontend/src/hooks/useWatchlistLive.test.ts",
-        "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx",
-        "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
         "frontend/src/pages/Alerts/AlertRuleModal.test.tsx",
         "frontend/src/pages/Alerts/Alerts.test.tsx",
-        "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
         "frontend/src/pages/AutoTrading/AutoTrading.test.tsx",
         "frontend/src/pages/AutoTrading/ConfigPanel.test.tsx",
-        "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
         "frontend/src/pages/Dashboard.test.tsx",
         "frontend/src/pages/Login/Login.test.tsx",
-        "frontend/src/pages/PreMarketMovers.test.tsx",
         "frontend/src/pages/Scanner/ScanConfigPanel.test.tsx",
         "frontend/src/pages/Scanner/Scanner.test.tsx",
-        "frontend/src/pages/ScorecardDetail.test.tsx",
-        "frontend/src/pages/ScorecardOverview.test.tsx",
-        "frontend/src/pages/Settings.test.tsx",
-        "frontend/src/pages/StockDetailPage/MetadataPanel.test.tsx",
-        "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
         "frontend/src/test-utils/renderWithQuery.tsx"
       ]
     },
@@ -24053,8 +23691,8 @@
       "imports": [],
       "layer": "frontend",
       "direct_dependents": 1,
-      "transitive_dependents": 4,
-      "blast_score": 3.0,
+      "transitive_dependents": 3,
+      "blast_score": 2.5,
       "imported_by": [
         "frontend/src/components/scorecard/ScannerSummaryCard.tsx"
       ]
@@ -34892,8 +34530,8 @@
       ],
       "layer": "infrastructure",
       "direct_dependents": 30,
-      "transitive_dependents": 102,
-      "blast_score": 81.0,
+      "transitive_dependents": 88,
+      "blast_score": 74.0,
       "imported_by": [
         "backend/app/core/cache.py",
         "backend/app/main.py",
@@ -54759,30 +54397,6 @@
       "kind": "renders"
     },
     {
-      "source": "frontend/src/components/scorecard/BackfillPanel.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/scorecard/BackfillPanel.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/scorecard/BackfillPanel.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/components/scorecard/BackfillPanel.test.tsx",
-      "target": "frontend/src/components/scorecard/BackfillPanel.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
       "source": "frontend/src/components/scorecard/BackfillPanel.tsx",
       "target": "react",
       "weight": 1,
@@ -54825,30 +54439,6 @@
       "kind": "renders"
     },
     {
-      "source": "frontend/src/components/scorecard/HeroMetrics.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/scorecard/HeroMetrics.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/scorecard/HeroMetrics.test.tsx",
-      "target": "frontend/src/components/scorecard/HeroMetrics.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/components/scorecard/HeroMetrics.test.tsx",
-      "target": "frontend/src/api/outcomes.ts",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
       "source": "frontend/src/components/scorecard/HeroMetrics.tsx",
       "target": "react",
       "weight": 1,
@@ -54856,30 +54446,6 @@
     },
     {
       "source": "frontend/src/components/scorecard/HeroMetrics.tsx",
-      "target": "frontend/src/api/outcomes.ts",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/components/scorecard/IntervalTable.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/scorecard/IntervalTable.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/scorecard/IntervalTable.test.tsx",
-      "target": "frontend/src/components/scorecard/IntervalTable.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/components/scorecard/IntervalTable.test.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
       "kind": "renders"
@@ -54916,36 +54482,6 @@
     },
     {
       "source": "frontend/src/components/scorecard/ScannerSummaryCard.tsx",
-      "target": "frontend/src/api/outcomes.ts",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/components/scorecard/SignalTable.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/scorecard/SignalTable.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/scorecard/SignalTable.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/components/scorecard/SignalTable.test.tsx",
-      "target": "frontend/src/components/scorecard/SignalTable.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/components/scorecard/SignalTable.test.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
       "kind": "renders"
@@ -55063,24 +54599,6 @@
       "target": "lucide-react",
       "weight": 1,
       "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/ui/PageLoader.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/ui/PageLoader.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/components/ui/PageLoader.test.tsx",
-      "target": "frontend/src/components/ui/PageLoader.tsx",
-      "weight": 1,
-      "kind": "renders"
     },
     {
       "source": "frontend/src/components/ui/StockChart.tsx",
@@ -55365,54 +54883,6 @@
       "kind": "styles"
     },
     {
-      "source": "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/ActiveWatchlist/ActiveWatchlist.test.tsx",
-      "target": "frontend/src/pages/ActiveWatchlist/index.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
-      "target": "frontend/src/pages/ActiveWatchlist/AlertBadges.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/ActiveWatchlist/AlertBadges.test.tsx",
-      "target": "frontend/src/hooks/useWatchlistLive.ts",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
       "source": "frontend/src/pages/ActiveWatchlist/AlertBadges.tsx",
       "target": "frontend/src/hooks/useWatchlistLive.ts",
       "weight": 1,
@@ -55677,30 +55147,6 @@
       "kind": "renders"
     },
     {
-      "source": "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/AutoTrading/AccountPanel.test.tsx",
-      "target": "frontend/src/pages/AutoTrading/AccountPanel.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
       "source": "frontend/src/pages/AutoTrading/AccountPanel.tsx",
       "target": "react",
       "weight": 1,
@@ -55804,36 +55250,6 @@
     },
     {
       "source": "frontend/src/pages/AutoTrading/ConfigPanel.tsx",
-      "target": "frontend/src/api/trading.ts",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
-      "target": "frontend/src/pages/AutoTrading/OrdersPanel.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/AutoTrading/OrdersPanel.test.tsx",
       "target": "frontend/src/api/trading.ts",
       "weight": 1,
       "kind": "imports"
@@ -56193,30 +55609,6 @@
       "kind": "renders"
     },
     {
-      "source": "frontend/src/pages/PreMarketMovers.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/PreMarketMovers.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/PreMarketMovers.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/PreMarketMovers.test.tsx",
-      "target": "frontend/src/pages/PreMarketMovers.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
       "source": "frontend/src/pages/PreMarketMovers.tsx",
       "target": "react",
       "weight": 1,
@@ -56433,36 +55825,6 @@
       "kind": "renders"
     },
     {
-      "source": "frontend/src/pages/ScorecardDetail.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/ScorecardDetail.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/ScorecardDetail.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/ScorecardDetail.test.tsx",
-      "target": "frontend/src/pages/ScorecardDetail.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/ScorecardDetail.test.tsx",
-      "target": "react-router-dom",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
       "source": "frontend/src/pages/ScorecardDetail.tsx",
       "target": "react",
       "weight": 1,
@@ -56523,30 +55885,6 @@
       "kind": "renders"
     },
     {
-      "source": "frontend/src/pages/ScorecardOverview.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/ScorecardOverview.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/ScorecardOverview.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/ScorecardOverview.test.tsx",
-      "target": "frontend/src/pages/ScorecardOverview.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
       "source": "frontend/src/pages/ScorecardOverview.tsx",
       "target": "react",
       "weight": 1,
@@ -56563,30 +55901,6 @@
       "target": "frontend/src/components/scorecard/ScannerSummaryCard.tsx",
       "weight": 1,
       "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/Settings.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/Settings.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/Settings.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/Settings.test.tsx",
-      "target": "frontend/src/pages/Settings.tsx",
-      "weight": 1,
-      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Settings.tsx",
@@ -56655,24 +55969,6 @@
       "kind": "renders"
     },
     {
-      "source": "frontend/src/pages/StockDetailPage/MetadataPanel.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/StockDetailPage/MetadataPanel.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/StockDetailPage/MetadataPanel.test.tsx",
-      "target": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
       "source": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
       "target": "lucide-react",
       "weight": 1,
@@ -56687,30 +55983,6 @@
     {
       "source": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
       "target": "frontend/src/components/NewsFeed.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
-      "target": "vitest",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
-      "target": "@testing-library/react",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
-      "target": "frontend/src/test-utils/renderWithQuery.tsx",
-      "weight": 1,
-      "kind": "renders"
-    },
-    {
-      "source": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
-      "target": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx",
       "weight": 1,
       "kind": "renders"
     },

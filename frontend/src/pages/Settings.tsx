@@ -137,7 +137,7 @@ const Settings: React.FC = () => {
         {/* Tab Content */}
         <div className="flex-1">
           {activeTab === 'data' && (
-            <Card title="Data & Storage" icon={Database as any}>
+            <Card title="Data & Storage" icon={Database}>
               <div className="space-y-6">
                 {/* Market Data Sync */}
                 <div>

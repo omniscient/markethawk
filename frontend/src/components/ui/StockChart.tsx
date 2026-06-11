@@ -19,6 +19,12 @@ import {
 import { calculateDoubleSuperTrend } from '../../utils/indicators';
 import { ScannerEvent } from '../../api/scanner';
 
+interface StyledCandleData extends CandlestickData {
+  color?: string;
+  borderColor?: string;
+  wickColor?: string;
+}
+
 export interface StockBarRow {
   Date?: string;
   Open?: number;
@@ -96,9 +102,7 @@ const StockChart: React.FC<StockChartProps> = ({
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  // lightweight-charts has no base series interface; ISeriesApi<SeriesType> makes setData
-  // unsatisfiable at call sites — keep ISeriesApi<any> per spec Req 7 (library limitation).
-  const seriesRef = useRef<ISeriesApi<any> | null>(null);
+  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const vwapSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const stLine1SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
@@ -244,14 +248,14 @@ const StockChart: React.FC<StockChartProps> = ({
         bottomColor: 'rgba(14, 165, 233, 0.0)',
         lineWidth: 2,
       });
-      seriesRef.current = areaSeries;
+      seriesRef.current = areaSeries as unknown as ISeriesApi<'Candlestick'>;
       markersPluginRef.current = createSeriesMarkers(areaSeries, []);
     } else {
       const lineSeries = chart.addSeries(LineSeries, {
         color: '#8b5cf6',
         lineWidth: 2,
       });
-      seriesRef.current = lineSeries;
+      seriesRef.current = lineSeries as unknown as ISeriesApi<'Candlestick'>;
       markersPluginRef.current = createSeriesMarkers(lineSeries, []);
     }
 
@@ -342,8 +346,8 @@ const StockChart: React.FC<StockChartProps> = ({
         
         const line1Data = stData.map(d => ({ time: d.time as Time, value: d.tsl1 }));
         const line2Data = stData.map(d => ({ time: d.time as Time, value: d.tsl2 }));
-        const cloudData = stData.map(d => ({
-          time: d.time,
+        const cloudData: StyledCandleData[] = stData.map(d => ({
+          time: d.time as Time,
           open: d.tsl1,
           close: d.tsl2,
           high: Math.max(d.tsl1, d.tsl2),
@@ -363,7 +367,7 @@ const StockChart: React.FC<StockChartProps> = ({
         
         stLine1SeriesRef.current?.setData(line1Data);
         stLine2SeriesRef.current?.setData(line2Data);
-        stCloudSeriesRef.current?.setData(cloudData as any);
+        stCloudSeriesRef.current?.setData(cloudData);
       }
 
       // Markers — events + inline indicators
@@ -447,7 +451,7 @@ const StockChart: React.FC<StockChartProps> = ({
         index === self.findIndex((t) => t.time === item.time)
       );
 
-      seriesRef.current.setData(uniqueData);
+      (seriesRef.current as unknown as ISeriesApi<'Line'>).setData(uniqueData as LineData[]);
     }
     
     // Only fit content on initial load or when data was previously empty
@@ -528,7 +532,7 @@ const StockChart: React.FC<StockChartProps> = ({
         });
       }
     } else {
-      seriesRef.current.update({
+      (seriesRef.current as unknown as ISeriesApi<'Line'>).update({
         time: timeValue,
         value: liveData.c,
       });

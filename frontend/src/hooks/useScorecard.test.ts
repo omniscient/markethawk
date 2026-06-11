@@ -3,6 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { createElement } from 'react';
 import { useScorecard } from './useScorecard';
+import type { Scorecard } from '../api/outcomes';
 
 vi.mock('../api/outcomes', () => ({
   fetchScorecard: vi.fn(),
@@ -25,7 +26,7 @@ function makeWrapper() {
 
 describe('useScorecard', () => {
   it('is loading initially when scannerType is provided', () => {
-    vi.mocked(fetchScorecard).mockResolvedValue({} as any);
+    vi.mocked(fetchScorecard).mockResolvedValue({} as Scorecard);
     const { wrapper } = makeWrapper();
     const { result } = renderHook(() => useScorecard('pre_market'), { wrapper });
     expect(result.current.isLoading).toBe(true);
@@ -40,7 +41,7 @@ describe('useScorecard', () => {
 
   it('returns data on success', async () => {
     const mockScorecard = { win_rate: 0.6, avg_mfe: 2.5, sample_size: 100 };
-    vi.mocked(fetchScorecard).mockResolvedValue(mockScorecard as any);
+    vi.mocked(fetchScorecard).mockResolvedValue(mockScorecard as Partial<Scorecard> as Scorecard);
     const { wrapper } = makeWrapper();
     const { result } = renderHook(() => useScorecard('pre_market'), { wrapper });
 

@@ -37,6 +37,7 @@ import {
 
 // API functions
 import { fetchScannerConfigs, getSignalQualityDistribution } from '../api/scanner';
+import type { EdgeDistributionEvent, EdgeStatEntry } from '../api/scanner';
 import { apiClient } from '../api/client';
 import CorrelationHeatmap from '../components/CorrelationHeatmap';
 import { fetchCorrelations, triggerAnalysis } from '../api/analysis';
@@ -53,27 +54,27 @@ const EdgeExplorer: React.FC = () => {
   });
 
   // Fetch edge stats
-  const { data: stats, isLoading: loadingStats } = useQuery({
+  const { data: stats, isLoading: loadingStats } = useQuery<EdgeStatEntry[]>({
     queryKey: ['edgeStats', period, ticker, scannerType],
     queryFn: async () => {
       const params = new URLSearchParams({ period });
       if (ticker) params.append('ticker', ticker);
       if (scannerType) params.append('scanner_type', scannerType);
-      
-      const response = await apiClient.get(`/scanner/edge-stats?${params.toString()}`);
+
+      const response = await apiClient.get<EdgeStatEntry[]>(`/scanner/edge-stats?${params.toString()}`);
       return response.data;
     }
   });
 
   // Fetch distribution data
-  const { data: distribution, isLoading: loadingDist } = useQuery({
+  const { data: distribution, isLoading: loadingDist } = useQuery<{ events: EdgeDistributionEvent[] }>({
     queryKey: ['edgeDistribution', ticker, scannerType],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (ticker) params.append('ticker', ticker);
       if (scannerType) params.append('scanner_type', scannerType);
-      
-      const response = await apiClient.get(`/scanner/edge-distribution?${params.toString()}`);
+
+      const response = await apiClient.get<{ events: EdgeDistributionEvent[] }>(`/scanner/edge-distribution?${params.toString()}`);
       return response.data;
     }
   });
@@ -104,9 +105,9 @@ const EdgeExplorer: React.FC = () => {
   const events = distribution?.events || [];
   
   // Calculate aggregate metrics
-  const avgGap = events.length > 0 ? events.reduce((acc: number, e: any) => acc + (e.gap_pct || 0), 0) / events.length : 0;
-  const avgFade = events.length > 0 ? events.reduce((acc: number, e: any) => acc + (e.fade_pct || 0), 0) / events.length : 0;
-  const avgRange = events.length > 0 ? events.reduce((acc: number, e: any) => acc + (e.day_range_pct || 0), 0) / events.length : 0;
+  const avgGap = events.length > 0 ? events.reduce((acc, e) => acc + (e.gap_pct || 0), 0) / events.length : 0;
+  const avgFade = events.length > 0 ? events.reduce((acc, e) => acc + (e.fade_pct || 0), 0) / events.length : 0;
+  const avgRange = events.length > 0 ? events.reduce((acc, e) => acc + (e.day_range_pct || 0), 0) / events.length : 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -173,33 +174,33 @@ const EdgeExplorer: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <MetricCard
               title="Frequency/Period"
-              value={stats && stats.length > 0 ? (stats.reduce((acc: number, s: any) => acc + s.event_count, 0) / stats.length).toFixed(1) : '0'}
-              icon={Layers as any}
+              value={stats && stats.length > 0 ? (stats.reduce((acc, s) => acc + s.event_count, 0) / stats.length).toFixed(1) : '0'}
+              icon={Layers}
               color="blue"
             />
             <MetricCard
               title="Avg Gap Persistence"
               value={`${avgGap.toFixed(2)}%`}
-              icon={TrendingUp as any}
+              icon={TrendingUp}
               color="green"
             />
             <MetricCard
               title="Avg Fade Severity"
               value={`${avgFade.toFixed(2)}%`}
-              icon={Target as any}
+              icon={Target}
               color="red"
             />
             <MetricCard
               title="Volatility Window"
               value={`${avgRange.toFixed(2)}%`}
-              icon={BarChart2 as any}
+              icon={BarChart2}
               color="purple"
             />
           </div>
 
           {/* Distribution Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card title="Gapper Retention Correlation" icon={TrendingUp as any}>
+            <Card title="Gapper Retention Correlation" icon={TrendingUp}>
               <div className="h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -231,7 +232,7 @@ const EdgeExplorer: React.FC = () => {
                     />
                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase'}}/>
                     <Scatter name="Scanner Events" data={events} fill="#3B82F6">
-                      {events.map((entry: any, index: number) => (
+                      {events.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fade_pct > entry.gap_pct ? '#EF4444' : '#10B981'} fillOpacity={0.6} />
                       ))}
                     </Scatter>
@@ -243,7 +244,7 @@ const EdgeExplorer: React.FC = () => {
               </p>
             </Card>
 
-            <Card title="Strategy Lifecycle Trends" icon={Calendar as any}>
+            <Card title="Strategy Lifecycle Trends" icon={Calendar}>
               <div className="h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={stats || []} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -291,7 +292,7 @@ const EdgeExplorer: React.FC = () => {
           </div>
 
           {/* Aggregate Table */}
-          <Card title="Performance Audit Log" icon={BarChart2 as any}>
+          <Card title="Performance Audit Log" icon={BarChart2}>
             <div className="overflow-x-auto">
               <table className="min-w-full border-separate border-spacing-y-2">
                 <thead>
@@ -305,7 +306,7 @@ const EdgeExplorer: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {stats?.map((row: any, i: number) => (
+                  {stats?.map((row, i) => (
                     <tr key={i} className="group hover:scale-[1.002] transition-transform duration-200">
                       <td className="px-6 py-4 bg-gray-800/40 rounded-l-xl text-sm font-black text-financial-light">{row.label}</td>
                       <td className="px-6 py-4 bg-gray-800/40 text-sm text-gray-300 font-mono italic">{row.event_count} EVENTS</td>
@@ -321,7 +322,7 @@ const EdgeExplorer: React.FC = () => {
           </Card>
 
           {/* Feature Correlations */}
-          <Card title="Feature Correlations" icon={BarChart2 as any}>
+          <Card title="Feature Correlations" icon={BarChart2}>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-gray-400 text-xs">
@@ -350,7 +351,7 @@ const EdgeExplorer: React.FC = () => {
             </div>
           </Card>
 
-          <Card title="Signal Quality Validation" icon={TrendingUp as any}>
+          <Card title="Signal Quality Validation" icon={TrendingUp}>
             {loadingQualityDist ? (
               <div className="flex items-center justify-center h-48 text-gray-500">Loading…</div>
             ) : !qualityDist?.deciles?.length ? (

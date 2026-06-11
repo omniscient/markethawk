@@ -5,9 +5,10 @@ import {
 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import type { AlertLog } from '../../api/alerts';
 
 export interface AlertActivityCardProps {
-  logs: any[];
+  logs: AlertLog[];
 }
 
 export function AlertActivityCard({ logs }: AlertActivityCardProps) {
@@ -46,7 +47,7 @@ export function AlertActivityCard({ logs }: AlertActivityCardProps) {
 }
 
 export interface AlertLogsPanelProps {
-  logs: any[];
+  logs: AlertLog[];
 }
 
 export function AlertLogsPanel({ logs }: AlertLogsPanelProps) {

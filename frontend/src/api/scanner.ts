@@ -306,6 +306,27 @@ export interface ScannerSparklinePoint {
   status: string;
 }
 
+export interface EdgeDistributionEvent {
+  ticker: string;
+  event_date: string;
+  gap_pct: number;
+  fade_pct: number;
+  day_range_pct: number;
+}
+
+export interface EdgeDistributionResponse {
+  events: EdgeDistributionEvent[];
+}
+
+export interface EdgeStatEntry {
+  label: string;
+  event_count: number;
+  avg_gap_pct: number;
+  avg_fade_pct: number;
+  avg_day_range_pct: number;
+  avg_rel_vol: number;
+}
+
 export interface ScannerStatusBlock {
   scanner_type: string;
   universe_id: number | null;

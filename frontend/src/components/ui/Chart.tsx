@@ -11,19 +11,22 @@ import {
 } from 'recharts';
 
 import StockChart from './StockChart';
+import type { StockBarRow } from './StockChart';
+import type { ScannerEvent } from '../../api/scanner';
+import type { LiveStockData } from '../../hooks/useLiveStockData';
 
 interface ChartProps {
-  data: any[];
+  data: StockBarRow[] | ScannerEvent[];
   type: 'line' | 'area' | 'bar' | 'candlestick';
   xKey: string;
   yKey?: string; // Optional if candlestick
-  events?: any[];
+  events?: ScannerEvent[];
   highlightDate?: string;
   color?: string;
   height?: number;
   timespan?: string;
   symbol?: string;
-  liveData?: any;
+  liveData?: LiveStockData | null;
   showGrid?: boolean;
   showTooltip?: boolean;
   showLegend?: boolean;
@@ -47,7 +50,7 @@ const Chart: React.FC<ChartProps> = ({
   showLegend = false,
   showDoubleSuperTrend = false
 }) => {
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: unknown }[]; label?: string }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-gray-800 border border-gray-600 rounded-lg p-3 shadow-lg">

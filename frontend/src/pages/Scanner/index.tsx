@@ -54,9 +54,9 @@ const Scanner: React.FC = () => {
 
   React.useEffect(() => {
     if (!existingResults) return;
-    state.setScanResults((prev: any) => {
+    state.setScanResults((prev) => {
       if (prev && prev.scan_id !== 'historical') return prev;
-      return { scan_id: 'historical', status: 'completed', stocks_scanned: 0, events_detected: existingResults.length, execution_time_ms: 0, events: existingResults };
+      return { scan_id: 'historical', status: 'completed', stocks_scanned: 0, events_detected: existingResults.length, execution_time_ms: 0, scanner_type: '', events: existingResults };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps -- adding state to deps causes infinite loop; state.setScanResults setter is the stable reference needed here
   }, [existingResults]);
@@ -78,9 +78,10 @@ const Scanner: React.FC = () => {
       localStorage.setItem(ACTIVE_SCAN_LS_KEY, JSON.stringify(ref));
       attachWebSocket(data.task_id);
     },
-    onError: (error: any) => {
-      const status = error?.response?.status;
-      const detail = error?.response?.data?.detail;
+    onError: (error: unknown) => {
+      const err = error as { response?: { status?: number; data?: { detail?: Record<string, string> } } };
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
       if (status === 409 && detail && typeof detail === 'object' && detail.task_id) {
         const ref: ActiveScanRef = {
           scan_id: detail.scan_id, task_id: detail.task_id, scanner_type: state.selectedConfig,
@@ -95,7 +96,7 @@ const Scanner: React.FC = () => {
         return;
       }
       console.error('Scanner error:', error);
-      state.setScanError(handleApiError(error));
+      state.setScanError(handleApiError(err));
       state.setIsScanning(false);
     },
   });

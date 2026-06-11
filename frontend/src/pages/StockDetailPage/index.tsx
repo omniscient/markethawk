@@ -182,13 +182,7 @@ const StockDetailPage: React.FC = () => {
     );
   }
 
-  const resultsArray = Array.isArray(scannerResults)
-    ? scannerResults
-    : (scannerResults as any)?.data || (scannerResults as any)?.results || [];
-  const events = resultsArray.map((e: any) => ({
-    id: String(e.id), ticker: e.ticker, event_date: e.event_date, scanner_type: e.scanner_type,
-    summary: e.summary, severity: e.severity, indicators: e.indicators, criteria_met: e.criteria_met,
-  }));
+  const events = Array.isArray(scannerResults) ? scannerResults : [];
 
   const currentPrice = liveData ? liveData.c : (details.latest_price || (historicalData.length > 0 ? historicalData[historicalData.length - 1].Close : 0));
   const prevClose = historicalData.length > 1 ? historicalData[historicalData.length - 2].Close : currentPrice;
@@ -211,7 +205,7 @@ const StockDetailPage: React.FC = () => {
             <div className="px-2 py-0.5 bg-gray-800 rounded text-xs font-bold text-gray-400 uppercase">
               {details.info.sector || 'Unknown Sector'}
             </div>
-            {tickerUniverses.map((u: any) => (
+            {tickerUniverses.map((u) => (
               <div key={u.id} className="px-2 py-0.5 bg-purple-900/50 border border-purple-700/50 rounded text-xs font-bold text-purple-300 uppercase">
                 {u.name}
               </div>
@@ -247,7 +241,7 @@ const StockDetailPage: React.FC = () => {
               {splitPending ? 'Split Adjustment Pending' : 'Recent Stock Split'}
             </p>
             <p className="text-gray-400 mt-1">
-              {recentSplits.map((s: any) => (
+              {recentSplits.map((s) => (
                 <span key={s.execution_date} className="mr-4">
                   {s.split_to}:{s.split_from} split on {format(new Date(s.execution_date + 'T00:00:00'), 'MMM d, yyyy')}
                   {s.adjusted ? <span className="text-positive ml-1">(adjusted)</span> : <span className="text-amber-400 ml-1">(pending adjustment)</span>}
