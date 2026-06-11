@@ -2,8 +2,9 @@ import asyncio
 from datetime import date
 from unittest.mock import AsyncMock
 
-import app.services.scan_orchestrator as orchestrator
 import pytest
+
+import app.services.scan_orchestrator as orchestrator
 from app.services.scan_orchestrator import ScannerDescriptor, get_all, register, run
 
 
@@ -90,6 +91,7 @@ def test_liquidity_hunt_variants_registered():
 from unittest.mock import patch
 
 import fakeredis
+
 from app.services.scan_orchestrator import (
     compute_next_run,
     get_scan_progress,

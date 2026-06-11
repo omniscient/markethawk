@@ -7,13 +7,14 @@ from app.core.config import get_settings
 
 get_settings.cache_clear()
 
+from jose import jwt
+
 from app.core.auth import (
     create_access_token,
     create_refresh_token,
     hash_password,
     verify_password,
 )
-from jose import jwt
 
 
 def test_hash_and_verify():

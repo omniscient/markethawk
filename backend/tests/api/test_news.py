@@ -7,10 +7,10 @@ and mock_news_provider patches httpx for any test touching POST /refresh.
 
 from unittest.mock import MagicMock, patch
 
-from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.main import app
 from tests.fixtures.providers import (  # noqa: F401
     mock_news_provider,
     seed_news_articles,

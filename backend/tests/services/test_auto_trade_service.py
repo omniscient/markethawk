@@ -11,6 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import fakeredis
 import pytest
+from sqlalchemy.orm import Session
+
 from app.models.alert_rule import AlertRule
 from app.models.auto_trade_order import AutoTradeOrder
 from app.models.scanner_event import ScannerEvent
@@ -22,7 +24,6 @@ from app.services.auto_trade_service import (
     get_account,
     get_stats,
 )
-from sqlalchemy.orm import Session
 
 # ── helpers ────────────────────────────────────────────────────────────────
 

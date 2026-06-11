@@ -3,10 +3,10 @@ Integration tests for system config API endpoints.
 Runs against a real Postgres DB (via testcontainers).
 """
 
-from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.main import app
 from tests.fixtures.system import seed_system_config
 
 client = TestClient(app)
