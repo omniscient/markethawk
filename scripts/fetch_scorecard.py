@@ -78,7 +78,7 @@ def in_window(iso: str | None, since: datetime, until: datetime) -> bool:
 
 # ── 2-week churn (GitClear slop signal) ───────────────────────────────────────
 def parse_numstat(output: str) -> dict[str, int]:
-    """``git show --numstat`` lines ('added\\tdeleted\\tpath') → {path: added}.
+    """``git show --numstat --format=`` lines ('added\\tdeleted\\tpath') → {path: added}.
 
     Binary files ('-') and zero-add lines are skipped. Renamed paths come
     through in git's rename syntax and will fail blame later → counted as

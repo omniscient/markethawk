@@ -106,16 +106,25 @@ def test_parse_numstat_empty_output():
     assert parse_numstat("") == {}
 
 
+_BLAME_ATTRS = (
+    "author Test\nauthor-mail <t@t.com>\nauthor-time 1000000000\nauthor-tz +0000\n"
+    "committer Test\ncommitter-mail <t@t.com>\ncommitter-time 1000000000\n"
+    "committer-tz +0000\nsummary test commit\nfilename test.py"
+)
+
+
 def test_count_surviving_lines_counts_only_header_lines_for_sha():
     sha = "a" * 40
     other = "b" * 40
     blame = "\n".join([
         f"{sha} 1 1 2",
-        "author MarketHawk Factory",
+        _BLAME_ATTRS,
         "\tline one content",
         f"{sha} 2 2",
+        _BLAME_ATTRS,
         "\tline two content",
         f"{other} 1 3 1",
+        _BLAME_ATTRS,
         f"\t{sha} content line that mentions the sha",
     ])
     assert count_surviving_lines(blame, sha) == 2
