@@ -52,6 +52,14 @@ Your entire response must follow this exact structure. Do not include any text o
 
 List every change in the diff that is NOT (a) spec-named, (b) supporting housekeeping directly backing an (a) change, or (c) strictly required for the in-scope work to compile/run. Include fixes to pre-existing defects even if they appear beneficial.
 
+**Formatter / import-ordering exception:** Reformatting and import re-ordering produced by
+`ruff`, `ruff format`, or equivalent linters acting on a Python file that also contains
+in-scope changes is **not** an out-of-scope change. Do NOT emit an `[OOS]` bullet for
+whitespace rewraps, line-length splits, or isort import reorders in touched `.py` files.
+These changes are non-actionable housekeeping — the formatter re-applies them on every
+commit. Only flag as `[OOS]` if the reformatting appears in a file with no spec-required
+changes.
+
 - [OOS] <file or area> — <one-sentence description of the unrelated change>
 
 (If there are no out-of-scope changes, write: None.)
