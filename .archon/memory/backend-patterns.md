@@ -64,3 +64,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+## Backend: SQLAlchemy Column Defaults
+
+- [PATTERN] For zero-arg callables used as SQLAlchemy `Column` defaults, pass the function object directly (`default=utc_now`) rather than wrapping in a lambda (`default=lambda: utc_now()`). Both are invoked at row-insert time, but the lambda adds indirection with no benefit. Only wrap in a lambda when you need to adapt arguments. At inline call sites (task code, services), invoke the function normally (`utc_now()`). <!-- issue:#286 date:2026-06-11 expires:2026-12-11 source:refine -->
