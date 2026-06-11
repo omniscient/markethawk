@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 491,
-    "total_loc": 69426,
+    "total_files": 493,
+    "total_loc": 69709,
     "languages": [
       "python",
       "javascript",
@@ -15159,6 +15159,41 @@
       ]
     },
     {
+      "id": "dark-factory/scripts/check_workflow_dag.py",
+      "type": "module",
+      "language": "python",
+      "size": 120,
+      "loc": 120,
+      "group": 22,
+      "imports": [
+        "__future__",
+        "sys",
+        "pathlib",
+        "typing",
+        "yaml"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "check",
+          "line": 45,
+          "kind": "function",
+          "exported": true,
+          "doc": "Validate OR-join trigger_rule semantics in *workflow_path*."
+        },
+        {
+          "name": "main",
+          "line": 98,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
       "id": "dark-factory/scripts/code_review_payload.py",
       "type": "module",
       "language": "python",
@@ -15811,6 +15846,85 @@
           "line": 26,
           "kind": "function",
           "exported": true
+        }
+      ]
+    },
+    {
+      "id": "dark-factory/tests/test_workflow_or_join.py",
+      "type": "module",
+      "language": "python",
+      "size": 151,
+      "loc": 151,
+      "group": 23,
+      "imports": [
+        "sys",
+        "textwrap",
+        "io",
+        "pathlib",
+        "pytest",
+        "yaml",
+        "check_workflow_dag"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "_make_workflow",
+          "line": 38,
+          "kind": "function",
+          "exported": false,
+          "doc": "Return minimal workflow YAML containing *nodes*."
+        },
+        {
+          "name": "_write_tmp",
+          "line": 43,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "test_current_workflow_passes",
+          "line": 53,
+          "kind": "function",
+          "exported": true,
+          "doc": "The live archon-dark-factory.yaml must have zero OR-join errors."
+        },
+        {
+          "name": "test_regression_pre_fix_validate_missing_trigger_rule",
+          "line": 64,
+          "kind": "function",
+          "exported": true,
+          "doc": "A validate node with depends_on=[preview-up, preview-up-resolve] but NO"
+        },
+        {
+          "name": "test_regression_all_success_trigger_rule",
+          "line": 82,
+          "kind": "function",
+          "exported": true,
+          "doc": "Explicitly setting trigger_rule: all_success on an OR-join node must be caught."
+        },
+        {
+          "name": "test_tripwire_fires_when_count_increases",
+          "line": 102,
+          "kind": "function",
+          "exported": true,
+          "doc": "Adding a fifth trigger_rule node without updating the guard triggers the tripwir"
+        },
+        {
+          "name": "test_tripwire_fires_when_count_decreases",
+          "line": 119,
+          "kind": "function",
+          "exported": true,
+          "doc": "Removing a trigger_rule node without updating the guard also triggers the tripwi"
+        },
+        {
+          "name": "test_one_success_is_accepted",
+          "line": 140,
+          "kind": "function",
+          "exported": true,
+          "doc": "one_success is a valid skip-tolerant trigger_rule and must not produce errors."
         }
       ]
     },
@@ -17397,19 +17511,21 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 13,
+      "direct_dependents": 15,
       "transitive_dependents": 2,
-      "blast_score": 14.0,
+      "blast_score": 16.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/live_scanner/main.py",
         "backend/scripts/download_futures.py",
         "backend/scripts/generate_schema_doc.py",
         "backend/scripts/scratch_erd.py",
+        "dark-factory/scripts/check_workflow_dag.py",
         "dark-factory/scripts/code_review_payload.py",
         "dark-factory/scripts/fmt_hunk_filter.py",
         "dark-factory/tests/test_code_review_payload.py",
         "dark-factory/tests/test_fmt_hunk_filter.py",
+        "dark-factory/tests/test_workflow_or_join.py",
         "scripts/fetch_metrics.py",
         "scripts/render_report.py",
         "services/tweet-monitor/tests/test_classifier.py",
@@ -17441,9 +17557,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 127,
+      "direct_dependents": 128,
       "transitive_dependents": 92,
-      "blast_score": 173.0,
+      "blast_score": 174.0,
       "imported_by": [
         "backend/app/alembic/versions/0b4b1c3739b4_add_missing_model_tables.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -17564,6 +17680,7 @@
         "backend/tests/conftest.py",
         "backend/tests/fixtures/providers.py",
         "backend/tests/services/test_pocket_pivot.py",
+        "dark-factory/scripts/check_workflow_dag.py",
         "dark-factory/scripts/code_review_payload.py",
         "services/tweet-monitor/app/browser.py",
         "services/tweet-monitor/app/classifier.py",
@@ -18333,15 +18450,16 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 10,
+      "direct_dependents": 11,
       "transitive_dependents": 0,
-      "blast_score": 10.0,
+      "blast_score": 11.0,
       "imported_by": [
         "backend/app/providers/ibkr_orders.py",
         "backend/app/services/auto_trade_service.py",
         "backend/app/services/liquidity_hunt.py",
         "backend/app/services/pocket_pivot.py",
         "backend/app/services/timeseries_forecast.py",
+        "dark-factory/scripts/check_workflow_dag.py",
         "dark-factory/scripts/code_review_payload.py",
         "services/tweet-monitor/app/classifier.py",
         "services/tweet-monitor/app/extractor.py",
@@ -18618,12 +18736,13 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 2,
+      "direct_dependents": 3,
       "transitive_dependents": 0,
-      "blast_score": 2.0,
+      "blast_score": 3.0,
       "imported_by": [
         "backend/app/services/journal_service.py",
-        "backend/app/services/universe_export.py"
+        "backend/app/services/universe_export.py",
+        "dark-factory/tests/test_workflow_or_join.py"
       ]
     },
     {
@@ -18928,9 +19047,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 34,
+      "direct_dependents": 35,
       "transitive_dependents": 0,
-      "blast_score": 34.0,
+      "blast_score": 35.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_alerts.py",
@@ -18962,6 +19081,7 @@
         "backend/tests/tasks/test_sync_tasks.py",
         "backend/tests/test_db_utils.py",
         "backend/tests/test_settings.py",
+        "dark-factory/tests/test_workflow_or_join.py",
         "services/tweet-monitor/tests/test_classifier.py",
         "services/tweet-monitor/tests/test_extractor.py",
         "tests/scripts/conftest.py",
@@ -19141,13 +19261,15 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 3,
+      "direct_dependents": 5,
       "transitive_dependents": 0,
-      "blast_score": 3.0,
+      "blast_score": 5.0,
       "imported_by": [
         "backend/tests/api/test_metrics.py",
+        "dark-factory/scripts/check_workflow_dag.py",
         "dark-factory/tests/test_config_code_review.py",
-        "dark-factory/tests/test_workflow_code_review.py"
+        "dark-factory/tests/test_workflow_code_review.py",
+        "dark-factory/tests/test_workflow_or_join.py"
       ]
     },
     {
@@ -19212,13 +19334,14 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 15,
+      "direct_dependents": 17,
       "transitive_dependents": 0,
-      "blast_score": 15.0,
+      "blast_score": 17.0,
       "imported_by": [
         "backend/tests/live_scanner/test_main_imports.py",
         "backend/tests/live_scanner/test_publisher.py",
         "backend/tests/test_coverage_config.py",
+        "dark-factory/scripts/check_workflow_dag.py",
         "dark-factory/tests/test_code_review_command.py",
         "dark-factory/tests/test_code_review_payload.py",
         "dark-factory/tests/test_code_review_prompt.py",
@@ -19228,6 +19351,7 @@
         "dark-factory/tests/test_fmt_hunk_filter.py",
         "dark-factory/tests/test_report_code_review_section.py",
         "dark-factory/tests/test_workflow_code_review.py",
+        "dark-factory/tests/test_workflow_or_join.py",
         "scripts/render_report.py",
         "tests/scripts/test_fetch_metrics.py",
         "tests/scripts/test_render_report.py"
@@ -19342,11 +19466,12 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 1,
+      "direct_dependents": 2,
       "transitive_dependents": 0,
-      "blast_score": 1.0,
+      "blast_score": 2.0,
       "imported_by": [
-        "dark-factory/tests/test_fmt_hunk_filter.py"
+        "dark-factory/tests/test_fmt_hunk_filter.py",
+        "dark-factory/tests/test_workflow_or_join.py"
       ]
     },
     {
@@ -19363,6 +19488,22 @@
       "blast_score": 1.0,
       "imported_by": [
         "dark-factory/tests/test_fmt_hunk_filter.py"
+      ]
+    },
+    {
+      "id": "check_workflow_dag",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "dark-factory/tests/test_workflow_or_join.py"
       ]
     },
     {
@@ -46978,6 +47119,19 @@
       "imported_by": [],
       "symbols": [
         {
+          "name": "check",
+          "line": 45,
+          "kind": "function",
+          "exported": true,
+          "doc": "Validate OR-join trigger_rule semantics in *workflow_path*."
+        },
+        {
+          "name": "main",
+          "line": 98,
+          "kind": "function",
+          "exported": true
+        },
+        {
           "name": "Finding",
           "line": 30,
           "kind": "class",
@@ -47412,6 +47566,61 @@
           "line": 26,
           "kind": "function",
           "exported": true
+        },
+        {
+          "name": "_make_workflow",
+          "line": 38,
+          "kind": "function",
+          "exported": false,
+          "doc": "Return minimal workflow YAML containing *nodes*."
+        },
+        {
+          "name": "_write_tmp",
+          "line": 43,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "test_current_workflow_passes",
+          "line": 53,
+          "kind": "function",
+          "exported": true,
+          "doc": "The live archon-dark-factory.yaml must have zero OR-join errors."
+        },
+        {
+          "name": "test_regression_pre_fix_validate_missing_trigger_rule",
+          "line": 64,
+          "kind": "function",
+          "exported": true,
+          "doc": "A validate node with depends_on=[preview-up, preview-up-resolve] but NO"
+        },
+        {
+          "name": "test_regression_all_success_trigger_rule",
+          "line": 82,
+          "kind": "function",
+          "exported": true,
+          "doc": "Explicitly setting trigger_rule: all_success on an OR-join node must be caught."
+        },
+        {
+          "name": "test_tripwire_fires_when_count_increases",
+          "line": 102,
+          "kind": "function",
+          "exported": true,
+          "doc": "Adding a fifth trigger_rule node without updating the guard triggers the tripwir"
+        },
+        {
+          "name": "test_tripwire_fires_when_count_decreases",
+          "line": 119,
+          "kind": "function",
+          "exported": true,
+          "doc": "Removing a trigger_rule node without updating the guard also triggers the tripwi"
+        },
+        {
+          "name": "test_one_success_is_accepted",
+          "line": 140,
+          "kind": "function",
+          "exported": true,
+          "doc": "one_success is a valid skip-tolerant trigger_rule and must not produce errors."
         }
       ]
     },
@@ -54661,6 +54870,36 @@
       "kind": "imports"
     },
     {
+      "source": "dark-factory/scripts/check_workflow_dag.py",
+      "target": "__future__",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/check_workflow_dag.py",
+      "target": "sys",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/check_workflow_dag.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/check_workflow_dag.py",
+      "target": "typing",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/check_workflow_dag.py",
+      "target": "yaml",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "dark-factory/scripts/code_review_payload.py",
       "target": "__future__",
       "weight": 1,
@@ -54855,6 +55094,48 @@
     {
       "source": "dark-factory/tests/test_workflow_code_review.py",
       "target": "yaml",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_workflow_or_join.py",
+      "target": "sys",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_workflow_or_join.py",
+      "target": "textwrap",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_workflow_or_join.py",
+      "target": "io",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_workflow_or_join.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_workflow_or_join.py",
+      "target": "pytest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_workflow_or_join.py",
+      "target": "yaml",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_workflow_or_join.py",
+      "target": "check_workflow_dag",
       "weight": 1,
       "kind": "imports"
     },
