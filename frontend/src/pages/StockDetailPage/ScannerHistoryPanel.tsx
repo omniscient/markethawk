@@ -3,6 +3,7 @@ import { Zap } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import RecentEvents from '../../components/RecentEvents';
 import ForceScanDialog from '../../components/ForceScanDialog';
+import type { ScannerEvent } from '../../api/scanner';
 
 export interface ScanTaskState {
   status: string;
@@ -13,7 +14,7 @@ export interface ScanTaskState {
 
 export interface ScannerHistoryPanelProps {
   symbol: string;
-  events: any[];
+  events: ScannerEvent[];
   clearConfirmOpen: boolean;
   onClearConfirmOpen: (v: boolean) => void;
   onClearHistory: () => void;
@@ -39,7 +40,7 @@ export function ScannerHistoryPanel({
     <>
       <Card
         title="Scanner Event History"
-        icon={Zap as any}
+        icon={Zap}
         actions={
           <div className="flex items-center space-x-2">
             {scanTask.status === 'connecting' && (
@@ -107,7 +108,7 @@ export function ScannerHistoryPanel({
         <RecentEvents
           events={events}
           maxItems={10}
-          onEventClick={(event: any) => onHighlightDate(event.event_date)}
+          onEventClick={(event) => onHighlightDate(event.event_date)}
         />
       </Card>
 

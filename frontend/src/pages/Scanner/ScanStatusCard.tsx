@@ -2,12 +2,13 @@
 import { formatDistanceToNow } from 'date-fns';
 import { Eye } from 'lucide-react';
 import Card from '../../components/ui/Card';
+import type { ScannerStatusBlock, StockUniverse } from '../../api/scanner';
 
 export interface ScanStatusCardProps {
   isScanning: boolean;
-  statusBlock: any;
+  statusBlock: ScannerStatusBlock | undefined;
   selectedUniverse: number | null;
-  universes: any[];
+  universes: StockUniverse[];
 }
 
 export function ScanStatusCard({ isScanning, statusBlock, selectedUniverse, universes }: ScanStatusCardProps) {
@@ -15,7 +16,7 @@ export function ScanStatusCard({ isScanning, statusBlock, selectedUniverse, univ
   const universeCount = universe?.ticker_count || universe?.aggregate_count || 0;
 
   return (
-    <Card title="Scan Status" icon={Eye as any}>
+    <Card title="Scan Status" icon={Eye}>
       <div className="space-y-3">
         <div className="flex justify-between items-center">
           <span className="text-gray-400">Status</span>
@@ -87,13 +88,13 @@ export function ScanStatusCard({ isScanning, statusBlock, selectedUniverse, univ
         )}
         {statusBlock?.sparkline && statusBlock.sparkline.length > 1 && (() => {
           const pts = statusBlock.sparkline;
-          const maxVal = Math.max(...pts.map((p: any) => p.events_detected), 1);
+          const maxVal = Math.max(...pts.map((p) => p.events_detected), 1);
           const w = 100, h = 28, barW = Math.floor(w / pts.length) - 1;
           return (
             <div className="pt-1">
               <span className="text-xs text-gray-500 mb-1 block">Events/run (last {pts.length})</span>
               <svg width={w} height={h} className="w-full" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-                {pts.map((p: any, i: number) => {
+                {pts.map((p, i) => {
                   const barH = Math.max(2, Math.round((p.events_detected / maxVal) * (h - 2)));
                   const fill = p.status === 'completed' ? '#60a5fa' : p.status === 'failed' ? '#f87171' : '#6b7280';
                   return <rect key={i} x={i * (barW + 1)} y={h - barH} width={barW} height={barH} fill={fill} rx={1} />;

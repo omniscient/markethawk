@@ -39,8 +39,7 @@ export default [
       'react-refresh': reactRefresh,
     },
     rules: {
-      // Pre-existing any debt — tracked in follow-on cleanup issue; warn only for now
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
 
       // React hooks
       ...reactHooks.configs['recommended-latest'].rules,

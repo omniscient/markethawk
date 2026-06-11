@@ -396,8 +396,9 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
       setPendingDelete(null);
       queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.detail ?? err?.message ?? 'Delete failed';
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      const msg = e?.response?.data?.detail ?? e?.message ?? 'Delete failed';
       setDeleteError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     },
   });
@@ -448,8 +449,8 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
     .filter((t) => t.coverage_pct >= minScore)
     .filter((t) => !removedTickers.has(t.ticker))
     .sort((a, b) => {
-      let av: any = a[sortKey];
-      let bv: any = b[sortKey];
+      let av: QualityTickerResult[SortKey] | number = a[sortKey];
+      let bv: QualityTickerResult[SortKey] | number = b[sortKey];
       if (sortKey === 'grade') {
         const order = { A: 0, B: 1, C: 2, D: 3, F: 4 };
         av = order[a.grade as keyof typeof order] ?? 5;

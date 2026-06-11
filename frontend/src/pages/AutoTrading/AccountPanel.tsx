@@ -5,14 +5,15 @@ import {
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { AccountMetric, StatRow, STATUS_CONFIG, fmtUSD, pnlColor } from './components';
+import type { AccountSummary, TradingStats, TradingConfig } from '../../api/trading';
 
 export interface AccountPanelProps {
-  account: any;
+  account: AccountSummary | null;
   fetchingAccount: boolean;
   onRefreshAccount: () => void;
-  stats: any;
-  config: any;
-  onUpdateConfig: (cfg: any) => void;
+  stats: TradingStats | null;
+  config: TradingConfig | null;
+  onUpdateConfig: (cfg: Partial<TradingConfig>) => void;
 }
 
 export function AccountPanel({
@@ -67,7 +68,7 @@ export function AccountPanel({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800/50">
-                      {account.open_broker_orders.map((o: any) => (
+                      {account.open_broker_orders.map((o) => (
                         <tr key={o.order_id} className="hover:bg-gray-800/30">
                           <td className="py-2 pl-4 font-mono font-bold text-white">{o.symbol}</td>
                           <td className={`py-2 font-bold text-xs uppercase ${o.action === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>{o.action}</td>

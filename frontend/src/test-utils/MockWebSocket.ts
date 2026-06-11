@@ -46,12 +46,15 @@ export class MockWebSocket {
   send(_data: string) {}
 }
 
+type GlobalWithWebSocket = typeof globalThis & { WebSocket: typeof WebSocket };
+
 /** Install MockWebSocket as the global WebSocket implementation. Returns a cleanup fn. */
 export function installMockWebSocket(): () => void {
-  const original = (globalThis as any).WebSocket;
-  (globalThis as any).WebSocket = MockWebSocket;
+  const g = globalThis as GlobalWithWebSocket;
+  const original = g.WebSocket;
+  g.WebSocket = MockWebSocket as unknown as typeof WebSocket;
   MockWebSocket.lastInstance = null;
   return () => {
-    (globalThis as any).WebSocket = original;
+    g.WebSocket = original;
   };
 }

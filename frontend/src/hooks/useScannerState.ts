@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import type { ScannerRunResponse } from '../api/scanner';
 
 export const ACTIVE_SCAN_LS_KEY = 'markethawk.activeScan';
 export const SELECTION_LS_KEY = 'markethawk.scanner.selection';
@@ -73,7 +74,7 @@ export function useScannerState() {
   });
   const [scanStartDate, setScanStartDate] = useState<string>(lastCompletedWeekday());
   const [scanEndDate, setScanEndDate] = useState<string>(lastCompletedWeekday());
-  const [scanResults, setScanResults] = useState<any>(null);
+  const [scanResults, setScanResults] = useState<ScannerRunResponse | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<string>('signal_quality_score');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');

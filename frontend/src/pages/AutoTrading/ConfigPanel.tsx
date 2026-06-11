@@ -193,7 +193,7 @@ export function ConfigPanel({
               <label className="block text-xs text-gray-400 mb-1.5 font-semibold">Entry Type</label>
               <select
                 value={stratForm.entry_type ?? 'market'}
-                onChange={e => onStratForm({ ...stratForm, entry_type: e.target.value as any })}
+                onChange={e => onStratForm({ ...stratForm, entry_type: e.target.value as TradingStrategy['entry_type'] })}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-financial-blue outline-none"
               >
                 {ENTRY_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
@@ -214,7 +214,7 @@ export function ConfigPanel({
               <label className="block text-xs text-gray-400 mb-1.5 font-semibold">Direction</label>
               <select
                 value={stratForm.direction ?? 'long_only'}
-                onChange={e => onStratForm({ ...stratForm, direction: e.target.value as any })}
+                onChange={e => onStratForm({ ...stratForm, direction: e.target.value as TradingStrategy['direction'] })}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-financial-blue outline-none"
               >
                 {DIRECTION_OPTIONS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}

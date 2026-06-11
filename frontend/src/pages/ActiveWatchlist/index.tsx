@@ -33,7 +33,10 @@ function AddSymbolForm() {
       },
       {
         onSuccess: () => { setSymbol(''); setExchange(''); setNotes(''); },
-        onError: (err: any) => { setError(err?.response?.data?.detail ?? 'Failed to add symbol.'); },
+        onError: (err: unknown) => {
+          const e = err as { response?: { data?: { detail?: string } } };
+          setError(e?.response?.data?.detail ?? 'Failed to add symbol.');
+        },
       }
     );
   };

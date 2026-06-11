@@ -20,6 +20,7 @@ import Modal from '../components/ui/Modal';
 
 // API
 import { journalApi } from '../api/journal';
+import type { CreateJournalEntryRequest, CreateTradeRequest } from '../api/journal';
 
 const Journal: React.FC = () => {
   const queryClient = useQueryClient();
@@ -79,7 +80,7 @@ const Journal: React.FC = () => {
   });
 
   const createEntryMutation = useMutation({
-    mutationFn: (data: any) => journalApi.createEntry(data),
+    mutationFn: (data: CreateJournalEntryRequest) => journalApi.createEntry(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journalEntries'] });
       setIsEntryModalOpen(false);
@@ -88,7 +89,7 @@ const Journal: React.FC = () => {
   });
 
   const createTradeMutation = useMutation({
-    mutationFn: (data: any) => journalApi.createTrade(data),
+    mutationFn: (data: CreateTradeRequest) => journalApi.createTrade(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journalTrades'] });
       queryClient.invalidateQueries({ queryKey: ['journalStats'] });
@@ -140,21 +141,21 @@ const Journal: React.FC = () => {
         <div className="flex items-center space-x-3">
           <Button 
             variant="secondary" 
-            icon={Download as any}
+            icon={Download}
             onClick={() => setIsImportModalOpen(true)}
           >
             Import
           </Button>
           <Button 
             variant="secondary" 
-            icon={PlusCircle as any}
+            icon={PlusCircle}
             onClick={() => setIsManualTradeModalOpen(true)}
           >
             Manual Trade
           </Button>
           <Button 
             variant="primary" 
-            icon={Plus as any}
+            icon={Plus}
             onClick={() => setIsEntryModalOpen(true)}
           >
             New Entry
@@ -168,30 +169,30 @@ const Journal: React.FC = () => {
           title="Total PnL"
           value={`$${Number(stats?.total_pnl || 0).toLocaleString()}`}
           color={(stats?.total_pnl || 0) > 0 ? 'green' : 'red'}
-          icon={Activity as any}
+          icon={Activity}
         />
         <MetricCard
           title="Win Rate"
           value={`${((stats?.win_rate || 0) * 100).toFixed(1)}%`}
           color={(stats?.win_rate || 0) >= 0.5 ? 'green' : 'yellow'}
-          icon={Target as any}
+          icon={Target}
         />
         <MetricCard
           title="Profit Factor"
           value={Number(stats?.profit_factor || 0).toFixed(2)}
-          icon={TrendingUp as any}
+          icon={TrendingUp}
         />
         <MetricCard
           title="Avg Profit"
           value={`$${Number(stats?.avg_profit || 0).toFixed(2)}`}
-          icon={TrendingDown as any}
+          icon={TrendingDown}
         />
       </div>
 
       {/* Main Content */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2">
-          <Card title="Trade History" icon={BookOpen as any}>
+          <Card title="Trade History" icon={BookOpen}>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -253,7 +254,7 @@ const Journal: React.FC = () => {
         </div>
 
         <div className="xl:col-span-1">
-          <Card title="Recent Notes" icon={MessageSquare as any}>
+          <Card title="Recent Notes" icon={MessageSquare}>
             <div className="space-y-4">
               {entries?.map((entry) => (
                 <div key={entry.id} className="p-3 bg-gray-800/40 rounded border border-gray-700">

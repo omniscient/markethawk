@@ -58,7 +58,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
     });
 
     const updateMutation = useMutation({
-        mutationFn: (data: { id: number; universe: any }) =>
+        mutationFn: (data: { id: number; universe: Parameters<typeof updateStockUniverse>[1] }) =>
             updateStockUniverse(data.id, data.universe),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['stockUniverses'] });
@@ -214,7 +214,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                             } catch { /* empty */ }
                                         }}
                                     >
-                                        {providers.filter((p: any) => p.classes?.includes('futures')).map((p: any) => (
+                                        {providers.filter((p) => p.classes?.includes('futures')).map((p) => (
                                             <option key={p.name} value={p.name}>
                                                 {p.name.toUpperCase()} {!p.available ? `(${p.status_message || 'UNAVAILABLE'})` : ''}
                                             </option>
@@ -267,7 +267,7 @@ const UniverseFormModal: React.FC<UniverseFormModalProps> = ({
                                             } catch { /* empty */ }
                                         }}
                                     >
-                                        {providers.filter((p: any) => p.classes?.includes('stocks')).map((p: any) => (
+                                        {providers.filter((p) => p.classes?.includes('stocks')).map((p) => (
                                             <option key={p.name} value={p.name}>
                                                 {p.name.toUpperCase()} {!p.available ? `(${p.status_message || 'UNAVAILABLE'})` : ''}
                                             </option>

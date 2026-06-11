@@ -1,9 +1,10 @@
 import React from 'react';
 import { Settings, Info } from 'lucide-react';
+import type { ScannerConfig as ScannerConfigType, StockUniverse } from '../api/scanner';
 
 interface ScannerConfigProps {
-  configs: any[];
-  universes: any[];
+  configs: ScannerConfigType[];
+  universes: StockUniverse[];
   selectedConfig: string;
   selectedUniverse: number | null;
   onConfigChange: (_config: string) => void;
@@ -97,7 +98,7 @@ const ScannerConfig: React.FC<ScannerConfigProps> = ({
                   </label>
                   <input
                     type={typeof value === 'number' ? 'number' : 'text'}
-                    value={value as any}
+                    value={value as string | number | readonly string[]}
                     className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-financial-light"
                     readOnly
                   />
@@ -113,19 +114,22 @@ const ScannerConfig: React.FC<ScannerConfigProps> = ({
               Criteria Logic
             </h5>
             <div className="space-y-2">
-              {currentConfig.criteria?.map((criterion: any, index: number) => (
+              {currentConfig.criteria?.map((criterion, index) => {
+                const c = criterion as Record<string, string>;
+                return (
                 <div key={index} className="flex items-start space-x-3">
                   <div className="w-2 h-2 bg-financial-blue rounded-full mt-2 flex-shrink-0"></div>
                   <div>
                     <div className="text-sm font-medium text-financial-light">
-                      {criterion.name}
+                      {c.name}
                     </div>
                     <div className="text-xs text-gray-400">
-                      {criterion.description}
+                      {c.description}
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

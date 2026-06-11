@@ -1,9 +1,10 @@
 
 import ScannerResults from '../../components/ScannerResults';
 import SignalReviewStats from '../../components/SignalReviewStats';
+import type { ScannerRunResponse } from '../../api/scanner';
 
 export interface ResultsPanelProps {
-  scanResults: any;
+  scanResults: ScannerRunResponse | null;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
   onSort: (column: string) => void;

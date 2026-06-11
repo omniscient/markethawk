@@ -2,28 +2,30 @@
 import { Globe, Newspaper } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import NewsFeed from '../../components/NewsFeed';
+import type { StockDetailConsolidated } from '../../api/stocks';
+import type { ScannerEvent } from '../../api/scanner';
 
 export interface MetadataPanelProps {
   symbol: string;
-  details: any;
-  scannerResults: any;
-  events: any[];
+  details: StockDetailConsolidated;
+  scannerResults: ScannerEvent[] | undefined;
+  events: ScannerEvent[];
 }
 
 export function MetadataPanel({ symbol, details, scannerResults, events }: MetadataPanelProps) {
   return (
     <div className="space-y-6">
-      <Card title="Stock Specific News" icon={Newspaper as any}>
+      <Card title="Stock Specific News" icon={Newspaper}>
         <NewsFeed ticker={symbol} limit={10} />
       </Card>
 
-      <Card title="Trader Plan Checklist" icon={Globe as any}>
+      <Card title="Trader Plan Checklist" icon={Globe}>
         <div className="space-y-3">
           {[
             { label: 'Scanner Alert Detected', status: events.length > 0 },
             { label: 'Check Extended Hours Volume', status: (details?.pre_market?.pre_market_volume || 0) > 100000 },
             { label: 'Confirm Sector Strength', status: true },
-            { label: 'Review Catalyst Summary', status: scannerResults && scannerResults.some((e: any) => e.metadata?.catalyst_summary) },
+            { label: 'Review Catalyst Summary', status: scannerResults && scannerResults.some((e) => e.metadata?.catalyst_summary) },
           ].map((item, idx) => (
             <div key={idx} className="flex items-center space-x-3 p-3 bg-gray-800/50 rounded-lg">
               <div className={`h-2 w-2 rounded-full ${item.status ? 'bg-positive' : 'bg-gray-600'}`}></div>

@@ -3,14 +3,18 @@ import { RefreshCw, Eye, EyeOff, BarChart2 } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Chart from '../../components/ui/Chart';
 import { Activity, Info } from 'lucide-react';
+import type { OHLCVRow } from '../../api/scanner';
+import type { LiveStockData } from '../../hooks/useLiveStockData';
+import type { StockDetailConsolidated } from '../../api/stocks';
+import type { ScannerEvent } from '../../api/scanner';
 
 export interface ChartPanelProps {
   symbol: string;
-  historicalData: any[];
+  historicalData: OHLCVRow[];
   loadingHistorical: boolean;
   fetchingHistorical: boolean;
-  liveData: any;
-  events: any[];
+  liveData: LiveStockData | null;
+  events: ScannerEvent[];
   highlightDate: string | undefined;
   period: string;
   onPeriodChange: (p: string) => void;
@@ -23,7 +27,7 @@ export interface ChartPanelProps {
   catchingUp: boolean;
   catchUpPending: boolean;
   onCatchUp: () => void;
-  details: any;
+  details: StockDetailConsolidated;
 }
 
 export function ChartPanel({
@@ -37,7 +41,7 @@ export function ChartPanel({
       <Card
         title={`Performance History (${period})`}
         subtitle={`${timespan === 'day' ? 'Daily' : 'Intraday'} candlestick chart`}
-        icon={BarChart2 as any}
+        icon={BarChart2}
         actions={
           <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-3">
             <div className="flex items-center space-x-1 p-1 bg-gray-900 rounded-lg border border-gray-800">
@@ -133,7 +137,7 @@ export function ChartPanel({
 
       {details && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card title="Market Profile" icon={Info as any}>
+          <Card title="Market Profile" icon={Info}>
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-400">Market Cap</span>
@@ -153,7 +157,7 @@ export function ChartPanel({
               </div>
             </div>
           </Card>
-          <Card title="Extended Hours" icon={Activity as any}>
+          <Card title="Extended Hours" icon={Activity}>
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2 border-b border-gray-800">
                 <span className="text-gray-400">PM Volume</span>

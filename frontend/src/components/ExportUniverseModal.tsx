@@ -111,8 +111,9 @@ const ExportUniverseModal: React.FC<ExportUniverseModalProps> = ({ isOpen, onClo
       a.download = `${universe.name.replace(/\s+/g, '_')}_export.zip`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? e?.message ?? 'Export failed');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      setError(err?.response?.data?.detail ?? err?.message ?? 'Export failed');
     } finally {
       setIsExporting(false);
     }

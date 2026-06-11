@@ -186,11 +186,11 @@ const AutoTrading: React.FC = () => {
 
       {tab === 'account' && (
         <AccountPanel
-          account={account}
+          account={account ?? null}
           fetchingAccount={fetchingAccount}
           onRefreshAccount={() => refetchAccount()}
-          stats={stats}
-          config={config}
+          stats={stats ?? null}
+          config={config ?? null}
           onUpdateConfig={(cfg) => updateConfig.mutate(cfg)}
         />
       )}
