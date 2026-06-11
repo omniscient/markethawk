@@ -2,7 +2,6 @@
 Universe router - CRUD operations for stock universes.
 """
 
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -25,6 +24,7 @@ from app.schemas import (
 from app.services import universe_export, universe_orchestrator
 from app.services.discovery_service import DiscoveryService
 from app.services.universe_stats import UniverseStatsService
+from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/universe", tags=["universe"])
 
@@ -128,8 +128,11 @@ def list_stock_universes(
     db: Session = Depends(get_db),
 ):
     """List all active stock universes. include_stats=false skips aggregate stats (for dropdowns)."""
+
     def _fetch():
-        universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+        universes = (
+            db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+        )
         results = []
         for universe in universes:
             universe_data = StockUniverseResponse.from_orm(universe)
@@ -176,7 +179,7 @@ def refresh_universe_stats(
     universe.cached_min_date = stats["min_date"]
     universe.cached_max_date = stats["max_date"]
     universe.cached_timespans = stats["timespans"]
-    universe.stats_refreshed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    universe.stats_refreshed_at = utc_now()
     db.commit()
     db.refresh(universe)
 

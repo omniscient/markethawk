@@ -24,7 +24,6 @@ Endpoints:
 
 import logging
 from datetime import date as date_type
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -42,6 +41,7 @@ from app.services.auto_trade_service import (
     get_account,
     get_stats,
 )
+from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/trading", tags=["auto-trading"])
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ def update_strategy(
         if key in _STRATEGY_UPDATABLE:
             setattr(s, key, value)
 
-    s.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    s.updated_at = utc_now()
     db.commit()
     db.refresh(s)
     return TradingStrategyResponse.from_orm_dict(s).model_dump()
@@ -177,7 +177,7 @@ def delete_strategy(
         )
 
     s.is_active = False
-    s.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    s.updated_at = utc_now()
     db.commit()
     logger.info(f"Deactivated trading strategy id={strategy_id}")
 
@@ -275,7 +275,7 @@ def reject_order(
 
     o.status = "rejected"
     o.rejection_reason = payload.get("reason", "Manually rejected via UI")
-    o.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    o.updated_at = utc_now()
     db.commit()
     db.refresh(o)
     logger.info(f"Rejected order id={o.id} reason='{o.rejection_reason}'")
@@ -359,7 +359,7 @@ def update_trading_config(
 ) -> Dict[str, Any]:
     """Update auto-trading system config (AUTO_TRADING_ENABLED, PAPER_ACCOUNT_SIZE)."""
     allowed = {"AUTO_TRADING_ENABLED", "PAPER_ACCOUNT_SIZE"}
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utc_now()
 
     for key, value in payload.items():
         if key not in allowed:

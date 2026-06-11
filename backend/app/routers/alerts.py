@@ -4,7 +4,7 @@ Alerts router — CRUD for alert rules, delivery log, stats, and Web Push endpoi
 
 import json
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,6 +15,7 @@ from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
+from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 logger = logging.getLogger(__name__)
@@ -138,7 +139,7 @@ def update_rule(
         if key in updatable:
             setattr(rule, key, value)
 
-    rule.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    rule.updated_at = utc_now()
     db.commit()
     db.refresh(rule)
     return _rule_to_dict(rule)

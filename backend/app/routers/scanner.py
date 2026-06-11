@@ -48,6 +48,7 @@ from app.services.scan_orchestrator import get_scan_progress, request_scan_cance
 from app.services.scanner import ScannerService
 from app.services.scanner_query_service import ScannerQueryService
 from app.utils.session import get_market_today
+from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/scanner", tags=["scanner"])
 
@@ -442,7 +443,6 @@ def get_scanner_stats(
     db: Session = Depends(get_db),
 ):
     """Get scanner statistics for the dashboard."""
-    from datetime import datetime
 
     from sqlalchemy import func
 
@@ -459,7 +459,7 @@ def get_scanner_stats(
     )
 
     # Active alerts (last 24 hours)
-    last_24h = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
+    last_24h = utc_now() - timedelta(hours=24)
     active_alerts = (
         db.query(func.count(ScannerEvent.id))
         .filter(ScannerEvent.created_at >= last_24h)

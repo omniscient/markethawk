@@ -13,6 +13,7 @@ from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,7 @@ class OutcomeService:
         snapshot.high_since_signal = Decimal(str(round(high, 4)))
         snapshot.low_since_signal = Decimal(str(round(low, 4)))
         snapshot.volume_since_signal = total_volume
-        snapshot.captured_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        snapshot.captured_at = utc_now()
         snapshot.status = "captured"
 
     @staticmethod
@@ -217,9 +218,7 @@ class OutcomeService:
         summary.eod_pct_change = Decimal(str(eod_pct)) if eod_pct is not None else None
         summary.follow_through = follow_through
         summary.is_complete = is_complete
-        summary.completed_at = (
-            datetime.now(timezone.utc).replace(tzinfo=None) if is_complete else None
-        )
+        summary.completed_at = utc_now() if is_complete else None
 
         db.flush()
         return summary

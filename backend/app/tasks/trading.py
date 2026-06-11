@@ -1,13 +1,14 @@
 import asyncio
 import logging
 import time as _time
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +155,7 @@ def poll_auto_trade_fills(self):
         paper_orders = [o for o in pending_orders if o.is_paper]
         live_orders = [o for o in pending_orders if not o.is_paper]
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = utc_now()
 
         for order in paper_orders:
             if order.status == "submitted":

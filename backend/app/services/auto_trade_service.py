@@ -35,6 +35,7 @@ from app.models.auto_trade_order import AutoTradeOrder
 from app.models.scanner_event import ScannerEvent
 from app.models.system_config import SystemConfig
 from app.models.trading_strategy import TradingStrategy
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -628,10 +629,8 @@ def cancel_order(
         finally:
             loop.close()
 
-    from datetime import datetime, timezone
-
     order.status = "cancelled"
-    order.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    order.updated_at = utc_now()
     db.commit()
     db.refresh(order)
     _logger.info(f"Cancelled order id={order.id}")
