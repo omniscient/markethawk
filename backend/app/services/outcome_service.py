@@ -3,7 +3,7 @@ OutcomeService — creates, captures, and summarises scanner outcome data.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 
@@ -13,7 +13,7 @@ from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
-from app.utils.time import utc_now
+from app.utils.time import to_utc_naive, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class OutcomeService:
 
         _ET = ZoneInfo("America/New_York")
         day_open_et = datetime.combine(event.event_date, _time(9, 30), tzinfo=_ET)
-        day_open_utc = day_open_et.astimezone(timezone.utc).replace(tzinfo=None)
+        day_open_utc = to_utc_naive(day_open_et)
 
         interval_map = {
             "1h": timedelta(hours=1),

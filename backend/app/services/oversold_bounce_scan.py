@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time as _time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 
@@ -13,6 +13,7 @@ from app.exceptions import DataFetchError, ProviderError, ScanError
 from app.models.stock_aggregate import StockAggregate
 from app.services.scan_orchestrator import ScannerDescriptor, register
 from app.utils.session import get_market_today
+from app.utils.time import to_utc_naive
 
 if TYPE_CHECKING:
     from app.models.scanner_run import ScannerRun
@@ -36,14 +37,8 @@ async def run_oversold_bounce_scan(
     failed: List[Dict[str, Any]] = []
     _ET = ZoneInfo("America/New_York")
     day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
-    day_end_utc = (
-        (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
-    )
-    hist_start_utc = (
-        (day_start_et - timedelta(days=90))
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
+    day_end_utc = to_utc_naive((day_start_et + timedelta(days=1)))
+    hist_start_utc = to_utc_naive(day_start_et - timedelta(days=90))
 
     # Read signal ranker config once before the ticker loop
     # Oversold bounce uses a reduced feature set; scorer re-normalizes over present features

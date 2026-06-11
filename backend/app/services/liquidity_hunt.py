@@ -30,6 +30,7 @@ from app.models.ticker_reference import TickerReference
 from app.services.alert_service import save_event as _save_event
 from app.services.catalyst_parser import CatalystParser
 from app.utils.session import get_market_today
+from app.utils.time import to_utc_naive
 
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
@@ -163,15 +164,9 @@ def _get_session_metrics(
     Query all minute bars for event_date. Return per-session aggregates.
     Returns None if no regular-session bars exist (e.g. market holiday).
     """
-    day_start_utc = (
-        datetime.combine(event_date, time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
-    day_end_utc = (
+    day_start_utc = to_utc_naive(datetime.combine(event_date, time.min, tzinfo=_ET))
+    day_end_utc = to_utc_naive(
         datetime.combine(event_date + timedelta(days=1), time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
     )
 
     rows = (
@@ -211,11 +206,7 @@ def _get_prior_day_close(db: Session, ticker: str, event_date: date) -> float | 
     Return the regular close of the most recent trading day before event_date.
     Tries timespan='day' bars first; falls back to the last regular minute bar.
     """
-    day_start_utc = (
-        datetime.combine(event_date, time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
+    day_start_utc = to_utc_naive(datetime.combine(event_date, time.min, tzinfo=_ET))
 
     row = (
         db.query(StockAggregate.close)
@@ -254,17 +245,11 @@ def _get_event_date_regular_close(
     Return the last regular-session minute close on event_date itself.
     Used as the reference close for the post-market variant.
     """
-    day_start_utc = (
-        datetime.combine(event_date, time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
-    reg_end_utc = (
+    day_start_utc = to_utc_naive(datetime.combine(event_date, time.min, tzinfo=_ET))
+    reg_end_utc = to_utc_naive(
         datetime.combine(
             event_date, time(16, 0), tzinfo=_ET
         )  # 4:00 PM ET (regular close)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
     )
 
     row = (
@@ -291,15 +276,9 @@ def _get_rolling_baselines(
     Compute 20-day rolling session averages from minute bars prior to event_date.
     Returns None if fewer than 10 trading days of data are available.
     """
-    day_start_utc = (
-        datetime.combine(event_date, time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
-    lookback_start_utc = (
+    day_start_utc = to_utc_naive(datetime.combine(event_date, time.min, tzinfo=_ET))
+    lookback_start_utc = to_utc_naive(
         datetime.combine(event_date - timedelta(days=45), time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
     )
 
     rows = (
