@@ -245,3 +245,109 @@ def test_filter_diff_no_ruff_returns_raw():
         filtered, stripped = fhf.filter_diff(FMT_DIFF, ["backend/app/core/tracing.py"])
     assert filtered == FMT_DIFF
     assert stripped == []
+
+
+# ---------------------------------------------------------------------------
+# Fix 1: is_formatter_only — loop-and-accumulate (don't return early)
+# ---------------------------------------------------------------------------
+
+def test_is_formatter_only_true_when_second_formatter_hunk_matches():
+    """First overlapping fmt hunk doesn't match; second does — should still return True."""
+    actual = _make_hunk(1, 4, [
+        "-import os\n", "-import sys\n",
+        "+import sys\n", "+import os\n",
+        " x = 1\n", " y = 2\n",
+    ])
+    # First formatter hunk: overlaps but produces different result (wrong reorder)
+    fmt_wrong = _make_hunk(1, 4, [
+        "-import os\n", "-import sys\n",
+        "+import os\n", "+import sys\n",  # same order = no change = different from actual
+        " x = 1\n", " y = 2\n",
+    ])
+    # Second formatter hunk: overlaps and produces the same result as actual
+    fmt_correct = _make_hunk(1, 4, [
+        "-import os\n", " import sys\n",
+        "+import os\n", " x = 1\n", " y = 2\n",
+    ])
+    # Pre-fix: returns False (exits on first hunk). Post-fix: returns True.
+    assert fhf.is_formatter_only(actual, [fmt_wrong, fmt_correct], BASE_LINES)
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: _apply_hunk — ignore "\ No newline at end of file" marker
+# ---------------------------------------------------------------------------
+
+def test_apply_hunk_ignores_no_newline_marker():
+    """Lines starting with \\ (the diff no-newline marker) should be silently skipped."""
+    hunk = _make_hunk(1, 1, ["+last line", "\\ No newline at end of file\n"])
+    result = fhf._apply_hunk(hunk)
+    assert result == ["last line"]
+
+
+# ---------------------------------------------------------------------------
+# Fix 3: _run_formatter — check returncode; fallback on ruff format error
+# ---------------------------------------------------------------------------
+
+def test_run_formatter_returns_content_unchanged_on_ruff_format_error(capsys):
+    """If ruff format exits non-zero, _run_formatter returns the original content."""
+    content = "import os\nprint('hello')\n"
+
+    def _mock_run_format_error(args, **kwargs):
+        m = MagicMock()
+        m.returncode = 2  # ruff format error (e.g. bad config)
+        m.stdout = b""
+        return m
+
+    with patch("fmt_hunk_filter.subprocess.run", side_effect=_mock_run_format_error):
+        result = fhf._run_formatter(content)
+
+    assert result == content
+    captured = capsys.readouterr()
+    assert "warning" in captured.err.lower() or "fmt_hunk_filter" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Fix 4: reconstruction loop — removed body lines starting with "--- " are not headers
+# ---------------------------------------------------------------------------
+
+def test_filter_diff_body_line_starting_with_triple_dash_not_treated_as_file_header():
+    """
+    A removed body line whose content starts with '-- ' (diff line '--- ...') must not
+    reset skip=False. The stripped hunk tail must still be suppressed after the fix.
+
+    Scenario: file has [import os, import sys, -- deprecated]. The formatter reorders
+    imports and removes the '-- deprecated' line (mocked), producing the same result as
+    the actual diff. The single hunk is formatter-only, gets stripped. The '--- deprecated'
+    body line in the stripped hunk must not trigger the file-header branch and re-enable
+    emission of subsequent hunk lines.
+    """
+    diff_with_dash_body = textwrap.dedent("""\
+        diff --git a/backend/app/core/tracing.py b/backend/app/core/tracing.py
+        index aaa..bbb 100644
+        --- a/backend/app/core/tracing.py
+        +++ b/backend/app/core/tracing.py
+        @@ -1,3 +1,2 @@
+        -import os
+        -import sys
+        +import sys
+        +import os
+        --- deprecated
+    """)
+
+    # base has the '-- deprecated' line; formatter removes it and reorders imports
+    base_content = "import os\nimport sys\n-- deprecated\n"
+    formatted_content = "import sys\nimport os\n"
+
+    with patch("fmt_hunk_filter.subprocess.run", side_effect=_make_mock_run(base_content, formatted_content)):
+        with patch("fmt_hunk_filter.shutil.which", return_value="/usr/bin/ruff"):
+            filtered, stripped = fhf.filter_diff(
+                diff_with_dash_body, ["backend/app/core/tracing.py"]
+            )
+
+    # The formatter-only hunk should be stripped.
+    assert "backend/app/core/tracing.py" in stripped
+    assert "@@ -1,3" not in filtered
+    # The '--- deprecated' removed body line must NOT appear in the filtered output.
+    # Pre-fix: it would appear because the reconstruction loop misidentified it as a
+    # file header and reset skip=False.
+    assert "--- deprecated" not in filtered

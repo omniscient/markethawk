@@ -74,6 +74,8 @@ def _apply_hunk(hunk):
             result.append(line[1:])
         elif line.startswith(" "):
             result.append(line[1:])
+        elif line.startswith("\\"):
+            pass  # '\\ No newline at end of file' marker — skip
         # '-' lines (removed from base) are skipped
     return result
 
@@ -115,7 +117,8 @@ def is_formatter_only(actual, fmt_hunks, base_lines):
             + base_lines[fh["old_start"] - 1 + fh["old_count"] : union_end]
         )
 
-        return actual_applied == fmt_applied
+        if actual_applied == fmt_applied:
+            return True
 
     return False
 
@@ -133,15 +136,28 @@ def _run_formatter(content):
         f.write(content)
         tmp = f.name
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["ruff", "format", "--config", "backend/pyproject.toml", tmp],
             capture_output=True,
         )
-        subprocess.run(
+        if result.returncode != 0:
+            print(
+                f"[fmt_hunk_filter] ruff format warning (rc={result.returncode})"
+                " — skipping formatter delta for this file",
+                file=sys.stderr,
+            )
+            return content
+        result = subprocess.run(
             ["ruff", "check", "--fix", "--select", "I",
              "--config", "backend/pyproject.toml", tmp],
             capture_output=True,
         )
+        if result.returncode > 1:
+            print(
+                f"[fmt_hunk_filter] ruff check warning (rc={result.returncode})"
+                " — using partial result",
+                file=sys.stderr,
+            )
         with open(tmp, encoding="utf-8") as f:
             return f.read()
     finally:
@@ -206,7 +222,12 @@ def filter_diff(raw_diff, py_files):
     skip = False
 
     for line in raw_diff.splitlines(keepends=True):
-        if line.startswith("diff --git") or line.startswith("--- ") or line.startswith("index "):
+        if (
+            line.startswith("diff --git")
+            or line.startswith("index ")
+            or line.startswith("--- a/")
+            or line.startswith("--- /dev/null")
+        ):
             skip = False
             output.append(line)
         elif line.startswith("+++ b/"):
