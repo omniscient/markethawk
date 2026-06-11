@@ -91,7 +91,7 @@ const Chart: React.FC<ChartProps> = ({
 
     // Fallback to Recharts for simple bar charts or other types
     const commonProps = {
-      data,
+      data: data as object[],
       margin: { top: 5, right: 30, left: 20, bottom: 5 }
     };
 
