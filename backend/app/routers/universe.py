@@ -2,7 +2,6 @@
 Universe router - CRUD operations for stock universes.
 """
 
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -25,6 +24,8 @@ from app.schemas import (
 from app.services import universe_export, universe_orchestrator
 from app.services.discovery_service import DiscoveryService
 from app.services.universe_stats import UniverseStatsService
+from app.utils.db import get_or_404
+from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/universe", tags=["universe"])
 
@@ -90,11 +91,7 @@ def update_stock_universe(
     db: Session = Depends(get_db),
 ):
     """Update a stock universe."""
-    db_universe = (
-        db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
-    )
-    if not db_universe:
-        raise HTTPException(status_code=404, detail="Universe not found")
+    db_universe = get_or_404(db, StockUniverse, universe_id, "Universe")
 
     update_data = universe_update.dict(exclude_unset=True)
     for key, value in update_data.items():
@@ -112,9 +109,7 @@ def delete_stock_universe(
     db: Session = Depends(get_db),
 ):
     """Delete (soft delete) a stock universe."""
-    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
-    if not universe:
-        raise HTTPException(status_code=404, detail="Universe not found")
+    universe = get_or_404(db, StockUniverse, universe_id, "Universe")
 
     universe.is_active = False
     db.commit()
@@ -128,8 +123,11 @@ def list_stock_universes(
     db: Session = Depends(get_db),
 ):
     """List all active stock universes. include_stats=false skips aggregate stats (for dropdowns)."""
+
     def _fetch():
-        universes = db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+        universes = (
+            db.query(StockUniverse).filter(StockUniverse.is_active == True).all()
+        )
         results = []
         for universe in universes:
             universe_data = StockUniverseResponse.from_orm(universe)
@@ -165,9 +163,7 @@ def refresh_universe_stats(
     db: Session = Depends(get_db),
 ):
     """Recompute and persist aggregate stats. Call after sync or refresh to update the cache."""
-    universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
-    if not universe:
-        raise HTTPException(status_code=404, detail="Universe not found")
+    universe = get_or_404(db, StockUniverse, universe_id, "Universe")
 
     stats = UniverseStatsService.compute(universe_id, db)
 
@@ -176,7 +172,7 @@ def refresh_universe_stats(
     universe.cached_min_date = stats["min_date"]
     universe.cached_max_date = stats["max_date"]
     universe.cached_timespans = stats["timespans"]
-    universe.stats_refreshed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    universe.stats_refreshed_at = utc_now()
     db.commit()
     db.refresh(universe)
 

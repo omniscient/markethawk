@@ -3,13 +3,13 @@ NewsArticle SQLAlchemy model.
 """
 
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
 from sqlalchemy import Uuid as UUID
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class NewsArticle(Base):
@@ -29,11 +29,9 @@ class NewsArticle(Base):
     # JSON list of ticker strings that this article is about
     # Using JSONB for Postgres to support indexed contains() checks
     tickers = Column(JSON().with_variant(JSONB, "postgresql"), default=list)
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )

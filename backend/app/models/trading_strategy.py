@@ -5,13 +5,12 @@ Decoupled from AlertRule so the same strategy can be reused across many rules,
 and R:R / sizing tweaks apply everywhere without touching alert configuration.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Boolean, Column, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class TradingStrategy(Base):
@@ -94,10 +93,10 @@ class TradingStrategy(Base):
 
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
     )
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )

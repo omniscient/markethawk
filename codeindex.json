@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 487,
-    "total_loc": 69460,
+    "total_files": 491,
+    "total_loc": 69426,
     "languages": [
       "python",
       "javascript",
@@ -1964,11 +1964,10 @@
       "id": "backend/app/models/active_watchlist.py",
       "type": "module",
       "language": "python",
-      "size": 32,
-      "loc": 32,
+      "size": 31,
+      "loc": 31,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -1980,7 +1979,7 @@
       "symbols": [
         {
           "name": "ActiveWatchlist",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true
         }
@@ -1990,11 +1989,10 @@
       "id": "backend/app/models/alert_delivery_log.py",
       "type": "module",
       "language": "python",
-      "size": 47,
-      "loc": 47,
+      "size": 46,
+      "loc": 46,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2006,7 +2004,7 @@
       "symbols": [
         {
           "name": "AlertDeliveryLog",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "One row per notification attempt (success or failure)."
@@ -2017,11 +2015,10 @@
       "id": "backend/app/models/alert_rule.py",
       "type": "module",
       "language": "python",
-      "size": 71,
-      "loc": 71,
+      "size": 70,
+      "loc": 70,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2033,7 +2030,7 @@
       "symbols": [
         {
           "name": "AlertRule",
-          "line": 14,
+          "line": 13,
           "kind": "class",
           "exported": true,
           "doc": "A user-defined rule that triggers notifications when scanner events match."
@@ -2044,11 +2041,10 @@
       "id": "backend/app/models/auto_trade_order.py",
       "type": "module",
       "language": "python",
-      "size": 141,
-      "loc": 141,
+      "size": 140,
+      "loc": 140,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2060,7 +2056,7 @@
       "symbols": [
         {
           "name": "AutoTradeOrder",
-          "line": 39,
+          "line": 38,
           "kind": "class",
           "exported": true,
           "doc": "Represents a single automated trade decision triggered by an alert rule."
@@ -2071,11 +2067,10 @@
       "id": "backend/app/models/futures_aggregate.py",
       "type": "module",
       "language": "python",
-      "size": 69,
-      "loc": 69,
+      "size": 66,
+      "loc": 66,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2087,7 +2082,7 @@
       "symbols": [
         {
           "name": "FuturesAggregate",
-          "line": 24,
+          "line": 23,
           "kind": "class",
           "exported": true,
           "doc": "One OHLCV bar for a specific futures contract month."
@@ -2098,11 +2093,10 @@
       "id": "backend/app/models/futures_contract.py",
       "type": "module",
       "language": "python",
-      "size": 53,
-      "loc": 53,
+      "size": 50,
+      "loc": 50,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2114,7 +2108,7 @@
       "symbols": [
         {
           "name": "FuturesContract",
-          "line": 16,
+          "line": 15,
           "kind": "class",
           "exported": true,
           "doc": "Metadata for a single futures contract month."
@@ -2125,11 +2119,10 @@
       "id": "backend/app/models/futures_rollover.py",
       "type": "module",
       "language": "python",
-      "size": 54,
-      "loc": 54,
+      "size": 51,
+      "loc": 51,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2141,7 +2134,7 @@
       "symbols": [
         {
           "name": "FuturesRollover",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true,
           "doc": "A detected rollover event \u2014 the date volume crossed over from one"
@@ -2177,11 +2170,10 @@
       "id": "backend/app/models/monitored_account.py",
       "type": "module",
       "language": "python",
-      "size": 40,
-      "loc": 40,
+      "size": 37,
+      "loc": 37,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2193,7 +2185,7 @@
       "symbols": [
         {
           "name": "MonitoredAccount",
-          "line": 10,
+          "line": 9,
           "kind": "class",
           "exported": true
         }
@@ -2203,11 +2195,10 @@
       "id": "backend/app/models/monitored_stock.py",
       "type": "module",
       "language": "python",
-      "size": 39,
-      "loc": 39,
+      "size": 36,
+      "loc": 36,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2219,7 +2210,7 @@
       "symbols": [
         {
           "name": "MonitoredStock",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock being monitored within a universe."
@@ -2230,12 +2221,11 @@
       "id": "backend/app/models/news_article.py",
       "type": "module",
       "language": "python",
-      "size": 40,
-      "loc": 40,
+      "size": 38,
+      "loc": 38,
       "group": 4,
       "imports": [
         "uuid",
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2258,12 +2248,11 @@
       "id": "backend/app/models/news_preference.py",
       "type": "module",
       "language": "python",
-      "size": 39,
-      "loc": 39,
+      "size": 37,
+      "loc": 37,
       "group": 4,
       "imports": [
         "uuid",
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2286,11 +2275,10 @@
       "id": "backend/app/models/push_subscription.py",
       "type": "module",
       "language": "python",
-      "size": 36,
-      "loc": 36,
+      "size": 35,
+      "loc": 35,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2302,7 +2290,7 @@
       "symbols": [
         {
           "name": "PushSubscription",
-          "line": 13,
+          "line": 12,
           "kind": "class",
           "exported": true,
           "doc": "A browser's Web Push subscription (endpoint + keys)."
@@ -2313,12 +2301,11 @@
       "id": "backend/app/models/scanner_config.py",
       "type": "module",
       "language": "python",
-      "size": 54,
-      "loc": 54,
+      "size": 50,
+      "loc": 50,
       "group": 4,
       "imports": [
         "uuid",
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2341,12 +2328,11 @@
       "id": "backend/app/models/scanner_event.py",
       "type": "module",
       "language": "python",
-      "size": 86,
-      "loc": 86,
+      "size": 84,
+      "loc": 84,
       "group": 4,
       "imports": [
         "uuid",
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2372,11 +2358,10 @@
       "id": "backend/app/models/scanner_outcome_snapshot.py",
       "type": "module",
       "language": "python",
-      "size": 51,
-      "loc": 51,
+      "size": 48,
+      "loc": 48,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2388,7 +2373,7 @@
       "symbols": [
         {
           "name": "ScannerOutcomeSnapshot",
-          "line": 21,
+          "line": 20,
           "kind": "class",
           "exported": true,
           "doc": "Captures price action at a specific time offset from a scanner signal."
@@ -2399,11 +2384,10 @@
       "id": "backend/app/models/scanner_outcome_summary.py",
       "type": "module",
       "language": "python",
-      "size": 46,
-      "loc": 46,
+      "size": 43,
+      "loc": 43,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2415,7 +2399,7 @@
       "symbols": [
         {
           "name": "ScannerOutcomeSummary",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Derived signal-quality metrics for a scanner event, computed from its snapshots."
@@ -2426,12 +2410,11 @@
       "id": "backend/app/models/scanner_run.py",
       "type": "module",
       "language": "python",
-      "size": 38,
-      "loc": 38,
+      "size": 36,
+      "loc": 36,
       "group": 4,
       "imports": [
         "uuid",
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2454,11 +2437,10 @@
       "id": "backend/app/models/signal_analysis_run.py",
       "type": "module",
       "language": "python",
-      "size": 28,
-      "loc": 28,
+      "size": 27,
+      "loc": 27,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2470,7 +2452,7 @@
       "symbols": [
         {
           "name": "SignalAnalysisRun",
-          "line": 9,
+          "line": 8,
           "kind": "class",
           "exported": true,
           "doc": "Anchor table for each statistical analysis execution."
@@ -2481,11 +2463,10 @@
       "id": "backend/app/models/signal_cluster.py",
       "type": "module",
       "language": "python",
-      "size": 29,
-      "loc": 29,
+      "size": 26,
+      "loc": 26,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2497,7 +2478,7 @@
       "symbols": [
         {
           "name": "SignalCluster",
-          "line": 10,
+          "line": 9,
           "kind": "class",
           "exported": true,
           "doc": "One row per cluster archetype produced by a single analysis run."
@@ -2508,11 +2489,10 @@
       "id": "backend/app/models/signal_review.py",
       "type": "module",
       "language": "python",
-      "size": 40,
-      "loc": 40,
+      "size": 39,
+      "loc": 39,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2524,7 +2504,7 @@
       "symbols": [
         {
           "name": "SignalReview",
-          "line": 14,
+          "line": 13,
           "kind": "class",
           "exported": true
         }
@@ -2534,11 +2514,10 @@
       "id": "backend/app/models/stock_aggregate.py",
       "type": "module",
       "language": "python",
-      "size": 48,
-      "loc": 48,
+      "size": 45,
+      "loc": 45,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2550,7 +2529,7 @@
       "symbols": [
         {
           "name": "StockAggregate",
-          "line": 13,
+          "line": 12,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock aggregate (candle)."
@@ -2586,11 +2565,10 @@
       "id": "backend/app/models/stock_split.py",
       "type": "module",
       "language": "python",
-      "size": 39,
-      "loc": 39,
+      "size": 36,
+      "loc": 36,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2602,7 +2580,7 @@
       "symbols": [
         {
           "name": "StockSplit",
-          "line": 20,
+          "line": 19,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock split execution."
@@ -2613,12 +2591,11 @@
       "id": "backend/app/models/stock_universe.py",
       "type": "module",
       "language": "python",
-      "size": 50,
-      "loc": 50,
+      "size": 48,
+      "loc": 48,
       "group": 4,
       "imports": [
         "uuid",
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2641,11 +2618,10 @@
       "id": "backend/app/models/stock_universe_ticker.py",
       "type": "module",
       "language": "python",
-      "size": 34,
-      "loc": 34,
+      "size": 31,
+      "loc": 31,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2657,7 +2633,7 @@
       "symbols": [
         {
           "name": "StockUniverseTicker",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Represents a simple list of tickers associated with a universe."
@@ -2668,11 +2644,10 @@
       "id": "backend/app/models/system_config.py",
       "type": "module",
       "language": "python",
-      "size": 22,
-      "loc": 22,
+      "size": 21,
+      "loc": 21,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2684,7 +2659,7 @@
       "symbols": [
         {
           "name": "SystemConfig",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true
         }
@@ -2694,11 +2669,10 @@
       "id": "backend/app/models/ticker_reference.py",
       "type": "module",
       "language": "python",
-      "size": 43,
-      "loc": 43,
+      "size": 40,
+      "loc": 40,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2710,7 +2684,7 @@
       "symbols": [
         {
           "name": "TickerReference",
-          "line": 8,
+          "line": 7,
           "kind": "class",
           "exported": true
         }
@@ -2720,11 +2694,10 @@
       "id": "backend/app/models/trade.py",
       "type": "module",
       "language": "python",
-      "size": 128,
-      "loc": 128,
+      "size": 123,
+      "loc": 123,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2736,28 +2709,28 @@
       "symbols": [
         {
           "name": "Tag",
-          "line": 38,
+          "line": 37,
           "kind": "class",
           "exported": true,
           "doc": "Represents a custom tag for categorizing trades."
         },
         {
           "name": "Trade",
-          "line": 51,
+          "line": 50,
           "kind": "class",
           "exported": true,
           "doc": "Represents a complete or ongoing trade unit (possibly multiple executions)."
         },
         {
           "name": "TradeExecution",
-          "line": 90,
+          "line": 87,
           "kind": "class",
           "exported": true,
           "doc": "Represents an individual buy or sell order within a trade."
         },
         {
           "name": "JournalEntry",
-          "line": 110,
+          "line": 107,
           "kind": "class",
           "exported": true,
           "doc": "Represents a daily journal entry or general note not tied to a specific trade."
@@ -2768,11 +2741,10 @@
       "id": "backend/app/models/trading_strategy.py",
       "type": "module",
       "language": "python",
-      "size": 104,
-      "loc": 104,
+      "size": 103,
+      "loc": 103,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2784,7 +2756,7 @@
       "symbols": [
         {
           "name": "TradingStrategy",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true,
           "doc": "Defines risk/reward parameters for automated trade execution."
@@ -2795,11 +2767,10 @@
       "id": "backend/app/models/tweet_signal.py",
       "type": "module",
       "language": "python",
-      "size": 68,
-      "loc": 68,
+      "size": 63,
+      "loc": 63,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2811,7 +2782,7 @@
       "symbols": [
         {
           "name": "TweetSignal",
-          "line": 20,
+          "line": 19,
           "kind": "class",
           "exported": true
         }
@@ -2821,11 +2792,10 @@
       "id": "backend/app/models/universe_quality_report.py",
       "type": "module",
       "language": "python",
-      "size": 49,
-      "loc": 49,
+      "size": 48,
+      "loc": 48,
       "group": 4,
       "imports": [
-        "datetime",
         "sqlalchemy",
         "app"
       ],
@@ -2837,7 +2807,7 @@
       "symbols": [
         {
           "name": "UniverseQualityReport",
-          "line": 16,
+          "line": 15,
           "kind": "class",
           "exported": true
         }
@@ -3128,8 +3098,8 @@
       "id": "backend/app/routers/alerts.py",
       "type": "module",
       "language": "python",
-      "size": 400,
-      "loc": 400,
+      "size": 396,
+      "loc": 396,
       "group": 6,
       "imports": [
         "json",
@@ -3152,34 +3122,34 @@
       "symbols": [
         {
           "name": "get_alert_stats",
-          "line": 29,
+          "line": 31,
           "kind": "function",
           "exported": true,
           "doc": "Return dashboard stats for the alerts page header cards."
         },
         {
           "name": "_rule_to_dict",
-          "line": 70,
+          "line": 72,
           "kind": "function",
           "exported": false
         },
         {
           "name": "list_rules",
-          "line": 88,
+          "line": 90,
           "kind": "function",
           "exported": true,
           "doc": "Return all alert rules ordered by creation date (newest first)."
         },
         {
           "name": "create_rule",
-          "line": 95,
+          "line": 97,
           "kind": "function",
           "exported": true,
           "doc": "Create a new alert rule."
         },
         {
           "name": "update_rule",
-          "line": 118,
+          "line": 120,
           "kind": "function",
           "exported": true,
           "doc": "Update an alert rule (full or partial). Used for toggles too."
@@ -3193,49 +3163,49 @@
         },
         {
           "name": "test_rule",
-          "line": 164,
+          "line": 162,
           "kind": "function",
           "exported": true,
           "doc": "Send a test notification through all channels configured on this rule."
         },
         {
           "name": "list_delivery_logs",
-          "line": 239,
+          "line": 235,
           "kind": "function",
           "exported": true,
           "doc": "Return the most recent alert delivery log entries."
         },
         {
           "name": "get_vapid_public_key",
-          "line": 272,
+          "line": 268,
           "kind": "function",
           "exported": true,
           "doc": "Return the VAPID public key so the frontend can subscribe."
         },
         {
           "name": "generate_vapid_keys",
-          "line": 285,
+          "line": 281,
           "kind": "function",
           "exported": true,
           "doc": "One-time key generation helper. Run once, copy output to .env."
         },
         {
           "name": "subscribe_push",
-          "line": 328,
+          "line": 324,
           "kind": "function",
           "exported": true,
           "doc": "Save a browser PushSubscription."
         },
         {
           "name": "unsubscribe_push",
-          "line": 370,
+          "line": 366,
           "kind": "function",
           "exported": true,
           "doc": "Remove a push subscription by endpoint URL."
         },
         {
           "name": "receive_infrastructure_alert",
-          "line": 389,
+          "line": 385,
           "kind": "function",
           "exported": true,
           "doc": "Receive Grafana alerting webhook payloads and log them."
@@ -3339,8 +3309,8 @@
       "id": "backend/app/routers/auto_trading.py",
       "type": "module",
       "language": "python",
-      "size": 384,
-      "loc": 384,
+      "size": 365,
+      "loc": 365,
       "group": 6,
       "imports": [
         "logging",
@@ -3360,96 +3330,96 @@
       "symbols": [
         {
           "name": "list_strategies",
-          "line": 73,
+          "line": 74,
           "kind": "function",
           "exported": true,
           "doc": "Return all trading strategies ordered by creation date."
         },
         {
           "name": "create_strategy",
-          "line": 86,
+          "line": 87,
           "kind": "function",
           "exported": true,
           "doc": "Create a new trading strategy. Defaults to paper_mode=True for safety."
         },
         {
           "name": "get_strategy",
-          "line": 117,
+          "line": 118,
           "kind": "function",
           "exported": true
         },
         {
           "name": "update_strategy",
-          "line": 128,
+          "line": 127,
           "kind": "function",
           "exported": true,
           "doc": "Partial update of a trading strategy."
         },
         {
           "name": "delete_strategy",
-          "line": 149,
+          "line": 146,
           "kind": "function",
           "exported": true,
           "doc": "Soft-delete a strategy by setting is_active=False."
         },
         {
           "name": "list_orders",
-          "line": 189,
+          "line": 184,
           "kind": "function",
           "exported": true,
           "doc": "List AutoTradeOrders with optional filters."
         },
         {
           "name": "get_order",
-          "line": 219,
+          "line": 214,
           "kind": "function",
           "exported": true
         },
         {
           "name": "approve_order_endpoint",
-          "line": 231,
+          "line": 224,
           "kind": "function",
           "exported": true,
           "doc": "Approve a pending_approval order."
         },
         {
           "name": "reject_order",
-          "line": 260,
+          "line": 245,
           "kind": "function",
           "exported": true,
           "doc": "Reject a pending_approval order without submitting it."
         },
         {
           "name": "cancel_order_endpoint",
-          "line": 287,
+          "line": 270,
           "kind": "function",
           "exported": true,
           "doc": "Cancel an active order."
         },
         {
           "name": "get_account_endpoint",
-          "line": 315,
+          "line": 296,
           "kind": "function",
           "exported": true,
           "doc": "Fetch live account summary from IBKR."
         },
         {
           "name": "get_stats_endpoint",
-          "line": 324,
+          "line": 305,
           "kind": "function",
           "exported": true,
           "doc": "Return auto-trading statistics for the last N days."
         },
         {
           "name": "get_trading_config",
-          "line": 336,
+          "line": 317,
           "kind": "function",
           "exported": true,
           "doc": "Return current auto-trading system config values."
         },
         {
           "name": "update_trading_config",
-          "line": 356,
+          "line": 337,
           "kind": "function",
           "exported": true,
           "doc": "Update auto-trading system config (AUTO_TRADING_ENABLED, PAPER_ACCOUNT_SIZE)."
@@ -3733,8 +3703,8 @@
       "id": "backend/app/routers/outcomes.py",
       "type": "module",
       "language": "python",
-      "size": 310,
-      "loc": 310,
+      "size": 309,
+      "loc": 309,
       "group": 6,
       "imports": [
         "datetime",
@@ -3753,73 +3723,73 @@
       "symbols": [
         {
           "name": "get_scorecard",
-          "line": 40,
+          "line": 41,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_scorecard_by_type",
-          "line": 53,
+          "line": 54,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_intervals",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_distribution",
-          "line": 73,
+          "line": 74,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_edge_decay",
-          "line": 82,
+          "line": 83,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_signals",
-          "line": 93,
+          "line": 94,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_event_outcome",
-          "line": 118,
+          "line": 119,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_readiness",
-          "line": 142,
+          "line": 141,
           "kind": "function",
           "exported": true
         },
         {
           "name": "backfill_outcomes",
-          "line": 173,
+          "line": 172,
           "kind": "function",
           "exported": true
         },
         {
           "name": "trigger_signal_analysis",
-          "line": 227,
+          "line": 226,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_correlations",
-          "line": 239,
+          "line": 238,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_latest_analysis",
-          "line": 268,
+          "line": 267,
           "kind": "function",
           "exported": true
         }
@@ -3852,70 +3822,70 @@
       "symbols": [
         {
           "name": "_last_completed_weekday",
-          "line": 55,
+          "line": 56,
           "kind": "function",
           "exported": false,
           "doc": "Default scan date when none supplied \u2014 most recent completed weekday."
         },
         {
           "name": "list_scanner_types",
-          "line": 67,
+          "line": 68,
           "kind": "function",
           "exported": true,
           "doc": "Return all registered scanner types for frontend scanner pickers."
         },
         {
           "name": "run_scanner",
-          "line": 84,
+          "line": 85,
           "kind": "function",
           "exported": true,
           "doc": "Enqueue a scan and return immediately."
         },
         {
           "name": "get_scan_status",
-          "line": 177,
+          "line": 178,
           "kind": "function",
           "exported": true,
           "doc": "Snapshot of an in-flight or finished scan."
         },
         {
           "name": "cancel_scan",
-          "line": 223,
+          "line": 224,
           "kind": "function",
           "exported": true,
           "doc": "Request cancellation of an in-flight scan."
         },
         {
           "name": "scan_run_websocket",
-          "line": 251,
+          "line": 252,
           "kind": "function",
           "exported": true,
           "doc": "Stream progress messages for one running scan."
         },
         {
           "name": "get_scanner_history",
-          "line": 336,
+          "line": 337,
           "kind": "function",
           "exported": true,
           "doc": "Get recent scanner runs."
         },
         {
           "name": "get_scanner_results",
-          "line": 362,
+          "line": 363,
           "kind": "function",
           "exported": true,
           "doc": "Get scanner results with filtering."
         },
         {
           "name": "get_signal_quality_distribution",
-          "line": 428,
+          "line": 429,
           "kind": "function",
           "exported": true,
           "doc": "Returns avg eod_pct_change and follow_through rate per score decile for EdgeExpl"
         },
         {
           "name": "get_scanner_stats",
-          "line": 441,
+          "line": 442,
           "kind": "function",
           "exported": true,
           "doc": "Get scanner statistics for the dashboard."
@@ -3996,8 +3966,8 @@
       "id": "backend/app/routers/stocks.py",
       "type": "module",
       "language": "python",
-      "size": 403,
-      "loc": 403,
+      "size": 404,
+      "loc": 404,
       "group": 6,
       "imports": [
         "datetime",
@@ -4019,28 +3989,28 @@
       "symbols": [
         {
           "name": "get_historical_data",
-          "line": 23,
+          "line": 24,
           "kind": "function",
           "exported": true,
           "doc": "Get historical stock data from DB."
         },
         {
           "name": "refresh_stock_data",
-          "line": 105,
+          "line": 106,
           "kind": "function",
           "exported": true,
           "doc": "Trigger a refresh of stock data from Polygon to DB."
         },
         {
           "name": "get_stock_detail_consolidated",
-          "line": 133,
+          "line": 134,
           "kind": "function",
           "exported": true,
           "doc": "Get consolidated stock detail for the frontend detail page."
         },
         {
           "name": "sync_missing_stock_aggregates",
-          "line": 236,
+          "line": 237,
           "kind": "function",
           "exported": true,
           "doc": "For a specific ticker, identify all (timespan, multiplier) combos already"
@@ -4168,11 +4138,10 @@
       "id": "backend/app/routers/universe.py",
       "type": "module",
       "language": "python",
-      "size": 450,
-      "loc": 450,
+      "size": 446,
+      "loc": 446,
       "group": 6,
       "imports": [
-        "datetime",
         "typing",
         "fastapi",
         "pydantic",
@@ -4190,158 +4159,158 @@
       "symbols": [
         {
           "name": "ExportAggregatesRequest",
-          "line": 32,
+          "line": 33,
           "kind": "class",
           "exported": true
         },
         {
           "name": "DeleteAggregatesRequest",
-          "line": 41,
+          "line": 42,
           "kind": "class",
           "exported": true
         },
         {
           "name": "NormalizeRequest",
-          "line": 48,
+          "line": 49,
           "kind": "class",
           "exported": true
         },
         {
           "name": "create_stock_universe",
-          "line": 53,
+          "line": 54,
           "kind": "function",
           "exported": true,
           "doc": "Create a new stock universe."
         },
         {
           "name": "get_universes_for_ticker",
-          "line": 67,
+          "line": 68,
           "kind": "function",
           "exported": true,
           "doc": "Return all active universes that contain the given ticker."
         },
         {
           "name": "update_stock_universe",
-          "line": 87,
+          "line": 88,
           "kind": "function",
           "exported": true,
           "doc": "Update a stock universe."
         },
         {
           "name": "delete_stock_universe",
-          "line": 110,
+          "line": 107,
           "kind": "function",
           "exported": true,
           "doc": "Delete (soft delete) a stock universe."
         },
         {
           "name": "list_stock_universes",
-          "line": 126,
+          "line": 121,
           "kind": "function",
           "exported": true,
           "doc": "List all active stock universes. include_stats=false skips aggregate stats (for "
         },
         {
           "name": "refresh_universe_stats",
-          "line": 163,
+          "line": 161,
           "kind": "function",
           "exported": true,
           "doc": "Recompute and persist aggregate stats. Call after sync or refresh to update the "
         },
         {
           "name": "sync_fundamental_data",
-          "line": 196,
+          "line": 192,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background sync of fundamental data from Polygon."
         },
         {
           "name": "sync_ticker_details",
-          "line": 213,
+          "line": 209,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background sync of ticker details. delay: 15.0=Free, 0.2=Paid. resync: f"
         },
         {
           "name": "stop_sync",
-          "line": 230,
+          "line": 226,
           "kind": "function",
           "exported": true,
           "doc": "Stops any running sync process by setting a Stop Flag in Redis and purging the q"
         },
         {
           "name": "sync_daily_metrics",
-          "line": 254,
+          "line": 250,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background update of daily technical metrics."
         },
         {
           "name": "refresh_universe",
-          "line": 269,
+          "line": 265,
           "kind": "function",
           "exported": true,
           "doc": "Refresh stocks in a universe using the Universe Discovery Engine."
         },
         {
           "name": "sync_missing_aggregates",
-          "line": 281,
+          "line": 277,
           "kind": "function",
           "exported": true,
           "doc": "For every recorded (timespan, multiplier), queue a sync from last bar to today."
         },
         {
           "name": "get_universe_sync_status",
-          "line": 290,
+          "line": 286,
           "kind": "function",
           "exported": true,
           "doc": "Return the current sync progress for a universe."
         },
         {
           "name": "export_universe_aggregates",
-          "line": 296,
+          "line": 292,
           "kind": "function",
           "exported": true,
           "doc": "Stream a ZIP file containing aggregate (OHLCV) data for the requested tickers."
         },
         {
           "name": "get_universe_stocks",
-          "line": 309,
+          "line": 305,
           "kind": "function",
           "exported": true,
           "doc": "List all stocks in a universe."
         },
         {
           "name": "sync_universe_aggregates",
-          "line": 327,
+          "line": 323,
           "kind": "function",
           "exported": true,
           "doc": "Trigger backfill of aggregates for all stocks in the universe."
         },
         {
           "name": "trigger_quality_analysis",
-          "line": 347,
+          "line": 343,
           "kind": "function",
           "exported": true,
           "doc": "Queue a background data-quality analysis. Poll GET .../quality-report for result"
         },
         {
           "name": "delete_ticker_aggregates",
-          "line": 360,
+          "line": 356,
           "kind": "function",
           "exported": true,
           "doc": "Delete aggregate bars for a ticker (optionally scoped to timespan/multiplier) an"
         },
         {
           "name": "get_quality_report",
-          "line": 399,
+          "line": 395,
           "kind": "function",
           "exported": true,
           "doc": "Return the latest quality report for a universe (or null if none exists)."
         },
         {
           "name": "trigger_normalization",
-          "line": 434,
+          "line": 430,
           "kind": "function",
           "exported": true,
           "doc": "Start (or resume) a normalization run. Poll GET .../quality-report for status."
@@ -5107,8 +5076,8 @@
       "id": "backend/app/services/alert_service.py",
       "type": "module",
       "language": "python",
-      "size": 418,
-      "loc": 418,
+      "size": 417,
+      "loc": 417,
       "group": 8,
       "imports": [
         "json",
@@ -5131,7 +5100,7 @@
       "symbols": [
         {
           "name": "AlertRuleService",
-          "line": 37,
+          "line": 38,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -5142,7 +5111,7 @@
         },
         {
           "name": "NotificationDispatcher",
-          "line": 95,
+          "line": 94,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -5160,14 +5129,14 @@
         },
         {
           "name": "trigger_scanner_alert",
-          "line": 341,
+          "line": 340,
           "kind": "function",
           "exported": true,
           "doc": "Enqueue alert evaluation for a newly persisted ScannerEvent."
         },
         {
           "name": "save_event",
-          "line": 348,
+          "line": 347,
           "kind": "function",
           "exported": true,
           "doc": "Persist a ScannerEvent and enqueue alert evaluation for new events."
@@ -5178,8 +5147,8 @@
       "id": "backend/app/services/auto_trade_service.py",
       "type": "module",
       "language": "python",
-      "size": 741,
-      "loc": 741,
+      "size": 740,
+      "loc": 740,
       "group": 8,
       "imports": [
         "__future__",
@@ -5201,13 +5170,13 @@
       "symbols": [
         {
           "name": "PositionCalc",
-          "line": 60,
+          "line": 61,
           "kind": "class",
           "exported": true
         },
         {
           "name": "AutoTradeExecutor",
-          "line": 74,
+          "line": 75,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -5223,28 +5192,28 @@
         },
         {
           "name": "approve_order",
-          "line": 555,
+          "line": 556,
           "kind": "function",
           "exported": true,
           "doc": "Approve a pending_approval order."
         },
         {
           "name": "cancel_order",
-          "line": 592,
+          "line": 593,
           "kind": "function",
           "exported": true,
           "doc": "Cancel an active order."
         },
         {
           "name": "get_account",
-          "line": 641,
+          "line": 640,
           "kind": "function",
           "exported": true,
           "doc": "Fetch live account summary from IBKR."
         },
         {
           "name": "get_stats",
-          "line": 698,
+          "line": 697,
           "kind": "function",
           "exported": true,
           "doc": "Return auto-trading statistics for the last N days."
@@ -5808,8 +5777,8 @@
       "id": "backend/app/services/liquidity_hunt.py",
       "type": "module",
       "language": "python",
-      "size": 709,
-      "loc": 709,
+      "size": 688,
+      "loc": 688,
       "group": 8,
       "imports": [
         "__future__",
@@ -5831,70 +5800,70 @@
       "symbols": [
         {
           "name": "_evaluate_criteria",
-          "line": 52,
+          "line": 53,
           "kind": "function",
           "exported": false,
           "doc": "Evaluate all six liquidity-hunt criteria against session metrics."
         },
         {
           "name": "_get_session_metrics",
-          "line": 159,
+          "line": 160,
           "kind": "function",
           "exported": false,
           "doc": "Query all minute bars for event_date. Return per-session aggregates."
         },
         {
           "name": "_get_prior_day_close",
-          "line": 209,
+          "line": 204,
           "kind": "function",
           "exported": false,
           "doc": "Return the regular close of the most recent trading day before event_date."
         },
         {
           "name": "_get_event_date_regular_close",
-          "line": 250,
+          "line": 241,
           "kind": "function",
           "exported": false,
           "doc": "Return the last regular-session minute close on event_date itself."
         },
         {
           "name": "_get_rolling_baselines",
-          "line": 287,
+          "line": 272,
           "kind": "function",
           "exported": false,
           "doc": "Compute 20-day rolling session averages from minute bars prior to event_date."
         },
         {
           "name": "_get_enrichment",
-          "line": 373,
+          "line": 352,
           "kind": "function",
           "exported": false,
           "doc": "Fetch catalyst, split, market-cap, and float enrichment for one ticker."
         },
         {
           "name": "_build_indicators",
-          "line": 407,
+          "line": 386,
           "kind": "function",
           "exported": false,
           "doc": "Merge base indicators with opening/closing prices, float rotation, and split fla"
         },
         {
           "name": "run_liquidity_hunt_scan",
-          "line": 438,
+          "line": 417,
           "kind": "function",
           "exported": true,
           "doc": "Run liquidity_hunt_pre and liquidity_hunt_post scans over a date range."
         },
         {
           "name": "run_liquidity_hunt_scan_for_date",
-          "line": 660,
+          "line": 639,
           "kind": "function",
           "exported": true,
           "doc": "Single-ticker single-date wrapper (used by tasks scanner_map)."
         },
         {
           "name": "_orchestrator_run",
-          "line": 676,
+          "line": 655,
           "kind": "function",
           "exported": false,
           "doc": "Adapter: maps the standard ScannerFn signature to run_liquidity_hunt_scan."
@@ -6000,8 +5969,8 @@
       "id": "backend/app/services/outcome_service.py",
       "type": "module",
       "language": "python",
-      "size": 226,
-      "loc": 226,
+      "size": 225,
+      "loc": 225,
       "group": 8,
       "imports": [
         "logging",
@@ -6020,7 +5989,7 @@
       "symbols": [
         {
           "name": "OutcomeService",
-          "line": 20,
+          "line": 21,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -6036,8 +6005,8 @@
       "id": "backend/app/services/oversold_bounce_scan.py",
       "type": "module",
       "language": "python",
-      "size": 238,
-      "loc": 238,
+      "size": 233,
+      "loc": 233,
       "group": 8,
       "imports": [
         "asyncio",
@@ -6058,14 +6027,14 @@
       "symbols": [
         {
           "name": "run_oversold_bounce_scan",
-          "line": 21,
+          "line": 22,
           "kind": "function",
           "exported": true,
           "doc": "Run the Oversold Bounce (Dual RSI) scan using DB daily aggregates."
         },
         {
           "name": "_run",
-          "line": 221,
+          "line": 216,
           "kind": "function",
           "exported": false
         }
@@ -6075,8 +6044,8 @@
       "id": "backend/app/services/pocket_pivot.py",
       "type": "module",
       "language": "python",
-      "size": 421,
-      "loc": 421,
+      "size": 412,
+      "loc": 412,
       "group": 8,
       "imports": [
         "__future__",
@@ -6096,56 +6065,56 @@
       "symbols": [
         {
           "name": "_get_today_bar",
-          "line": 42,
+          "line": 43,
           "kind": "function",
           "exported": false,
           "doc": "Fetch the daily bar for ticker on event_date. Returns None if not found."
         },
         {
           "name": "_get_prior_close",
-          "line": 69,
+          "line": 64,
           "kind": "function",
           "exported": false,
           "doc": "Fetch the most recent daily-bar close strictly before event_date."
         },
         {
           "name": "_get_lookback_bars",
-          "line": 90,
+          "line": 81,
           "kind": "function",
           "exported": false,
           "doc": "Fetch up to lookback_days+1 daily bars before event_date (ascending)."
         },
         {
           "name": "_classify_down_days",
-          "line": 117,
+          "line": 104,
           "kind": "function",
           "exported": false,
           "doc": "Return volumes of down days within the lookback window."
         },
         {
           "name": "_get_enrichment",
-          "line": 139,
+          "line": 126,
           "kind": "function",
           "exported": false,
           "doc": "Fetch split, market-cap, float, and catalyst enrichment. Mirrors liquidity_hunt."
         },
         {
           "name": "run_pocket_pivot_scan",
-          "line": 173,
+          "line": 160,
           "kind": "function",
           "exported": true,
           "doc": "Run the pocket pivot scanner over a date range."
         },
         {
           "name": "run_pocket_pivot_scan_for_date",
-          "line": 377,
+          "line": 368,
           "kind": "function",
           "exported": true,
           "doc": "Single-ticker single-date wrapper used by run_range_scan's scanner_map."
         },
         {
           "name": "_orchestrator_run",
-          "line": 393,
+          "line": 384,
           "kind": "function",
           "exported": false,
           "doc": "Adapter: maps the standard ScannerFn signature to run_pocket_pivot_scan."
@@ -6156,8 +6125,8 @@
       "id": "backend/app/services/pre_market_scan.py",
       "type": "module",
       "language": "python",
-      "size": 388,
-      "loc": 388,
+      "size": 383,
+      "loc": 383,
       "group": 8,
       "imports": [
         "asyncio",
@@ -6179,14 +6148,14 @@
       "symbols": [
         {
           "name": "run_pre_market_scan",
-          "line": 25,
+          "line": 26,
           "kind": "function",
           "exported": true,
           "doc": "Run extended hours volume spike scanner using DB aggregates."
         },
         {
           "name": "_run",
-          "line": 371,
+          "line": 366,
           "kind": "function",
           "exported": false
         }
@@ -6196,8 +6165,8 @@
       "id": "backend/app/services/scan_enrichment.py",
       "type": "module",
       "language": "python",
-      "size": 218,
-      "loc": 218,
+      "size": 215,
+      "loc": 215,
       "group": 8,
       "imports": [
         "logging",
@@ -6216,14 +6185,14 @@
       "symbols": [
         {
           "name": "_get_batch_enrichment_data",
-          "line": 37,
+          "line": 38,
           "kind": "function",
           "exported": false,
           "doc": "Fetch common enrichment data for a batch of tickers."
         },
         {
           "name": "_get_batch_enrichment_data_impl",
-          "line": 51,
+          "line": 52,
           "kind": "function",
           "exported": false
         }
@@ -6386,8 +6355,8 @@
       "id": "backend/app/services/session_metrics.py",
       "type": "module",
       "language": "python",
-      "size": 145,
-      "loc": 145,
+      "size": 146,
+      "loc": 146,
       "group": 8,
       "imports": [
         "datetime",
@@ -6404,14 +6373,14 @@
       "symbols": [
         {
           "name": "calculate_day_metrics_from_aggs",
-          "line": 14,
+          "line": 15,
           "kind": "function",
           "exported": true,
           "doc": "Calculate detailed price metrics from a list of minute aggregates."
         },
         {
           "name": "calculate_day_metrics",
-          "line": 70,
+          "line": 71,
           "kind": "function",
           "exported": true,
           "doc": "Calculate detailed price metrics for different sessions of a given day."
@@ -6465,8 +6434,8 @@
       "id": "backend/app/services/split_adjustment.py",
       "type": "module",
       "language": "python",
-      "size": 195,
-      "loc": 195,
+      "size": 196,
+      "loc": 196,
       "group": 8,
       "imports": [
         "logging",
@@ -6484,7 +6453,7 @@
       "symbols": [
         {
           "name": "SplitAdjustmentService",
-          "line": 24,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -6586,8 +6555,8 @@
       "id": "backend/app/services/stock_data.py",
       "type": "module",
       "language": "python",
-      "size": 650,
-      "loc": 650,
+      "size": 651,
+      "loc": 651,
       "group": 8,
       "imports": [
         "logging",
@@ -6606,7 +6575,7 @@
       "symbols": [
         {
           "name": "StockDataService",
-          "line": 25,
+          "line": 26,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -6670,8 +6639,8 @@
         "typing",
         "redis",
         "sqlalchemy",
-        "celery",
         "app",
+        "celery",
         "os"
       ],
       "layer": "backend",
@@ -6682,14 +6651,14 @@
       "symbols": [
         {
           "name": "_now_et",
-          "line": 18,
+          "line": 20,
           "kind": "function",
           "exported": false,
           "doc": "Return current datetime in ET. Module-level so tests can monkeypatch it."
         },
         {
           "name": "SystemService",
-          "line": 23,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -6780,8 +6749,8 @@
       "id": "backend/app/services/universe_orchestrator.py",
       "type": "module",
       "language": "python",
-      "size": 527,
-      "loc": 527,
+      "size": 528,
+      "loc": 528,
       "group": 8,
       "imports": [
         "json",
@@ -6801,42 +6770,42 @@
       "symbols": [
         {
           "name": "discover_and_refresh",
-          "line": 33,
+          "line": 34,
           "kind": "function",
           "exported": true,
           "doc": "Refresh stocks in a universe using the Universe Discovery Engine."
         },
         {
           "name": "sync_missing_aggregates",
-          "line": 110,
+          "line": 111,
           "kind": "function",
           "exported": true,
           "doc": "For every (timespan, multiplier) already recorded in this universe,"
         },
         {
           "name": "get_sync_status",
-          "line": 245,
+          "line": 246,
           "kind": "function",
           "exported": true,
           "doc": "Return the current sync progress for a universe."
         },
         {
           "name": "sync_aggregates",
-          "line": 306,
+          "line": 307,
           "kind": "function",
           "exported": true,
           "doc": "Trigger backfill of aggregates for all stocks in the universe."
         },
         {
           "name": "queue_quality_analysis",
-          "line": 439,
+          "line": 440,
           "kind": "function",
           "exported": true,
           "doc": "Upsert a pending UniverseQualityReport row (clearing stale snapshot fields)"
         },
         {
           "name": "queue_normalization",
-          "line": 474,
+          "line": 475,
           "kind": "function",
           "exported": true,
           "doc": "Start (or resume) a normalization run for the universe."
@@ -6937,7 +6906,6 @@
       "imports": [
         "logging",
         "time",
-        "datetime",
         "sqlalchemy",
         "app",
         "pandas"
@@ -6974,8 +6942,8 @@
       "id": "backend/app/tasks/scanning.py",
       "type": "module",
       "language": "python",
-      "size": 759,
-      "loc": 759,
+      "size": 752,
+      "loc": 752,
       "group": 9,
       "imports": [
         "asyncio",
@@ -6996,63 +6964,63 @@
       "symbols": [
         {
           "name": "_evaluate_scanner_alerts_logic",
-          "line": 24,
+          "line": 25,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of evaluate_scanner_alerts. No OTel/Celery context needed."
         },
         {
           "name": "_run_range_scan_logic",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_range_scan. Returns events_detected count."
         },
         {
           "name": "_run_universe_scan_logic",
-          "line": 141,
+          "line": 142,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
         },
         {
           "name": "evaluate_scanner_alerts",
-          "line": 328,
+          "line": 321,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 361,
+          "line": 354,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 415,
+          "line": 408,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 504,
+          "line": 497,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 608,
+          "line": 601,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
           "name": "validate_scheduled_scanner_configs",
-          "line": 697,
+          "line": 690,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
@@ -7063,8 +7031,8 @@
       "id": "backend/app/tasks/sync.py",
       "type": "module",
       "language": "python",
-      "size": 691,
-      "loc": 691,
+      "size": 692,
+      "loc": 692,
       "group": 9,
       "imports": [
         "asyncio",
@@ -7086,56 +7054,56 @@
       "symbols": [
         {
           "name": "sync_tickers_batch",
-          "line": 28,
+          "line": 29,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to sync tickers in batches using strict rate limiting (recursive cha"
         },
         {
           "name": "sync_ticker_details",
-          "line": 135,
+          "line": 136,
           "kind": "function",
           "exported": true,
           "doc": "Slow crawler task to fetch details for ONE ticker."
         },
         {
           "name": "start_details_crawl",
-          "line": 246,
+          "line": 247,
           "kind": "function",
           "exported": true,
           "doc": "Kicks off the details crawler if it's not running."
         },
         {
           "name": "sync_stock_aggregates",
-          "line": 297,
+          "line": 298,
           "kind": "function",
           "exported": true,
           "doc": "Fetch and store aggregates for a specific ticker and date range."
         },
         {
           "name": "poll_massive_news",
-          "line": 391,
+          "line": 392,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to poll Polygon.io News API based on NewsPreference settings."
         },
         {
           "name": "sync_futures_aggregates",
-          "line": 539,
+          "line": 540,
           "kind": "function",
           "exported": true,
           "doc": "Download historical futures data from IBKR for one root symbol."
         },
         {
           "name": "sync_stock_splits",
-          "line": 599,
+          "line": 600,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to fetch recent stock splits from Polygon.io."
         },
         {
           "name": "trigger_tweet_monitor",
-          "line": 681,
+          "line": 682,
           "kind": "function",
           "exported": true,
           "doc": "HTTP trigger for the tweet-monitor microservice (POST /poll)."
@@ -7146,8 +7114,8 @@
       "id": "backend/app/tasks/trading.py",
       "type": "module",
       "language": "python",
-      "size": 427,
-      "loc": 427,
+      "size": 428,
+      "loc": 428,
       "group": 9,
       "imports": [
         "asyncio",
@@ -7165,56 +7133,56 @@
       "symbols": [
         {
           "name": "execute_auto_trade",
-          "line": 16,
+          "line": 17,
           "kind": "function",
           "exported": true,
           "doc": "Execute an automated trade for a matched alert rule."
         },
         {
           "name": "submit_approved_order",
-          "line": 77,
+          "line": 78,
           "kind": "function",
           "exported": true,
           "doc": "Submit a manually-approved AutoTradeOrder to IBKR."
         },
         {
           "name": "poll_auto_trade_fills",
-          "line": 122,
+          "line": 123,
           "kind": "function",
           "exported": true,
           "doc": "Poll IBKR for fill updates on submitted/open AutoTradeOrders."
         },
         {
           "name": "_check_entry_slippage",
-          "line": 188,
+          "line": 189,
           "kind": "function",
           "exported": false,
           "doc": "Enforce max_slippage_pct: reject the order if fill deviated too far from"
         },
         {
           "name": "_record_entry_fill",
-          "line": 224,
+          "line": 225,
           "kind": "function",
           "exported": false,
           "doc": "Mark an order as open (entry filled) and create the journal Trade record."
         },
         {
           "name": "_record_exit_fill",
-          "line": 268,
+          "line": 269,
           "kind": "function",
           "exported": false,
           "doc": "Mark an order closed and update the journal Trade."
         },
         {
           "name": "_poll_live_orders",
-          "line": 327,
+          "line": 328,
           "kind": "function",
           "exported": false,
           "doc": "Query IBKR for status of live AutoTradeOrders and process any fills."
         },
         {
           "name": "_simulate_paper_exit",
-          "line": 399,
+          "line": 400,
           "kind": "function",
           "exported": false
         }
@@ -7233,6 +7201,32 @@
       "transitive_dependents": 0,
       "blast_score": 0.0,
       "imported_by": []
+    },
+    {
+      "id": "backend/app/utils/db.py",
+      "type": "module",
+      "language": "python",
+      "size": 12,
+      "loc": 12,
+      "group": 10,
+      "imports": [
+        "typing",
+        "fastapi",
+        "sqlalchemy"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "get_or_404",
+          "line": 7,
+          "kind": "function",
+          "exported": true
+        }
+      ]
     },
     {
       "id": "backend/app/utils/session.py",
@@ -7285,6 +7279,36 @@
           "kind": "function",
           "exported": true,
           "doc": "Return the current date in America/New_York."
+        }
+      ]
+    },
+    {
+      "id": "backend/app/utils/time.py",
+      "type": "module",
+      "language": "python",
+      "size": 12,
+      "loc": 12,
+      "group": 10,
+      "imports": [
+        "datetime"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "utc_now",
+          "line": 4,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "to_utc_naive",
+          "line": 8,
+          "kind": "function",
+          "exported": true
         }
       ]
     },
@@ -14893,6 +14917,45 @@
       ]
     },
     {
+      "id": "backend/tests/test_db_utils.py",
+      "type": "module",
+      "language": "python",
+      "size": 39,
+      "loc": 39,
+      "group": 14,
+      "imports": [
+        "unittest",
+        "pytest",
+        "fastapi",
+        "sqlalchemy",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "_FakeModel",
+          "line": 12,
+          "kind": "class",
+          "exported": false
+        },
+        {
+          "name": "TestGetOr404",
+          "line": 16,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_returns_object_when_found",
+            "test_raises_404_when_not_found",
+            "test_detail_uses_name_argument"
+          ]
+        }
+      ]
+    },
+    {
       "id": "backend/tests/test_exceptions.py",
       "type": "module",
       "language": "python",
@@ -15019,6 +15082,48 @@
             "test_default_cors_origins",
             "test_cors_origins_from_env",
             "test_no_load_dotenv_call"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "backend/tests/test_time_utils.py",
+      "type": "module",
+      "language": "python",
+      "size": 47,
+      "loc": 47,
+      "group": 14,
+      "imports": [
+        "datetime",
+        "zoneinfo",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "TestUtcNow",
+          "line": 9,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_returns_naive_datetime",
+            "test_is_close_to_now"
+          ]
+        },
+        {
+          "name": "TestToUtcNaive",
+          "line": 21,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_aware_utc_returns_naive",
+            "test_aware_non_utc_converts_correctly",
+            "test_naive_passthrough_unchanged",
+            "test_idempotent_on_already_naive"
           ]
         }
       ]
@@ -16850,9 +16955,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 159,
+      "direct_dependents": 161,
       "transitive_dependents": 109,
-      "blast_score": 213.5,
+      "blast_score": 215.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -16973,6 +17078,7 @@
         "backend/app/tasks/scanning.py",
         "backend/app/tasks/sync.py",
         "backend/app/tasks/trading.py",
+        "backend/app/utils/db.py",
         "backend/live_scanner/publisher.py",
         "backend/tests/api/test_alerts.py",
         "backend/tests/api/test_analysis.py",
@@ -17009,6 +17115,7 @@
         "backend/tests/services/test_scanner_event_model.py",
         "backend/tests/services/test_stock_screener.py",
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
+        "backend/tests/test_db_utils.py",
         "services/tweet-monitor/app/health.py",
         "services/tweet-monitor/app/main.py",
         "services/tweet-monitor/app/models.py",
@@ -17024,9 +17131,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 213,
+      "direct_dependents": 215,
       "transitive_dependents": 109,
-      "blast_score": 267.5,
+      "blast_score": 269.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/__init__.py",
@@ -17231,8 +17338,10 @@
         "backend/tests/tasks/test_trading_task_shells.py",
         "backend/tests/test_auth_core.py",
         "backend/tests/test_config.py",
+        "backend/tests/test_db_utils.py",
         "backend/tests/test_exceptions.py",
         "backend/tests/test_settings.py",
+        "backend/tests/test_time_utils.py",
         "backend/tests/test_user_model.py",
         "services/tweet-monitor/app/browser.py",
         "services/tweet-monitor/app/health.py",
@@ -17332,9 +17441,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 126,
+      "direct_dependents": 127,
       "transitive_dependents": 92,
-      "blast_score": 172.0,
+      "blast_score": 173.0,
       "imported_by": [
         "backend/app/alembic/versions/0b4b1c3739b4_add_missing_model_tables.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -17446,6 +17555,7 @@
         "backend/app/services/timeseries_forecast.py",
         "backend/app/services/universe_orchestrator.py",
         "backend/app/services/websocket_manager.py",
+        "backend/app/utils/db.py",
         "backend/live_scanner/bar_aggregator.py",
         "backend/live_scanner/conditions.py",
         "backend/live_scanner/ibkr_adapter.py",
@@ -17568,43 +17678,13 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 137,
+      "direct_dependents": 107,
       "transitive_dependents": 110,
-      "blast_score": 192.0,
+      "blast_score": 162.0,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/core/error_tracking.py",
         "backend/app/main.py",
-        "backend/app/models/active_watchlist.py",
-        "backend/app/models/alert_delivery_log.py",
-        "backend/app/models/alert_rule.py",
-        "backend/app/models/auto_trade_order.py",
-        "backend/app/models/futures_aggregate.py",
-        "backend/app/models/futures_contract.py",
-        "backend/app/models/futures_rollover.py",
-        "backend/app/models/monitored_account.py",
-        "backend/app/models/monitored_stock.py",
-        "backend/app/models/news_article.py",
-        "backend/app/models/news_preference.py",
-        "backend/app/models/push_subscription.py",
-        "backend/app/models/scanner_config.py",
-        "backend/app/models/scanner_event.py",
-        "backend/app/models/scanner_outcome_snapshot.py",
-        "backend/app/models/scanner_outcome_summary.py",
-        "backend/app/models/scanner_run.py",
-        "backend/app/models/signal_analysis_run.py",
-        "backend/app/models/signal_cluster.py",
-        "backend/app/models/signal_review.py",
-        "backend/app/models/stock_aggregate.py",
-        "backend/app/models/stock_split.py",
-        "backend/app/models/stock_universe.py",
-        "backend/app/models/stock_universe_ticker.py",
-        "backend/app/models/system_config.py",
-        "backend/app/models/ticker_reference.py",
-        "backend/app/models/trade.py",
-        "backend/app/models/trading_strategy.py",
-        "backend/app/models/tweet_signal.py",
-        "backend/app/models/universe_quality_report.py",
         "backend/app/models/user.py",
         "backend/app/providers/ibkr.py",
         "backend/app/providers/massive.py",
@@ -17616,7 +17696,6 @@
         "backend/app/routers/scanner.py",
         "backend/app/routers/stocks.py",
         "backend/app/routers/system.py",
-        "backend/app/routers/universe.py",
         "backend/app/schemas/active_watchlist.py",
         "backend/app/schemas/analysis.py",
         "backend/app/schemas/auto_trade.py",
@@ -17656,11 +17735,11 @@
         "backend/app/services/system_service.py",
         "backend/app/services/universe_export.py",
         "backend/app/services/universe_orchestrator.py",
-        "backend/app/tasks/quality.py",
         "backend/app/tasks/scanning.py",
         "backend/app/tasks/sync.py",
         "backend/app/tasks/trading.py",
         "backend/app/utils/session.py",
+        "backend/app/utils/time.py",
         "backend/live_scanner/bar_aggregator.py",
         "backend/live_scanner/ibkr_adapter.py",
         "backend/live_scanner/publisher.py",
@@ -17700,6 +17779,7 @@
         "backend/tests/services/test_system_service.py",
         "backend/tests/tasks/test_scanning_tasks.py",
         "backend/tests/tasks/test_sync_tasks.py",
+        "backend/tests/test_time_utils.py",
         "scripts/fetch_metrics.py",
         "services/tweet-monitor/app/browser.py",
         "services/tweet-monitor/app/classifier.py",
@@ -17736,9 +17816,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 43,
+      "direct_dependents": 45,
       "transitive_dependents": 109,
-      "blast_score": 97.5,
+      "blast_score": 99.5,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/main.py",
@@ -17758,6 +17838,7 @@
         "backend/app/routers/universe.py",
         "backend/app/routers/watchlist.py",
         "backend/app/services/universe_export.py",
+        "backend/app/utils/db.py",
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_alerts.py",
         "backend/tests/api/test_analysis.py",
@@ -17782,6 +17863,7 @@
         "backend/tests/api/test_watchlist.py",
         "backend/tests/api/test_ws_auth.py",
         "backend/tests/conftest.py",
+        "backend/tests/test_db_utils.py",
         "services/tweet-monitor/app/main.py"
       ]
     },
@@ -18570,9 +18652,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 16,
+      "direct_dependents": 17,
       "transitive_dependents": 0,
-      "blast_score": 16.0,
+      "blast_score": 17.0,
       "imported_by": [
         "backend/app/services/liquidity_hunt.py",
         "backend/app/services/outcome_service.py",
@@ -18589,7 +18671,8 @@
         "backend/tests/services/test_liquidity_hunt.py",
         "backend/tests/services/test_outcome_service.py",
         "backend/tests/services/test_scanner_refactor.py",
-        "backend/tests/services/test_session_utils.py"
+        "backend/tests/services/test_session_utils.py",
+        "backend/tests/test_time_utils.py"
       ]
     },
     {
@@ -18774,9 +18857,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 36,
+      "direct_dependents": 37,
       "transitive_dependents": 0,
-      "blast_score": 36.0,
+      "blast_score": 37.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_analysis.py",
@@ -18813,6 +18896,7 @@
         "backend/tests/tasks/test_slippage.py",
         "backend/tests/tasks/test_sync_tasks.py",
         "backend/tests/tasks/test_trading_task_shells.py",
+        "backend/tests/test_db_utils.py",
         "dark-factory/tests/test_fmt_hunk_filter.py"
       ]
     },
@@ -18844,9 +18928,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 33,
+      "direct_dependents": 34,
       "transitive_dependents": 0,
-      "blast_score": 33.0,
+      "blast_score": 34.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_alerts.py",
@@ -18876,6 +18960,7 @@
         "backend/tests/tasks/test_quality_tasks.py",
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
         "backend/tests/tasks/test_sync_tasks.py",
+        "backend/tests/test_db_utils.py",
         "backend/tests/test_settings.py",
         "services/tweet-monitor/tests/test_classifier.py",
         "services/tweet-monitor/tests/test_extractor.py",
@@ -25725,48 +25810,48 @@
         },
         {
           "name": "ActiveWatchlist",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true
         },
         {
           "name": "AlertDeliveryLog",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "One row per notification attempt (success or failure)."
         },
         {
           "name": "AlertRule",
-          "line": 14,
+          "line": 13,
           "kind": "class",
           "exported": true,
           "doc": "A user-defined rule that triggers notifications when scanner events match."
         },
         {
           "name": "AutoTradeOrder",
-          "line": 39,
+          "line": 38,
           "kind": "class",
           "exported": true,
           "doc": "Represents a single automated trade decision triggered by an alert rule."
         },
         {
           "name": "FuturesAggregate",
-          "line": 24,
+          "line": 23,
           "kind": "class",
           "exported": true,
           "doc": "One OHLCV bar for a specific futures contract month."
         },
         {
           "name": "FuturesContract",
-          "line": 16,
+          "line": 15,
           "kind": "class",
           "exported": true,
           "doc": "Metadata for a single futures contract month."
         },
         {
           "name": "FuturesRollover",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true,
           "doc": "A detected rollover event \u2014 the date volume crossed over from one"
@@ -25779,13 +25864,13 @@
         },
         {
           "name": "MonitoredAccount",
-          "line": 10,
+          "line": 9,
           "kind": "class",
           "exported": true
         },
         {
           "name": "MonitoredStock",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock being monitored within a universe."
@@ -25806,7 +25891,7 @@
         },
         {
           "name": "PushSubscription",
-          "line": 13,
+          "line": 12,
           "kind": "class",
           "exported": true,
           "doc": "A browser's Web Push subscription (endpoint + keys)."
@@ -25830,14 +25915,14 @@
         },
         {
           "name": "ScannerOutcomeSnapshot",
-          "line": 21,
+          "line": 20,
           "kind": "class",
           "exported": true,
           "doc": "Captures price action at a specific time offset from a scanner signal."
         },
         {
           "name": "ScannerOutcomeSummary",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Derived signal-quality metrics for a scanner event, computed from its snapshots."
@@ -25851,27 +25936,27 @@
         },
         {
           "name": "SignalAnalysisRun",
-          "line": 9,
+          "line": 8,
           "kind": "class",
           "exported": true,
           "doc": "Anchor table for each statistical analysis execution."
         },
         {
           "name": "SignalCluster",
-          "line": 10,
+          "line": 9,
           "kind": "class",
           "exported": true,
           "doc": "One row per cluster archetype produced by a single analysis run."
         },
         {
           "name": "SignalReview",
-          "line": 14,
+          "line": 13,
           "kind": "class",
           "exported": true
         },
         {
           "name": "StockAggregate",
-          "line": 13,
+          "line": 12,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock aggregate (candle)."
@@ -25884,7 +25969,7 @@
         },
         {
           "name": "StockSplit",
-          "line": 20,
+          "line": 19,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock split execution."
@@ -25898,67 +25983,67 @@
         },
         {
           "name": "StockUniverseTicker",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Represents a simple list of tickers associated with a universe."
         },
         {
           "name": "SystemConfig",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true
         },
         {
           "name": "TickerReference",
-          "line": 8,
+          "line": 7,
           "kind": "class",
           "exported": true
         },
         {
           "name": "Tag",
-          "line": 38,
+          "line": 37,
           "kind": "class",
           "exported": true,
           "doc": "Represents a custom tag for categorizing trades."
         },
         {
           "name": "Trade",
-          "line": 51,
+          "line": 50,
           "kind": "class",
           "exported": true,
           "doc": "Represents a complete or ongoing trade unit (possibly multiple executions)."
         },
         {
           "name": "TradeExecution",
-          "line": 90,
+          "line": 87,
           "kind": "class",
           "exported": true,
           "doc": "Represents an individual buy or sell order within a trade."
         },
         {
           "name": "JournalEntry",
-          "line": 110,
+          "line": 107,
           "kind": "class",
           "exported": true,
           "doc": "Represents a daily journal entry or general note not tied to a specific trade."
         },
         {
           "name": "TradingStrategy",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true,
           "doc": "Defines risk/reward parameters for automated trade execution."
         },
         {
           "name": "TweetSignal",
-          "line": 20,
+          "line": 19,
           "kind": "class",
           "exported": true
         },
         {
           "name": "UniverseQualityReport",
-          "line": 16,
+          "line": 15,
           "kind": "class",
           "exported": true
         },
@@ -26095,34 +26180,34 @@
         },
         {
           "name": "get_alert_stats",
-          "line": 29,
+          "line": 31,
           "kind": "function",
           "exported": true,
           "doc": "Return dashboard stats for the alerts page header cards."
         },
         {
           "name": "_rule_to_dict",
-          "line": 70,
+          "line": 72,
           "kind": "function",
           "exported": false
         },
         {
           "name": "list_rules",
-          "line": 88,
+          "line": 90,
           "kind": "function",
           "exported": true,
           "doc": "Return all alert rules ordered by creation date (newest first)."
         },
         {
           "name": "create_rule",
-          "line": 95,
+          "line": 97,
           "kind": "function",
           "exported": true,
           "doc": "Create a new alert rule."
         },
         {
           "name": "update_rule",
-          "line": 118,
+          "line": 120,
           "kind": "function",
           "exported": true,
           "doc": "Update an alert rule (full or partial). Used for toggles too."
@@ -26136,49 +26221,49 @@
         },
         {
           "name": "test_rule",
-          "line": 164,
+          "line": 162,
           "kind": "function",
           "exported": true,
           "doc": "Send a test notification through all channels configured on this rule."
         },
         {
           "name": "list_delivery_logs",
-          "line": 239,
+          "line": 235,
           "kind": "function",
           "exported": true,
           "doc": "Return the most recent alert delivery log entries."
         },
         {
           "name": "get_vapid_public_key",
-          "line": 272,
+          "line": 268,
           "kind": "function",
           "exported": true,
           "doc": "Return the VAPID public key so the frontend can subscribe."
         },
         {
           "name": "generate_vapid_keys",
-          "line": 285,
+          "line": 281,
           "kind": "function",
           "exported": true,
           "doc": "One-time key generation helper. Run once, copy output to .env."
         },
         {
           "name": "subscribe_push",
-          "line": 328,
+          "line": 324,
           "kind": "function",
           "exported": true,
           "doc": "Save a browser PushSubscription."
         },
         {
           "name": "unsubscribe_push",
-          "line": 370,
+          "line": 366,
           "kind": "function",
           "exported": true,
           "doc": "Remove a push subscription by endpoint URL."
         },
         {
           "name": "receive_infrastructure_alert",
-          "line": 389,
+          "line": 385,
           "kind": "function",
           "exported": true,
           "doc": "Receive Grafana alerting webhook payloads and log them."
@@ -26251,96 +26336,96 @@
         },
         {
           "name": "list_strategies",
-          "line": 73,
+          "line": 74,
           "kind": "function",
           "exported": true,
           "doc": "Return all trading strategies ordered by creation date."
         },
         {
           "name": "create_strategy",
-          "line": 86,
+          "line": 87,
           "kind": "function",
           "exported": true,
           "doc": "Create a new trading strategy. Defaults to paper_mode=True for safety."
         },
         {
           "name": "get_strategy",
-          "line": 117,
+          "line": 118,
           "kind": "function",
           "exported": true
         },
         {
           "name": "update_strategy",
-          "line": 128,
+          "line": 127,
           "kind": "function",
           "exported": true,
           "doc": "Partial update of a trading strategy."
         },
         {
           "name": "delete_strategy",
-          "line": 149,
+          "line": 146,
           "kind": "function",
           "exported": true,
           "doc": "Soft-delete a strategy by setting is_active=False."
         },
         {
           "name": "list_orders",
-          "line": 189,
+          "line": 184,
           "kind": "function",
           "exported": true,
           "doc": "List AutoTradeOrders with optional filters."
         },
         {
           "name": "get_order",
-          "line": 219,
+          "line": 214,
           "kind": "function",
           "exported": true
         },
         {
           "name": "approve_order_endpoint",
-          "line": 231,
+          "line": 224,
           "kind": "function",
           "exported": true,
           "doc": "Approve a pending_approval order."
         },
         {
           "name": "reject_order",
-          "line": 260,
+          "line": 245,
           "kind": "function",
           "exported": true,
           "doc": "Reject a pending_approval order without submitting it."
         },
         {
           "name": "cancel_order_endpoint",
-          "line": 287,
+          "line": 270,
           "kind": "function",
           "exported": true,
           "doc": "Cancel an active order."
         },
         {
           "name": "get_account_endpoint",
-          "line": 315,
+          "line": 296,
           "kind": "function",
           "exported": true,
           "doc": "Fetch live account summary from IBKR."
         },
         {
           "name": "get_stats_endpoint",
-          "line": 324,
+          "line": 305,
           "kind": "function",
           "exported": true,
           "doc": "Return auto-trading statistics for the last N days."
         },
         {
           "name": "get_trading_config",
-          "line": 336,
+          "line": 317,
           "kind": "function",
           "exported": true,
           "doc": "Return current auto-trading system config values."
         },
         {
           "name": "update_trading_config",
-          "line": 356,
+          "line": 337,
           "kind": "function",
           "exported": true,
           "doc": "Update auto-trading system config (AUTO_TRADING_ENABLED, PAPER_ACCOUNT_SIZE)."
@@ -26504,142 +26589,142 @@
         },
         {
           "name": "get_scorecard",
-          "line": 40,
+          "line": 41,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_scorecard_by_type",
-          "line": 53,
+          "line": 54,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_intervals",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_distribution",
-          "line": 73,
+          "line": 74,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_edge_decay",
-          "line": 82,
+          "line": 83,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_signals",
-          "line": 93,
+          "line": 94,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_event_outcome",
-          "line": 118,
+          "line": 119,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_readiness",
-          "line": 142,
+          "line": 141,
           "kind": "function",
           "exported": true
         },
         {
           "name": "backfill_outcomes",
-          "line": 173,
+          "line": 172,
           "kind": "function",
           "exported": true
         },
         {
           "name": "trigger_signal_analysis",
-          "line": 227,
+          "line": 226,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_correlations",
-          "line": 239,
+          "line": 238,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_latest_analysis",
-          "line": 268,
+          "line": 267,
           "kind": "function",
           "exported": true
         },
         {
           "name": "_last_completed_weekday",
-          "line": 55,
+          "line": 56,
           "kind": "function",
           "exported": false,
           "doc": "Default scan date when none supplied \u2014 most recent completed weekday."
         },
         {
           "name": "list_scanner_types",
-          "line": 67,
+          "line": 68,
           "kind": "function",
           "exported": true,
           "doc": "Return all registered scanner types for frontend scanner pickers."
         },
         {
           "name": "run_scanner",
-          "line": 84,
+          "line": 85,
           "kind": "function",
           "exported": true,
           "doc": "Enqueue a scan and return immediately."
         },
         {
           "name": "get_scan_status",
-          "line": 177,
+          "line": 178,
           "kind": "function",
           "exported": true,
           "doc": "Snapshot of an in-flight or finished scan."
         },
         {
           "name": "cancel_scan",
-          "line": 223,
+          "line": 224,
           "kind": "function",
           "exported": true,
           "doc": "Request cancellation of an in-flight scan."
         },
         {
           "name": "scan_run_websocket",
-          "line": 251,
+          "line": 252,
           "kind": "function",
           "exported": true,
           "doc": "Stream progress messages for one running scan."
         },
         {
           "name": "get_scanner_history",
-          "line": 336,
+          "line": 337,
           "kind": "function",
           "exported": true,
           "doc": "Get recent scanner runs."
         },
         {
           "name": "get_scanner_results",
-          "line": 362,
+          "line": 363,
           "kind": "function",
           "exported": true,
           "doc": "Get scanner results with filtering."
         },
         {
           "name": "get_signal_quality_distribution",
-          "line": 428,
+          "line": 429,
           "kind": "function",
           "exported": true,
           "doc": "Returns avg eod_pct_change and follow_through rate per score decile for EdgeExpl"
         },
         {
           "name": "get_scanner_stats",
-          "line": 441,
+          "line": 442,
           "kind": "function",
           "exported": true,
           "doc": "Get scanner statistics for the dashboard."
@@ -26716,28 +26801,28 @@
         },
         {
           "name": "get_historical_data",
-          "line": 23,
+          "line": 24,
           "kind": "function",
           "exported": true,
           "doc": "Get historical stock data from DB."
         },
         {
           "name": "refresh_stock_data",
-          "line": 105,
+          "line": 106,
           "kind": "function",
           "exported": true,
           "doc": "Trigger a refresh of stock data from Polygon to DB."
         },
         {
           "name": "get_stock_detail_consolidated",
-          "line": 133,
+          "line": 134,
           "kind": "function",
           "exported": true,
           "doc": "Get consolidated stock detail for the frontend detail page."
         },
         {
           "name": "sync_missing_stock_aggregates",
-          "line": 236,
+          "line": 237,
           "kind": "function",
           "exported": true,
           "doc": "For a specific ticker, identify all (timespan, multiplier) combos already"
@@ -26807,158 +26892,158 @@
         },
         {
           "name": "ExportAggregatesRequest",
-          "line": 32,
+          "line": 33,
           "kind": "class",
           "exported": true
         },
         {
           "name": "DeleteAggregatesRequest",
-          "line": 41,
+          "line": 42,
           "kind": "class",
           "exported": true
         },
         {
           "name": "NormalizeRequest",
-          "line": 48,
+          "line": 49,
           "kind": "class",
           "exported": true
         },
         {
           "name": "create_stock_universe",
-          "line": 53,
+          "line": 54,
           "kind": "function",
           "exported": true,
           "doc": "Create a new stock universe."
         },
         {
           "name": "get_universes_for_ticker",
-          "line": 67,
+          "line": 68,
           "kind": "function",
           "exported": true,
           "doc": "Return all active universes that contain the given ticker."
         },
         {
           "name": "update_stock_universe",
-          "line": 87,
+          "line": 88,
           "kind": "function",
           "exported": true,
           "doc": "Update a stock universe."
         },
         {
           "name": "delete_stock_universe",
-          "line": 110,
+          "line": 107,
           "kind": "function",
           "exported": true,
           "doc": "Delete (soft delete) a stock universe."
         },
         {
           "name": "list_stock_universes",
-          "line": 126,
+          "line": 121,
           "kind": "function",
           "exported": true,
           "doc": "List all active stock universes. include_stats=false skips aggregate stats (for "
         },
         {
           "name": "refresh_universe_stats",
-          "line": 163,
+          "line": 161,
           "kind": "function",
           "exported": true,
           "doc": "Recompute and persist aggregate stats. Call after sync or refresh to update the "
         },
         {
           "name": "sync_fundamental_data",
-          "line": 196,
+          "line": 192,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background sync of fundamental data from Polygon."
         },
         {
           "name": "sync_ticker_details",
-          "line": 213,
+          "line": 209,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background sync of ticker details. delay: 15.0=Free, 0.2=Paid. resync: f"
         },
         {
           "name": "stop_sync",
-          "line": 230,
+          "line": 226,
           "kind": "function",
           "exported": true,
           "doc": "Stops any running sync process by setting a Stop Flag in Redis and purging the q"
         },
         {
           "name": "sync_daily_metrics",
-          "line": 254,
+          "line": 250,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background update of daily technical metrics."
         },
         {
           "name": "refresh_universe",
-          "line": 269,
+          "line": 265,
           "kind": "function",
           "exported": true,
           "doc": "Refresh stocks in a universe using the Universe Discovery Engine."
         },
         {
           "name": "sync_missing_aggregates",
-          "line": 281,
+          "line": 277,
           "kind": "function",
           "exported": true,
           "doc": "For every recorded (timespan, multiplier), queue a sync from last bar to today."
         },
         {
           "name": "get_universe_sync_status",
-          "line": 290,
+          "line": 286,
           "kind": "function",
           "exported": true,
           "doc": "Return the current sync progress for a universe."
         },
         {
           "name": "export_universe_aggregates",
-          "line": 296,
+          "line": 292,
           "kind": "function",
           "exported": true,
           "doc": "Stream a ZIP file containing aggregate (OHLCV) data for the requested tickers."
         },
         {
           "name": "get_universe_stocks",
-          "line": 309,
+          "line": 305,
           "kind": "function",
           "exported": true,
           "doc": "List all stocks in a universe."
         },
         {
           "name": "sync_universe_aggregates",
-          "line": 327,
+          "line": 323,
           "kind": "function",
           "exported": true,
           "doc": "Trigger backfill of aggregates for all stocks in the universe."
         },
         {
           "name": "trigger_quality_analysis",
-          "line": 347,
+          "line": 343,
           "kind": "function",
           "exported": true,
           "doc": "Queue a background data-quality analysis. Poll GET .../quality-report for result"
         },
         {
           "name": "delete_ticker_aggregates",
-          "line": 360,
+          "line": 356,
           "kind": "function",
           "exported": true,
           "doc": "Delete aggregate bars for a ticker (optionally scoped to timespan/multiplier) an"
         },
         {
           "name": "get_quality_report",
-          "line": 399,
+          "line": 395,
           "kind": "function",
           "exported": true,
           "doc": "Return the latest quality report for a universe (or null if none exists)."
         },
         {
           "name": "trigger_normalization",
-          "line": 434,
+          "line": 430,
           "kind": "function",
           "exported": true,
           "doc": "Start (or resume) a normalization run. Poll GET .../quality-report for status."
@@ -27439,7 +27524,7 @@
         },
         {
           "name": "AlertRuleService",
-          "line": 37,
+          "line": 38,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -27450,7 +27535,7 @@
         },
         {
           "name": "NotificationDispatcher",
-          "line": 95,
+          "line": 94,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -27468,27 +27553,27 @@
         },
         {
           "name": "trigger_scanner_alert",
-          "line": 341,
+          "line": 340,
           "kind": "function",
           "exported": true,
           "doc": "Enqueue alert evaluation for a newly persisted ScannerEvent."
         },
         {
           "name": "save_event",
-          "line": 348,
+          "line": 347,
           "kind": "function",
           "exported": true,
           "doc": "Persist a ScannerEvent and enqueue alert evaluation for new events."
         },
         {
           "name": "PositionCalc",
-          "line": 60,
+          "line": 61,
           "kind": "class",
           "exported": true
         },
         {
           "name": "AutoTradeExecutor",
-          "line": 74,
+          "line": 75,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -27504,28 +27589,28 @@
         },
         {
           "name": "approve_order",
-          "line": 555,
+          "line": 556,
           "kind": "function",
           "exported": true,
           "doc": "Approve a pending_approval order."
         },
         {
           "name": "cancel_order",
-          "line": 592,
+          "line": 593,
           "kind": "function",
           "exported": true,
           "doc": "Cancel an active order."
         },
         {
           "name": "get_account",
-          "line": 641,
+          "line": 640,
           "kind": "function",
           "exported": true,
           "doc": "Fetch live account summary from IBKR."
         },
         {
           "name": "get_stats",
-          "line": 698,
+          "line": 697,
           "kind": "function",
           "exported": true,
           "doc": "Return auto-trading statistics for the last N days."
@@ -27803,70 +27888,70 @@
         },
         {
           "name": "_evaluate_criteria",
-          "line": 52,
+          "line": 53,
           "kind": "function",
           "exported": false,
           "doc": "Evaluate all six liquidity-hunt criteria against session metrics."
         },
         {
           "name": "_get_session_metrics",
-          "line": 159,
+          "line": 160,
           "kind": "function",
           "exported": false,
           "doc": "Query all minute bars for event_date. Return per-session aggregates."
         },
         {
           "name": "_get_prior_day_close",
-          "line": 209,
+          "line": 204,
           "kind": "function",
           "exported": false,
           "doc": "Return the regular close of the most recent trading day before event_date."
         },
         {
           "name": "_get_event_date_regular_close",
-          "line": 250,
+          "line": 241,
           "kind": "function",
           "exported": false,
           "doc": "Return the last regular-session minute close on event_date itself."
         },
         {
           "name": "_get_rolling_baselines",
-          "line": 287,
+          "line": 272,
           "kind": "function",
           "exported": false,
           "doc": "Compute 20-day rolling session averages from minute bars prior to event_date."
         },
         {
           "name": "_get_enrichment",
-          "line": 373,
+          "line": 352,
           "kind": "function",
           "exported": false,
           "doc": "Fetch catalyst, split, market-cap, and float enrichment for one ticker."
         },
         {
           "name": "_build_indicators",
-          "line": 407,
+          "line": 386,
           "kind": "function",
           "exported": false,
           "doc": "Merge base indicators with opening/closing prices, float rotation, and split fla"
         },
         {
           "name": "run_liquidity_hunt_scan",
-          "line": 438,
+          "line": 417,
           "kind": "function",
           "exported": true,
           "doc": "Run liquidity_hunt_pre and liquidity_hunt_post scans over a date range."
         },
         {
           "name": "run_liquidity_hunt_scan_for_date",
-          "line": 660,
+          "line": 639,
           "kind": "function",
           "exported": true,
           "doc": "Single-ticker single-date wrapper (used by tasks scanner_map)."
         },
         {
           "name": "_orchestrator_run",
-          "line": 676,
+          "line": 655,
           "kind": "function",
           "exported": false,
           "doc": "Adapter: maps the standard ScannerFn signature to run_liquidity_hunt_scan."
@@ -27945,7 +28030,7 @@
         },
         {
           "name": "OutcomeService",
-          "line": 20,
+          "line": 21,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -27957,96 +28042,96 @@
         },
         {
           "name": "run_oversold_bounce_scan",
-          "line": 21,
+          "line": 22,
           "kind": "function",
           "exported": true,
           "doc": "Run the Oversold Bounce (Dual RSI) scan using DB daily aggregates."
         },
         {
           "name": "_run",
-          "line": 221,
+          "line": 216,
           "kind": "function",
           "exported": false
         },
         {
           "name": "_get_today_bar",
-          "line": 42,
+          "line": 43,
           "kind": "function",
           "exported": false,
           "doc": "Fetch the daily bar for ticker on event_date. Returns None if not found."
         },
         {
           "name": "_get_prior_close",
-          "line": 69,
+          "line": 64,
           "kind": "function",
           "exported": false,
           "doc": "Fetch the most recent daily-bar close strictly before event_date."
         },
         {
           "name": "_get_lookback_bars",
-          "line": 90,
+          "line": 81,
           "kind": "function",
           "exported": false,
           "doc": "Fetch up to lookback_days+1 daily bars before event_date (ascending)."
         },
         {
           "name": "_classify_down_days",
-          "line": 117,
+          "line": 104,
           "kind": "function",
           "exported": false,
           "doc": "Return volumes of down days within the lookback window."
         },
         {
           "name": "_get_enrichment",
-          "line": 139,
+          "line": 126,
           "kind": "function",
           "exported": false,
           "doc": "Fetch split, market-cap, float, and catalyst enrichment. Mirrors liquidity_hunt."
         },
         {
           "name": "run_pocket_pivot_scan",
-          "line": 173,
+          "line": 160,
           "kind": "function",
           "exported": true,
           "doc": "Run the pocket pivot scanner over a date range."
         },
         {
           "name": "run_pocket_pivot_scan_for_date",
-          "line": 377,
+          "line": 368,
           "kind": "function",
           "exported": true,
           "doc": "Single-ticker single-date wrapper used by run_range_scan's scanner_map."
         },
         {
           "name": "_orchestrator_run",
-          "line": 393,
+          "line": 384,
           "kind": "function",
           "exported": false,
           "doc": "Adapter: maps the standard ScannerFn signature to run_pocket_pivot_scan."
         },
         {
           "name": "run_pre_market_scan",
-          "line": 25,
+          "line": 26,
           "kind": "function",
           "exported": true,
           "doc": "Run extended hours volume spike scanner using DB aggregates."
         },
         {
           "name": "_run",
-          "line": 371,
+          "line": 366,
           "kind": "function",
           "exported": false
         },
         {
           "name": "_get_batch_enrichment_data",
-          "line": 37,
+          "line": 38,
           "kind": "function",
           "exported": false,
           "doc": "Fetch common enrichment data for a batch of tickers."
         },
         {
           "name": "_get_batch_enrichment_data_impl",
-          "line": 51,
+          "line": 52,
           "kind": "function",
           "exported": false
         },
@@ -28137,14 +28222,14 @@
         },
         {
           "name": "calculate_day_metrics_from_aggs",
-          "line": 14,
+          "line": 15,
           "kind": "function",
           "exported": true,
           "doc": "Calculate detailed price metrics from a list of minute aggregates."
         },
         {
           "name": "calculate_day_metrics",
-          "line": 70,
+          "line": 71,
           "kind": "function",
           "exported": true,
           "doc": "Calculate detailed price metrics for different sessions of a given day."
@@ -28172,7 +28257,7 @@
         },
         {
           "name": "SplitAdjustmentService",
-          "line": 24,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -28224,7 +28309,7 @@
         },
         {
           "name": "StockDataService",
-          "line": 25,
+          "line": 26,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -28252,14 +28337,14 @@
         },
         {
           "name": "_now_et",
-          "line": 18,
+          "line": 20,
           "kind": "function",
           "exported": false,
           "doc": "Return current datetime in ET. Module-level so tests can monkeypatch it."
         },
         {
           "name": "SystemService",
-          "line": 23,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -28300,42 +28385,42 @@
         },
         {
           "name": "discover_and_refresh",
-          "line": 33,
+          "line": 34,
           "kind": "function",
           "exported": true,
           "doc": "Refresh stocks in a universe using the Universe Discovery Engine."
         },
         {
           "name": "sync_missing_aggregates",
-          "line": 110,
+          "line": 111,
           "kind": "function",
           "exported": true,
           "doc": "For every (timespan, multiplier) already recorded in this universe,"
         },
         {
           "name": "get_sync_status",
-          "line": 245,
+          "line": 246,
           "kind": "function",
           "exported": true,
           "doc": "Return the current sync progress for a universe."
         },
         {
           "name": "sync_aggregates",
-          "line": 306,
+          "line": 307,
           "kind": "function",
           "exported": true,
           "doc": "Trigger backfill of aggregates for all stocks in the universe."
         },
         {
           "name": "queue_quality_analysis",
-          "line": 439,
+          "line": 440,
           "kind": "function",
           "exported": true,
           "doc": "Upsert a pending UniverseQualityReport row (clearing stale snapshot fields)"
         },
         {
           "name": "queue_normalization",
-          "line": 474,
+          "line": 475,
           "kind": "function",
           "exported": true,
           "doc": "Start (or resume) a normalization run for the universe."
@@ -28386,177 +28471,183 @@
         },
         {
           "name": "_evaluate_scanner_alerts_logic",
-          "line": 24,
+          "line": 25,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of evaluate_scanner_alerts. No OTel/Celery context needed."
         },
         {
           "name": "_run_range_scan_logic",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_range_scan. Returns events_detected count."
         },
         {
           "name": "_run_universe_scan_logic",
-          "line": 141,
+          "line": 142,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
         },
         {
           "name": "evaluate_scanner_alerts",
-          "line": 328,
+          "line": 321,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 361,
+          "line": 354,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 415,
+          "line": 408,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 504,
+          "line": 497,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 608,
+          "line": 601,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
           "name": "validate_scheduled_scanner_configs",
-          "line": 697,
+          "line": 690,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
         },
         {
           "name": "sync_tickers_batch",
-          "line": 28,
+          "line": 29,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to sync tickers in batches using strict rate limiting (recursive cha"
         },
         {
           "name": "sync_ticker_details",
-          "line": 135,
+          "line": 136,
           "kind": "function",
           "exported": true,
           "doc": "Slow crawler task to fetch details for ONE ticker."
         },
         {
           "name": "start_details_crawl",
-          "line": 246,
+          "line": 247,
           "kind": "function",
           "exported": true,
           "doc": "Kicks off the details crawler if it's not running."
         },
         {
           "name": "sync_stock_aggregates",
-          "line": 297,
+          "line": 298,
           "kind": "function",
           "exported": true,
           "doc": "Fetch and store aggregates for a specific ticker and date range."
         },
         {
           "name": "poll_massive_news",
-          "line": 391,
+          "line": 392,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to poll Polygon.io News API based on NewsPreference settings."
         },
         {
           "name": "sync_futures_aggregates",
-          "line": 539,
+          "line": 540,
           "kind": "function",
           "exported": true,
           "doc": "Download historical futures data from IBKR for one root symbol."
         },
         {
           "name": "sync_stock_splits",
-          "line": 599,
+          "line": 600,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to fetch recent stock splits from Polygon.io."
         },
         {
           "name": "trigger_tweet_monitor",
-          "line": 681,
+          "line": 682,
           "kind": "function",
           "exported": true,
           "doc": "HTTP trigger for the tweet-monitor microservice (POST /poll)."
         },
         {
           "name": "execute_auto_trade",
-          "line": 16,
+          "line": 17,
           "kind": "function",
           "exported": true,
           "doc": "Execute an automated trade for a matched alert rule."
         },
         {
           "name": "submit_approved_order",
-          "line": 77,
+          "line": 78,
           "kind": "function",
           "exported": true,
           "doc": "Submit a manually-approved AutoTradeOrder to IBKR."
         },
         {
           "name": "poll_auto_trade_fills",
-          "line": 122,
+          "line": 123,
           "kind": "function",
           "exported": true,
           "doc": "Poll IBKR for fill updates on submitted/open AutoTradeOrders."
         },
         {
           "name": "_check_entry_slippage",
-          "line": 188,
+          "line": 189,
           "kind": "function",
           "exported": false,
           "doc": "Enforce max_slippage_pct: reject the order if fill deviated too far from"
         },
         {
           "name": "_record_entry_fill",
-          "line": 224,
+          "line": 225,
           "kind": "function",
           "exported": false,
           "doc": "Mark an order as open (entry filled) and create the journal Trade record."
         },
         {
           "name": "_record_exit_fill",
-          "line": 268,
+          "line": 269,
           "kind": "function",
           "exported": false,
           "doc": "Mark an order closed and update the journal Trade."
         },
         {
           "name": "_poll_live_orders",
-          "line": 327,
+          "line": 328,
           "kind": "function",
           "exported": false,
           "doc": "Query IBKR for status of live AutoTradeOrders and process any fills."
         },
         {
           "name": "_simulate_paper_exit",
-          "line": 399,
+          "line": 400,
           "kind": "function",
           "exported": false
+        },
+        {
+          "name": "get_or_404",
+          "line": 7,
+          "kind": "function",
+          "exported": true
         },
         {
           "name": "session_for_ts",
@@ -28592,6 +28683,18 @@
           "kind": "function",
           "exported": true,
           "doc": "Return the current date in America/New_York."
+        },
+        {
+          "name": "utc_now",
+          "line": 4,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "to_utc_naive",
+          "line": 8,
+          "kind": "function",
+          "exported": true
         },
         {
           "name": "MinuteBar",
@@ -33830,6 +33933,23 @@
           "exported": true
         },
         {
+          "name": "_FakeModel",
+          "line": 12,
+          "kind": "class",
+          "exported": false
+        },
+        {
+          "name": "TestGetOr404",
+          "line": 16,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_returns_object_when_found",
+            "test_raises_404_when_not_found",
+            "test_detail_uses_name_argument"
+          ]
+        },
+        {
           "name": "test_markethawk_error_is_base",
           "line": 6,
           "kind": "function",
@@ -33919,6 +34039,28 @@
             "test_default_cors_origins",
             "test_cors_origins_from_env",
             "test_no_load_dotenv_call"
+          ]
+        },
+        {
+          "name": "TestUtcNow",
+          "line": 9,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_returns_naive_datetime",
+            "test_is_close_to_now"
+          ]
+        },
+        {
+          "name": "TestToUtcNaive",
+          "line": 21,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_aware_utc_returns_naive",
+            "test_aware_non_utc_converts_correctly",
+            "test_naive_passthrough_unchanged",
+            "test_idempotent_on_already_naive"
           ]
         },
         {
@@ -36638,48 +36780,48 @@
         },
         {
           "name": "ActiveWatchlist",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true
         },
         {
           "name": "AlertDeliveryLog",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "One row per notification attempt (success or failure)."
         },
         {
           "name": "AlertRule",
-          "line": 14,
+          "line": 13,
           "kind": "class",
           "exported": true,
           "doc": "A user-defined rule that triggers notifications when scanner events match."
         },
         {
           "name": "AutoTradeOrder",
-          "line": 39,
+          "line": 38,
           "kind": "class",
           "exported": true,
           "doc": "Represents a single automated trade decision triggered by an alert rule."
         },
         {
           "name": "FuturesAggregate",
-          "line": 24,
+          "line": 23,
           "kind": "class",
           "exported": true,
           "doc": "One OHLCV bar for a specific futures contract month."
         },
         {
           "name": "FuturesContract",
-          "line": 16,
+          "line": 15,
           "kind": "class",
           "exported": true,
           "doc": "Metadata for a single futures contract month."
         },
         {
           "name": "FuturesRollover",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true,
           "doc": "A detected rollover event \u2014 the date volume crossed over from one"
@@ -36692,13 +36834,13 @@
         },
         {
           "name": "MonitoredAccount",
-          "line": 10,
+          "line": 9,
           "kind": "class",
           "exported": true
         },
         {
           "name": "MonitoredStock",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock being monitored within a universe."
@@ -36719,7 +36861,7 @@
         },
         {
           "name": "PushSubscription",
-          "line": 13,
+          "line": 12,
           "kind": "class",
           "exported": true,
           "doc": "A browser's Web Push subscription (endpoint + keys)."
@@ -36743,14 +36885,14 @@
         },
         {
           "name": "ScannerOutcomeSnapshot",
-          "line": 21,
+          "line": 20,
           "kind": "class",
           "exported": true,
           "doc": "Captures price action at a specific time offset from a scanner signal."
         },
         {
           "name": "ScannerOutcomeSummary",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Derived signal-quality metrics for a scanner event, computed from its snapshots."
@@ -36764,27 +36906,27 @@
         },
         {
           "name": "SignalAnalysisRun",
-          "line": 9,
+          "line": 8,
           "kind": "class",
           "exported": true,
           "doc": "Anchor table for each statistical analysis execution."
         },
         {
           "name": "SignalCluster",
-          "line": 10,
+          "line": 9,
           "kind": "class",
           "exported": true,
           "doc": "One row per cluster archetype produced by a single analysis run."
         },
         {
           "name": "SignalReview",
-          "line": 14,
+          "line": 13,
           "kind": "class",
           "exported": true
         },
         {
           "name": "StockAggregate",
-          "line": 13,
+          "line": 12,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock aggregate (candle)."
@@ -36797,7 +36939,7 @@
         },
         {
           "name": "StockSplit",
-          "line": 20,
+          "line": 19,
           "kind": "class",
           "exported": true,
           "doc": "Represents a stock split execution."
@@ -36811,67 +36953,67 @@
         },
         {
           "name": "StockUniverseTicker",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true,
           "doc": "Represents a simple list of tickers associated with a universe."
         },
         {
           "name": "SystemConfig",
-          "line": 12,
+          "line": 11,
           "kind": "class",
           "exported": true
         },
         {
           "name": "TickerReference",
-          "line": 8,
+          "line": 7,
           "kind": "class",
           "exported": true
         },
         {
           "name": "Tag",
-          "line": 38,
+          "line": 37,
           "kind": "class",
           "exported": true,
           "doc": "Represents a custom tag for categorizing trades."
         },
         {
           "name": "Trade",
-          "line": 51,
+          "line": 50,
           "kind": "class",
           "exported": true,
           "doc": "Represents a complete or ongoing trade unit (possibly multiple executions)."
         },
         {
           "name": "TradeExecution",
-          "line": 90,
+          "line": 87,
           "kind": "class",
           "exported": true,
           "doc": "Represents an individual buy or sell order within a trade."
         },
         {
           "name": "JournalEntry",
-          "line": 110,
+          "line": 107,
           "kind": "class",
           "exported": true,
           "doc": "Represents a daily journal entry or general note not tied to a specific trade."
         },
         {
           "name": "TradingStrategy",
-          "line": 17,
+          "line": 16,
           "kind": "class",
           "exported": true,
           "doc": "Defines risk/reward parameters for automated trade execution."
         },
         {
           "name": "TweetSignal",
-          "line": 20,
+          "line": 19,
           "kind": "class",
           "exported": true
         },
         {
           "name": "UniverseQualityReport",
-          "line": 16,
+          "line": 15,
           "kind": "class",
           "exported": true
         },
@@ -37008,34 +37150,34 @@
         },
         {
           "name": "get_alert_stats",
-          "line": 29,
+          "line": 31,
           "kind": "function",
           "exported": true,
           "doc": "Return dashboard stats for the alerts page header cards."
         },
         {
           "name": "_rule_to_dict",
-          "line": 70,
+          "line": 72,
           "kind": "function",
           "exported": false
         },
         {
           "name": "list_rules",
-          "line": 88,
+          "line": 90,
           "kind": "function",
           "exported": true,
           "doc": "Return all alert rules ordered by creation date (newest first)."
         },
         {
           "name": "create_rule",
-          "line": 95,
+          "line": 97,
           "kind": "function",
           "exported": true,
           "doc": "Create a new alert rule."
         },
         {
           "name": "update_rule",
-          "line": 118,
+          "line": 120,
           "kind": "function",
           "exported": true,
           "doc": "Update an alert rule (full or partial). Used for toggles too."
@@ -37049,49 +37191,49 @@
         },
         {
           "name": "test_rule",
-          "line": 164,
+          "line": 162,
           "kind": "function",
           "exported": true,
           "doc": "Send a test notification through all channels configured on this rule."
         },
         {
           "name": "list_delivery_logs",
-          "line": 239,
+          "line": 235,
           "kind": "function",
           "exported": true,
           "doc": "Return the most recent alert delivery log entries."
         },
         {
           "name": "get_vapid_public_key",
-          "line": 272,
+          "line": 268,
           "kind": "function",
           "exported": true,
           "doc": "Return the VAPID public key so the frontend can subscribe."
         },
         {
           "name": "generate_vapid_keys",
-          "line": 285,
+          "line": 281,
           "kind": "function",
           "exported": true,
           "doc": "One-time key generation helper. Run once, copy output to .env."
         },
         {
           "name": "subscribe_push",
-          "line": 328,
+          "line": 324,
           "kind": "function",
           "exported": true,
           "doc": "Save a browser PushSubscription."
         },
         {
           "name": "unsubscribe_push",
-          "line": 370,
+          "line": 366,
           "kind": "function",
           "exported": true,
           "doc": "Remove a push subscription by endpoint URL."
         },
         {
           "name": "receive_infrastructure_alert",
-          "line": 389,
+          "line": 385,
           "kind": "function",
           "exported": true,
           "doc": "Receive Grafana alerting webhook payloads and log them."
@@ -37164,96 +37306,96 @@
         },
         {
           "name": "list_strategies",
-          "line": 73,
+          "line": 74,
           "kind": "function",
           "exported": true,
           "doc": "Return all trading strategies ordered by creation date."
         },
         {
           "name": "create_strategy",
-          "line": 86,
+          "line": 87,
           "kind": "function",
           "exported": true,
           "doc": "Create a new trading strategy. Defaults to paper_mode=True for safety."
         },
         {
           "name": "get_strategy",
-          "line": 117,
+          "line": 118,
           "kind": "function",
           "exported": true
         },
         {
           "name": "update_strategy",
-          "line": 128,
+          "line": 127,
           "kind": "function",
           "exported": true,
           "doc": "Partial update of a trading strategy."
         },
         {
           "name": "delete_strategy",
-          "line": 149,
+          "line": 146,
           "kind": "function",
           "exported": true,
           "doc": "Soft-delete a strategy by setting is_active=False."
         },
         {
           "name": "list_orders",
-          "line": 189,
+          "line": 184,
           "kind": "function",
           "exported": true,
           "doc": "List AutoTradeOrders with optional filters."
         },
         {
           "name": "get_order",
-          "line": 219,
+          "line": 214,
           "kind": "function",
           "exported": true
         },
         {
           "name": "approve_order_endpoint",
-          "line": 231,
+          "line": 224,
           "kind": "function",
           "exported": true,
           "doc": "Approve a pending_approval order."
         },
         {
           "name": "reject_order",
-          "line": 260,
+          "line": 245,
           "kind": "function",
           "exported": true,
           "doc": "Reject a pending_approval order without submitting it."
         },
         {
           "name": "cancel_order_endpoint",
-          "line": 287,
+          "line": 270,
           "kind": "function",
           "exported": true,
           "doc": "Cancel an active order."
         },
         {
           "name": "get_account_endpoint",
-          "line": 315,
+          "line": 296,
           "kind": "function",
           "exported": true,
           "doc": "Fetch live account summary from IBKR."
         },
         {
           "name": "get_stats_endpoint",
-          "line": 324,
+          "line": 305,
           "kind": "function",
           "exported": true,
           "doc": "Return auto-trading statistics for the last N days."
         },
         {
           "name": "get_trading_config",
-          "line": 336,
+          "line": 317,
           "kind": "function",
           "exported": true,
           "doc": "Return current auto-trading system config values."
         },
         {
           "name": "update_trading_config",
-          "line": 356,
+          "line": 337,
           "kind": "function",
           "exported": true,
           "doc": "Update auto-trading system config (AUTO_TRADING_ENABLED, PAPER_ACCOUNT_SIZE)."
@@ -37417,142 +37559,142 @@
         },
         {
           "name": "get_scorecard",
-          "line": 40,
+          "line": 41,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_scorecard_by_type",
-          "line": 53,
+          "line": 54,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_intervals",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_distribution",
-          "line": 73,
+          "line": 74,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_edge_decay",
-          "line": 82,
+          "line": 83,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_signals",
-          "line": 93,
+          "line": 94,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_event_outcome",
-          "line": 118,
+          "line": 119,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_readiness",
-          "line": 142,
+          "line": 141,
           "kind": "function",
           "exported": true
         },
         {
           "name": "backfill_outcomes",
-          "line": 173,
+          "line": 172,
           "kind": "function",
           "exported": true
         },
         {
           "name": "trigger_signal_analysis",
-          "line": 227,
+          "line": 226,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_correlations",
-          "line": 239,
+          "line": 238,
           "kind": "function",
           "exported": true
         },
         {
           "name": "get_latest_analysis",
-          "line": 268,
+          "line": 267,
           "kind": "function",
           "exported": true
         },
         {
           "name": "_last_completed_weekday",
-          "line": 55,
+          "line": 56,
           "kind": "function",
           "exported": false,
           "doc": "Default scan date when none supplied \u2014 most recent completed weekday."
         },
         {
           "name": "list_scanner_types",
-          "line": 67,
+          "line": 68,
           "kind": "function",
           "exported": true,
           "doc": "Return all registered scanner types for frontend scanner pickers."
         },
         {
           "name": "run_scanner",
-          "line": 84,
+          "line": 85,
           "kind": "function",
           "exported": true,
           "doc": "Enqueue a scan and return immediately."
         },
         {
           "name": "get_scan_status",
-          "line": 177,
+          "line": 178,
           "kind": "function",
           "exported": true,
           "doc": "Snapshot of an in-flight or finished scan."
         },
         {
           "name": "cancel_scan",
-          "line": 223,
+          "line": 224,
           "kind": "function",
           "exported": true,
           "doc": "Request cancellation of an in-flight scan."
         },
         {
           "name": "scan_run_websocket",
-          "line": 251,
+          "line": 252,
           "kind": "function",
           "exported": true,
           "doc": "Stream progress messages for one running scan."
         },
         {
           "name": "get_scanner_history",
-          "line": 336,
+          "line": 337,
           "kind": "function",
           "exported": true,
           "doc": "Get recent scanner runs."
         },
         {
           "name": "get_scanner_results",
-          "line": 362,
+          "line": 363,
           "kind": "function",
           "exported": true,
           "doc": "Get scanner results with filtering."
         },
         {
           "name": "get_signal_quality_distribution",
-          "line": 428,
+          "line": 429,
           "kind": "function",
           "exported": true,
           "doc": "Returns avg eod_pct_change and follow_through rate per score decile for EdgeExpl"
         },
         {
           "name": "get_scanner_stats",
-          "line": 441,
+          "line": 442,
           "kind": "function",
           "exported": true,
           "doc": "Get scanner statistics for the dashboard."
@@ -37629,28 +37771,28 @@
         },
         {
           "name": "get_historical_data",
-          "line": 23,
+          "line": 24,
           "kind": "function",
           "exported": true,
           "doc": "Get historical stock data from DB."
         },
         {
           "name": "refresh_stock_data",
-          "line": 105,
+          "line": 106,
           "kind": "function",
           "exported": true,
           "doc": "Trigger a refresh of stock data from Polygon to DB."
         },
         {
           "name": "get_stock_detail_consolidated",
-          "line": 133,
+          "line": 134,
           "kind": "function",
           "exported": true,
           "doc": "Get consolidated stock detail for the frontend detail page."
         },
         {
           "name": "sync_missing_stock_aggregates",
-          "line": 236,
+          "line": 237,
           "kind": "function",
           "exported": true,
           "doc": "For a specific ticker, identify all (timespan, multiplier) combos already"
@@ -37720,158 +37862,158 @@
         },
         {
           "name": "ExportAggregatesRequest",
-          "line": 32,
+          "line": 33,
           "kind": "class",
           "exported": true
         },
         {
           "name": "DeleteAggregatesRequest",
-          "line": 41,
+          "line": 42,
           "kind": "class",
           "exported": true
         },
         {
           "name": "NormalizeRequest",
-          "line": 48,
+          "line": 49,
           "kind": "class",
           "exported": true
         },
         {
           "name": "create_stock_universe",
-          "line": 53,
+          "line": 54,
           "kind": "function",
           "exported": true,
           "doc": "Create a new stock universe."
         },
         {
           "name": "get_universes_for_ticker",
-          "line": 67,
+          "line": 68,
           "kind": "function",
           "exported": true,
           "doc": "Return all active universes that contain the given ticker."
         },
         {
           "name": "update_stock_universe",
-          "line": 87,
+          "line": 88,
           "kind": "function",
           "exported": true,
           "doc": "Update a stock universe."
         },
         {
           "name": "delete_stock_universe",
-          "line": 110,
+          "line": 107,
           "kind": "function",
           "exported": true,
           "doc": "Delete (soft delete) a stock universe."
         },
         {
           "name": "list_stock_universes",
-          "line": 126,
+          "line": 121,
           "kind": "function",
           "exported": true,
           "doc": "List all active stock universes. include_stats=false skips aggregate stats (for "
         },
         {
           "name": "refresh_universe_stats",
-          "line": 163,
+          "line": 161,
           "kind": "function",
           "exported": true,
           "doc": "Recompute and persist aggregate stats. Call after sync or refresh to update the "
         },
         {
           "name": "sync_fundamental_data",
-          "line": 196,
+          "line": 192,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background sync of fundamental data from Polygon."
         },
         {
           "name": "sync_ticker_details",
-          "line": 213,
+          "line": 209,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background sync of ticker details. delay: 15.0=Free, 0.2=Paid. resync: f"
         },
         {
           "name": "stop_sync",
-          "line": 230,
+          "line": 226,
           "kind": "function",
           "exported": true,
           "doc": "Stops any running sync process by setting a Stop Flag in Redis and purging the q"
         },
         {
           "name": "sync_daily_metrics",
-          "line": 254,
+          "line": 250,
           "kind": "function",
           "exported": true,
           "doc": "Trigger background update of daily technical metrics."
         },
         {
           "name": "refresh_universe",
-          "line": 269,
+          "line": 265,
           "kind": "function",
           "exported": true,
           "doc": "Refresh stocks in a universe using the Universe Discovery Engine."
         },
         {
           "name": "sync_missing_aggregates",
-          "line": 281,
+          "line": 277,
           "kind": "function",
           "exported": true,
           "doc": "For every recorded (timespan, multiplier), queue a sync from last bar to today."
         },
         {
           "name": "get_universe_sync_status",
-          "line": 290,
+          "line": 286,
           "kind": "function",
           "exported": true,
           "doc": "Return the current sync progress for a universe."
         },
         {
           "name": "export_universe_aggregates",
-          "line": 296,
+          "line": 292,
           "kind": "function",
           "exported": true,
           "doc": "Stream a ZIP file containing aggregate (OHLCV) data for the requested tickers."
         },
         {
           "name": "get_universe_stocks",
-          "line": 309,
+          "line": 305,
           "kind": "function",
           "exported": true,
           "doc": "List all stocks in a universe."
         },
         {
           "name": "sync_universe_aggregates",
-          "line": 327,
+          "line": 323,
           "kind": "function",
           "exported": true,
           "doc": "Trigger backfill of aggregates for all stocks in the universe."
         },
         {
           "name": "trigger_quality_analysis",
-          "line": 347,
+          "line": 343,
           "kind": "function",
           "exported": true,
           "doc": "Queue a background data-quality analysis. Poll GET .../quality-report for result"
         },
         {
           "name": "delete_ticker_aggregates",
-          "line": 360,
+          "line": 356,
           "kind": "function",
           "exported": true,
           "doc": "Delete aggregate bars for a ticker (optionally scoped to timespan/multiplier) an"
         },
         {
           "name": "get_quality_report",
-          "line": 399,
+          "line": 395,
           "kind": "function",
           "exported": true,
           "doc": "Return the latest quality report for a universe (or null if none exists)."
         },
         {
           "name": "trigger_normalization",
-          "line": 434,
+          "line": 430,
           "kind": "function",
           "exported": true,
           "doc": "Start (or resume) a normalization run. Poll GET .../quality-report for status."
@@ -38352,7 +38494,7 @@
         },
         {
           "name": "AlertRuleService",
-          "line": 37,
+          "line": 38,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -38363,7 +38505,7 @@
         },
         {
           "name": "NotificationDispatcher",
-          "line": 95,
+          "line": 94,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -38381,27 +38523,27 @@
         },
         {
           "name": "trigger_scanner_alert",
-          "line": 341,
+          "line": 340,
           "kind": "function",
           "exported": true,
           "doc": "Enqueue alert evaluation for a newly persisted ScannerEvent."
         },
         {
           "name": "save_event",
-          "line": 348,
+          "line": 347,
           "kind": "function",
           "exported": true,
           "doc": "Persist a ScannerEvent and enqueue alert evaluation for new events."
         },
         {
           "name": "PositionCalc",
-          "line": 60,
+          "line": 61,
           "kind": "class",
           "exported": true
         },
         {
           "name": "AutoTradeExecutor",
-          "line": 74,
+          "line": 75,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -38417,28 +38559,28 @@
         },
         {
           "name": "approve_order",
-          "line": 555,
+          "line": 556,
           "kind": "function",
           "exported": true,
           "doc": "Approve a pending_approval order."
         },
         {
           "name": "cancel_order",
-          "line": 592,
+          "line": 593,
           "kind": "function",
           "exported": true,
           "doc": "Cancel an active order."
         },
         {
           "name": "get_account",
-          "line": 641,
+          "line": 640,
           "kind": "function",
           "exported": true,
           "doc": "Fetch live account summary from IBKR."
         },
         {
           "name": "get_stats",
-          "line": 698,
+          "line": 697,
           "kind": "function",
           "exported": true,
           "doc": "Return auto-trading statistics for the last N days."
@@ -38716,70 +38858,70 @@
         },
         {
           "name": "_evaluate_criteria",
-          "line": 52,
+          "line": 53,
           "kind": "function",
           "exported": false,
           "doc": "Evaluate all six liquidity-hunt criteria against session metrics."
         },
         {
           "name": "_get_session_metrics",
-          "line": 159,
+          "line": 160,
           "kind": "function",
           "exported": false,
           "doc": "Query all minute bars for event_date. Return per-session aggregates."
         },
         {
           "name": "_get_prior_day_close",
-          "line": 209,
+          "line": 204,
           "kind": "function",
           "exported": false,
           "doc": "Return the regular close of the most recent trading day before event_date."
         },
         {
           "name": "_get_event_date_regular_close",
-          "line": 250,
+          "line": 241,
           "kind": "function",
           "exported": false,
           "doc": "Return the last regular-session minute close on event_date itself."
         },
         {
           "name": "_get_rolling_baselines",
-          "line": 287,
+          "line": 272,
           "kind": "function",
           "exported": false,
           "doc": "Compute 20-day rolling session averages from minute bars prior to event_date."
         },
         {
           "name": "_get_enrichment",
-          "line": 373,
+          "line": 352,
           "kind": "function",
           "exported": false,
           "doc": "Fetch catalyst, split, market-cap, and float enrichment for one ticker."
         },
         {
           "name": "_build_indicators",
-          "line": 407,
+          "line": 386,
           "kind": "function",
           "exported": false,
           "doc": "Merge base indicators with opening/closing prices, float rotation, and split fla"
         },
         {
           "name": "run_liquidity_hunt_scan",
-          "line": 438,
+          "line": 417,
           "kind": "function",
           "exported": true,
           "doc": "Run liquidity_hunt_pre and liquidity_hunt_post scans over a date range."
         },
         {
           "name": "run_liquidity_hunt_scan_for_date",
-          "line": 660,
+          "line": 639,
           "kind": "function",
           "exported": true,
           "doc": "Single-ticker single-date wrapper (used by tasks scanner_map)."
         },
         {
           "name": "_orchestrator_run",
-          "line": 676,
+          "line": 655,
           "kind": "function",
           "exported": false,
           "doc": "Adapter: maps the standard ScannerFn signature to run_liquidity_hunt_scan."
@@ -38858,7 +39000,7 @@
         },
         {
           "name": "OutcomeService",
-          "line": 20,
+          "line": 21,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -38870,96 +39012,96 @@
         },
         {
           "name": "run_oversold_bounce_scan",
-          "line": 21,
+          "line": 22,
           "kind": "function",
           "exported": true,
           "doc": "Run the Oversold Bounce (Dual RSI) scan using DB daily aggregates."
         },
         {
           "name": "_run",
-          "line": 221,
+          "line": 216,
           "kind": "function",
           "exported": false
         },
         {
           "name": "_get_today_bar",
-          "line": 42,
+          "line": 43,
           "kind": "function",
           "exported": false,
           "doc": "Fetch the daily bar for ticker on event_date. Returns None if not found."
         },
         {
           "name": "_get_prior_close",
-          "line": 69,
+          "line": 64,
           "kind": "function",
           "exported": false,
           "doc": "Fetch the most recent daily-bar close strictly before event_date."
         },
         {
           "name": "_get_lookback_bars",
-          "line": 90,
+          "line": 81,
           "kind": "function",
           "exported": false,
           "doc": "Fetch up to lookback_days+1 daily bars before event_date (ascending)."
         },
         {
           "name": "_classify_down_days",
-          "line": 117,
+          "line": 104,
           "kind": "function",
           "exported": false,
           "doc": "Return volumes of down days within the lookback window."
         },
         {
           "name": "_get_enrichment",
-          "line": 139,
+          "line": 126,
           "kind": "function",
           "exported": false,
           "doc": "Fetch split, market-cap, float, and catalyst enrichment. Mirrors liquidity_hunt."
         },
         {
           "name": "run_pocket_pivot_scan",
-          "line": 173,
+          "line": 160,
           "kind": "function",
           "exported": true,
           "doc": "Run the pocket pivot scanner over a date range."
         },
         {
           "name": "run_pocket_pivot_scan_for_date",
-          "line": 377,
+          "line": 368,
           "kind": "function",
           "exported": true,
           "doc": "Single-ticker single-date wrapper used by run_range_scan's scanner_map."
         },
         {
           "name": "_orchestrator_run",
-          "line": 393,
+          "line": 384,
           "kind": "function",
           "exported": false,
           "doc": "Adapter: maps the standard ScannerFn signature to run_pocket_pivot_scan."
         },
         {
           "name": "run_pre_market_scan",
-          "line": 25,
+          "line": 26,
           "kind": "function",
           "exported": true,
           "doc": "Run extended hours volume spike scanner using DB aggregates."
         },
         {
           "name": "_run",
-          "line": 371,
+          "line": 366,
           "kind": "function",
           "exported": false
         },
         {
           "name": "_get_batch_enrichment_data",
-          "line": 37,
+          "line": 38,
           "kind": "function",
           "exported": false,
           "doc": "Fetch common enrichment data for a batch of tickers."
         },
         {
           "name": "_get_batch_enrichment_data_impl",
-          "line": 51,
+          "line": 52,
           "kind": "function",
           "exported": false
         },
@@ -39050,14 +39192,14 @@
         },
         {
           "name": "calculate_day_metrics_from_aggs",
-          "line": 14,
+          "line": 15,
           "kind": "function",
           "exported": true,
           "doc": "Calculate detailed price metrics from a list of minute aggregates."
         },
         {
           "name": "calculate_day_metrics",
-          "line": 70,
+          "line": 71,
           "kind": "function",
           "exported": true,
           "doc": "Calculate detailed price metrics for different sessions of a given day."
@@ -39085,7 +39227,7 @@
         },
         {
           "name": "SplitAdjustmentService",
-          "line": 24,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -39137,7 +39279,7 @@
         },
         {
           "name": "StockDataService",
-          "line": 25,
+          "line": 26,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -39165,14 +39307,14 @@
         },
         {
           "name": "_now_et",
-          "line": 18,
+          "line": 20,
           "kind": "function",
           "exported": false,
           "doc": "Return current datetime in ET. Module-level so tests can monkeypatch it."
         },
         {
           "name": "SystemService",
-          "line": 23,
+          "line": 25,
           "kind": "class",
           "exported": true,
           "methods": [
@@ -39213,42 +39355,42 @@
         },
         {
           "name": "discover_and_refresh",
-          "line": 33,
+          "line": 34,
           "kind": "function",
           "exported": true,
           "doc": "Refresh stocks in a universe using the Universe Discovery Engine."
         },
         {
           "name": "sync_missing_aggregates",
-          "line": 110,
+          "line": 111,
           "kind": "function",
           "exported": true,
           "doc": "For every (timespan, multiplier) already recorded in this universe,"
         },
         {
           "name": "get_sync_status",
-          "line": 245,
+          "line": 246,
           "kind": "function",
           "exported": true,
           "doc": "Return the current sync progress for a universe."
         },
         {
           "name": "sync_aggregates",
-          "line": 306,
+          "line": 307,
           "kind": "function",
           "exported": true,
           "doc": "Trigger backfill of aggregates for all stocks in the universe."
         },
         {
           "name": "queue_quality_analysis",
-          "line": 439,
+          "line": 440,
           "kind": "function",
           "exported": true,
           "doc": "Upsert a pending UniverseQualityReport row (clearing stale snapshot fields)"
         },
         {
           "name": "queue_normalization",
-          "line": 474,
+          "line": 475,
           "kind": "function",
           "exported": true,
           "doc": "Start (or resume) a normalization run for the universe."
@@ -39299,177 +39441,183 @@
         },
         {
           "name": "_evaluate_scanner_alerts_logic",
-          "line": 24,
+          "line": 25,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of evaluate_scanner_alerts. No OTel/Celery context needed."
         },
         {
           "name": "_run_range_scan_logic",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_range_scan. Returns events_detected count."
         },
         {
           "name": "_run_universe_scan_logic",
-          "line": 141,
+          "line": 142,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
         },
         {
           "name": "evaluate_scanner_alerts",
-          "line": 328,
+          "line": 321,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 361,
+          "line": 354,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 415,
+          "line": 408,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 504,
+          "line": 497,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 608,
+          "line": 601,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
           "name": "validate_scheduled_scanner_configs",
-          "line": 697,
+          "line": 690,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
         },
         {
           "name": "sync_tickers_batch",
-          "line": 28,
+          "line": 29,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to sync tickers in batches using strict rate limiting (recursive cha"
         },
         {
           "name": "sync_ticker_details",
-          "line": 135,
+          "line": 136,
           "kind": "function",
           "exported": true,
           "doc": "Slow crawler task to fetch details for ONE ticker."
         },
         {
           "name": "start_details_crawl",
-          "line": 246,
+          "line": 247,
           "kind": "function",
           "exported": true,
           "doc": "Kicks off the details crawler if it's not running."
         },
         {
           "name": "sync_stock_aggregates",
-          "line": 297,
+          "line": 298,
           "kind": "function",
           "exported": true,
           "doc": "Fetch and store aggregates for a specific ticker and date range."
         },
         {
           "name": "poll_massive_news",
-          "line": 391,
+          "line": 392,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to poll Polygon.io News API based on NewsPreference settings."
         },
         {
           "name": "sync_futures_aggregates",
-          "line": 539,
+          "line": 540,
           "kind": "function",
           "exported": true,
           "doc": "Download historical futures data from IBKR for one root symbol."
         },
         {
           "name": "sync_stock_splits",
-          "line": 599,
+          "line": 600,
           "kind": "function",
           "exported": true,
           "doc": "Celery task to fetch recent stock splits from Polygon.io."
         },
         {
           "name": "trigger_tweet_monitor",
-          "line": 681,
+          "line": 682,
           "kind": "function",
           "exported": true,
           "doc": "HTTP trigger for the tweet-monitor microservice (POST /poll)."
         },
         {
           "name": "execute_auto_trade",
-          "line": 16,
+          "line": 17,
           "kind": "function",
           "exported": true,
           "doc": "Execute an automated trade for a matched alert rule."
         },
         {
           "name": "submit_approved_order",
-          "line": 77,
+          "line": 78,
           "kind": "function",
           "exported": true,
           "doc": "Submit a manually-approved AutoTradeOrder to IBKR."
         },
         {
           "name": "poll_auto_trade_fills",
-          "line": 122,
+          "line": 123,
           "kind": "function",
           "exported": true,
           "doc": "Poll IBKR for fill updates on submitted/open AutoTradeOrders."
         },
         {
           "name": "_check_entry_slippage",
-          "line": 188,
+          "line": 189,
           "kind": "function",
           "exported": false,
           "doc": "Enforce max_slippage_pct: reject the order if fill deviated too far from"
         },
         {
           "name": "_record_entry_fill",
-          "line": 224,
+          "line": 225,
           "kind": "function",
           "exported": false,
           "doc": "Mark an order as open (entry filled) and create the journal Trade record."
         },
         {
           "name": "_record_exit_fill",
-          "line": 268,
+          "line": 269,
           "kind": "function",
           "exported": false,
           "doc": "Mark an order closed and update the journal Trade."
         },
         {
           "name": "_poll_live_orders",
-          "line": 327,
+          "line": 328,
           "kind": "function",
           "exported": false,
           "doc": "Query IBKR for status of live AutoTradeOrders and process any fills."
         },
         {
           "name": "_simulate_paper_exit",
-          "line": 399,
+          "line": 400,
           "kind": "function",
           "exported": false
+        },
+        {
+          "name": "get_or_404",
+          "line": 7,
+          "kind": "function",
+          "exported": true
         },
         {
           "name": "session_for_ts",
@@ -39505,6 +39653,18 @@
           "kind": "function",
           "exported": true,
           "doc": "Return the current date in America/New_York."
+        },
+        {
+          "name": "utc_now",
+          "line": 4,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "to_utc_naive",
+          "line": 8,
+          "kind": "function",
+          "exported": true
         },
         {
           "name": "MinuteBar",
@@ -44743,6 +44903,23 @@
           "exported": true
         },
         {
+          "name": "_FakeModel",
+          "line": 12,
+          "kind": "class",
+          "exported": false
+        },
+        {
+          "name": "TestGetOr404",
+          "line": 16,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_returns_object_when_found",
+            "test_raises_404_when_not_found",
+            "test_detail_uses_name_argument"
+          ]
+        },
+        {
           "name": "test_markethawk_error_is_base",
           "line": 6,
           "kind": "function",
@@ -44832,6 +45009,28 @@
             "test_default_cors_origins",
             "test_cors_origins_from_env",
             "test_no_load_dotenv_call"
+          ]
+        },
+        {
+          "name": "TestUtcNow",
+          "line": 9,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_returns_naive_datetime",
+            "test_is_close_to_now"
+          ]
+        },
+        {
+          "name": "TestToUtcNaive",
+          "line": 21,
+          "kind": "class",
+          "exported": true,
+          "methods": [
+            "test_aware_utc_returns_naive",
+            "test_aware_non_utc_converts_correctly",
+            "test_naive_passthrough_unchanged",
+            "test_idempotent_on_already_naive"
           ]
         },
         {
@@ -48949,12 +49148,6 @@
     },
     {
       "source": "backend/app/models/active_watchlist.py",
-      "target": "datetime",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/active_watchlist.py",
       "target": "sqlalchemy",
       "weight": 1,
       "kind": "imports"
@@ -48962,13 +49155,7 @@
     {
       "source": "backend/app/models/active_watchlist.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/alert_delivery_log.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -48980,13 +49167,7 @@
     {
       "source": "backend/app/models/alert_delivery_log.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/alert_rule.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -48998,13 +49179,7 @@
     {
       "source": "backend/app/models/alert_rule.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/auto_trade_order.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49016,13 +49191,7 @@
     {
       "source": "backend/app/models/auto_trade_order.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/futures_aggregate.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49034,13 +49203,7 @@
     {
       "source": "backend/app/models/futures_aggregate.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/futures_contract.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49052,13 +49215,7 @@
     {
       "source": "backend/app/models/futures_contract.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/futures_rollover.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49070,7 +49227,7 @@
     {
       "source": "backend/app/models/futures_rollover.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49087,12 +49244,6 @@
     },
     {
       "source": "backend/app/models/monitored_account.py",
-      "target": "datetime",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/monitored_account.py",
       "target": "sqlalchemy",
       "weight": 3,
       "kind": "imports"
@@ -49100,13 +49251,7 @@
     {
       "source": "backend/app/models/monitored_account.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/monitored_stock.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49118,18 +49263,12 @@
     {
       "source": "backend/app/models/monitored_stock.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
       "source": "backend/app/models/news_article.py",
       "target": "uuid",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/news_article.py",
-      "target": "datetime",
       "weight": 1,
       "kind": "imports"
     },
@@ -49142,18 +49281,12 @@
     {
       "source": "backend/app/models/news_article.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
       "source": "backend/app/models/news_preference.py",
       "target": "uuid",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/news_preference.py",
-      "target": "datetime",
       "weight": 1,
       "kind": "imports"
     },
@@ -49166,13 +49299,7 @@
     {
       "source": "backend/app/models/news_preference.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/push_subscription.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49184,18 +49311,12 @@
     {
       "source": "backend/app/models/push_subscription.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
       "source": "backend/app/models/scanner_config.py",
       "target": "uuid",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/scanner_config.py",
-      "target": "datetime",
       "weight": 1,
       "kind": "imports"
     },
@@ -49208,18 +49329,12 @@
     {
       "source": "backend/app/models/scanner_config.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
       "source": "backend/app/models/scanner_event.py",
       "target": "uuid",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/scanner_event.py",
-      "target": "datetime",
       "weight": 1,
       "kind": "imports"
     },
@@ -49232,13 +49347,7 @@
     {
       "source": "backend/app/models/scanner_event.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/scanner_outcome_snapshot.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49250,13 +49359,7 @@
     {
       "source": "backend/app/models/scanner_outcome_snapshot.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/scanner_outcome_summary.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49268,7 +49371,7 @@
     {
       "source": "backend/app/models/scanner_outcome_summary.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49279,12 +49382,6 @@
     },
     {
       "source": "backend/app/models/scanner_run.py",
-      "target": "datetime",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/scanner_run.py",
       "target": "sqlalchemy",
       "weight": 3,
       "kind": "imports"
@@ -49292,13 +49389,7 @@
     {
       "source": "backend/app/models/scanner_run.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/signal_analysis_run.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49310,13 +49401,7 @@
     {
       "source": "backend/app/models/signal_analysis_run.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/signal_cluster.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49328,13 +49413,7 @@
     {
       "source": "backend/app/models/signal_cluster.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/signal_review.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49346,13 +49425,7 @@
     {
       "source": "backend/app/models/signal_review.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/stock_aggregate.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49364,7 +49437,7 @@
     {
       "source": "backend/app/models/stock_aggregate.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49381,12 +49454,6 @@
     },
     {
       "source": "backend/app/models/stock_split.py",
-      "target": "datetime",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/stock_split.py",
       "target": "sqlalchemy",
       "weight": 1,
       "kind": "imports"
@@ -49394,7 +49461,7 @@
     {
       "source": "backend/app/models/stock_split.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49405,12 +49472,6 @@
     },
     {
       "source": "backend/app/models/stock_universe.py",
-      "target": "datetime",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/stock_universe.py",
       "target": "sqlalchemy",
       "weight": 2,
       "kind": "imports"
@@ -49418,13 +49479,7 @@
     {
       "source": "backend/app/models/stock_universe.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/stock_universe_ticker.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49436,13 +49491,7 @@
     {
       "source": "backend/app/models/stock_universe_ticker.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/system_config.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49454,13 +49503,7 @@
     {
       "source": "backend/app/models/system_config.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/ticker_reference.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49472,13 +49515,7 @@
     {
       "source": "backend/app/models/ticker_reference.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/trade.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49490,13 +49527,7 @@
     {
       "source": "backend/app/models/trade.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/trading_strategy.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49508,13 +49539,7 @@
     {
       "source": "backend/app/models/trading_strategy.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/tweet_signal.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49526,13 +49551,7 @@
     {
       "source": "backend/app/models/tweet_signal.py",
       "target": "app",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/models/universe_quality_report.py",
-      "target": "datetime",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49544,7 +49563,7 @@
     {
       "source": "backend/app/models/universe_quality_report.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -49784,7 +49803,7 @@
     {
       "source": "backend/app/routers/alerts.py",
       "target": "app",
-      "weight": 7,
+      "weight": 9,
       "kind": "imports"
     },
     {
@@ -49850,7 +49869,7 @@
     {
       "source": "backend/app/routers/auto_trading.py",
       "target": "datetime",
-      "weight": 2,
+      "weight": 1,
       "kind": "imports"
     },
     {
@@ -49874,7 +49893,7 @@
     {
       "source": "backend/app/routers/auto_trading.py",
       "target": "app",
-      "weight": 7,
+      "weight": 9,
       "kind": "imports"
     },
     {
@@ -50054,7 +50073,7 @@
     {
       "source": "backend/app/routers/outcomes.py",
       "target": "app",
-      "weight": 12,
+      "weight": 13,
       "kind": "imports"
     },
     {
@@ -50066,7 +50085,7 @@
     {
       "source": "backend/app/routers/scanner.py",
       "target": "datetime",
-      "weight": 3,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -50090,7 +50109,7 @@
     {
       "source": "backend/app/routers/scanner.py",
       "target": "app",
-      "weight": 23,
+      "weight": 24,
       "kind": "imports"
     },
     {
@@ -50138,7 +50157,7 @@
     {
       "source": "backend/app/routers/stocks.py",
       "target": "app",
-      "weight": 14,
+      "weight": 15,
       "kind": "imports"
     },
     {
@@ -50257,12 +50276,6 @@
     },
     {
       "source": "backend/app/routers/universe.py",
-      "target": "datetime",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/routers/universe.py",
       "target": "typing",
       "weight": 1,
       "kind": "imports"
@@ -50288,7 +50301,7 @@
     {
       "source": "backend/app/routers/universe.py",
       "target": "app",
-      "weight": 14,
+      "weight": 16,
       "kind": "imports"
     },
     {
@@ -50624,7 +50637,7 @@
     {
       "source": "backend/app/services/alert_service.py",
       "target": "app",
-      "weight": 8,
+      "weight": 9,
       "kind": "imports"
     },
     {
@@ -50660,7 +50673,7 @@
     {
       "source": "backend/app/services/auto_trade_service.py",
       "target": "datetime",
-      "weight": 4,
+      "weight": 3,
       "kind": "imports"
     },
     {
@@ -50690,7 +50703,7 @@
     {
       "source": "backend/app/services/auto_trade_service.py",
       "target": "app",
-      "weight": 12,
+      "weight": 13,
       "kind": "imports"
     },
     {
@@ -51116,7 +51129,7 @@
     {
       "source": "backend/app/services/liquidity_hunt.py",
       "target": "app",
-      "weight": 9,
+      "weight": 10,
       "kind": "imports"
     },
     {
@@ -51188,7 +51201,7 @@
     {
       "source": "backend/app/services/outcome_service.py",
       "target": "app",
-      "weight": 5,
+      "weight": 6,
       "kind": "imports"
     },
     {
@@ -51248,7 +51261,7 @@
     {
       "source": "backend/app/services/oversold_bounce_scan.py",
       "target": "app",
-      "weight": 8,
+      "weight": 9,
       "kind": "imports"
     },
     {
@@ -51296,7 +51309,7 @@
     {
       "source": "backend/app/services/pocket_pivot.py",
       "target": "app",
-      "weight": 9,
+      "weight": 10,
       "kind": "imports"
     },
     {
@@ -51350,7 +51363,7 @@
     {
       "source": "backend/app/services/pre_market_scan.py",
       "target": "app",
-      "weight": 11,
+      "weight": 12,
       "kind": "imports"
     },
     {
@@ -51392,7 +51405,7 @@
     {
       "source": "backend/app/services/scan_enrichment.py",
       "target": "app",
-      "weight": 7,
+      "weight": 8,
       "kind": "imports"
     },
     {
@@ -51530,7 +51543,7 @@
     {
       "source": "backend/app/services/session_metrics.py",
       "target": "app",
-      "weight": 1,
+      "weight": 2,
       "kind": "imports"
     },
     {
@@ -51596,7 +51609,7 @@
     {
       "source": "backend/app/services/split_adjustment.py",
       "target": "app",
-      "weight": 5,
+      "weight": 6,
       "kind": "imports"
     },
     {
@@ -51710,7 +51723,7 @@
     {
       "source": "backend/app/services/stock_data.py",
       "target": "app",
-      "weight": 9,
+      "weight": 10,
       "kind": "imports"
     },
     {
@@ -51781,14 +51794,14 @@
     },
     {
       "source": "backend/app/services/system_service.py",
-      "target": "celery",
-      "weight": 1,
+      "target": "app",
+      "weight": 4,
       "kind": "imports"
     },
     {
       "source": "backend/app/services/system_service.py",
-      "target": "app",
-      "weight": 3,
+      "target": "celery",
+      "weight": 1,
       "kind": "imports"
     },
     {
@@ -51914,7 +51927,7 @@
     {
       "source": "backend/app/services/universe_orchestrator.py",
       "target": "app",
-      "weight": 16,
+      "weight": 17,
       "kind": "imports"
     },
     {
@@ -51997,12 +52010,6 @@
     },
     {
       "source": "backend/app/tasks/quality.py",
-      "target": "datetime",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "backend/app/tasks/quality.py",
       "target": "sqlalchemy",
       "weight": 1,
       "kind": "imports"
@@ -52010,7 +52017,7 @@
     {
       "source": "backend/app/tasks/quality.py",
       "target": "app",
-      "weight": 13,
+      "weight": 14,
       "kind": "imports"
     },
     {
@@ -52064,7 +52071,7 @@
     {
       "source": "backend/app/tasks/scanning.py",
       "target": "app",
-      "weight": 27,
+      "weight": 28,
       "kind": "imports"
     },
     {
@@ -52130,7 +52137,7 @@
     {
       "source": "backend/app/tasks/sync.py",
       "target": "app",
-      "weight": 15,
+      "weight": 16,
       "kind": "imports"
     },
     {
@@ -52166,7 +52173,25 @@
     {
       "source": "backend/app/tasks/trading.py",
       "target": "app",
-      "weight": 13,
+      "weight": 14,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/utils/db.py",
+      "target": "typing",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/utils/db.py",
+      "target": "fastapi",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/utils/db.py",
+      "target": "sqlalchemy",
+      "weight": 1,
       "kind": "imports"
     },
     {
@@ -52178,6 +52203,12 @@
     {
       "source": "backend/app/utils/session.py",
       "target": "zoneinfo",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/utils/time.py",
+      "target": "datetime",
       "weight": 1,
       "kind": "imports"
     },
@@ -54546,6 +54577,36 @@
       "kind": "imports"
     },
     {
+      "source": "backend/tests/test_db_utils.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_db_utils.py",
+      "target": "pytest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_db_utils.py",
+      "target": "fastapi",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_db_utils.py",
+      "target": "sqlalchemy",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_db_utils.py",
+      "target": "app",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "backend/tests/test_exceptions.py",
       "target": "app",
       "weight": 1,
@@ -54573,6 +54634,24 @@
       "source": "backend/tests/test_settings.py",
       "target": "app",
       "weight": 13,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_time_utils.py",
+      "target": "datetime",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_time_utils.py",
+      "target": "zoneinfo",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/test_time_utils.py",
+      "target": "app",
+      "weight": 1,
       "kind": "imports"
     },
     {

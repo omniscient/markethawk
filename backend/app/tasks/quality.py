@@ -1,12 +1,12 @@
 import logging
 import time as _time
-from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def analyze_universe_quality(self, universe_id: int):
             report = UniverseQualityReport(universe_id=universe_id)
             db.add(report)
         report.status = "running"
-        report.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        report.started_at = utc_now()
         report.error_message = None
         db.commit()
 
@@ -45,7 +45,7 @@ def analyze_universe_quality(self, universe_id: int):
         report.overall_grade = result["overall_grade"]
         report.overall_score = result["overall_score"]
         report.ticker_count = result["ticker_count"]
-        report.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        report.generated_at = utc_now()
         report.report_data = result
         db.commit()
 
@@ -302,7 +302,7 @@ def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
 
         run.status = "completed"
         run.event_count = len(unique_event_ids)
-        run.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        run.completed_at = utc_now()
         db.commit()
         logger.info(
             "analyze_signal_features: completed (events=%d)", len(unique_event_ids)

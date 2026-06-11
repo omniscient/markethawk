@@ -1,5 +1,3 @@
-from datetime import datetime, timezone
-
 from sqlalchemy import (
     Boolean,
     Column,
@@ -15,6 +13,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class TweetSignal(Base):
@@ -27,9 +26,7 @@ class TweetSignal(Base):
     tweet_id = Column(String(30), nullable=False, unique=True, index=True)
     tweet_url = Column(String(200), nullable=False)
     posted_at = Column(DateTime, nullable=False)
-    scraped_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    scraped_at = Column(DateTime, default=utc_now)
 
     # Content
     full_text = Column(Text, nullable=False)
@@ -51,9 +48,7 @@ class TweetSignal(Base):
     scanner_event_id = Column(Integer, ForeignKey("scanner_events.id"), nullable=True)
     promotion_reason = Column(String(30), nullable=True)
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
 
     account = relationship("MonitoredAccount", back_populates="tweet_signals")
     scanner_event = relationship("ScannerEvent", foreign_keys=[scanner_event_id])

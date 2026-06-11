@@ -20,6 +20,7 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.stock_split import StockSplit
 from app.models.ticker_reference import TickerReference
 from app.services.stock_data import StockDataService
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ def sync_tickers_batch(self, next_url: str = None, delay_seconds: float = 15.0):
                 # stmt.sector = t.get("type") # REMOVED: User confirmed this was wrong
 
                 stmt.primary_exchange = t.get("primary_exchange")
-                stmt.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+                stmt.last_updated = utc_now()
                 count += 1
 
             except Exception as e:
@@ -423,7 +424,7 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
             logger.info("No NewsPreference found. Skipping poll.")
             return
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = utc_now()
         if not force and pref.last_polled_at:
             delta_minutes = (now - pref.last_polled_at).total_seconds() / 60.0
             if delta_minutes < pref.refresh_interval_minutes:

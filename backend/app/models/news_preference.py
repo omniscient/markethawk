@@ -3,12 +3,12 @@ NewsPreference SQLAlchemy model.
 """
 
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Column, DateTime, Integer
 from sqlalchemy import Uuid as UUID
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class NewsPreference(Base):
@@ -28,11 +28,9 @@ class NewsPreference(Base):
     refresh_interval_minutes = Column(Integer, default=5)
     last_polled_at = Column(DateTime)
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )

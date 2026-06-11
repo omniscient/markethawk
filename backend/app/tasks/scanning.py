@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 from app.models.monitored_stock import MonitoredStock
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +194,7 @@ def _run_universe_scan_logic(
     run.scan_end_date = end
     db.commit()
 
-    started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    started_at = utc_now()
 
     cum = {
         "evaluated": 0,
@@ -238,12 +239,7 @@ def _run_universe_scan_logic(
         if is_cancelled():
             run.status = "cancelled"
             run.events_detected = events_total
-            run.execution_time_ms = int(
-                (
-                    datetime.now(timezone.utc).replace(tzinfo=None) - started_at
-                ).total_seconds()
-                * 1000
-            )
+            run.execution_time_ms = int((utc_now() - started_at).total_seconds() * 1000)
             db.commit()
             publish(
                 {
@@ -295,10 +291,7 @@ def _run_universe_scan_logic(
 
     run.status = "completed"
     run.events_detected = events_total
-    run.execution_time_ms = int(
-        (datetime.now(timezone.utc).replace(tzinfo=None) - started_at).total_seconds()
-        * 1000
-    )
+    run.execution_time_ms = int((utc_now() - started_at).total_seconds() * 1000)
     db.commit()
     publish(
         {

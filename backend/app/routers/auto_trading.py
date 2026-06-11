@@ -24,7 +24,6 @@ Endpoints:
 
 import logging
 from datetime import date as date_type
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -42,6 +41,8 @@ from app.services.auto_trade_service import (
     get_account,
     get_stats,
 )
+from app.utils.db import get_or_404
+from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/trading", tags=["auto-trading"])
 logger = logging.getLogger(__name__)
@@ -118,9 +119,7 @@ def get_strategy(
     strategy_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    s = db.query(TradingStrategy).filter(TradingStrategy.id == strategy_id).first()
-    if not s:
-        raise HTTPException(status_code=404, detail="Strategy not found.")
+    s = get_or_404(db, TradingStrategy, strategy_id, "Strategy")
     return TradingStrategyResponse.from_orm_dict(s).model_dump()
 
 
@@ -131,15 +130,13 @@ def update_strategy(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Partial update of a trading strategy."""
-    s = db.query(TradingStrategy).filter(TradingStrategy.id == strategy_id).first()
-    if not s:
-        raise HTTPException(status_code=404, detail="Strategy not found.")
+    s = get_or_404(db, TradingStrategy, strategy_id, "Strategy")
 
     for key, value in payload.items():
         if key in _STRATEGY_UPDATABLE:
             setattr(s, key, value)
 
-    s.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    s.updated_at = utc_now()
     db.commit()
     db.refresh(s)
     return TradingStrategyResponse.from_orm_dict(s).model_dump()
@@ -156,9 +153,7 @@ def delete_strategy(
     We never hard-delete because AutoTradeOrders reference the strategy and
     it would break the audit trail.
     """
-    s = db.query(TradingStrategy).filter(TradingStrategy.id == strategy_id).first()
-    if not s:
-        raise HTTPException(status_code=404, detail="Strategy not found.")
+    s = get_or_404(db, TradingStrategy, strategy_id, "Strategy")
 
     open_orders = (
         db.query(AutoTradeOrder)
@@ -177,7 +172,7 @@ def delete_strategy(
         )
 
     s.is_active = False
-    s.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    s.updated_at = utc_now()
     db.commit()
     logger.info(f"Deactivated trading strategy id={strategy_id}")
 
@@ -220,9 +215,7 @@ def get_order(
     order_id: int,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    o = db.query(AutoTradeOrder).filter(AutoTradeOrder.id == order_id).first()
-    if not o:
-        raise HTTPException(status_code=404, detail="Order not found.")
+    o = get_or_404(db, AutoTradeOrder, order_id, "Order")
     return AutoTradeOrderResponse.from_orm_dict(o).model_dump()
 
 
@@ -234,22 +227,14 @@ def approve_order_endpoint(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Approve a pending_approval order."""
-    o = db.query(AutoTradeOrder).filter(AutoTradeOrder.id == order_id).first()
-    if not o:
-        raise HTTPException(status_code=404, detail="Order not found.")
+    o = get_or_404(db, AutoTradeOrder, order_id, "Order")
     if o.status != "pending_approval":
         raise HTTPException(
             status_code=409,
             detail=f"Order is not pending approval (current status: {o.status}).",
         )
 
-    strategy = (
-        db.query(TradingStrategy)
-        .filter(TradingStrategy.id == o.trading_strategy_id)
-        .first()
-    )
-    if not strategy:
-        raise HTTPException(status_code=404, detail="Strategy not found.")
+    strategy = get_or_404(db, TradingStrategy, o.trading_strategy_id, "Strategy")
 
     result = approve_order(o, strategy, db)
     return AutoTradeOrderResponse.from_orm_dict(result).model_dump()
@@ -264,9 +249,7 @@ def reject_order(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Reject a pending_approval order without submitting it."""
-    o = db.query(AutoTradeOrder).filter(AutoTradeOrder.id == order_id).first()
-    if not o:
-        raise HTTPException(status_code=404, detail="Order not found.")
+    o = get_or_404(db, AutoTradeOrder, order_id, "Order")
     if o.status != "pending_approval":
         raise HTTPException(
             status_code=409,
@@ -275,7 +258,7 @@ def reject_order(
 
     o.status = "rejected"
     o.rejection_reason = payload.get("reason", "Manually rejected via UI")
-    o.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    o.updated_at = utc_now()
     db.commit()
     db.refresh(o)
     logger.info(f"Rejected order id={o.id} reason='{o.rejection_reason}'")
@@ -290,9 +273,7 @@ def cancel_order_endpoint(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Cancel an active order."""
-    o = db.query(AutoTradeOrder).filter(AutoTradeOrder.id == order_id).first()
-    if not o:
-        raise HTTPException(status_code=404, detail="Order not found.")
+    o = get_or_404(db, AutoTradeOrder, order_id, "Order")
 
     cancellable = {"submitted", "open", "pending", "pending_approval"}
     if o.status not in cancellable:
@@ -359,7 +340,7 @@ def update_trading_config(
 ) -> Dict[str, Any]:
     """Update auto-trading system config (AUTO_TRADING_ENABLED, PAPER_ACCOUNT_SIZE)."""
     allowed = {"AUTO_TRADING_ENABLED", "PAPER_ACCOUNT_SIZE"}
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utc_now()
 
     for key, value in payload.items():
         if key not in allowed:

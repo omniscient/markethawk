@@ -5,11 +5,10 @@ Symbols are added and removed by the user. A soft limit of 50 is enforced at
 the API layer. There is no automatic expiry; entries persist until removed.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Column, DateTime, Integer, String, Text
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 WATCHLIST_SOFT_LIMIT = 50
 
@@ -27,5 +26,5 @@ class ActiveWatchlist(Base):
     added_at = Column(
         DateTime,
         nullable=False,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
     )

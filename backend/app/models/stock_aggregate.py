@@ -2,12 +2,11 @@
 StockAggregate SQLAlchemy model.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import BigInteger, Boolean, Column, DateTime, Integer, Numeric, String
 from sqlalchemy.schema import Index
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class StockAggregate(Base):
@@ -36,9 +35,7 @@ class StockAggregate(Base):
         String(50), default="polygon", nullable=True
     )  # data source: 'polygon', 'ibkr', etc.
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
 
     # Composite index for efficient querying by ticker and time
     __table_args__ = (

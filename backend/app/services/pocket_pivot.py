@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import time as _time
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
@@ -27,6 +27,7 @@ from app.models.ticker_reference import TickerReference
 from app.services.alert_service import save_event as _save_event
 from app.services.catalyst_parser import CatalystParser
 from app.utils.session import get_market_today
+from app.utils.time import to_utc_naive
 
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
@@ -41,15 +42,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 def _get_today_bar(db: Session, ticker: str, event_date: date) -> dict[str, Any] | None:
     """Fetch the daily bar for ticker on event_date. Returns None if not found."""
-    day_start_utc = (
-        datetime.combine(event_date, time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
-    day_end_utc = (
+    day_start_utc = to_utc_naive(datetime.combine(event_date, time.min, tzinfo=_ET))
+    day_end_utc = to_utc_naive(
         datetime.combine(event_date + timedelta(days=1), time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
     )
     row = (
         db.query(StockAggregate)
@@ -68,11 +63,7 @@ def _get_today_bar(db: Session, ticker: str, event_date: date) -> dict[str, Any]
 
 def _get_prior_close(db: Session, ticker: str, event_date: date) -> float | None:
     """Fetch the most recent daily-bar close strictly before event_date."""
-    day_start_utc = (
-        datetime.combine(event_date, time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
+    day_start_utc = to_utc_naive(datetime.combine(event_date, time.min, tzinfo=_ET))
     row = (
         db.query(StockAggregate.close)
         .filter(
@@ -94,11 +85,7 @@ def _get_lookback_bars(
     Fetch up to lookback_days+1 daily bars before event_date (ascending).
     The first bar provides a prior-close for classifying the oldest lookback day.
     """
-    day_start_utc = (
-        datetime.combine(event_date, time.min, tzinfo=_ET)
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
+    day_start_utc = to_utc_naive(datetime.combine(event_date, time.min, tzinfo=_ET))
     rows = (
         db.query(StockAggregate)
         .filter(
@@ -239,7 +226,9 @@ async def run_pocket_pivot_scan(
                     continue
 
                 # Lookback bars: need min_lookback_days classifiable bars (+1 context)
-                lookback_bars = _get_lookback_bars(db, ticker, event_date, lookback_days)
+                lookback_bars = _get_lookback_bars(
+                    db, ticker, event_date, lookback_days
+                )
                 if len(lookback_bars) < min_lookback_days + 1:
                     counts["no_baseline"] += 1
                     continue
@@ -287,9 +276,11 @@ async def run_pocket_pivot_scan(
                     if (event_date - split_dt).days <= 28:
                         split_in_lookback = True
 
-                up_day_pct = round(
-                    (today["close"] - prior_close) / prior_close, 4
-                ) if prior_close > 0 else 0.0
+                up_day_pct = (
+                    round((today["close"] - prior_close) / prior_close, 4)
+                    if prior_close > 0
+                    else 0.0
+                )
                 volume_over_max_down_pct = round(
                     today["volume"] / max_down_day_vol - 1.0, 4
                 )

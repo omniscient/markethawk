@@ -2,11 +2,10 @@
 SystemConfig model — key/value store for system-wide settings.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Column, DateTime, String
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class SystemConfig(Base):
@@ -16,6 +15,6 @@ class SystemConfig(Base):
     value = Column(String, nullable=False)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )

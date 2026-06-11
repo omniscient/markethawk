@@ -22,6 +22,7 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.universe_quality_report import UniverseQualityReport
 from app.services.universe_stats import UniverseStatsService
 from app.utils.session import get_market_today
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ def discover_and_refresh(universe_id: int, db: Session) -> dict:
             ticker=res["ticker"],
             asset_class=res.get("asset_class", "stocks"),
             data_source=res.get("data_source", "massive"),
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=utc_now(),
         )
         db.add(stock_ticker)
         added_count += 1
@@ -96,7 +97,7 @@ def discover_and_refresh(universe_id: int, db: Session) -> dict:
     universe.cached_min_date = stats["min_date"]
     universe.cached_max_date = stats["max_date"]
     universe.cached_timespans = stats["timespans"]
-    universe.stats_refreshed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    universe.stats_refreshed_at = utc_now()
     db.commit()
 
     return {
@@ -126,7 +127,7 @@ def sync_missing_aggregates(universe_id: int, db: Session) -> dict:
     if not stocks:
         return {"status": "skipped", "message": "No active stocks in this universe."}
 
-    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_utc = utc_now()
     today = now_utc.strftime("%Y-%m-%d")
     stock_tickers = [s.ticker for s in stocks if s.asset_class != "futures"]
     futures_stocks = [s for s in stocks if s.asset_class == "futures"]
@@ -457,7 +458,7 @@ def queue_quality_analysis(universe_id: int, db: Session) -> dict:
         report = UniverseQualityReport(universe_id=universe_id)
         db.add(report)
     report.status = "pending"
-    report.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    report.started_at = utc_now()
     report.generated_at = None
     report.report_data = None
     report.overall_grade = None
