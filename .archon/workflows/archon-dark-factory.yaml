@@ -110,11 +110,18 @@ nodes:
           | jq --argjson pr "$PR_COMMENTS" --argjson inline "$INLINE_COMMENTS" \
             '. + {pr_reviews: $pr, pr_inline_comments: $inline}')
       fi
-      echo "$ISSUE_DATA" | jq \
+      FINAL_JSON=$(echo "$ISSUE_DATA" | jq \
         --arg intent "$INTENT" \
         --argjson resolved "$N" \
         --arg epic "${EPIC_N:-null}" \
-        '. + {intent: $intent, resolved_number: $resolved, epic_number: (if $epic == "null" then null else ($epic | tonumber) end)}'
+        '. + {intent: $intent, resolved_number: $resolved, epic_number: (if $epic == "null" then null else ($epic | tonumber) end)}')
+      # Persist to artifacts so downstream bash nodes read the file instead of inlining
+      # the fetch-issue node output into their scripts. (NEVER write the dollar-ref form in
+      # comments — Archon substitutes it textually, even inside comments.) Inlined output
+      # counts against the kernel's 128KiB-per-argv limit; a comment-heavy issue → E2BIG.
+      mkdir -p "$ARTIFACTS_DIR"
+      printf '%s' "$FINAL_JSON" > "$ARTIFACTS_DIR/issue.json"
+      echo "$FINAL_JSON"
     depends_on: [parse-intent]
     timeout: 60000
 
@@ -144,7 +151,7 @@ nodes:
 
   - id: acknowledge-continue
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       SUMMARY="$summarize-feedback.output.summary"
       echo "Acknowledging feedback for issue #${ISSUE}..."
       gh issue comment "$ISSUE" --body "Resuming work — Feedback understood: ${SUMMARY}"
@@ -156,7 +163,7 @@ nodes:
   # Layer 1: Route based on intent
   - id: close-announce
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       echo "Closing issue #${ISSUE}: merging PR and tearing down preview..."
       gh issue comment "$ISSUE" --body "Merging PR and tearing down preview environment."
       echo "Announced close for issue #${ISSUE}"
@@ -166,8 +173,8 @@ nodes:
 
   - id: close-preview
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
-      EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
+      EPIC_NUM=$(jq -r '.epic_number // empty' "$ARTIFACTS_DIR/issue.json")
 
       echo "Tearing down mh-preview-${ISSUE}..."
       docker compose -p "mh-preview-${ISSUE}" down -v 2>/dev/null || echo "No preview stack found"
@@ -206,9 +213,9 @@ nodes:
 
   - id: setup-branch
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       INTENT=$parse-intent.output.intent
-      SLUG=$(echo $fetch-issue.output | jq -r '.title // "feature"' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
+      SLUG=$(jq -r '.title // "feature"' "$ARTIFACTS_DIR/issue.json" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
       BRANCH="feat/issue-${ISSUE}-${SLUG}"
       echo "Setting up branch for issue #${ISSUE}..."
 
@@ -225,8 +232,8 @@ nodes:
   # Refinement branch setup (refine/issue-N-slug)
   - id: setup-refine-branch
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
-      SLUG=$(echo $fetch-issue.output | jq -r '.title // "feature"' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
+      SLUG=$(jq -r '.title // "feature"' "$ARTIFACTS_DIR/issue.json" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
       BRANCH="refine/issue-${ISSUE}-${SLUG}"
 
       EXISTING=$(git branch -r --list "origin/$BRANCH" 2>/dev/null)
@@ -243,8 +250,8 @@ nodes:
   # Resolve branch setup — checkout the existing feat/issue-N-slug branch (no new branch)
   - id: setup-branch-resolve
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
-      SLUG=$(echo $fetch-issue.output | jq -r '.title // "feature"' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
+      SLUG=$(jq -r '.title // "feature"' "$ARTIFACTS_DIR/issue.json" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | head -c 40)
       BRANCH="feat/issue-${ISSUE}-${SLUG}"
 
       echo "Checking out existing branch ${BRANCH} for conflict resolution..."
@@ -278,7 +285,7 @@ nodes:
   # for refinement every poll. Labels are guaranteed to exist in the repo.
   - id: refine-push
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       BRANCH=$(git branch --show-current)
 
       git push -u origin "$BRANCH"
@@ -295,7 +302,7 @@ nodes:
   # Labels are guaranteed to exist in the repo.
   - id: plan-push-and-advance
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       BRANCH=$(git branch --show-current)
 
       git push -u origin "$BRANCH"
@@ -355,7 +362,7 @@ nodes:
   # Shared between `continue` (runs after regen-codeindex) and `resolve` (runs after branch checkout).
   - id: de-conflict
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       ARTIFACTS_DIR="${ARTIFACTS_DIR:-/tmp/artifacts/${ISSUE}}"
       mkdir -p "$ARTIFACTS_DIR"
 
@@ -569,23 +576,57 @@ nodes:
   # Layer 3: Spin up preview and validate
   - id: preview-up
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       NEEDS_PREVIEW=$classify-preview.output.needs_preview
       SKIP_REASON="$classify-preview.output.reason"
+
+      mkdir -p "$ARTIFACTS_DIR"
+      BUILD_LOG="$ARTIFACTS_DIR/preview_build.log"
+
+      # Single writer for preview_env.sh — every exit path MUST go through this so
+      # downstream nodes (validate, push-and-pr, report) can always source the file.
+      # args: skipped failed reason slot frontend backend net
+      write_preview_env() {
+        {
+          echo "export PREVIEW_SKIPPED=$1"
+          echo "export PREVIEW_FAILED=$2"
+          echo "export PREVIEW_SKIP_REASON=\"$3\""
+          echo "export PREVIEW_SLOT=\"$4\""
+          echo "export PREVIEW_FRONTEND=\"$5\""
+          echo "export PREVIEW_BACKEND=\"$6\""
+          echo "export PREVIEW_NET=\"$7\""
+        } > "$ARTIFACTS_DIR/preview_env.sh"
+      }
+
+      # Fail-proof degrade: a broken preview must never kill the run (it used to send the
+      # ticket back to Ready in a loop). Note the failure on the ticket, mark the preview
+      # as skipped+failed, and exit 0 so validate/push/PR proceed without live endpoints.
+      preview_fail() {
+        REASON="$1"
+        echo "WARNING: preview failed: ${REASON} — continuing without preview" >&2
+        write_preview_env true true "preview failed: ${REASON}" "" "" "" ""
+        LOG_TAIL=""
+        [ -f "$BUILD_LOG" ] && LOG_TAIL=$(tail -30 "$BUILD_LOG")
+        gh issue comment "$ISSUE" --body "⚠️ **Preview environment failed to start** — ${REASON}
+
+      The run continued in degraded mode (no live-endpoint validation; PR still created). Last build/boot output:
+      \`\`\`
+      ${LOG_TAIL:-<no build log captured>}
+      \`\`\`
+      The \`mh-preview-${ISSUE}\` stack was left as-is for debugging — tear down with \"Close issue #${ISSUE}\"." \
+          || echo "WARNING: could not post preview-failure comment to issue #${ISSUE}" >&2
+        echo "PREVIEW_SKIPPED=true"
+        echo "PREVIEW_FAILED=true"
+        echo "PREVIEW_SKIP_REASON=preview failed: ${REASON}"
+        exit 0
+      }
 
       # Skip ONLY on an explicit "false". Any other value (including garbled or errored
       # classifier output) falls through to building the preview — fail-safe direction.
       if [ "$NEEDS_PREVIEW" = "false" ]; then
         echo "Preview differentiator: skipping preview for issue #${ISSUE}"
         echo "Reason: ${SKIP_REASON}"
-        mkdir -p "$ARTIFACTS_DIR"
-        {
-          echo "export PREVIEW_SKIPPED=true"
-          echo "export PREVIEW_SKIP_REASON=\"${SKIP_REASON}\""
-          echo "export PREVIEW_FRONTEND=\"\""
-          echo "export PREVIEW_BACKEND=\"\""
-          echo "export PREVIEW_NET=\"\""
-        } > "$ARTIFACTS_DIR/preview_env.sh"
+        write_preview_env true false "${SKIP_REASON}" "" "" "" ""
         echo "PREVIEW_SKIPPED=true"
         echo "PREVIEW_SKIP_REASON=${SKIP_REASON}"
         exit 0
@@ -615,8 +656,7 @@ nodes:
           fi
         done
         if [ -z "$PADDED" ]; then
-          echo "ERROR: No free preview slot in range 00-99. Run 'Close issue #N' on a stale preview to free a slot." >&2
-          exit 1
+          preview_fail "no free preview slot in range 00-99 — run 'Close issue #N' on a stale preview to free one"
         fi
         echo "INFO: Allocated slot ${PADDED} for issue #${ISSUE}" >&2
       fi
@@ -625,32 +665,41 @@ nodes:
 
       PREVIEW_START=$(date +%s)
       echo "Starting preview stack mh-preview-${ISSUE} (ports: 1${PADDED}33, 1${PADDED}80)..."
-      docker compose -p "mh-preview-${ISSUE}" \
+      # Build/boot noise goes to the build log, NOT stdout: this node's stdout becomes
+      # the preview-up node output, and oversized node output triggered the E2BIG loop.
+      if ! docker compose -p "mh-preview-${ISSUE}" \
         -f dark-factory/docker-compose.preview.yml \
-        up -d --build
+        up -d --build >> "$BUILD_LOG" 2>&1; then
+        preview_fail "docker compose up --build failed (see preview_build.log tail below)"
+      fi
 
       echo "Checking database state..."
       TABLE_COUNT=$(docker compose -p "mh-preview-${ISSUE}" \
         -f dark-factory/docker-compose.preview.yml \
         exec -T postgres psql -U postgres -d stockscanner -tAc \
         "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" 2>/dev/null || echo "0")
+      TABLE_COUNT=$(echo "$TABLE_COUNT" | tr -dc '0-9')
 
-      if [ "${TABLE_COUNT:-0}" -gt 0 ]; then
+      if [ "${TABLE_COUNT:-0}" -gt 0 ] 2>/dev/null; then
         echo "Existing DB detected (${TABLE_COUNT} tables) — skipping create_all and stamp head, running alembic upgrade head only..."
         docker compose -p "mh-preview-${ISSUE}" \
           -f dark-factory/docker-compose.preview.yml \
-          exec -T backend python -m alembic upgrade head
+          exec -T backend python -m alembic upgrade head >> "$BUILD_LOG" 2>&1 \
+          || preview_fail "alembic upgrade head failed on existing DB"
       else
         echo "Fresh DB — running full bootstrap (create_all, stamp head, upgrade head)..."
         docker compose -p "mh-preview-${ISSUE}" \
           -f dark-factory/docker-compose.preview.yml \
-          exec -T backend python -c 'from app.core.database import Base, engine; from app.models import *; Base.metadata.create_all(bind=engine); print("Tables created")'
+          exec -T backend python -c 'from app.core.database import Base, engine; from app.models import *; Base.metadata.create_all(bind=engine); print("Tables created")' \
+          >> "$BUILD_LOG" 2>&1 || preview_fail "DB bootstrap (create_all) failed"
         docker compose -p "mh-preview-${ISSUE}" \
           -f dark-factory/docker-compose.preview.yml \
-          exec -T backend python -m alembic stamp head
+          exec -T backend python -m alembic stamp head >> "$BUILD_LOG" 2>&1 \
+          || preview_fail "alembic stamp head failed"
         docker compose -p "mh-preview-${ISSUE}" \
           -f dark-factory/docker-compose.preview.yml \
-          exec -T backend python -m alembic upgrade head
+          exec -T backend python -m alembic upgrade head >> "$BUILD_LOG" 2>&1 \
+          || preview_fail "alembic upgrade head failed on fresh DB"
       fi
 
       PREVIEW_NET="mh-preview-${ISSUE}_preview-network"
@@ -677,22 +726,17 @@ nodes:
           echo "PREVIEW_FRONTEND=http://localhost:1${PADDED}33"
           echo "PREVIEW_BACKEND=${BACKEND_INTERNAL}"
           echo "PREVIEW_MOUNT_SECS=${PREVIEW_SECS}"
-          # Write env file so the validate command can source it reliably without
-          # having to parse raw step output or guess the URL.
-          mkdir -p "$ARTIFACTS_DIR"
-          {
-            echo "export PREVIEW_SKIPPED=false"
-            echo "export PREVIEW_FRONTEND=\"http://localhost:1${PADDED}33\""
-            echo "export PREVIEW_BACKEND=\"${BACKEND_INTERNAL}\""
-            echo "export PREVIEW_NET=\"${PREVIEW_NET}\""
-          } > "$ARTIFACTS_DIR/preview_env.sh"
+          # Write env file so downstream nodes (validate, push-and-pr, report) can source
+          # it reliably without having to parse raw step output or guess the URL.
+          write_preview_env false false "" "${PADDED}" "http://localhost:1${PADDED}33" "${BACKEND_INTERNAL}" "${PREVIEW_NET}"
           exit 0
         fi
         sleep 3
       done
-      echo "WARNING: Backend did not become healthy within 180s"
       docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
-      exit 1
+      docker compose -p "mh-preview-${ISSUE}" -f dark-factory/docker-compose.preview.yml \
+        logs --tail 40 backend >> "$BUILD_LOG" 2>&1 || true
+      preview_fail "backend did not become healthy within 180s"
     depends_on: [classify-preview]
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 300000
@@ -700,12 +744,14 @@ nodes:
   # preview-up-resolve: resolve runs skip the preview stack — validate uses pytest/tsc only
   - id: preview-up-resolve
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       ARTIFACTS_DIR="${ARTIFACTS_DIR:-/tmp/artifacts/${ISSUE}}"
       mkdir -p "$ARTIFACTS_DIR"
       {
         echo "export PREVIEW_SKIPPED=true"
+        echo "export PREVIEW_FAILED=false"
         echo "export PREVIEW_SKIP_REASON=\"conflict resolution run — no preview rebuild\""
+        echo "export PREVIEW_SLOT=\"\""
         echo "export PREVIEW_FRONTEND=\"\""
         echo "export PREVIEW_BACKEND=\"\""
         echo "export PREVIEW_NET=\"\""
@@ -735,7 +781,7 @@ nodes:
   # push-resolve: push conflict-resolved branch to the existing PR (no new PR created)
   - id: push-resolve
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       BRANCH=$(git branch --show-current)
       echo "Pushing conflict-resolved branch ${BRANCH} to existing PR for issue #${ISSUE}..."
       if ! git push origin "$BRANCH"; then
@@ -757,12 +803,16 @@ nodes:
   # Layer 4: Push and create PR
   - id: push-and-pr
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
-      EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
-      PREVIEW_SKIPPED=$(echo $preview-up.output | grep '^PREVIEW_SKIPPED=' | cut -d= -f2-)
-      PREVIEW_SKIP_REASON=$(echo $preview-up.output | grep '^PREVIEW_SKIP_REASON=' | cut -d= -f2-)
-      PREVIEW_FRONTEND=$(echo $preview-up.output | grep '^PREVIEW_FRONTEND=' | cut -d= -f2-)
-      PREVIEW_BACKEND=$(echo $preview-up.output | grep '^PREVIEW_BACKEND=' | cut -d= -f2-)
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
+      EPIC_NUM=$(jq -r '.epic_number // empty' "$ARTIFACTS_DIR/issue.json")
+      # Source preview state from the artifact file — never dollar-reference the preview-up
+      # node output here (Archon substitutes it textually, even in comments). Each reference
+      # embeds the node's full stdout into this script's argv; 4 references overflowed the
+      # 128KiB argv limit → E2BIG (#250 loop).
+      PREVIEW_SKIPPED=true
+      PREVIEW_SKIP_REASON="preview_env.sh missing"
+      PREVIEW_FAILED=false
+      [ -f "$ARTIFACTS_DIR/preview_env.sh" ] && . "$ARTIFACTS_DIR/preview_env.sh"
       BRANCH=$(git branch --show-current)
       echo "Pushing branch and creating/updating PR for issue #${ISSUE}..."
 
@@ -814,7 +864,9 @@ nodes:
       fi
 
       # --- Build the Preview section ---
-      if [ "$PREVIEW_SKIPPED" = "true" ]; then
+      if [ "$PREVIEW_FAILED" = "true" ]; then
+        PREVIEW_SECTION="⚠️ _Preview environment failed to start (${PREVIEW_SKIP_REASON}) — endpoint validation was skipped; see the failure comment on the issue._"
+      elif [ "$PREVIEW_SKIPPED" = "true" ]; then
         PREVIEW_SECTION="_No preview environment — this change does not affect the running app (${PREVIEW_SKIP_REASON})._"
       else
         PREVIEW_SECTION="- Frontend: ${PREVIEW_FRONTEND}
@@ -824,6 +876,15 @@ nodes:
       EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number // empty')
       if [ -n "$EXISTING_PR" ]; then
         echo "PR #${EXISTING_PR} already exists, updated with latest push."
+        # Backfill the closing keyword on PRs created before it was added — without
+        # "Closes #N" GitHub never attaches the PR to the issue's Development sidebar.
+        EXISTING_BODY=$(gh pr view "$EXISTING_PR" --json body --jq '.body')
+        if ! echo "$EXISTING_BODY" | grep -qiE "(close[sd]?|fix(e[sd])?|resolve[sd]?) #${ISSUE}\b"; then
+          gh pr edit "$EXISTING_PR" --body "Closes #${ISSUE}
+
+      ${EXISTING_BODY}" && echo "Added 'Closes #${ISSUE}' to PR #${EXISTING_PR} body" \
+            || echo "WARNING: could not backfill closing keyword on PR #${EXISTING_PR}" >&2
+        fi
         echo "$EXISTING_PR"
       else
         EPIC_LINE=""
@@ -833,7 +894,9 @@ nodes:
         fi
         PR_URL=$(gh pr create \
           --title "$(gh issue view $ISSUE --json title --jq '.title')" \
-          --body "## Summary
+          --body "Closes #${ISSUE}
+
+      ## Summary
       Automated implementation for issue #${ISSUE}.${EPIC_LINE}
 
       ## Preview
@@ -872,7 +935,7 @@ nodes:
   # Layer 5: Move to "In review" and post report
   - id: status-in-review
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       INTENT=$parse-intent.output.intent
       # For resolve: the issue is already In Review — confirm without a board move.
       if [ "$INTENT" = "resolve" ]; then
@@ -901,13 +964,14 @@ nodes:
 
   - id: report
     bash: |
-      ISSUE=$(echo $fetch-issue.output | jq -r '.resolved_number')
-      EPIC_NUM=$(echo $fetch-issue.output | jq -r '.epic_number // empty')
-      PREVIEW_SKIPPED=$(echo $preview-up.output | grep '^PREVIEW_SKIPPED=' | cut -d= -f2-)
-      PREVIEW_SKIP_REASON=$(echo $preview-up.output | grep '^PREVIEW_SKIP_REASON=' | cut -d= -f2-)
-      PREVIEW_SLOT=$(echo $preview-up.output | grep '^PREVIEW_SLOT=' | cut -d= -f2-)
-      PREVIEW_FRONTEND=$(echo $preview-up.output | grep '^PREVIEW_FRONTEND=' | cut -d= -f2-)
-      PREVIEW_BACKEND=$(echo $preview-up.output | grep '^PREVIEW_BACKEND=' | cut -d= -f2-)
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
+      EPIC_NUM=$(jq -r '.epic_number // empty' "$ARTIFACTS_DIR/issue.json")
+      # Source preview state from the artifact file — see push-and-pr for why dollar-
+      # referencing the preview-up node output here is forbidden (argv-limit E2BIG).
+      PREVIEW_SKIPPED=true
+      PREVIEW_SKIP_REASON="preview_env.sh missing"
+      PREVIEW_FAILED=false
+      [ -f "$ARTIFACTS_DIR/preview_env.sh" ] && . "$ARTIFACTS_DIR/preview_env.sh"
       INTENT=$parse-intent.output.intent
       BRANCH=$(git branch --show-current)
       echo "Posting summary to issue #${ISSUE}..."
@@ -986,6 +1050,8 @@ nodes:
       # --- Build the Preview Environment section ---
       if [ "$INTENT" = "resolve" ]; then
         PREVIEW_SECTION="_No preview environment — conflict resolution run._"
+      elif [ "$PREVIEW_FAILED" = "true" ]; then
+        PREVIEW_SECTION="⚠️ _Preview environment failed to start (${PREVIEW_SKIP_REASON}) — endpoint validation was skipped; see the failure comment above._"
       elif [ "$PREVIEW_SKIPPED" = "true" ]; then
         PREVIEW_SECTION="_No preview environment — this change does not affect the running app (${PREVIEW_SKIP_REASON})._"
       else
