@@ -334,16 +334,22 @@ class TestRunPocketPivotScheduledFixed:
 class TestValidateScheduledScannerConfigs:
     """Tests for the validate_scheduled_scanner_configs() startup check."""
 
-    def _run_validation(self, liquidity_hunt_configs, pocket_pivot_configs):
+    def _run_validation(
+        self, liquidity_hunt_configs, pocket_pivot_configs, trend_pullback_configs=None
+    ):
         """Invoke validate_scheduled_scanner_configs with mocked DB results.
 
         The validation function iterates _BEAT_SCHEDULED_SCANNER_TYPES in order:
-        ["liquidity_hunt", "pocket_pivot"]. We return configs by call index.
+        ["liquidity_hunt", "pocket_pivot", "trend_pullback"]. We return configs by call index.
         """
         import app.tasks.scanning as scanning_module
 
         call_count = [0]
-        results_by_index = [liquidity_hunt_configs, pocket_pivot_configs]
+        results_by_index = [
+            liquidity_hunt_configs,
+            pocket_pivot_configs,
+            trend_pullback_configs or [],
+        ]
 
         def _make_filter_chain():
             idx = call_count[0]
@@ -361,14 +367,15 @@ class TestValidateScheduledScannerConfigs:
         with patch("app.tasks.scanning.SessionLocal", return_value=mock_db):
             scanning_module.validate_scheduled_scanner_configs()
 
-    def test_validate_passes_when_both_types_configured(self, caplog):
-        """No error logged when both scanner types have a valid config."""
+    def test_validate_passes_when_all_types_configured(self, caplog):
+        """No error logged when all scanner types have a valid config."""
         import logging
 
         lh = _make_cfg(id=2, universe_id=1, scanner_type="liquidity_hunt")
         pp = _make_cfg(id=4, universe_id=1, scanner_type="pocket_pivot")
+        tp = _make_cfg(id=6, universe_id=1, scanner_type="trend_pullback")
         with caplog.at_level(logging.ERROR, logger="app.tasks.scanning"):
-            self._run_validation([lh], [pp])
+            self._run_validation([lh], [pp], [tp])
         assert not any(r.levelno >= logging.ERROR for r in caplog.records), (
             "validate_scheduled_scanner_configs logged ERROR when it should not have"
         )
@@ -387,9 +394,20 @@ class TestValidateScheduledScannerConfigs:
         import logging
 
         lh = _make_cfg(id=2, universe_id=1, scanner_type="liquidity_hunt")
+        tp = _make_cfg(id=6, universe_id=1, scanner_type="trend_pullback")
         with caplog.at_level(logging.ERROR, logger="app.tasks.scanning"):
-            self._run_validation([lh], [])
+            self._run_validation([lh], [], [tp])
         assert any("pocket_pivot" in r.message.lower() for r in caplog.records)
+
+    def test_validate_logs_error_for_missing_trend_pullback(self, caplog):
+        """Error logged when no active trend_pullback config exists."""
+        import logging
+
+        lh = _make_cfg(id=2, universe_id=1, scanner_type="liquidity_hunt")
+        pp = _make_cfg(id=4, universe_id=1, scanner_type="pocket_pivot")
+        with caplog.at_level(logging.ERROR, logger="app.tasks.scanning"):
+            self._run_validation([lh], [pp], [])
+        assert any("trend_pullback" in r.message.lower() for r in caplog.records)
 
     def test_validate_logs_error_when_universe_id_null(self, caplog):
         """Error logged when a config has universe_id=NULL."""

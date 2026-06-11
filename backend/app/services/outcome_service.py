@@ -97,6 +97,7 @@ class OutcomeService:
             "1d": timedelta(days=1),
             "2d": timedelta(days=2),
             "5d": timedelta(days=5),
+            "10d": timedelta(days=10),
         }
         delta = interval_map.get(snapshot.interval_key)
         if delta is None:

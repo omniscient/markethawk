@@ -89,6 +89,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Gate commands (conformance, code-review) that need to write `[AVOID]` memory entries should define `route_memory_file()` and `write_memory_entry()` as inline shell functions using: dedup via `grep -qF`, 30-entry cap check, mawk-compatible two-arg awk expiry cleanup, and `sed -i "/^---$/i ENTRY"` to insert before the PROVISIONAL section delimiter. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
 
+- [AVOID] Never use a simple hex-sequence like `a1b2c3d4e5f6` as an Alembic revision ID — the existing migration set contains files with IDs following this pattern and conflicts will produce a `CycleDetected` error. Use `python -m alembic revision -m "..."` to generate a unique ID, or pick a random 12-char alphanumeric string that doesn't appear in `ls backend/app/alembic/versions/` output. <!-- issue:#299 date:2026-06-11 expires:2026-12-11 source:implement -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from

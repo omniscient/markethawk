@@ -79,6 +79,9 @@ def _run_range_scan_logic(
     from app.services.pocket_pivot import run_pocket_pivot_scan_for_date as _pp_scan
     from app.services.scanner import ScannerService
     from app.services.stock_data import StockDataService
+    from app.services.trend_pullback_scan import (
+        run_trend_pullback_scan_for_date as _tpb_scan,
+    )
 
     trading_days = [
         start + timedelta(days=i)
@@ -112,6 +115,7 @@ def _run_range_scan_logic(
         "liquidity_hunt_post": _lh_scan,
         "oversold_bounce": ScannerService.run_oversold_bounce_scan_for_date,
         "pocket_pivot": _pp_scan,
+        "trend_pullback": _tpb_scan,
     }
 
     async def _scan_day(day):
@@ -159,6 +163,7 @@ def _run_universe_scan_logic(
     import app.services.pocket_pivot  # noqa: F401
     import app.services.pre_market_scan  # noqa: F401 — triggers self-registration
     import app.services.scan_orchestrator as _orchestrator
+    import app.services.trend_pullback_scan  # noqa: F401
     from app.models.scanner_run import ScannerRun
 
     run = db.query(ScannerRun).filter(ScannerRun.uuid == scan_id).first()
@@ -680,11 +685,96 @@ def run_pocket_pivot_scheduled(self):
         db.close()
 
 
+@celery_app.task(
+    bind=True, max_retries=1, name="app.tasks.run_trend_pullback_scheduled"
+)
+def run_trend_pullback_scheduled(self):
+    """
+    Nightly 02:00 UTC task: run trend_pullback for today's date over all active
+    ScannerConfig universes of type 'trend_pullback'.
+    """
+    from app.models.scanner_config import ScannerConfig
+    from app.services.trend_pullback_scan import run_trend_pullback_scan
+    from app.utils.session import get_market_today
+
+    _task_name = "run_trend_pullback_scheduled"
+    _start = _time.monotonic()
+    db: Session = SessionLocal()
+    try:
+        event_date = get_market_today()
+        configs = (
+            db.query(ScannerConfig)
+            .filter(
+                ScannerConfig.scanner_type == "trend_pullback",
+                ScannerConfig.is_active.is_(True),
+            )
+            .all()
+        )
+
+        if not configs:
+            logger.error(
+                "run_trend_pullback_scheduled: no active trend_pullback ScannerConfig "
+                "rows found — add a row to scanner_configs with scanner_type='trend_pullback', "
+                "is_active=true, and a valid universe_id FK."
+            )
+            raise RuntimeError("no active trend_pullback scanner configs")
+
+        for cfg in configs:
+            if cfg.universe_id is None:
+                logger.error(
+                    "run_trend_pullback_scheduled: ScannerConfig id=%s has universe_id=NULL "
+                    "— this is a data integrity violation; run the migration "
+                    "c7d8e9f0a1b2_add_universe_id_to_scanner_configs to backfill.",
+                    cfg.id,
+                )
+                raise RuntimeError(f"ScannerConfig id={cfg.id} has universe_id=NULL")
+
+            tickers = [
+                ms.ticker
+                for ms in db.query(MonitoredStock)
+                .filter(
+                    MonitoredStock.universe_id == cfg.universe_id,
+                    MonitoredStock.is_active.is_(True),
+                )
+                .all()
+            ]
+            if not tickers:
+                logger.warning(
+                    "run_trend_pullback_scheduled: universe_id=%s has no active tickers, "
+                    "skipping ScannerConfig id=%s",
+                    cfg.universe_id,
+                    cfg.id,
+                )
+                continue
+
+            results = asyncio.run(
+                run_trend_pullback_scan(
+                    tickers, db, start_date=event_date, end_date=event_date
+                )
+            )
+            logger.info(
+                "trend_pullback scheduled scan for universe %s on %s: %d events",
+                cfg.universe_id,
+                event_date,
+                len(results),
+            )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
+    except Exception as exc:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
+        logger.exception("run_trend_pullback_scheduled failed: %s", exc)
+        raise self.retry(exc=exc)
+    finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
+        db.close()
+
+
 # ---------------------------------------------------------------------------
 # Startup validation — wired to worker_ready signal in celery_app.py
 # ---------------------------------------------------------------------------
 
-_BEAT_SCHEDULED_SCANNER_TYPES = ["liquidity_hunt", "pocket_pivot"]
+_BEAT_SCHEDULED_SCANNER_TYPES = ["liquidity_hunt", "pocket_pivot", "trend_pullback"]
 
 
 def validate_scheduled_scanner_configs() -> None:
