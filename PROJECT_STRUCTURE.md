@@ -76,6 +76,7 @@ MarketHawk/
 │   │   │   ├── pre_market_scan.py
 │   │   │   ├── oversold_bounce_scan.py
 │   │   │   ├── pocket_pivot.py
+│   │   │   ├── trend_pullback_scan.py
 │   │   │   ├── scanner.py          (facade — scan bodies in sibling modules)
 │   │   │   ├── session_metrics.py  (calculate_day_metrics* — extracted from scanner.py)
 │   │   │   ├── scan_enrichment.py  (_get_batch_enrichment_data* — extracted from scanner.py)
