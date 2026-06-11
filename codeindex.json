@@ -2,7 +2,7 @@
   "meta": {
     "root": "markethawk/",
     "total_files": 479,
-    "total_loc": 68122,
+    "total_loc": 68143,
     "languages": [
       "python",
       "javascript",
@@ -18880,7 +18880,7 @@
     },
     {
       "id": "frontend/src/api/analysis.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 69,
@@ -18956,7 +18956,7 @@
     },
     {
       "id": "frontend/src/api/auth.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 35,
@@ -19099,7 +19099,7 @@
     },
     {
       "id": "frontend/src/api/journal.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 147,
@@ -19181,7 +19181,7 @@
     },
     {
       "id": "frontend/src/api/news.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 46,
@@ -19240,7 +19240,7 @@
     },
     {
       "id": "frontend/src/api/outcomes.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 217,
@@ -19396,7 +19396,7 @@
     },
     {
       "id": "frontend/src/api/scanner.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 809,
@@ -19945,7 +19945,7 @@
     },
     {
       "id": "frontend/src/api/stocks.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 65,
@@ -19998,7 +19998,7 @@
     },
     {
       "id": "frontend/src/api/system.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 55,
@@ -20872,8 +20872,8 @@
       "type": "component",
       "language": "typescript",
       "framework": null,
-      "size": 67,
-      "loc": 67,
+      "size": 70,
+      "loc": 70,
       "group": 35,
       "imports": [
         "vitest",
@@ -21181,8 +21181,8 @@
       "type": "component",
       "language": "typescript",
       "framework": null,
-      "size": 138,
-      "loc": 138,
+      "size": 139,
+      "loc": 139,
       "group": 36,
       "imports": [
         "react",
@@ -21597,7 +21597,7 @@
     },
     {
       "id": "frontend/src/hooks/useScannerWs.test.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 150,
@@ -21651,7 +21651,7 @@
     },
     {
       "id": "frontend/src/hooks/useScorecard.test.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 63,
@@ -53998,7 +53998,7 @@
       "source": "frontend/src/App.tsx",
       "target": "frontend/src/api/auth.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/App.tsx",
@@ -54220,7 +54220,7 @@
       "source": "frontend/src/components/CorrelationHeatmap.tsx",
       "target": "frontend/src/api/analysis.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/CreateUniverseModal.tsx",
@@ -54250,7 +54250,7 @@
       "source": "frontend/src/components/CreateUniverseModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ExportUniverseModal.tsx",
@@ -54340,7 +54340,7 @@
       "source": "frontend/src/components/Layout.tsx",
       "target": "frontend/src/api/system.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/Layout.tsx",
@@ -54370,7 +54370,7 @@
       "source": "frontend/src/components/NewsFeed.tsx",
       "target": "frontend/src/api/news.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/NewsFeed.tsx",
@@ -54400,13 +54400,13 @@
       "source": "frontend/src/components/NewsSettings.tsx",
       "target": "frontend/src/api/news.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/NewsSettings.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/QualityReportModal.test.tsx",
@@ -54436,7 +54436,7 @@
       "source": "frontend/src/components/QualityReportModal.test.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/QualityReportModal.tsx",
@@ -54478,7 +54478,7 @@
       "source": "frontend/src/components/QualityReportModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/RecentEvents.tsx",
@@ -54514,7 +54514,7 @@
       "source": "frontend/src/components/RecentEvents.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ReviewControls.tsx",
@@ -54538,7 +54538,7 @@
       "source": "frontend/src/components/ReviewControls.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ScannerConfig.tsx",
@@ -54556,7 +54556,7 @@
       "source": "frontend/src/components/ScannerConfig.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ScannerResults.test.tsx",
@@ -54586,7 +54586,7 @@
       "source": "frontend/src/components/ScannerResults.test.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ScannerResults.tsx",
@@ -54616,7 +54616,7 @@
       "source": "frontend/src/components/ScannerResults.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/SignalReviewStats.tsx",
@@ -54646,7 +54646,7 @@
       "source": "frontend/src/components/SignalReviewStats.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/SyncUniverseModal.tsx",
@@ -54682,7 +54682,7 @@
       "source": "frontend/src/components/SyncUniverseModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/SystemActivityMonitor.tsx",
@@ -54790,7 +54790,7 @@
       "source": "frontend/src/components/UniverseDetailsModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/UniverseFormModal.test.tsx",
@@ -54844,7 +54844,7 @@
       "source": "frontend/src/components/UniverseFormModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/BackfillPanel.test.tsx",
@@ -54898,7 +54898,7 @@
       "source": "frontend/src/components/scorecard/DistributionChart.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/EdgeDecayChart.tsx",
@@ -54910,7 +54910,7 @@
       "source": "frontend/src/components/scorecard/EdgeDecayChart.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/HeroMetrics.test.tsx",
@@ -54934,7 +54934,7 @@
       "source": "frontend/src/components/scorecard/HeroMetrics.test.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/HeroMetrics.tsx",
@@ -54946,7 +54946,7 @@
       "source": "frontend/src/components/scorecard/HeroMetrics.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/IntervalTable.test.tsx",
@@ -54970,7 +54970,7 @@
       "source": "frontend/src/components/scorecard/IntervalTable.test.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/IntervalTable.tsx",
@@ -54982,7 +54982,7 @@
       "source": "frontend/src/components/scorecard/IntervalTable.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/ScannerSummaryCard.tsx",
@@ -55006,7 +55006,7 @@
       "source": "frontend/src/components/scorecard/ScannerSummaryCard.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/SignalTable.test.tsx",
@@ -55036,7 +55036,7 @@
       "source": "frontend/src/components/scorecard/SignalTable.test.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/SignalTable.tsx",
@@ -55102,7 +55102,7 @@
       "source": "frontend/src/components/ui/Chart.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ui/Chart.tsx",
@@ -55198,7 +55198,7 @@
       "source": "frontend/src/components/ui/StockChart.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/hooks/useLiveStockData.test.ts",
@@ -55396,7 +55396,7 @@
       "source": "frontend/src/hooks/useScorecard.test.ts",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/hooks/useScorecard.ts",
@@ -56176,7 +56176,7 @@
       "source": "frontend/src/pages/Dashboard.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/EdgeExplorer.tsx",
@@ -56206,7 +56206,7 @@
       "source": "frontend/src/pages/EdgeExplorer.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/EdgeExplorer.tsx",
@@ -56224,7 +56224,7 @@
       "source": "frontend/src/pages/EdgeExplorer.tsx",
       "target": "frontend/src/api/analysis.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Journal.tsx",
@@ -56266,7 +56266,7 @@
       "source": "frontend/src/pages/Journal.tsx",
       "target": "frontend/src/api/journal.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Login/Login.test.tsx",
@@ -56308,7 +56308,7 @@
       "source": "frontend/src/pages/Login/index.tsx",
       "target": "frontend/src/api/auth.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/PreMarketMovers.test.tsx",
@@ -56362,7 +56362,7 @@
       "source": "frontend/src/pages/PreMarketMovers.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Scanner/LiveProgressPanel.tsx",
@@ -56398,7 +56398,7 @@
       "source": "frontend/src/pages/Scanner/ResultsPanel.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Scanner/ScanConfigPanel.test.tsx",
@@ -56476,7 +56476,7 @@
       "source": "frontend/src/pages/Scanner/ScanConfigPanel.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Scanner/ScanStatusCard.tsx",
@@ -56500,7 +56500,7 @@
       "source": "frontend/src/pages/Scanner/ScanStatusCard.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Scanner/Scanner.test.tsx",
@@ -56566,7 +56566,7 @@
       "source": "frontend/src/pages/Scanner/index.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/ScorecardDetail.test.tsx",
@@ -56794,7 +56794,7 @@
       "source": "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
@@ -56806,7 +56806,7 @@
       "source": "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
       "target": "frontend/src/api/stocks.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/MetadataPanel.test.tsx",
@@ -56848,13 +56848,13 @@
       "source": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
       "target": "frontend/src/api/stocks.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.test.tsx",
@@ -56908,7 +56908,7 @@
       "source": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
@@ -56944,19 +56944,19 @@
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
       "target": "frontend/src/api/stocks.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
       "target": "frontend/src/api/system.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
@@ -57046,7 +57046,7 @@
       "source": "frontend/src/pages/Universes.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/test-setup.ts",
