@@ -60,10 +60,15 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Archon CLI (from fork — includes workflow cost tracking)
+# Archon CLI (from fork — includes workflow cost tracking).
+# Explicit wrapper instead of `bun link`: as of bun 1.3.x, no-arg `bun link`
+# only REGISTERS the package and no longer drops a global bin shim, so
+# `archon` silently vanished from PATH on clean rebuilds (exit 127 at runtime).
 RUN git clone -b feat/workflow-cost-tracking https://github.com/omniscient/Archon.git /opt/archon && \
     cd /opt/archon && bun install && \
-    cd /opt/archon/packages/cli && bun link
+    printf '#!/bin/sh\nexec /opt/bun/bin/bun /opt/archon/packages/cli/src/cli.ts "$@"\n' > /usr/local/bin/archon && \
+    chmod +x /usr/local/bin/archon && \
+    archon 2>&1 | grep -q "archon workflow"
 
 # Workspace directory
 RUN mkdir -p /workspace
@@ -77,15 +82,26 @@ COPY docker-compose.yml /opt/dark-factory/docker-compose.yml
 COPY .claude/skills/refinement/ /opt/refinement-skills/
 RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
 
-# Non-root factory user — must be created AFTER all root-level installs
-RUN groupadd --gid 1000 factory && \
+# Non-root factory user — must be created AFTER all root-level installs.
+# ubuntu:24.04 ships a default 'ubuntu' user at UID/GID 1000; evict it first or
+# groupadd/useradd fail on any clean (--no-cache) build. Latent until the layer
+# cache is dropped — cached builds skipped this layer for months.
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    groupdel ubuntu 2>/dev/null || true && \
+    groupadd --gid 1000 factory && \
     useradd --uid 1000 --gid 1000 --create-home --home-dir /home/factory factory
 
-# Transfer workspace ownership to the factory user
-RUN chown -R factory:factory /workspace
+# Transfer workspace ownership to the factory user.
+# /opt/dark-factory too: scheduler.sh (runs as factory) provisions
+# /opt/dark-factory/.archon/.env at startup — root-owned dir crash-loops it.
+# /var/lib/dark-factory pre-created so the scheduler_state named volume
+# initializes factory-owned on first use instead of as a root-owned mountpoint.
+RUN mkdir -p /var/lib/dark-factory && \
+    chown -R factory:factory /workspace /opt/dark-factory /var/lib/dark-factory
 
-# Re-link archon CLI so it remains accessible after user switch
-RUN cd /opt/archon/packages/cli && /opt/bun/bin/bun link
+# Verify the archon wrapper resolves for the non-root user (fail the build, not the run).
+# (This CLI branch predates --version support, so grep the usage banner instead.)
+RUN su factory -c 'archon 2>&1 | grep -q "archon workflow"'
 
 USER factory
 WORKDIR /workspace
