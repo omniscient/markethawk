@@ -46,6 +46,10 @@ def test_pr_is_factory_if_any_commit_is_factory():
     assert not is_factory_pr(_pr(commits=[{"authors": [HUMAN, CLAUDE]}]))
 
 
+def test_pr_with_no_commits_is_not_factory():
+    assert not is_factory_pr(_pr(commits=[]))
+
+
 # ── triad classification ───────────────────────────────────────────────────────
 def test_classify_open_pr():
     assert classify_pr(_pr(state="OPEN")) == "open"
@@ -84,7 +88,7 @@ def test_linked_issue_none_for_human_branches():
 # ── window filtering ───────────────────────────────────────────────────────────
 def test_in_window_inclusive_bounds():
     assert in_window("2026-05-01T00:00:00Z", SINCE, UNTIL)
-    assert in_window("2026-06-11T23:00:00Z", SINCE, UNTIL)
+    assert in_window("2026-06-11T23:59:59Z", SINCE, UNTIL)
     assert not in_window("2026-04-30T23:59:59Z", SINCE, UNTIL)
     assert not in_window("2026-06-12T00:00:01Z", SINCE, UNTIL)
     assert not in_window(None, SINCE, UNTIL)

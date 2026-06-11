@@ -48,6 +48,9 @@ def classify_pr(pr: dict) -> str:
     if pr["state"] == "CLOSED":
         return "closed"
     label_names = {lbl["name"] for lbl in pr.get("labels", [])}
+    # Callers only classify factory PRs (is_factory_pr ⇒ ≥1 commit), so an
+    # empty commits list can't occur on the merged path; if it ever did,
+    # falling through to merged_clean (no human commit seen) is the intent.
     has_human_commit = any(
         not is_factory_commit(c) for c in pr.get("commits", [])
     )
@@ -56,7 +59,7 @@ def classify_pr(pr: dict) -> str:
     return "merged_clean"
 
 
-def linked_issue_number(head_ref: str) -> int | None:
+def linked_issue_number(head_ref: str | None) -> int | None:
     m = _ISSUE_RE.search(head_ref or "")
     return int(m.group(1)) if m else None
 
