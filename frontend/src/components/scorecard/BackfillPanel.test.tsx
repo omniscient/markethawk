@@ -3,9 +3,11 @@ import { screen, fireEvent } from '@testing-library/react';
 import { renderWithQuery } from '../../test-utils/renderWithQuery';
 import BackfillPanel from './BackfillPanel';
 
+const mockMutate = vi.hoisted(() => vi.fn());
+
 vi.mock('../../hooks/useScorecard', () => ({
   useBackfillMutation: () => ({
-    mutate: vi.fn(),
+    mutate: mockMutate,
     isPending: false,
     isSuccess: false,
     isError: false,
@@ -55,12 +57,13 @@ describe('BackfillPanel — expanded state', () => {
 
 describe('BackfillPanel — backfill action', () => {
   it('calls mutate when Run Backfill is clicked', () => {
-    const mutate = vi.fn();
-    vi.mocked(vi.importActual).mockImplementation?.(() => Promise.resolve({}));
+    mockMutate.mockClear();
     renderWithQuery(<BackfillPanel scannerType="pre_market_volume_spike" />);
     fireEvent.click(screen.getByRole('button', { name: /Backfill Outcomes/i }));
     fireEvent.click(screen.getByRole('button', { name: /Run Backfill/i }));
-    expect(mutate).not.toHaveBeenCalled(); // fn from mock is in module scope, can't capture here
-    // Sufficient to verify the button exists and is clickable without error
+    expect(mockMutate).toHaveBeenCalledOnce();
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ scanner_type: 'pre_market_volume_spike' }),
+    );
   });
 });

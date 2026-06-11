@@ -24,7 +24,7 @@ vi.mock('../hooks/useScorecard', () => ({
     data: null,
     error: null,
   }),
-  useSignals: () => ({ data: { items: [], total: 0, page: 1, pages: 1 }, isLoading: false }),
+  useSignals: () => ({ data: { signals: [], total: 0, limit: 25, offset: 0 }, isLoading: false }),
 }));
 
 vi.mock('../components/scorecard/EdgeDecayChart', () => ({ default: () => null }));

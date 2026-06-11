@@ -3,8 +3,10 @@ import { screen } from '@testing-library/react';
 import { renderWithQuery } from '../../test-utils/renderWithQuery';
 import ActiveWatchlist from './index';
 
+const mockUseWatchlist = vi.fn(() => ({ data: [], isLoading: false, isError: false }));
+
 vi.mock('../../api/watchlist', () => ({
-  useWatchlist: () => ({ data: [], isLoading: false, isError: false }),
+  useWatchlist: () => mockUseWatchlist(),
   useAddToWatchlist: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveFromWatchlist: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateWatchlistNotes: () => ({ mutate: vi.fn(), isPending: false }),
@@ -44,11 +46,9 @@ describe('ActiveWatchlist', () => {
     expect(screen.getByText(/Add Symbol/i)).toBeInTheDocument();
   });
 
-  it('shows error state when isError is true', () => {
-    vi.mocked(vi.fn()).mockImplementation(() => ({
-      useWatchlist: () => ({ data: [], isLoading: false, isError: true }),
-    }));
-    // Re-render with error — the default mock has isError: false, so just verify no crash
+  it('shows error state when useWatchlist returns isError', () => {
+    mockUseWatchlist.mockReturnValueOnce({ data: [], isLoading: false, isError: true });
     renderWithQuery(<ActiveWatchlist />);
+    expect(screen.getByText(/Failed to load watchlist/i)).toBeInTheDocument();
   });
 });
