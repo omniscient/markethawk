@@ -25,21 +25,25 @@ import yaml
 # OR-join nodes that are known to depend on mutually-exclusive upstream branches.
 # Any intent run skips exactly one of their upstreams, so they MUST declare a
 # skip-tolerant trigger_rule.
-REQUIRED_OR_JOIN_NODES: dict[str, str] = {
-    "validate": "none_failed_min_one_success",
-    "de-conflict": "none_failed_min_one_success",
-    "status-in-review": "none_failed_min_one_success",
-    "report": "none_failed_min_one_success",
-}
+REQUIRED_OR_JOIN_NODES: frozenset[str] = frozenset(
+    {"validate", "de-conflict", "status-in-review", "report"}
+)
 
 # Accepted skip-tolerant rule values.
+# all_done is intentionally excluded: it runs the join even when upstream nodes fail,
+# masking real errors. Only rules that tolerate skips while still enforcing upstream
+# success are accepted.
 SKIP_TOLERANT_RULES: frozenset[str] = frozenset(
     {"none_failed_min_one_success", "one_success"}
 )
 
-# Tripwire: expected total count of nodes carrying an explicit trigger_rule.
-# If this changes, a new OR-join was added or removed without updating this guard.
-EXPECTED_TRIGGER_RULE_COUNT = len(REQUIRED_OR_JOIN_NODES)
+
+def _has_when(node_by_id: dict[str, dict], dep_id: str) -> bool:
+    """Return True if the node identified by *dep_id* carries a 'when:' condition."""
+    dep = node_by_id.get(dep_id)
+    if dep is None:
+        return False  # unknown upstream → treat as unconditional (conservative)
+    return bool(dep.get("when"))
 
 
 def check(workflow_path: Union[str, Path]) -> list[str]:
@@ -64,8 +68,8 @@ def check(workflow_path: Union[str, Path]) -> list[str]:
 
     errors: list[str] = []
 
-    # 1. Each known OR-join node must have a skip-tolerant trigger_rule.
-    for node_id in REQUIRED_OR_JOIN_NODES:
+    # Check 1: each known OR-join node must exist and carry a skip-tolerant trigger_rule.
+    for node_id in sorted(REQUIRED_OR_JOIN_NODES):
         node = node_by_id.get(node_id)
         if node is None:
             errors.append(
@@ -82,15 +86,30 @@ def check(workflow_path: Union[str, Path]) -> list[str]:
                 "silently aborts the rest of the workflow"
             )
 
-    # 2. Tripwire: total count of trigger_rule-bearing nodes must equal the expected value.
-    actual_count = sum(1 for n in nodes if isinstance(n, dict) and "trigger_rule" in n)
-    if actual_count != EXPECTED_TRIGGER_RULE_COUNT:
-        errors.append(
-            f"{path}: expected {EXPECTED_TRIGGER_RULE_COUNT} node(s) with an explicit "
-            f"trigger_rule, found {actual_count}. "
-            "If a new OR-join was added, update REQUIRED_OR_JOIN_NODES and "
-            "EXPECTED_TRIGGER_RULE_COUNT in check_workflow_dag.py."
-        )
+    # Check 2: structural OR-join detection for nodes NOT in the allowlist.
+    # A node whose every upstream carries a 'when:' condition may receive a skip from
+    # a mutually-exclusive sibling branch under the default all_success rule.  Flag any
+    # such node that lacks a skip-tolerant trigger_rule.
+    # (Nodes with at least one unconditional upstream are AND-joins; all_success is correct.)
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_id = node.get("id", "<unknown>")
+        if node_id in REQUIRED_OR_JOIN_NODES:
+            continue  # already covered by check 1
+        depends_on = node.get("depends_on", [])
+        if not isinstance(depends_on, list) or len(depends_on) <= 1:
+            continue
+        if all(_has_when(node_by_id, dep) for dep in depends_on):
+            rule = node.get("trigger_rule")
+            if rule not in SKIP_TOLERANT_RULES:
+                errors.append(
+                    f"{path}: node '{node_id}' has {len(depends_on)} conditional upstreams "
+                    f"(all have 'when:') but trigger_rule={rule!r} is not skip-tolerant "
+                    f"(must be one of {sorted(SKIP_TOLERANT_RULES)}); "
+                    "if any upstream is skipped due to a mutually-exclusive intent branch, "
+                    "all_success will silently abort the rest of the workflow"
+                )
 
     return errors
 
