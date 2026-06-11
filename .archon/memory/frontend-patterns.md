@@ -63,6 +63,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Components using `useParams` from react-router-dom need `vi.mock('react-router-dom', async (importOriginal) => ({ ...await importOriginal(), useParams: () => ({ paramName: value }) }))` in tests — `renderWithQuery` uses `MemoryRouter` without param-aware route patterns, so `useParams` returns `{}` by default. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:implement -->
 
+## Frontend: Testing Mock Spies
+
+- [PATTERN] When a test needs to assert that a mutation function inside a `vi.mock` factory was called, use `vi.hoisted(() => vi.fn())` to hoist the spy above the factory, then reference it in both the mock factory and the test assertion — `const mockMutate = vi.hoisted(() => vi.fn()); vi.mock('../../hooks/...', () => ({ useFoo: () => ({ mutate: mockMutate }) }))`. Without hoisting, the local spy and the module-scope mock use different `vi.fn()` instances and the assertion is always a tautology. <!-- issue:#250 date:2026-06-11 expires:2026-12-11 source:implement -->
+
+- [PATTERN] For per-test mock overrides with `vi.mock`, create the factory function as a `vi.fn()` spy at module scope (e.g. `const mockUseWatchlist = vi.fn(() => defaultReturn)`), reference it in the `vi.mock` factory (`useWatchlist: () => mockUseWatchlist()`), then use `mockUseWatchlist.mockReturnValueOnce(...)` in individual tests — same pattern as ScorecardOverview.test.tsx and ActiveWatchlist.test.tsx. <!-- issue:#250 date:2026-06-11 expires:2026-12-11 source:implement -->
+
+- [AVOID] Do not mock API response shapes with ad-hoc field names — always derive mock objects from the actual TypeScript interface. Wrong mock shapes (`{ items, page }` vs `{ signals, limit, offset }`) silently pass because falsy checks short-circuit before the wrong field is accessed. <!-- issue:#250 date:2026-06-11 expires:2026-12-11 source:implement -->
+
 ## Frontend: Coverage Thresholds
 
 - [PATTERN] Coverage threshold formula (issue #250 ratchet series): `floor(actual) - 3`, clamped to min 30 for statements/lines and 22 for branches/functions. Run `npx vitest run --coverage` to get actuals; update `frontend/vitest.config.ts` thresholds block. CI gate = threshold ≤ actual, so if clamped threshold exceeds actual, add more tests first. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:implement -->
