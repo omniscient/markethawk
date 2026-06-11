@@ -673,7 +673,7 @@ function buildWeeklyTimeseries() {
 
   eChart('chart-triad', {
     legend:{data:TRIAD_NAMES,textStyle:{color:C.mut},bottom:0},
-    xAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    xAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
     yAxis:{type:'category',data:['Factory PRs'],axisLabel:{color:C.mut2}},
     series:TRIAD_KEYS.map((k,i)=>({
       name:TRIAD_NAMES[i],type:'bar',stack:'t',data:[t[k]],
