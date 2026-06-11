@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 483,
-    "total_loc": 68630,
+    "total_files": 487,
+    "total_loc": 69460,
     "languages": [
       "python",
       "javascript",
@@ -15134,6 +15134,78 @@
       ]
     },
     {
+      "id": "dark-factory/scripts/fmt_hunk_filter.py",
+      "type": "module",
+      "language": "python",
+      "size": 289,
+      "loc": 289,
+      "group": 22,
+      "imports": [
+        "difflib",
+        "os",
+        "re",
+        "shutil",
+        "subprocess",
+        "sys",
+        "tempfile"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "parse_file_hunks",
+          "line": 32,
+          "kind": "function",
+          "exported": true,
+          "doc": "Return list of hunk dicts for one file from a unified diff."
+        },
+        {
+          "name": "overlaps",
+          "line": 61,
+          "kind": "function",
+          "exported": true,
+          "doc": "True if the old-file line ranges of two hunks overlap."
+        },
+        {
+          "name": "_apply_hunk",
+          "line": 69,
+          "kind": "function",
+          "exported": false,
+          "doc": "Return lines produced by hunk: added lines and context lines (no removed)."
+        },
+        {
+          "name": "is_formatter_only",
+          "line": 83,
+          "kind": "function",
+          "exported": true,
+          "doc": "Check if applying actual hunk to base_lines produces the same file content"
+        },
+        {
+          "name": "_run_formatter",
+          "line": 126,
+          "kind": "function",
+          "exported": false,
+          "doc": "Apply ruff format + ruff check --fix --select I to content, return result."
+        },
+        {
+          "name": "filter_diff",
+          "line": 169,
+          "kind": "function",
+          "exported": true,
+          "doc": "Strip formatter-only hunks from raw_diff for each file in py_files."
+        },
+        {
+          "name": "main",
+          "line": 269,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
       "id": "dark-factory/tests/test_code_review_command.py",
       "type": "module",
       "language": "python",
@@ -15321,6 +15393,252 @@
           "line": 6,
           "kind": "function",
           "exported": true
+        }
+      ]
+    },
+    {
+      "id": "dark-factory/tests/test_conformance_formatter_step.py",
+      "type": "module",
+      "language": "python",
+      "size": 40,
+      "loc": 40,
+      "group": 23,
+      "imports": [
+        "pathlib"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "test_step_30_invokes_filter_script",
+          "line": 9,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_guards_on_ruff_absence_via_script",
+          "line": 14,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_writes_py_files_list",
+          "line": 20,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_pre_triage_annotation_variable",
+          "line": 26,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_31_uses_triaged_diff",
+          "line": 32,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
+      "id": "dark-factory/tests/test_conformance_prompt_formatter_rule.py",
+      "type": "module",
+      "language": "python",
+      "size": 24,
+      "loc": 24,
+      "group": 23,
+      "imports": [
+        "pathlib"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "test_formatter_exception_rule_present",
+          "line": 9,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_formatter_rule_precedes_oos_bullet_format",
+          "line": 17,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
+      "id": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "type": "module",
+      "language": "python",
+      "size": 477,
+      "loc": 477,
+      "group": 23,
+      "imports": [
+        "sys",
+        "textwrap",
+        "pathlib",
+        "unittest",
+        "fmt_hunk_filter"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "test_parse_file_hunks_returns_two_hunks",
+          "line": 41,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_captures_hunk_lines",
+          "line": 46,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_unknown_file_returns_empty",
+          "line": 53,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_overlaps_true_when_adjacent",
+          "line": 61,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_overlaps_false_when_disjoint",
+          "line": 68,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_hunk",
+          "line": 79,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build a hunk dict with the given body (list of diff lines, no @@ header)."
+        },
+        {
+          "name": "test_apply_hunk_produces_added_and_context_lines",
+          "line": 90,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_apply_hunk_skips_removed_lines",
+          "line": 100,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_true_for_reorder_despite_different_diff_grouping",
+          "line": 112,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_false_when_actual_adds_feature_line",
+          "line": 128,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_false_when_no_overlap",
+          "line": 142,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_mock_run",
+          "line": 177,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "test_filter_diff_strips_formatter_only_hunk",
+          "line": 195,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_leaves_interleaved_hunk_intact",
+          "line": 205,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_new_file_skipped",
+          "line": 225,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_no_ruff_returns_raw",
+          "line": 247,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_true_when_second_formatter_hunk_matches",
+          "line": 258,
+          "kind": "function",
+          "exported": true,
+          "doc": "First overlapping fmt hunk doesn't match; second does \u2014 should still return True"
+        },
+        {
+          "name": "test_apply_hunk_ignores_no_newline_marker",
+          "line": 284,
+          "kind": "function",
+          "exported": true,
+          "doc": "Lines starting with \\ (the diff no-newline marker) should be silently skipped."
+        },
+        {
+          "name": "test_run_formatter_returns_content_unchanged_on_ruff_format_error",
+          "line": 295,
+          "kind": "function",
+          "exported": true,
+          "doc": "If ruff format exits non-zero, _run_formatter returns the original content."
+        },
+        {
+          "name": "test_filter_diff_body_line_starting_with_triple_dash_not_treated_as_file_header",
+          "line": 317,
+          "kind": "function",
+          "exported": true,
+          "doc": "A removed body line whose content starts with '-- ' (diff line '--- ...') must n"
+        },
+        {
+          "name": "test_filter_diff_uses_merge_base_for_git_show",
+          "line": 364,
+          "kind": "function",
+          "exported": true,
+          "doc": "filter_diff must call git merge-base and use its SHA for git show."
+        },
+        {
+          "name": "test_run_formatter_returns_fmt_only_on_ruff_check_error",
+          "line": 404,
+          "kind": "function",
+          "exported": true,
+          "doc": "If ruff check returns rc>1, return post-format content (not partial isort fix)."
+        },
+        {
+          "name": "test_filter_diff_strips_hunk_with_function_context_in_header",
+          "line": 448,
+          "kind": "function",
+          "exported": true,
+          "doc": "Git sometimes adds optional context to @@ headers: '@@ -1,4 +1,4 @@ def foo():'."
         }
       ]
     },
@@ -16934,9 +17252,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 20,
+      "direct_dependents": 21,
       "transitive_dependents": 56,
-      "blast_score": 48.0,
+      "blast_score": 49.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/celery_app.py",
@@ -16956,6 +17274,7 @@
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
         "backend/tests/test_auth_core.py",
         "backend/tests/test_config.py",
+        "dark-factory/scripts/fmt_hunk_filter.py",
         "services/tweet-monitor/tests/test_classifier.py",
         "services/tweet-monitor/tests/test_extractor.py"
       ]
@@ -16969,9 +17288,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 11,
+      "direct_dependents": 13,
       "transitive_dependents": 2,
-      "blast_score": 12.0,
+      "blast_score": 14.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/live_scanner/main.py",
@@ -16979,7 +17298,9 @@
         "backend/scripts/generate_schema_doc.py",
         "backend/scripts/scratch_erd.py",
         "dark-factory/scripts/code_review_payload.py",
+        "dark-factory/scripts/fmt_hunk_filter.py",
         "dark-factory/tests/test_code_review_payload.py",
+        "dark-factory/tests/test_fmt_hunk_filter.py",
         "scripts/fetch_metrics.py",
         "scripts/render_report.py",
         "services/tweet-monitor/tests/test_classifier.py",
@@ -18153,12 +18474,13 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 7,
+      "direct_dependents": 8,
       "transitive_dependents": 1,
-      "blast_score": 7.5,
+      "blast_score": 8.5,
       "imported_by": [
         "backend/app/services/catalyst_parser.py",
         "dark-factory/scripts/code_review_payload.py",
+        "dark-factory/scripts/fmt_hunk_filter.py",
         "scripts/fetch_metrics.py",
         "services/tweet-monitor/app/classifier.py",
         "services/tweet-monitor/app/extractor.py",
@@ -18452,9 +18774,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 35,
+      "direct_dependents": 36,
       "transitive_dependents": 0,
-      "blast_score": 35.0,
+      "blast_score": 36.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_analysis.py",
@@ -18490,7 +18812,8 @@
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
         "backend/tests/tasks/test_slippage.py",
         "backend/tests/tasks/test_sync_tasks.py",
-        "backend/tests/tasks/test_trading_task_shells.py"
+        "backend/tests/tasks/test_trading_task_shells.py",
+        "dark-factory/tests/test_fmt_hunk_filter.py"
       ]
     },
     {
@@ -18804,9 +19127,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 12,
+      "direct_dependents": 15,
       "transitive_dependents": 0,
-      "blast_score": 12.0,
+      "blast_score": 15.0,
       "imported_by": [
         "backend/tests/live_scanner/test_main_imports.py",
         "backend/tests/live_scanner/test_publisher.py",
@@ -18815,6 +19138,9 @@
         "dark-factory/tests/test_code_review_payload.py",
         "dark-factory/tests/test_code_review_prompt.py",
         "dark-factory/tests/test_config_code_review.py",
+        "dark-factory/tests/test_conformance_formatter_step.py",
+        "dark-factory/tests/test_conformance_prompt_formatter_rule.py",
+        "dark-factory/tests/test_fmt_hunk_filter.py",
         "dark-factory/tests/test_report_code_review_section.py",
         "dark-factory/tests/test_workflow_code_review.py",
         "scripts/render_report.py",
@@ -18839,6 +19165,74 @@
       ]
     },
     {
+      "id": "difflib",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "dark-factory/scripts/fmt_hunk_filter.py"
+      ]
+    },
+    {
+      "id": "shutil",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 2,
+      "transitive_dependents": 0,
+      "blast_score": 2.0,
+      "imported_by": [
+        "dark-factory/scripts/fmt_hunk_filter.py",
+        "tests/scripts/test_render_report.py"
+      ]
+    },
+    {
+      "id": "subprocess",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 4,
+      "transitive_dependents": 1,
+      "blast_score": 4.5,
+      "imported_by": [
+        "dark-factory/scripts/fmt_hunk_filter.py",
+        "dark-factory/tests/test_code_review_payload.py",
+        "scripts/fetch_metrics.py",
+        "tests/scripts/test_render_report.py"
+      ]
+    },
+    {
+      "id": "tempfile",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "dark-factory/scripts/fmt_hunk_filter.py"
+      ]
+    },
+    {
       "id": "code_review_payload",
       "type": "import",
       "language": "python",
@@ -18855,7 +19249,7 @@
       ]
     },
     {
-      "id": "subprocess",
+      "id": "textwrap",
       "type": "import",
       "language": "python",
       "size": 40,
@@ -18863,13 +19257,27 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 3,
-      "transitive_dependents": 1,
-      "blast_score": 3.5,
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
       "imported_by": [
-        "dark-factory/tests/test_code_review_payload.py",
-        "scripts/fetch_metrics.py",
-        "tests/scripts/test_render_report.py"
+        "dark-factory/tests/test_fmt_hunk_filter.py"
+      ]
+    },
+    {
+      "id": "fmt_hunk_filter",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "dark-factory/tests/test_fmt_hunk_filter.py"
       ]
     },
     {
@@ -18920,22 +19328,6 @@
       "imported_by": [
         "services/tweet-monitor/app/browser.py",
         "services/tweet-monitor/app/scraper.py"
-      ]
-    },
-    {
-      "id": "shutil",
-      "type": "import",
-      "language": "python",
-      "size": 40,
-      "loc": 0,
-      "group": 9000,
-      "imports": [],
-      "layer": "backend",
-      "direct_dependents": 1,
-      "transitive_dependents": 0,
-      "blast_score": 1.0,
-      "imported_by": [
-        "tests/scripts/test_render_report.py"
       ]
     },
     {
@@ -46443,6 +46835,54 @@
           "exported": true
         },
         {
+          "name": "parse_file_hunks",
+          "line": 32,
+          "kind": "function",
+          "exported": true,
+          "doc": "Return list of hunk dicts for one file from a unified diff."
+        },
+        {
+          "name": "overlaps",
+          "line": 61,
+          "kind": "function",
+          "exported": true,
+          "doc": "True if the old-file line ranges of two hunks overlap."
+        },
+        {
+          "name": "_apply_hunk",
+          "line": 69,
+          "kind": "function",
+          "exported": false,
+          "doc": "Return lines produced by hunk: added lines and context lines (no removed)."
+        },
+        {
+          "name": "is_formatter_only",
+          "line": 83,
+          "kind": "function",
+          "exported": true,
+          "doc": "Check if applying actual hunk to base_lines produces the same file content"
+        },
+        {
+          "name": "_run_formatter",
+          "line": 126,
+          "kind": "function",
+          "exported": false,
+          "doc": "Apply ruff format + ruff check --fix --select I to content, return result."
+        },
+        {
+          "name": "filter_diff",
+          "line": 169,
+          "kind": "function",
+          "exported": true,
+          "doc": "Strip formatter-only hunks from raw_diff for each file in py_files."
+        },
+        {
+          "name": "main",
+          "line": 269,
+          "kind": "function",
+          "exported": true
+        },
+        {
           "name": "test_command_wires_the_contract",
           "line": 6,
           "kind": "function",
@@ -46555,6 +46995,194 @@
           "line": 6,
           "kind": "function",
           "exported": true
+        },
+        {
+          "name": "test_step_30_invokes_filter_script",
+          "line": 9,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_guards_on_ruff_absence_via_script",
+          "line": 14,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_writes_py_files_list",
+          "line": 20,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_pre_triage_annotation_variable",
+          "line": 26,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_31_uses_triaged_diff",
+          "line": 32,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_formatter_exception_rule_present",
+          "line": 9,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_formatter_rule_precedes_oos_bullet_format",
+          "line": 17,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_returns_two_hunks",
+          "line": 41,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_captures_hunk_lines",
+          "line": 46,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_unknown_file_returns_empty",
+          "line": 53,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_overlaps_true_when_adjacent",
+          "line": 61,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_overlaps_false_when_disjoint",
+          "line": 68,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_hunk",
+          "line": 79,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build a hunk dict with the given body (list of diff lines, no @@ header)."
+        },
+        {
+          "name": "test_apply_hunk_produces_added_and_context_lines",
+          "line": 90,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_apply_hunk_skips_removed_lines",
+          "line": 100,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_true_for_reorder_despite_different_diff_grouping",
+          "line": 112,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_false_when_actual_adds_feature_line",
+          "line": 128,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_false_when_no_overlap",
+          "line": 142,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_mock_run",
+          "line": 177,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "test_filter_diff_strips_formatter_only_hunk",
+          "line": 195,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_leaves_interleaved_hunk_intact",
+          "line": 205,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_new_file_skipped",
+          "line": 225,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_no_ruff_returns_raw",
+          "line": 247,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_true_when_second_formatter_hunk_matches",
+          "line": 258,
+          "kind": "function",
+          "exported": true,
+          "doc": "First overlapping fmt hunk doesn't match; second does \u2014 should still return True"
+        },
+        {
+          "name": "test_apply_hunk_ignores_no_newline_marker",
+          "line": 284,
+          "kind": "function",
+          "exported": true,
+          "doc": "Lines starting with \\ (the diff no-newline marker) should be silently skipped."
+        },
+        {
+          "name": "test_run_formatter_returns_content_unchanged_on_ruff_format_error",
+          "line": 295,
+          "kind": "function",
+          "exported": true,
+          "doc": "If ruff format exits non-zero, _run_formatter returns the original content."
+        },
+        {
+          "name": "test_filter_diff_body_line_starting_with_triple_dash_not_treated_as_file_header",
+          "line": 317,
+          "kind": "function",
+          "exported": true,
+          "doc": "A removed body line whose content starts with '-- ' (diff line '--- ...') must n"
+        },
+        {
+          "name": "test_filter_diff_uses_merge_base_for_git_show",
+          "line": 364,
+          "kind": "function",
+          "exported": true,
+          "doc": "filter_diff must call git merge-base and use its SHA for git show."
+        },
+        {
+          "name": "test_run_formatter_returns_fmt_only_on_ruff_check_error",
+          "line": 404,
+          "kind": "function",
+          "exported": true,
+          "doc": "If ruff check returns rc>1, return post-format content (not partial isort fix)."
+        },
+        {
+          "name": "test_filter_diff_strips_hunk_with_function_context_in_header",
+          "line": 448,
+          "kind": "function",
+          "exported": true,
+          "doc": "Git sometimes adds optional context to @@ headers: '@@ -1,4 +1,4 @@ def foo():'."
         },
         {
           "name": "test_report_node_renders_code_review_section",
@@ -53996,6 +54624,48 @@
       "kind": "imports"
     },
     {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "difflib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "os",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "re",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "shutil",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "subprocess",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "sys",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "tempfile",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "dark-factory/tests/test_code_review_command.py",
       "target": "pathlib",
       "weight": 1,
@@ -54046,6 +54716,48 @@
     {
       "source": "dark-factory/tests/test_config_code_review.py",
       "target": "yaml",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_conformance_formatter_step.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_conformance_prompt_formatter_rule.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "sys",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "textwrap",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "fmt_hunk_filter",
       "weight": 1,
       "kind": "imports"
     },
