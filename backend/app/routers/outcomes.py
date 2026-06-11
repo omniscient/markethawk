@@ -32,6 +32,7 @@ from app.schemas.outcome import (
 from app.services.data_readiness import DataReadinessService
 from app.services.outcome_service import OutcomeService
 from app.services.stats import StatsService
+from app.utils.db import get_or_404
 
 router = APIRouter(prefix="/api/v1/outcomes", tags=["outcomes"])
 
@@ -119,9 +120,7 @@ def get_event_outcome(
     event_id: int,
     db: Session = Depends(get_db),
 ):
-    event = db.query(ScannerEvent).filter(ScannerEvent.id == event_id).first()
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
+    get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
 
     summary = (
         db.query(ScannerOutcomeSummary)

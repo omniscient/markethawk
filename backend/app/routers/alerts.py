@@ -15,6 +15,7 @@ from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
+from app.utils.db import get_or_404
 from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
@@ -120,9 +121,7 @@ def update_rule(
     rule_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Update an alert rule (full or partial). Used for toggles too."""
-    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Alert rule not found.")
+    rule = get_or_404(db, AlertRule, rule_id, "AlertRule")
 
     updatable = {
         "name",
@@ -148,9 +147,7 @@ def update_rule(
 @router.delete("/rules/{rule_id}", status_code=204)
 def delete_rule(rule_id: int, db: Session = Depends(get_db)) -> None:
     """Delete an alert rule."""
-    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Alert rule not found.")
+    rule = get_or_404(db, AlertRule, rule_id, "AlertRule")
     db.delete(rule)
     db.commit()
     logger.info(f"Deleted alert rule id={rule_id}")
@@ -164,9 +161,7 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db)) -> None:
 @router.post("/rules/{rule_id}/test")
 def test_rule(rule_id: int, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Send a test notification through all channels configured on this rule."""
-    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Alert rule not found.")
+    rule = get_or_404(db, AlertRule, rule_id, "AlertRule")
 
     # Build a synthetic scanner event for the test
     test_event = ScannerEvent(
