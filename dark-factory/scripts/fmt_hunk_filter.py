@@ -127,8 +127,7 @@ def _run_formatter(content):
     """Apply ruff format + ruff check --fix --select I to content, return result.
 
     Passes --config backend/pyproject.toml so the formatter uses the project's
-    line-length (88) and rule-set — temp files in /tmp/ are outside the project
-    tree and ruff won't auto-discover the config from there.
+    line-length (88) and rule-set regardless of where the temp file lands.
     """
     with tempfile.NamedTemporaryFile(
         suffix=".py", mode="w", delete=False, encoding="utf-8"
@@ -147,6 +146,8 @@ def _run_formatter(content):
                 file=sys.stderr,
             )
             return content
+        with open(tmp, encoding="utf-8") as f:
+            fmt_only = f.read()  # post-ruff-format, pre-isort
         result = subprocess.run(
             ["ruff", "check", "--fix", "--select", "I",
              "--config", "backend/pyproject.toml", tmp],
@@ -155,9 +156,10 @@ def _run_formatter(content):
         if result.returncode > 1:
             print(
                 f"[fmt_hunk_filter] ruff check warning (rc={result.returncode})"
-                " — using partial result",
+                " — skipping isort delta for this file",
                 file=sys.stderr,
             )
+            return fmt_only
         with open(tmp, encoding="utf-8") as f:
             return f.read()
     finally:
@@ -173,14 +175,25 @@ def filter_diff(raw_diff, py_files):
     if not shutil.which("ruff"):
         return raw_diff, []
 
-    headers_to_strip = {}  # filepath → set of hunk header strings to remove
+    headers_to_strip = {}  # filepath → set of (old_start, old_count) tuples to remove
+
+    merge_base_proc = subprocess.run(
+        ["git", "merge-base", "main", "HEAD"], capture_output=True
+    )
+    merge_base = (
+        merge_base_proc.stdout.decode().strip()
+        if merge_base_proc.returncode == 0
+        else "main"
+    )
 
     for filepath in py_files:
         actual_hunks = parse_file_hunks(raw_diff, filepath)
         if not actual_hunks:
             continue
 
-        proc = subprocess.run(["git", "show", f"main:{filepath}"], capture_output=True)
+        proc = subprocess.run(
+            ["git", "show", f"{merge_base}:{filepath}"], capture_output=True
+        )
         if proc.returncode != 0:
             continue  # new file — no base version to compare against
 
@@ -206,7 +219,7 @@ def filter_diff(raw_diff, py_files):
             continue
 
         to_strip = {
-            ah["header"]
+            (ah["old_start"], ah["old_count"])
             for ah in actual_hunks
             if is_formatter_only(ah, fmt_hunks, base_lines)
         }
@@ -235,9 +248,11 @@ def filter_diff(raw_diff, py_files):
             skip = False
             output.append(line)
         elif cur_file and cur_file in headers_to_strip:
-            m = re.match(r"^@@ ", line)
+            m = re.match(r"^@@ -(\d+)(?:,(\d+))? \+", line)
             if m:
-                skip = line in headers_to_strip[cur_file]
+                old_start = int(m.group(1))
+                old_count = int(m.group(2) or 1)
+                skip = (old_start, old_count) in headers_to_strip[cur_file]
             if not skip:
                 output.append(line)
         else:

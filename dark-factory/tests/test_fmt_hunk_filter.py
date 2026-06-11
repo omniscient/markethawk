@@ -178,9 +178,13 @@ def _make_mock_run(base_content, formatted_content):
     def _run(args, **kwargs):
         mock = MagicMock()
         mock.returncode = 0
-        mock.stdout = base_content.encode() if "show" in args else b""
+        if "merge-base" in args:
+            mock.stdout = b"deadbeef1234\n"
+        elif "show" in args:
+            mock.stdout = base_content.encode()
+        else:
+            mock.stdout = b""
         if "format" in args or "check" in args:
-            import os as _os
             tmpfile = args[-1]
             with open(tmpfile, "w", encoding="utf-8") as f:
                 f.write(formatted_content)
@@ -351,3 +355,122 @@ def test_filter_diff_body_line_starting_with_triple_dash_not_treated_as_file_hea
     # Pre-fix: it would appear because the reconstruction loop misidentified it as a
     # file header and reset skip=False.
     assert "--- deprecated" not in filtered
+
+
+# ---------------------------------------------------------------------------
+# Fix 5: filter_diff — use merge-base for git show, not main's tip
+# ---------------------------------------------------------------------------
+
+def test_filter_diff_uses_merge_base_for_git_show():
+    """filter_diff must call git merge-base and use its SHA for git show."""
+    calls = []
+
+    def _mock_run_capture(args, **kwargs):
+        mock = MagicMock()
+        calls.append(list(args))
+        if "merge-base" in args:
+            mock.returncode = 0
+            mock.stdout = b"abc123\n"
+        elif "show" in args:
+            mock.returncode = 0
+            mock.stdout = BASE_CONTENT.encode()
+        else:
+            mock.returncode = 0
+            mock.stdout = b""
+        if "format" in args or "check" in args:
+            tmpfile = args[-1]
+            with open(tmpfile, "w", encoding="utf-8") as f:
+                f.write(FORMATTED_CONTENT)
+        return mock
+
+    with patch("fmt_hunk_filter.subprocess.run", side_effect=_mock_run_capture):
+        with patch("fmt_hunk_filter.shutil.which", return_value="/usr/bin/ruff"):
+            fhf.filter_diff(FMT_DIFF, ["backend/app/core/tracing.py"])
+
+    merge_base_calls = [c for c in calls if "merge-base" in c]
+    assert len(merge_base_calls) == 1, "merge-base must be called exactly once"
+
+    show_calls = [c for c in calls if "show" in c]
+    assert len(show_calls) >= 1
+    # git show must use the merge-base SHA, not "main"
+    assert any("abc123:backend/app/core/tracing.py" in " ".join(c) for c in show_calls)
+    assert not any("main:backend/app/core/tracing.py" in " ".join(c) for c in show_calls)
+
+
+# ---------------------------------------------------------------------------
+# Fix 7: _run_formatter — rc>1 from ruff check returns post-format content
+# ---------------------------------------------------------------------------
+
+def test_run_formatter_returns_fmt_only_on_ruff_check_error(capsys):
+    """If ruff check returns rc>1, return post-format content (not partial isort fix)."""
+    content = "import os\nprint('hello')\n"
+    fmt_content = "import os\n\nprint('hello')\n"  # post-format, pre-isort
+    isort_content = "import os\n\nprint('ISORT_APPLIED')\n"  # partial isort fix
+
+    call_count = [0]
+
+    def _mock_run(args, **kwargs):
+        m = MagicMock()
+        call_count[0] += 1
+        if "format" in args:
+            m.returncode = 0
+            m.stdout = b""
+            tmpfile = args[-1]
+            with open(tmpfile, "w", encoding="utf-8") as f:
+                f.write(fmt_content)
+        elif "check" in args:
+            m.returncode = 2  # real error (not just "fixes applied")
+            m.stdout = b""
+            # Writes partial isort content — should NOT be returned
+            tmpfile = args[-1]
+            with open(tmpfile, "w", encoding="utf-8") as f:
+                f.write(isort_content)
+        else:
+            m.returncode = 0
+            m.stdout = b""
+        return m
+
+    with patch("fmt_hunk_filter.subprocess.run", side_effect=_mock_run):
+        result = fhf._run_formatter(content)
+
+    # Must return fmt_only, not the partial isort_content
+    assert result == fmt_content
+    assert result != isort_content
+    captured = capsys.readouterr()
+    assert "warning" in captured.err.lower() or "fmt_hunk_filter" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Fix 8: reconstruction loop — hunk keyed by (old_start, old_count) tuple,
+# so @@ headers with optional function context still match correctly.
+# ---------------------------------------------------------------------------
+
+def test_filter_diff_strips_hunk_with_function_context_in_header():
+    """
+    Git sometimes adds optional context to @@ headers: '@@ -1,4 +1,4 @@ def foo():'.
+    With string-based keying, a mismatch between the parsed header and the raw diff
+    line would prevent stripping. With tuple-based keying on (old_start, old_count),
+    the strip is range-based and immune to the optional context suffix.
+    """
+    # Raw diff has function context in the @@ header
+    diff_with_context = textwrap.dedent("""\
+        diff --git a/backend/app/core/tracing.py b/backend/app/core/tracing.py
+        index aaa..bbb 100644
+        --- a/backend/app/core/tracing.py
+        +++ b/backend/app/core/tracing.py
+        @@ -1,4 +1,4 @@ def module_init():
+        -import os
+        -import sys
+        +import sys
+        +import os
+         x = 1
+         y = 2
+    """)
+
+    with patch("fmt_hunk_filter.subprocess.run", side_effect=_make_mock_run(BASE_CONTENT, FORMATTED_CONTENT)):
+        with patch("fmt_hunk_filter.shutil.which", return_value="/usr/bin/ruff"):
+            filtered, stripped = fhf.filter_diff(diff_with_context, ["backend/app/core/tracing.py"])
+
+    # The formatter-only hunk should be stripped despite the function context in the header
+    assert "backend/app/core/tracing.py" in stripped
+    assert "@@ -1,4" not in filtered
