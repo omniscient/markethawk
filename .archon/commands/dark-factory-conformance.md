@@ -63,24 +63,64 @@ If no spec file is found after all three steps:
 
 ## Phase 3: PRE-TRIAGE AND CONFORMANCE REVIEW
 
-### Step 3.0 — Pre-triage: strip housekeeping
+### Step 3.0 — Pre-triage: strip housekeeping and formatter-only Python hunks
 
-Before feeding the diff to the reviewer, strip noise that would pollute the out-of-scope analysis:
+Before feeding the diff to the reviewer, strip noise that would pollute the out-of-scope analysis.
+
+**3.0.1 — Get the raw diff (lock files, generated artifacts, and agent memory excluded):**
 
 ```bash
-# Get raw diff excluding lock files, auto-generated artifacts, and agent memory
-git diff main...HEAD \
+RAW_DIFF=$(git diff main...HEAD \
   -- ':!*.lock' ':!*.md' \
   ':!.archon/memory/**' \
   ':!codeindex.json' ':!symbolindex.json' \
   ':!docs/codeindex-hotspots.md' \
   ':!docs/database-schema.md' \
-  2>/dev/null | head -1000
+  2>/dev/null | head -1000)
 ```
 
-These files are housekeeping that does not belong to the feature's spec surface; excluding them prevents the reviewer from mis-classifying them as out-of-scope.
+**3.0.2 — Strip formatter-only hunks from .py files (hunk-level, not file-level):**
 
-Also check for an `out-of-scope.md` recorded by the implement agent:
+For each `.py` file in the diff, the filter script fetches the base version from `main`,
+applies `ruff format` + `ruff check --fix --select I` to a throwaway copy, computes the
+formatter delta, and removes from the diff any hunk whose changed lines are a strict subset
+of the formatter delta. Interleaved hunks (formatter noise and feature code share the same
+hunk) are left intact — Layer 2 (reviewer prompt) handles the residual.
+
+```bash
+# Extract .py files touched by the branch (one per line)
+PY_FILES=$(git diff main...HEAD --name-only -- '*.py' 2>/dev/null)
+
+TRIAGED_DIFF="$RAW_DIFF"
+FILTER_ANNOTATION=""
+
+if [ -n "$PY_FILES" ]; then
+  # Write inputs to temp files
+  DIFF_TMP=$(mktemp /tmp/fmt_diff_XXXXXX.txt)
+  FILES_TMP=$(mktemp /tmp/fmt_files_XXXXXX.txt)
+  printf '%s' "$RAW_DIFF" > "$DIFF_TMP"
+  printf '%s\n' $PY_FILES > "$FILES_TMP"
+
+  # Run the hunk filter; on script error fall back to raw diff (fail-open)
+  FILTER_OUT=$(python3 dark-factory/scripts/fmt_hunk_filter.py \
+    "$DIFF_TMP" "$FILES_TMP" 2>/tmp/fmt_filter_err.txt) \
+    && TRIAGED_DIFF="$FILTER_OUT" \
+    || echo "pre-triage: fmt_hunk_filter.py failed — using raw diff ($(cat /tmp/fmt_filter_err.txt))"
+
+  rm -f "$DIFF_TMP" "$FILES_TMP"
+
+  # Extract the [Pre-triage] annotation line if present (first line of output)
+  FILTER_ANNOTATION=$(printf '%s' "$TRIAGED_DIFF" | head -1 | grep '^\[Pre-triage\]' || true)
+  if [ -n "$FILTER_ANNOTATION" ]; then
+    echo "pre-triage: $FILTER_ANNOTATION"
+  fi
+fi
+```
+
+`$TRIAGED_DIFF` is the formatter-stripped diff (or the raw diff if no .py files or ruff is
+absent). `$FILTER_ANNOTATION` is the one-line informational note (empty if no stripping).
+
+Also check for an `out-of-scope.md` recorded by the implement agent (preserved from original Step 3.0):
 ```bash
 OOS_LOG=""
 if [ -f "$ARTIFACTS_DIR/out-of-scope.md" ]; then
@@ -102,7 +142,8 @@ fi
    <contents of $ARTIFACTS_DIR/out-of-scope.md, or "None recorded.">
 
    ### Diff (pre-triaged, truncated to 1000 lines)
-   <git diff output from Step 3.0>
+   $FILTER_ANNOTATION
+   $TRIAGED_DIFF
    ```
 
 3. Set `CONFORMANCE_CYCLE=0` and `CONFORMANCE_DIALOGUE=""`
