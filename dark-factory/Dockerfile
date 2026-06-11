@@ -86,8 +86,13 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
     groupadd --gid 1000 factory && \
     useradd --uid 1000 --gid 1000 --create-home --home-dir /home/factory factory
 
-# Transfer workspace ownership to the factory user
-RUN chown -R factory:factory /workspace
+# Transfer workspace ownership to the factory user.
+# /opt/dark-factory too: scheduler.sh (runs as factory) provisions
+# /opt/dark-factory/.archon/.env at startup — root-owned dir crash-loops it.
+# /var/lib/dark-factory pre-created so the scheduler_state named volume
+# initializes factory-owned on first use instead of as a root-owned mountpoint.
+RUN mkdir -p /var/lib/dark-factory && \
+    chown -R factory:factory /workspace /opt/dark-factory /var/lib/dark-factory
 
 # Re-link archon CLI so it remains accessible after user switch
 RUN cd /opt/archon/packages/cli && /opt/bun/bin/bun link
