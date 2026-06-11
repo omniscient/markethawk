@@ -80,6 +80,8 @@ MarketHawk/
 │   │   │   ├── session_metrics.py  (calculate_day_metrics* — extracted from scanner.py)
 │   │   │   ├── scan_enrichment.py  (_get_batch_enrichment_data* — extracted from scanner.py)
 │   │   │   ├── discovery_service.py
+│   │   │   ├── stock_screener.py   (StockScreener — self-registers as "stocks" screener adapter)
+│   │   │   ├── futures_screener.py (FuturesScreener — self-registers as "futures" screener adapter)
 │   │   │   ├── catalyst_parser.py
 │   │   │   ├── futures_data.py         (facade — impl in sibling modules)
 │   │   │   ├── futures_contracts.py    (SYMBOL_EXCHANGE_MAP, FuturesContractService)
