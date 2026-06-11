@@ -93,3 +93,27 @@ def test_all_charts_render_with_real_echarts():
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "THROW" not in result.stdout, result.stdout
+
+
+# ── scorecard merge (#331) ─────────────────────────────────────────────────────
+def test_render_merges_scorecard_when_present(tmp_path, monkeypatch):
+    monkeypatch.setattr(render_report, "_get_echarts_js", lambda: STUB_ECHARTS)
+    metrics_path = _write_metrics(tmp_path)
+    scorecard_path = tmp_path / "scorecard.json"
+    scorecard_path.write_text(json.dumps({"triad": {"merged_clean": 5}}))
+    output_path = tmp_path / "report.html"
+    render(str(metrics_path), str(TEMPLATE), str(output_path), str(scorecard_path))
+    html = output_path.read_text(encoding="utf-8")
+    assert '"scorecard"' in html
+    assert '"merged_clean": 5' in html
+
+
+def test_render_without_scorecard_file_still_works(tmp_path, monkeypatch):
+    monkeypatch.setattr(render_report, "_get_echarts_js", lambda: STUB_ECHARTS)
+    metrics_path = _write_metrics(tmp_path)
+    output_path = tmp_path / "report.html"
+    render(str(metrics_path), str(TEMPLATE), str(output_path),
+           str(tmp_path / "missing.json"))
+    html = output_path.read_text(encoding="utf-8")
+    assert '"scorecard"' not in html
+    assert html.startswith("<!DOCTYPE html")

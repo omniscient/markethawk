@@ -27,13 +27,24 @@ def _get_echarts_js() -> str:
     return js
 
 
-def render(metrics_path: str, template_path: str, output_path: str) -> None:
+def render(
+    metrics_path: str,
+    template_path: str,
+    output_path: str,
+    scorecard_path: str | None = None,
+) -> None:
     """Render the pipeline report.
 
-    Reads metrics JSON, injects ECharts (vendored) and metrics data into the
-    template, writes a single self-contained HTML file.
+    Reads metrics JSON (merging scorecard.json under a ``scorecard`` key when
+    present — the template skips the Factory Scorecard section otherwise),
+    injects ECharts (vendored) and the data into the template, writes a single
+    self-contained HTML file.
     """
     metrics = json.loads(Path(metrics_path).read_text(encoding="utf-8"))
+    if scorecard_path and Path(scorecard_path).exists():
+        metrics["scorecard"] = json.loads(
+            Path(scorecard_path).read_text(encoding="utf-8")
+        )
     template = Path(template_path).read_text(encoding="utf-8")
     echarts_js = _get_echarts_js()
 
@@ -51,8 +62,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--metrics", default="metrics.json")
+    parser.add_argument("--scorecard", default="scorecard.json")
     parser.add_argument("--template", default="scripts/template.html")
     parser.add_argument("--output", default="docs/pipeline-report.html")
     args = parser.parse_args()
 
-    render(args.metrics, args.template, args.output)
+    render(args.metrics, args.template, args.output, args.scorecard)

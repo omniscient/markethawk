@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Architecture review — MarketHawk Dark Factory</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+</script>
+<style>
+  .seam { stroke-dasharray: 4 4; }
+  .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+  .badge { @apply text-xs font-semibold px-2.5 py-1 rounded-full; }
+</style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-6 py-12 space-y-14">
+
+<!-- ============ HEADER ============ -->
+<header class="space-y-4">
+  <p class="text-xs uppercase tracking-widest text-slate-500">Architecture review · 2026-06-11</p>
+  <h1 class="font-serif text-4xl">The Dark Factory</h1>
+  <p class="text-slate-600 max-w-3xl">Multi-dimensional review of the autonomous development pipeline (Archon DAG + superpowers-style commands + backlog scheduler). Evidence: 42 days of operation, 100 merged PRs, full pipeline map, and 2025–26 frontier research on measuring agentic coding pipelines.</p>
+  <div class="flex gap-6 text-xs text-slate-500 pt-2">
+    <span><span class="inline-block w-3 h-3 border border-slate-700 bg-white align-middle mr-1"></span> module</span>
+    <span><span class="inline-block w-6 border-t-2 border-dashed border-slate-500 align-middle mr-1"></span> seam</span>
+    <span><span class="inline-block w-6 border-t-2 border-red-600 align-middle mr-1"></span> leakage</span>
+    <span><span class="inline-block w-3 h-3 deep align-middle mr-1"></span> deep module</span>
+  </div>
+</header>
+
+<!-- ============ SCORECARD ============ -->
+<section class="space-y-4">
+  <h2 class="font-serif text-2xl">Dimensional scorecard</h2>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4"><p class="text-xs uppercase tracking-wider text-emerald-700">Throughput</p><p class="text-2xl font-bold text-emerald-800">A</p><p class="text-xs text-emerald-700 mt-1">2.4 PRs/day, ~$3/issue. Real and cheap.</p></div>
+    <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4"><p class="text-xs uppercase tracking-wider text-emerald-700">Security model</p><p class="text-2xl font-bold text-emerald-800">B+</p><p class="text-xs text-emerald-700 mt-1">Socket proxy, non-root, risk accepted in ADR-0008. Settled.</p></div>
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4"><p class="text-xs uppercase tracking-wider text-amber-700">Gate effectiveness</p><p class="text-2xl font-bold text-amber-800">C</p><p class="text-xs text-amber-700 mt-1">Code review: 0 blocking findings in every sampled PR. Conformance: 9 reverts incl. a double-revert. Uncalibrated both ways.</p></div>
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4"><p class="text-xs uppercase tracking-wider text-amber-700">Resilience</p><p class="text-2xl font-bold text-amber-800">C+</p><p class="text-xs text-amber-700 mt-1">Circuit breaker + retries exist; one red main blocked everything 48h (#250). No baseline-green check.</p></div>
+    <div class="rounded-lg border border-red-200 bg-red-50 p-4"><p class="text-xs uppercase tracking-wider text-red-700">Measurement</p><p class="text-2xl font-bold text-red-800">D</p><p class="text-xs text-red-700 mt-1">Cost is tracked; outcomes are not. No merge-rate, rework, churn, or per-gate effectiveness numbers. No benchmark.</p></div>
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4"><p class="text-xs uppercase tracking-wider text-amber-700">Self-improvement</p><p class="text-2xl font-bold text-amber-800">C</p><p class="text-xs text-amber-700 mt-1">Memory writes exist but ungoverned (#254 open). No failure→eval flywheel.</p></div>
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-4"><p class="text-xs uppercase tracking-wider text-amber-700">Artifact calibration</p><p class="text-2xl font-bold text-amber-800">B−</p><p class="text-xs text-amber-700 mt-1">Specs/plans/reports persist; the four verdict artifacts (validation, conformance, review, conflict) die with /tmp.</p></div>
+    <div class="rounded-lg border border-red-200 bg-red-50 p-4"><p class="text-xs uppercase tracking-wider text-red-700">Testability of the factory</p><p class="text-2xl font-bold text-red-800">D</p><p class="text-xs text-red-700 mt-1">~1,700 lines of bash glue (entrypoint, scheduler, de-conflict) with zero tests; only code_review_payload.py is tested.</p></div>
+  </div>
+</section>
+
+<!-- ============ EVIDENCE ============ -->
+<section class="space-y-4">
+  <h2 class="font-serif text-2xl">Evidence baseline (42 days)</h2>
+  <div class="grid md:grid-cols-3 gap-3 text-sm">
+    <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-1">
+      <p class="text-xs uppercase tracking-wider text-slate-500">Output</p>
+      <p>100 merged PRs (2026-05-23 → 06-10) · avg time-to-merge 7.1h, max 54.7h · 35% of PRs ≥500 LOC</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-1">
+      <p class="text-xs uppercase tracking-wider text-slate-500">Rework signal</p>
+      <p>42 scope-spillover tickets · 9 "excise out-of-scope" reverts (one double-revert) · 3 multi-issue rework chains (JWT, seed SQL, Pocket Pivot) · PR #278 silently re-reverted a settled migration decision</p>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-4 space-y-1">
+      <p class="text-xs uppercase tracking-wider text-slate-500">Review reality</p>
+      <p>All sampled PR reviews authored by the factory's own code-review stage · <strong>0 blocking findings, ever, in the sample</strong> · 3 of 6 sampled PRs merged with no review at all</p>
+    </div>
+  </div>
+  <p class="text-sm text-slate-600 max-w-3xl">The honest read: the factory is <em>productive</em> and <em>cheap</em>, and the architecture-review series (62 → 83 → 90) proves directional improvement. But every quality number above had to be excavated by hand for this review — none of it is recorded by the factory itself. That is the central finding.</p>
+</section>
+
+<!-- ============ RESEARCH ============ -->
+<section class="space-y-4">
+  <h2 class="font-serif text-2xl">What frontier practice says (2025–26)</h2>
+  <div class="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 text-sm">
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">DORA 2025</span><span>Added <strong>Rework Rate</strong> as a fifth metric precisely because AI inflates first-pass throughput and pushes correction downstream. Small batch size is the strongest lever. <a class="text-indigo-600" href="https://dora.dev/dora-report-2025/">dora.dev</a></span></div>
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">Cognition '26</span><span><strong>PR merge rate is the industry top-line</strong> (Devin: 34%→67% YoY — moved by harness/scoping iteration, not model upgrades). <a class="text-indigo-600" href="https://cognition.ai/blog/devin-annual-performance-review-2025">cognition.ai</a></span></div>
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">METR '26</span><span>Maintainers accepted only <strong>~half</strong> of AI PRs that passed automated graders — test-passage overstates mergeability ~2×. Track success by ticket-size bucket to find your autonomy ceiling. <a class="text-indigo-600" href="https://metr.org/notes/2026-03-10-many-swe-bench-passing-prs-would-not-be-merged-into-main/">metr.org</a></span></div>
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">GitClear '25</span><span>The slop proxies: <strong>2-week churn</strong> on AI-authored lines, copy/paste vs moved-line ratio, duplicate-block growth. All computable from git history alone. <a class="text-indigo-600" href="https://www.gitclear.com/ai_assistant_code_quality_2025_research">gitclear.com</a></span></div>
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">MSR '26</span><span>Post-merge SonarQube on 1,210 agent PRs: <strong>PR size drove issue density</strong>, not which agent. Recommends size-aware static-analysis gates beyond unit tests. <a class="text-indigo-600" href="https://arxiv.org/html/2601.20109v1">arXiv 2601.20109</a></span></div>
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">pass^k</span><span>For unattended pipelines, <strong>pass^k = (c/n)^k</strong> is the honest reliability metric: 70% single-run success → only 34% chance of 3 clean runs in a row. <a class="text-indigo-600" href="https://www.philschmid.de/agents-pass-at-k-pass-power-k">philschmid.de</a></span></div>
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">Judge calibration</span><span>LLM judges usable as gates at ≥75% human-agreement; production judges missed ~80% of guardrail failures in one 2026 study. <strong>Deterministic checks hard-gate; judges advisory until calibrated.</strong> <a class="text-indigo-600" href="https://arxiv.org/html/2606.10315">arXiv 2606.10315</a></span></div>
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">Anthropic '26</span><span>Build the first eval set from <strong>20–50 of your own production failures</strong>; long-running harnesses must smoke-test the baseline before starting new work. <a class="text-indigo-600" href="https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents">anthropic.com</a></span></div>
+    <div class="p-3 flex gap-3"><span class="text-xs font-mono text-slate-400 w-28 shrink-0">ACE / ICLR '26</span><span>Memory as an <strong>append-only playbook of small delta lessons</strong>; never let an agent wholesale-rewrite its own lessons file (context collapse). Validates the .archon/memory design, prescribes its governance. <a class="text-indigo-600" href="https://arxiv.org/abs/2510.04618">arXiv 2510.04618</a></span></div>
+  </div>
+</section>
+
+<!-- ============ CANDIDATES ============ -->
+<section id="candidates" class="space-y-10">
+  <h2 class="font-serif text-2xl">Candidates</h2>
+
+  <!-- C1 -->
+  <article id="c1" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C1 · The Run Record — give every factory run one deep artifact</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">dark-factory/entrypoint.sh · dark-factory/scheduler.sh · .archon/workflows/archon-dark-factory.yaml · Seq (ADR-0011)</p>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Before — run state scattered across 5 sinks, 4 of them lossy</p>
+        <pre class="mermaid">
+flowchart TD
+  R[factory run] --> A["cost comment<br/>(issue, jq-formatted)"]
+  R --> B["/tmp/artifacts/*.md<br/>(deleted with container)"]
+  R --> C["scheduler-state.json<br/>(retry counts only)"]
+  R --> D["GitHub labels<br/>(current state, no history)"]
+  R --> E["Seq raw lines<br/>(unstructured GELF)"]
+  classDef lossy stroke:#dc2626,stroke-width:2px;
+  class B,C,D lossy
+        </pre>
+      </div>
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">After — one run-record module; every stage writes a verdict through one interface</p>
+        <pre class="mermaid">
+flowchart TD
+  S1[implement] --> RR
+  S2[validate] --> RR
+  S3[conformance] --> RR
+  S4[code-review] --> RR
+  S5[scheduler] --> RR
+  RR["RunRecord<br/>record(stage, verdict, tokens, ms)"]:::deep
+  RR --> Q["Seq (structured,<br/>gen_ai.* attributes)"]
+  RR --> J["runs.jsonl<br/>(queryable history)"]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+        </pre>
+      </div>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> the factory produces verdicts everywhere and records them nowhere — conformance status, review findings, validation results, retries, and durations are split across issue comments, ephemeral /tmp files, a retry-counter JSON, and unstructured Seq lines; this whole review's baseline had to be reconstructed by hand.</p>
+    <p class="text-sm"><strong>Solution:</strong> a run-record module with one interface — <code class="font-mono text-xs bg-slate-100 px-1 rounded">record(stage, verdict)</code> — that every stage and the scheduler write to; persisted as one structured record per run (issue, intent, stages, outcomes, tokens, cost, durations) shipped to Seq with OTel <code class="font-mono text-xs bg-slate-100 px-1 rounded">gen_ai.*</code> attribute names and appended to a queryable history file.</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>leverage: one interface feeds every metric in C2, C3, C9</li>
+      <li>locality: gate-effectiveness questions become one query</li>
+      <li>verdict artifacts stop dying with /tmp</li>
+      <li>future-proof: OTel GenAI schema, not a private one</li>
+    </ul>
+  </article>
+
+  <!-- C2 -->
+  <article id="c2" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C2 · A Scorecard for the factory itself</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">near-zero effort</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">gh queries + one git script + 2 new labels (factory-regression, merged-with-edits)</p>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4 space-y-2">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Before — the product has this loop; the factory doesn't</p>
+        <div class="flex items-center gap-2 text-xs">
+          <div class="border border-slate-700 bg-white px-2 py-2">Signal</div><span>→</span>
+          <div class="border border-slate-700 bg-white px-2 py-2">Review</div><span>→</span>
+          <div class="border border-slate-700 bg-white px-2 py-2">Outcome</div><span>→</span>
+          <div class="border border-slate-700 bg-white px-2 py-2">Scorecard</div><span>→</span>
+          <div class="border border-slate-700 bg-white px-2 py-2">Edge?</div>
+        </div>
+        <div class="flex items-center gap-2 text-xs pt-3">
+          <div class="border border-slate-700 bg-white px-2 py-2">Factory PR</div><span>→</span>
+          <div class="border-2 border-dashed border-red-400 text-red-500 px-2 py-2">nothing</div><span class="text-red-500">→ merged & forgotten</span>
+        </div>
+      </div>
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4 space-y-2">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">After — the factory's PRs get Outcomes and a Scorecard</p>
+        <div class="flex items-center gap-2 text-xs">
+          <div class="border border-slate-700 bg-white px-2 py-2">Factory PR</div><span>→</span>
+          <div class="border border-slate-700 bg-white px-2 py-2">merge triad<br/><span class="text-slate-400">clean / edited / closed</span></div><span>→</span>
+          <div class="border border-slate-700 bg-white px-2 py-2">14-day outcome<br/><span class="text-slate-400">churn · regression label</span></div><span>→</span>
+          <div class="deep text-white px-2 py-2">Factory<br/>Scorecard</div>
+        </div>
+        <p class="text-xs text-slate-500 pt-2">Merge rate (Cognition's top-line) · Rework rate (DORA's fifth metric) · 2-week churn (GitClear's slop signal) · human-minutes per PR · success by S/M/L label (METR ceiling)</p>
+      </div>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> the platform measures its Scanners with Outcomes and a Scorecard, but the factory — itself a signal generator whose Signals are PRs — has no Outcome tracking at all, so "is the factory good?" is unanswerable.</p>
+    <p class="text-sm"><strong>Solution:</strong> apply the project's own domain model to the factory: label-based merge triad, a <code class="font-mono text-xs bg-slate-100 px-1 rounded">factory-regression</code> label on every follow-up fix, a weekly git script computing 2-week churn on factory commits, and success-rate by size label — rendered as a Factory Scorecard (the metrics dashboard from PR #217 is the natural home).</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>the benchmark gap closes with ~1 day of work</li>
+      <li>every number is industry-comparable (DORA, Cognition, GitClear)</li>
+      <li>feeds the dispatch ceiling in C9</li>
+      <li>regression-labelled issues seed the eval set in C8</li>
+    </ul>
+  </article>
+
+  <!-- C3 -->
+  <article id="c3" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C3 · Replay benchmark — measure the harness, not the model</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">medium effort</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">new: dark-factory/bench/ · sources: 10–20 closed issues with merged PRs · pattern: SWE-Bench++ test-oracle extraction, Harness-Bench fixed-suite</p>
+    <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+      <pre class="mermaid">
+flowchart LR
+  A["closed issue #N<br/>+ golden merged PR"] --> B["replay: dispatch issue<br/>against pre-PR commit"]
+  B --> C["run 3×"]
+  C --> D["deterministic check<br/>tests fail pre / pass post"]
+  C --> E["quality grade<br/>vs golden PR<br/>(METR: discount test-pass ~2×)"]
+  D --> F["pass^k by<br/>size bucket"]:::deep
+  E --> F
+  F --> G["harness change?<br/>re-run suite before merging it"]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+      </pre>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> every change to the DAG, a command prompt, or a gate threshold ships unmeasured — the OR-join trigger_rule self-regression (ce9e4a3) proved the harness can silently break itself, and there is no fixed suite to catch the next one.</p>
+    <p class="text-sm"><strong>Solution:</strong> a replay suite of 10–20 already-closed issues (benchmark-eligible iff their merged PR contains tests that fail pre-patch and pass post-patch), each run 3× against the pre-PR commit; report pass^k per size bucket; re-run the suite whenever the factory's own prompts or DAG change.</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>the interface is the test surface — for the factory itself</li>
+      <li>pass^k is the honest unattended-reliability number</li>
+      <li>harness regressions caught before they burn live runs</li>
+      <li>Max-plan token cost is the real constraint: run nightly or pre-change, not per-commit</li>
+    </ul>
+  </article>
+
+  <!-- C4 -->
+  <article id="c4" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C4 · Deepen the Gate seam — layered policy, calibrated judges</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">local-substitutable</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">.archon/commands/dark-factory-conformance.md · dark-factory-code-review.md · .claude/skills/refinement/config.yaml · codeindex get_impact</p>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Before — two shallow gates, miscalibrated in opposite directions</p>
+        <div class="space-y-2 text-xs">
+          <div class="border border-slate-700 bg-white p-2">conformance — <span class="text-red-600">over-blocks</span>: 9 excise-reverts, 1 double-revert, 42 spillover tickets<br/><span class="text-slate-400 font-mono">inline route_memory_file() + write_memory_entry()</span></div>
+          <div class="border border-slate-700 bg-white p-2">code-review — <span class="text-red-600">under-blocks</span>: 0 blocking findings across all sampled PRs; fail-open; auto-advance<br/><span class="text-slate-400 font-mono">inline route_memory_file() + write_memory_entry() (95% duplicate)</span></div>
+          <p class="text-red-600 pt-1">PR #278 passed both gates and re-reverted a settled migration decision.</p>
+        </div>
+      </div>
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">After — one Gate interface, a policy cross-section</p>
+        <div class="space-y-0 text-xs">
+          <div class="h-10 border-l-4 border-slate-900 bg-slate-900 text-white flex items-center px-3">hard gate · deterministic — tsc, pytest, migrations, conflict-marker grep</div>
+          <div class="h-10 border-l-4 border-slate-700 bg-slate-200 flex items-center px-3">hard gate · structural — PR-size budget + blast-radius (get_impact on hotspots ⇒ human approval)</div>
+          <div class="h-10 border-l-4 border-amber-500 bg-amber-50 flex items-center px-3">advisory · LLM judges (conformance, code-review) — promoted to blocking only at ≥75% agreement on 20–30 hand-labelled past verdicts</div>
+          <p class="text-slate-500 pt-2">Both judges become adapters of one Gate interface: <span class="font-mono">verdict(diff, context) → {status, findings[], severity}</span> + one shared memory-write implementation. Two adapters = the seam is real.</p>
+        </div>
+      </div>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> the two LLM gates are shallow modules — near-identical inline memory-write implementations, separate verdict formats, no shared policy — and neither is calibrated: conformance generates churn (the reverts), code review rubber-stamps (zero blocks), and the gating order doesn't distinguish deterministic facts from model opinions.</p>
+    <p class="text-sm"><strong>Solution:</strong> one Gate interface with conformance and code-review as adapters; deterministic and structural checks hard-gate, LLM verdicts stay advisory until a one-time calibration audit (hand-label 20–30 past verdicts) earns them blocking power; high-blast files (codeindex get_impact) always require human approval regardless of judge verdict.</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>locality: one memory-write implementation, one verdict format</li>
+      <li>leverage: new gates (security, perf) plug into the same seam</li>
+      <li>#278-class incidents need a deterministic or human gate, and get one</li>
+      <li>calibration turns "0 blocking" from suspicious to verified</li>
+    </ul>
+    <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">Overlaps open work: #276 (scope over-reporting) and #275 (root cause) cover the conformance half; the Gate interface + calibration audit is the part nothing currently tracks.</div>
+  </article>
+
+  <!-- C5 -->
+  <article id="c5" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C5 · Baseline-green gate — never start work on a red main</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">Strong</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">cheap</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">.archon/workflows/archon-dark-factory.yaml (new stage 0) · dark-factory/scheduler.sh</p>
+    <div class="grid md:grid-cols-2 gap-4 text-xs">
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+        <p class="uppercase tracking-wider text-slate-500 mb-3">Before — issue #250, June 5–6</p>
+        <div class="space-y-1">
+          <div class="flex items-center gap-2"><span class="font-mono text-slate-400 w-12">t+0h</span><div class="flex-1 h-6 bg-red-200 border border-red-400 flex items-center px-2">PR #228 merges a tsc break to main</div></div>
+          <div class="flex items-center gap-2"><span class="font-mono text-slate-400 w-12">t+1h</span><div class="flex-1 h-6 bg-red-100 border border-red-300 flex items-center px-2">every dispatched ticket fails at preview-up</div></div>
+          <div class="flex items-center gap-2"><span class="font-mono text-slate-400 w-12">t+3h</span><div class="flex-1 h-6 bg-red-100 border border-red-300 flex items-center px-2">circuit breakers trip across the backlog, runs burned</div></div>
+          <div class="flex items-center gap-2"><span class="font-mono text-slate-400 w-12">t+48h</span><div class="flex-1 h-6 bg-emerald-100 border border-emerald-300 flex items-center px-2">human diagnoses via Seq + fresh tsc, fixes main</div></div>
+        </div>
+      </div>
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+        <p class="uppercase tracking-wider text-slate-500 mb-3">After — stage 0 smoke gate</p>
+        <div class="space-y-1">
+          <div class="flex items-center gap-2"><span class="font-mono text-slate-400 w-12">t+0m</span><div class="flex-1 h-6 deep text-white flex items-center px-2">smoke main: tsc -p tsconfig.app.json + backend import check (~2 min)</div></div>
+          <div class="flex items-center gap-2"><span class="font-mono text-slate-400 w-12">red?</span><div class="flex-1 h-6 bg-amber-100 border border-amber-300 flex items-center px-2">halt run · file/flag one "main is red" ticket · scheduler pauses dispatch</div></div>
+          <div class="flex items-center gap-2"><span class="font-mono text-slate-400 w-12">green</span><div class="flex-1 h-6 bg-emerald-100 border border-emerald-300 flex items-center px-2">proceed; any later tsc failure is provably the factory's own</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> the pipeline assumes main is green; when it isn't, every run fails at preview-up for someone else's reason, the circuit breaker mis-attributes the failure to each ticket, and runs burn until a human notices — 48 hours, in the one measured incident.</p>
+    <p class="text-sm"><strong>Solution:</strong> a stage-0 smoke check of origin/main (the exact commands the memory file already prescribes for diagnosis) that halts the run, files one root-cause ticket, and pauses the scheduler when red — Anthropic's published harness pattern ("verify the baseline before new work"), learned here the hard way and not yet codified.</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>failure attribution becomes trustworthy (own break vs inherited)</li>
+      <li>circuit-breaker state stops lying</li>
+      <li>~2 minutes per run buys 48-hour-class incident immunity</li>
+    </ul>
+  </article>
+
+  <!-- C6 -->
+  <article id="c6" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C6 · Extract the factory core from the bash glue</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">ports &amp; adapters</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">dark-factory/entrypoint.sh (~200 ln) · dark-factory/scheduler.sh (~400 ln) · de-conflict stage (~200 ln inline yaml-bash) · only code_review_payload.py has tests</p>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Before — duplicated, untested glue</p>
+        <pre class="mermaid">
+flowchart TD
+  E[entrypoint.sh] --> B1[find_board_item]
+  E --> B2[set_board_status]
+  E --> B3[cost report jq]
+  S[scheduler.sh] --> B4[find_board_item ²]
+  S --> B5[set_board_status ²]
+  S --> B6[retry / rate-limit]
+  Y[DAG yaml] --> B7[de-conflict tiers 1–3 inline]
+  classDef dup stroke:#dc2626,stroke-width:2px;
+  class B1,B2,B4,B5 dup
+        </pre>
+      </div>
+      <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">After — tested core, bash as thin adapters</p>
+        <pre class="mermaid">
+flowchart TD
+  E[entrypoint.sh<br/>thin adapter] --> CORE
+  S[scheduler.sh<br/>thin adapter] --> CORE
+  Y[DAG yaml<br/>calls core CLI] --> CORE
+  CORE["factory_core (python)<br/>board · retry · de-conflict · run-record<br/>pytest suite"]:::deep
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+        </pre>
+      </div>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> board updates, retry/circuit-breaker logic, and the three-tier de-conflict live as duplicated bash across entrypoint, scheduler, and inline DAG yaml — the deletion test says deleting any one file scatters complexity to the others, and none of it is testable, so factory bugs (the trigger_rule regression, the double-revert) are only caught in production runs.</p>
+    <p class="text-sm"><strong>Solution:</strong> deepen into one Python factory-core module (board ops, retry state, de-conflict tiers, run-record from C1) with a pytest suite; entrypoint.sh, scheduler.sh, and DAG stages become thin adapters calling it — the interface stays the same shell commands, the implementation concentrates.</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>locality: one place for retry/board/conflict bugs</li>
+      <li>the factory's own changes become testable pre-merge (pairs with C3)</li>
+      <li>two adapters (entrypoint, scheduler) prove the seam today</li>
+    </ul>
+    <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">Overlaps #215 (scheduler tests) — but #215 tests the bash as-is; this concentrates first so the tests have one interface to hit. Note: baked-image constraint applies — core changes need <span class="font-mono">docker compose build</span> (memory: scheduler/entrypoint are baked).</div>
+  </article>
+
+  <!-- C7 -->
+  <article id="c7" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C7 · One config interface</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">in-process</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">.claude/skills/refinement/config.yaml · scheduler.sh env defaults · entrypoint.sh env defaults · SEVERITY_ORDER in code_review_payload.py</p>
+    <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+      <div class="grid grid-cols-2 gap-6 text-xs">
+        <div class="space-y-2">
+          <p class="uppercase tracking-wider text-slate-500">Before — same knob, three owners</p>
+          <div class="border border-slate-700 bg-white p-2">config.yaml: <span class="font-mono">refine.wip_limit: 2</span></div>
+          <div class="border border-red-400 bg-white p-2">scheduler.sh: <span class="font-mono">REFINE_WIP_LIMIT=2</span> <span class="text-red-600">(independent default)</span></div>
+          <div class="border border-red-400 bg-white p-2">code_review_payload.py: <span class="font-mono">SEVERITY_ORDER</span> hardcoded <span class="text-red-600">(diverges from block_threshold enum)</span></div>
+        </div>
+        <div class="space-y-2">
+          <p class="uppercase tracking-wider text-slate-500">After — yaml is the interface, everything reads it</p>
+          <div class="deep text-white p-2">config.yaml — single source; scheduler/entrypoint read via yq at startup; env vars demoted to overrides; payload script reads the same enum</div>
+          <p class="text-slate-500">Interface = the documented knob list. Implementation = wherever each consumer reads it. Today the interface is as wide as three implementations.</p>
+        </div>
+      </div>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> the config surface is shallow — the same knobs are defined independently in yaml, two shell scripts' env defaults, and a Python constant, so they silently diverge and there is no single place to answer "what is the factory's current policy?"</p>
+    <p class="text-sm"><strong>Solution:</strong> make config.yaml the one interface — scheduler and entrypoint parse it at startup (env vars become explicit overrides, logged when active), and the severity enum lives in the yaml that block_threshold already references.</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>deletion test: deleting yaml today loses only some knobs — after, it loses all (that's depth)</li>
+      <li>policy questions get one answer</li>
+    </ul>
+  </article>
+
+  <!-- C8 -->
+  <article id="c8" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C8 · Post-mortem stage + failure→eval flywheel</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">Worth exploring</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">mock-free by design</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">scheduler.sh circuit-breaker path · new: post-mortem prompt · eval suite from C3 · memory governance per #254</p>
+    <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+      <pre class="mermaid">
+flowchart LR
+  CB["circuit breaker trips<br/>(today: human does Seq forensics)"] --> PM["post-mortem agent<br/>1 paragraph: why it failed<br/>posted to the ticket"]
+  PM --> RT["retry run reads it<br/>(Reflexion: +11pp pass@1)"]
+  PM --> EV["failure becomes a<br/>permanent eval task"]:::deep
+  EV --> C3["replay suite (C3)<br/>harness changes must not regress it"]
+  classDef deep fill:#0f172a,color:#fff,stroke:#0f172a;
+      </pre>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> when the circuit breaker trips, the failure's cause evaporates — the human reconstructs it from Seq, the retry run starts blind, and nothing accumulates; the factory's most valuable data (its own failures) is discarded.</p>
+    <p class="text-sm"><strong>Solution:</strong> on circuit-break, a cheap haiku post-mortem step writes a one-paragraph "why this failed" comment on the ticket; the retry reads it (the published Reflexion pattern), and each factory-caused failure is promoted into the C3 eval suite — Anthropic's "build evals from your real failures" loop, automated.</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>retries stop repeating the same mistake</li>
+      <li>the eval suite grows from reality, not invention</li>
+      <li>human Seq forensics becomes the exception</li>
+    </ul>
+    <div class="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">Complements #254 (memory governance): post-mortems are per-ticket and ephemeral by default; only twice-confirmed lessons graduate to .archon/memory — exactly the ACE "delta items, never wholesale rewrite" discipline.</div>
+  </article>
+
+  <!-- C9 -->
+  <article id="c9" class="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h3 class="font-serif text-xl">C9 · Size- and type-aware dispatch policy</h3>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-200 text-slate-700">Speculative</span>
+      <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">needs C2 data first</span>
+    </div>
+    <p class="font-mono text-sm text-slate-500">scheduler.sh dispatch loop · existing size: S/M/L and priority labels</p>
+    <div class="rounded-lg border border-slate-200 bg-stone-50 p-4">
+      <div class="grid grid-cols-2 gap-6 text-xs">
+        <div class="space-y-1">
+          <p class="uppercase tracking-wider text-slate-500 mb-2">Hypothetical success-by-size (illustrative — C2 will give real bars)</p>
+          <div class="flex items-center gap-2"><span class="font-mono w-8">S</span><div class="h-5 bg-emerald-400" style="width:85%"></div><span>~high</span></div>
+          <div class="flex items-center gap-2"><span class="font-mono w-8">M</span><div class="h-5 bg-amber-400" style="width:60%"></div><span>~mixed</span></div>
+          <div class="flex items-center gap-2"><span class="font-mono w-8">L</span><div class="h-5 bg-red-400" style="width:30%"></div><span>~burns runs</span></div>
+          <p class="text-slate-500 pt-1">MSR '26: chores merge at 84%, perf work at 55% — task type matters as much as size.</p>
+        </div>
+        <div class="space-y-2">
+          <p class="uppercase tracking-wider text-slate-500 mb-2">Policy</p>
+          <div class="border border-slate-700 bg-white p-2">below ceiling (S, chores, tests, docs) → full autonomy, direct-to-pr</div>
+          <div class="border border-slate-700 bg-white p-2">at ceiling (M, features) → autonomy with plan-pending-review gate</div>
+          <div class="border border-slate-700 bg-white p-2">above ceiling (L, perf, architectural, migrations) → refine-only; human pairs on implement</div>
+        </div>
+      </div>
+    </div>
+    <p class="text-sm"><strong>Problem:</strong> the scheduler dispatches every ready ticket identically, but agent success rates are known to vary ~30 points by task type and collapse above a size threshold — undisciplined L-ticket dispatch is where 5-hour Max windows go to die.</p>
+    <p class="text-sm"><strong>Solution:</strong> once C2 produces success-by-bucket numbers, encode a dispatch ceiling: full autonomy below it, gated autonomy at it, refine-only above it — METR's time-horizon idea applied as an internal dispatch policy.</p>
+    <ul class="text-sm list-disc ml-5 space-y-1">
+      <li>runs concentrate where the factory actually succeeds</li>
+      <li>the ceiling is measured, revisited quarterly as models improve</li>
+    </ul>
+  </article>
+</section>
+
+<!-- ============ ARTIFACT & REVIEW CALIBRATION ============ -->
+<section class="space-y-4">
+  <h2 class="font-serif text-2xl">Calibration verdicts: artifacts &amp; reviews</h2>
+  <div class="grid md:grid-cols-2 gap-4 text-sm">
+    <div class="rounded-lg border border-slate-200 bg-white p-5 space-y-2">
+      <p class="font-semibold">Artifacts — roughly right amount, wrong persistence</p>
+      <ul class="list-disc ml-5 space-y-1 text-slate-600">
+        <li><strong>Keep:</strong> spec, plan, cost report, run report comment, spillover tickets.</li>
+        <li><strong>Fix:</strong> the four verdict artifacts (validation, conformance, review, conflict-resolution .md) die in /tmp — attach them to the PR or fold into the C1 run record.</li>
+        <li><strong>Trim:</strong> spillover ticket auto-filing is over-producing (42 tickets, many duplicate/cosmetic — already tracked as #275/#276). Dedup-before-file beats file-then-triage.</li>
+      </ul>
+    </div>
+    <div class="rounded-lg border border-slate-200 bg-white p-5 space-y-2">
+      <p class="font-semibold">Reviews — right count (2 gates + human), wrong calibration</p>
+      <ul class="list-disc ml-5 space-y-1 text-slate-600">
+        <li>Don't add more review stages — fix the two you have (C4): conformance over-fires, code-review never fires.</li>
+        <li>Human review is currently optional in practice (auto-advance + grace windows). Make it mandatory only where it pays: blast-radius hotspots, migrations, seed data, auth.</li>
+        <li>The 30-min grace window auto-advance is fine for S tickets; for the high-blast set it's how #278 happened.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TOP RECOMMENDATION ============ -->
+<section id="top-recommendation" class="rounded-xl deep text-white p-8 space-y-4">
+  <p class="text-xs uppercase tracking-widest text-slate-400">Top recommendation</p>
+  <h2 class="font-serif text-2xl">Start with C1 + C2: the run record and the Factory Scorecard</h2>
+  <p class="text-slate-300 max-w-3xl">Every other candidate — judge calibration (C4), the dispatch ceiling (C9), the replay benchmark (C3), the failure flywheel (C8) — consumes measurements that don't exist yet. C2 is a day of labels and scripts and immediately answers "is the factory good?" with industry-comparable numbers; C1 is the deep module that makes those numbers a query instead of an excavation. You cannot calibrate what you don't record — and the single most expensive current behavior (gates miscalibrated in both directions) is invisible without them.</p>
+  <p class="text-slate-300 max-w-3xl">Sequence: <span class="text-white font-semibold">C2 (days) → C5 (one stage, cheap insurance) → C1 (the seam everything else plugs into) → C4 → C3 → C8 → C9</span>. C6 and C7 ride along whenever the glue is next touched.</p>
+  <a href="#c1" class="inline-block text-sm text-emerald-300">↳ jump to C1</a>
+</section>
+
+<footer class="text-xs text-slate-400 pt-4 pb-8">
+  Sources: pipeline map from .archon/ + dark-factory/ exploration · operational baseline from gh/git history (2026-05-01 → 06-11) · research digest from DORA 2025, Cognition, METR, GitClear, MSR '26, Anthropic engineering, ACE (ICLR '26). Generated 2026-06-11.
+</footer>
+
+</main>
+</body>
+</html>
