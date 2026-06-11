@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 464,
-    "total_loc": 66838,
+    "total_files": 468,
+    "total_loc": 67598,
     "languages": [
       "python",
       "javascript",
@@ -11,7 +11,7 @@
       "ci",
       "schema"
     ],
-    "apiLinks": 19,
+    "apiLinks": 18,
     "indexed": true
   },
   "nodes": [
@@ -1916,8 +1916,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 37,
-      "blast_score": 19.5,
+      "transitive_dependents": 44,
+      "blast_score": 23.0,
       "imported_by": [
         "frontend/src/api/scanner.ts"
       ],
@@ -3144,8 +3144,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 7,
-      "blast_score": 4.5,
+      "transitive_dependents": 8,
+      "blast_score": 5.0,
       "imported_by": [
         "frontend/src/api/alerts.ts"
       ],
@@ -3260,8 +3260,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 86,
-      "blast_score": 45.0,
+      "transitive_dependents": 93,
+      "blast_score": 48.5,
       "imported_by": [
         "frontend/src/api/auth.ts",
         "frontend/src/api/client.ts"
@@ -3473,8 +3473,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 37,
-      "blast_score": 19.5,
+      "transitive_dependents": 44,
+      "blast_score": 23.0,
       "imported_by": [
         "frontend/src/api/scanner.ts"
       ],
@@ -3843,12 +3843,11 @@
         "redis"
       ],
       "layer": "backend",
-      "direct_dependents": 2,
-      "transitive_dependents": 36,
-      "blast_score": 20.0,
+      "direct_dependents": 1,
+      "transitive_dependents": 44,
+      "blast_score": 23.0,
       "imported_by": [
-        "frontend/src/api/scanner.ts",
-        "frontend/src/pages/EdgeExplorer.tsx"
+        "frontend/src/api/scanner.ts"
       ],
       "symbols": [
         {
@@ -4067,8 +4066,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 39,
-      "blast_score": 21.5,
+      "transitive_dependents": 46,
+      "blast_score": 25.0,
       "imported_by": [
         "frontend/src/api/scanner.ts",
         "frontend/src/api/system.ts"
@@ -4183,8 +4182,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 37,
-      "blast_score": 19.5,
+      "transitive_dependents": 44,
+      "blast_score": 23.0,
       "imported_by": [
         "frontend/src/api/scanner.ts"
       ],
@@ -14887,6 +14886,78 @@
       ]
     },
     {
+      "id": "dark-factory/scripts/fmt_hunk_filter.py",
+      "type": "module",
+      "language": "python",
+      "size": 274,
+      "loc": 274,
+      "group": 22,
+      "imports": [
+        "difflib",
+        "os",
+        "re",
+        "shutil",
+        "subprocess",
+        "sys",
+        "tempfile"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "parse_file_hunks",
+          "line": 32,
+          "kind": "function",
+          "exported": true,
+          "doc": "Return list of hunk dicts for one file from a unified diff."
+        },
+        {
+          "name": "overlaps",
+          "line": 61,
+          "kind": "function",
+          "exported": true,
+          "doc": "True if the old-file line ranges of two hunks overlap."
+        },
+        {
+          "name": "_apply_hunk",
+          "line": 69,
+          "kind": "function",
+          "exported": false,
+          "doc": "Return lines produced by hunk: added lines and context lines (no removed)."
+        },
+        {
+          "name": "is_formatter_only",
+          "line": 83,
+          "kind": "function",
+          "exported": true,
+          "doc": "Check if applying actual hunk to base_lines produces the same file content"
+        },
+        {
+          "name": "_run_formatter",
+          "line": 126,
+          "kind": "function",
+          "exported": false,
+          "doc": "Apply ruff format + ruff check --fix --select I to content, return result."
+        },
+        {
+          "name": "filter_diff",
+          "line": 167,
+          "kind": "function",
+          "exported": true,
+          "doc": "Strip formatter-only hunks from raw_diff for each file in py_files."
+        },
+        {
+          "name": "main",
+          "line": 254,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
       "id": "dark-factory/tests/test_code_review_command.py",
       "type": "module",
       "language": "python",
@@ -15074,6 +15145,232 @@
           "line": 6,
           "kind": "function",
           "exported": true
+        }
+      ]
+    },
+    {
+      "id": "dark-factory/tests/test_conformance_formatter_step.py",
+      "type": "module",
+      "language": "python",
+      "size": 40,
+      "loc": 40,
+      "group": 23,
+      "imports": [
+        "pathlib"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "test_step_30_invokes_filter_script",
+          "line": 9,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_guards_on_ruff_absence_via_script",
+          "line": 14,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_writes_py_files_list",
+          "line": 20,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_pre_triage_annotation_variable",
+          "line": 26,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_31_uses_triaged_diff",
+          "line": 32,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
+      "id": "dark-factory/tests/test_conformance_prompt_formatter_rule.py",
+      "type": "module",
+      "language": "python",
+      "size": 24,
+      "loc": 24,
+      "group": 23,
+      "imports": [
+        "pathlib"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "test_formatter_exception_rule_present",
+          "line": 9,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_formatter_rule_precedes_oos_bullet_format",
+          "line": 17,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
+      "id": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "type": "module",
+      "language": "python",
+      "size": 354,
+      "loc": 354,
+      "group": 23,
+      "imports": [
+        "sys",
+        "textwrap",
+        "pathlib",
+        "unittest",
+        "fmt_hunk_filter",
+        "os"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "test_parse_file_hunks_returns_two_hunks",
+          "line": 41,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_captures_hunk_lines",
+          "line": 46,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_unknown_file_returns_empty",
+          "line": 53,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_overlaps_true_when_adjacent",
+          "line": 61,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_overlaps_false_when_disjoint",
+          "line": 68,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_hunk",
+          "line": 79,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build a hunk dict with the given body (list of diff lines, no @@ header)."
+        },
+        {
+          "name": "test_apply_hunk_produces_added_and_context_lines",
+          "line": 90,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_apply_hunk_skips_removed_lines",
+          "line": 100,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_true_for_reorder_despite_different_diff_grouping",
+          "line": 112,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_false_when_actual_adds_feature_line",
+          "line": 128,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_false_when_no_overlap",
+          "line": 142,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_mock_run",
+          "line": 177,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "test_filter_diff_strips_formatter_only_hunk",
+          "line": 191,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_leaves_interleaved_hunk_intact",
+          "line": 201,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_new_file_skipped",
+          "line": 221,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_no_ruff_returns_raw",
+          "line": 243,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_true_when_second_formatter_hunk_matches",
+          "line": 254,
+          "kind": "function",
+          "exported": true,
+          "doc": "First overlapping fmt hunk doesn't match; second does \u2014 should still return True"
+        },
+        {
+          "name": "test_apply_hunk_ignores_no_newline_marker",
+          "line": 280,
+          "kind": "function",
+          "exported": true,
+          "doc": "Lines starting with \\ (the diff no-newline marker) should be silently skipped."
+        },
+        {
+          "name": "test_run_formatter_returns_content_unchanged_on_ruff_format_error",
+          "line": 291,
+          "kind": "function",
+          "exported": true,
+          "doc": "If ruff format exits non-zero, _run_formatter returns the original content."
+        },
+        {
+          "name": "test_filter_diff_body_line_starting_with_triple_dash_not_treated_as_file_header",
+          "line": 313,
+          "kind": "function",
+          "exported": true,
+          "doc": "A removed body line whose content starts with '-- ' (diff line '--- ...') must n"
         }
       ]
     },
@@ -15536,8 +15833,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 39,
-      "blast_score": 21.5,
+      "transitive_dependents": 46,
+      "blast_score": 25.0,
       "imported_by": [
         "frontend/src/api/scanner.ts",
         "frontend/src/api/system.ts"
@@ -16159,8 +16456,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 53,
-      "transitive_dependents": 61,
-      "blast_score": 83.5,
+      "transitive_dependents": 69,
+      "blast_score": 87.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/error_tracking.py",
@@ -16284,8 +16581,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 209,
-      "transitive_dependents": 88,
-      "blast_score": 253.0,
+      "transitive_dependents": 95,
+      "blast_score": 256.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/__init__.py",
@@ -16508,8 +16805,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 155,
-      "transitive_dependents": 88,
-      "blast_score": 199.0,
+      "transitive_dependents": 95,
+      "blast_score": 202.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -16677,9 +16974,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 20,
-      "transitive_dependents": 41,
-      "blast_score": 40.5,
+      "direct_dependents": 22,
+      "transitive_dependents": 48,
+      "blast_score": 46.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/celery_app.py",
@@ -16699,6 +16996,8 @@
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
         "backend/tests/test_auth_core.py",
         "backend/tests/test_config.py",
+        "dark-factory/scripts/fmt_hunk_filter.py",
+        "dark-factory/tests/test_fmt_hunk_filter.py",
         "services/tweet-monitor/tests/test_classifier.py",
         "services/tweet-monitor/tests/test_extractor.py"
       ]
@@ -16712,9 +17011,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 11,
+      "direct_dependents": 13,
       "transitive_dependents": 2,
-      "blast_score": 12.0,
+      "blast_score": 14.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/live_scanner/main.py",
@@ -16722,7 +17021,9 @@
         "backend/scripts/generate_schema_doc.py",
         "backend/scripts/scratch_erd.py",
         "dark-factory/scripts/code_review_payload.py",
+        "dark-factory/scripts/fmt_hunk_filter.py",
         "dark-factory/tests/test_code_review_payload.py",
+        "dark-factory/tests/test_fmt_hunk_filter.py",
         "scripts/fetch_metrics.py",
         "scripts/render_report.py",
         "services/tweet-monitor/tests/test_classifier.py",
@@ -16755,8 +17056,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 124,
-      "transitive_dependents": 72,
-      "blast_score": 160.0,
+      "transitive_dependents": 79,
+      "blast_score": 163.5,
       "imported_by": [
         "backend/app/alembic/versions/0b4b1c3739b4_add_missing_model_tables.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -16894,8 +17195,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 28,
-      "transitive_dependents": 44,
-      "blast_score": 50.0,
+      "transitive_dependents": 52,
+      "blast_score": 54.0,
       "imported_by": [
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
         "backend/app/alembic/versions/e9bd09ec24b0_seed_outcome_config_and_data_requirements.py",
@@ -16953,8 +17254,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 21,
-      "transitive_dependents": 88,
-      "blast_score": 65.0,
+      "transitive_dependents": 95,
+      "blast_score": 68.5,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/models/news_article.py",
@@ -16989,8 +17290,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 134,
-      "transitive_dependents": 89,
-      "blast_score": 178.5,
+      "transitive_dependents": 96,
+      "blast_score": 182.0,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/core/error_tracking.py",
@@ -17154,8 +17455,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 43,
-      "transitive_dependents": 88,
-      "blast_score": 87.0,
+      "transitive_dependents": 95,
+      "blast_score": 90.5,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/main.py",
@@ -17212,8 +17513,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 4,
-      "transitive_dependents": 41,
-      "blast_score": 24.5,
+      "transitive_dependents": 48,
+      "blast_score": 28.0,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/main.py",
@@ -17250,8 +17551,8 @@
       ],
       "layer": "backend",
       "direct_dependents": 30,
-      "transitive_dependents": 88,
-      "blast_score": 74.0,
+      "transitive_dependents": 95,
+      "blast_score": 77.5,
       "imported_by": [
         "backend/app/core/cache.py",
         "backend/app/main.py",
@@ -17315,8 +17616,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 4,
-      "transitive_dependents": 38,
-      "blast_score": 23.0,
+      "transitive_dependents": 45,
+      "blast_score": 26.5,
       "imported_by": [
         "backend/app/core/celery_app.py",
         "backend/app/core/metrics.py",
@@ -17353,8 +17654,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 17,
-      "transitive_dependents": 88,
-      "blast_score": 61.0,
+      "transitive_dependents": 95,
+      "blast_score": 64.5,
       "imported_by": [
         "backend/app/core/config.py",
         "backend/app/routers/auth.py",
@@ -17402,8 +17703,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 28,
-      "transitive_dependents": 46,
-      "blast_score": 51.0,
+      "transitive_dependents": 52,
+      "blast_score": 54.0,
       "imported_by": [
         "backend/app/core/error_tracking.py",
         "backend/app/main.py",
@@ -17463,8 +17764,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 3,
-      "transitive_dependents": 38,
-      "blast_score": 22.0,
+      "transitive_dependents": 45,
+      "blast_score": 25.5,
       "imported_by": [
         "backend/app/core/rate_limits.py",
         "backend/app/main.py",
@@ -17501,8 +17802,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 38,
-      "blast_score": 20.0,
+      "transitive_dependents": 45,
+      "blast_score": 23.5,
       "imported_by": [
         "backend/app/main.py"
       ]
@@ -17517,8 +17818,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 12,
-      "transitive_dependents": 41,
-      "blast_score": 32.5,
+      "transitive_dependents": 48,
+      "blast_score": 36.0,
       "imported_by": [
         "backend/app/main.py",
         "backend/app/providers/ibkr.py",
@@ -17544,8 +17845,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 38,
-      "blast_score": 21.0,
+      "transitive_dependents": 45,
+      "blast_score": 24.5,
       "imported_by": [
         "backend/app/main.py",
         "backend/app/routers/stocks.py"
@@ -17561,8 +17862,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 3,
-      "transitive_dependents": 41,
-      "blast_score": 23.5,
+      "transitive_dependents": 48,
+      "blast_score": 27.0,
       "imported_by": [
         "backend/app/main.py",
         "backend/tests/conftest.py",
@@ -17579,8 +17880,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 4,
-      "transitive_dependents": 38,
-      "blast_score": 23.0,
+      "transitive_dependents": 45,
+      "blast_score": 26.5,
       "imported_by": [
         "backend/app/main.py",
         "backend/tests/tasks/test_package_exports.py",
@@ -17598,8 +17899,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 2,
-      "transitive_dependents": 38,
-      "blast_score": 21.0,
+      "transitive_dependents": 45,
+      "blast_score": 24.5,
       "imported_by": [
         "backend/app/main.py",
         "backend/run.py"
@@ -17735,8 +18036,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 8,
-      "blast_score": 5.0,
+      "transitive_dependents": 9,
+      "blast_score": 5.5,
       "imported_by": [
         "backend/app/routers/alerts.py"
       ]
@@ -17751,8 +18052,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 1,
-      "transitive_dependents": 8,
-      "blast_score": 5.0,
+      "transitive_dependents": 9,
+      "blast_score": 5.5,
       "imported_by": [
         "backend/app/routers/alerts.py"
       ]
@@ -17767,8 +18068,8 @@
       "imports": [],
       "layer": "backend",
       "direct_dependents": 15,
-      "transitive_dependents": 38,
-      "blast_score": 34.0,
+      "transitive_dependents": 45,
+      "blast_score": 37.5,
       "imported_by": [
         "backend/app/routers/futures.py",
         "backend/app/routers/stocks.py",
@@ -17891,12 +18192,13 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 7,
+      "direct_dependents": 8,
       "transitive_dependents": 1,
-      "blast_score": 7.5,
+      "blast_score": 8.5,
       "imported_by": [
         "backend/app/services/catalyst_parser.py",
         "dark-factory/scripts/code_review_payload.py",
+        "dark-factory/scripts/fmt_hunk_filter.py",
         "scripts/fetch_metrics.py",
         "services/tweet-monitor/app/classifier.py",
         "services/tweet-monitor/app/extractor.py",
@@ -18190,9 +18492,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 35,
+      "direct_dependents": 36,
       "transitive_dependents": 0,
-      "blast_score": 35.0,
+      "blast_score": 36.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_analysis.py",
@@ -18228,7 +18530,8 @@
         "backend/tests/tasks/test_scheduled_scanner_tasks.py",
         "backend/tests/tasks/test_slippage.py",
         "backend/tests/tasks/test_sync_tasks.py",
-        "backend/tests/tasks/test_trading_task_shells.py"
+        "backend/tests/tasks/test_trading_task_shells.py",
+        "dark-factory/tests/test_fmt_hunk_filter.py"
       ]
     },
     {
@@ -18544,9 +18847,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 12,
+      "direct_dependents": 15,
       "transitive_dependents": 0,
-      "blast_score": 12.0,
+      "blast_score": 15.0,
       "imported_by": [
         "backend/tests/live_scanner/test_main_imports.py",
         "backend/tests/live_scanner/test_publisher.py",
@@ -18555,6 +18858,9 @@
         "dark-factory/tests/test_code_review_payload.py",
         "dark-factory/tests/test_code_review_prompt.py",
         "dark-factory/tests/test_config_code_review.py",
+        "dark-factory/tests/test_conformance_formatter_step.py",
+        "dark-factory/tests/test_conformance_prompt_formatter_rule.py",
+        "dark-factory/tests/test_fmt_hunk_filter.py",
         "dark-factory/tests/test_report_code_review_section.py",
         "dark-factory/tests/test_workflow_code_review.py",
         "scripts/render_report.py",
@@ -18579,6 +18885,74 @@
       ]
     },
     {
+      "id": "difflib",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "dark-factory/scripts/fmt_hunk_filter.py"
+      ]
+    },
+    {
+      "id": "shutil",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 2,
+      "transitive_dependents": 0,
+      "blast_score": 2.0,
+      "imported_by": [
+        "dark-factory/scripts/fmt_hunk_filter.py",
+        "tests/scripts/test_render_report.py"
+      ]
+    },
+    {
+      "id": "subprocess",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 4,
+      "transitive_dependents": 1,
+      "blast_score": 4.5,
+      "imported_by": [
+        "dark-factory/scripts/fmt_hunk_filter.py",
+        "dark-factory/tests/test_code_review_payload.py",
+        "scripts/fetch_metrics.py",
+        "tests/scripts/test_render_report.py"
+      ]
+    },
+    {
+      "id": "tempfile",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "dark-factory/scripts/fmt_hunk_filter.py"
+      ]
+    },
+    {
       "id": "code_review_payload",
       "type": "import",
       "language": "python",
@@ -18595,7 +18969,7 @@
       ]
     },
     {
-      "id": "subprocess",
+      "id": "textwrap",
       "type": "import",
       "language": "python",
       "size": 40,
@@ -18603,13 +18977,27 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 3,
-      "transitive_dependents": 1,
-      "blast_score": 3.5,
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
       "imported_by": [
-        "dark-factory/tests/test_code_review_payload.py",
-        "scripts/fetch_metrics.py",
-        "tests/scripts/test_render_report.py"
+        "dark-factory/tests/test_fmt_hunk_filter.py"
+      ]
+    },
+    {
+      "id": "fmt_hunk_filter",
+      "type": "import",
+      "language": "python",
+      "size": 40,
+      "loc": 0,
+      "group": 9000,
+      "imports": [],
+      "layer": "backend",
+      "direct_dependents": 1,
+      "transitive_dependents": 0,
+      "blast_score": 1.0,
+      "imported_by": [
+        "dark-factory/tests/test_fmt_hunk_filter.py"
       ]
     },
     {
@@ -18663,22 +19051,6 @@
       ]
     },
     {
-      "id": "shutil",
-      "type": "import",
-      "language": "python",
-      "size": 40,
-      "loc": 0,
-      "group": 9000,
-      "imports": [],
-      "layer": "backend",
-      "direct_dependents": 1,
-      "transitive_dependents": 0,
-      "blast_score": 1.0,
-      "imported_by": [
-        "tests/scripts/test_render_report.py"
-      ]
-    },
-    {
       "id": "docs/presentations/mermaid.min.js",
       "type": "component",
       "language": "javascript",
@@ -18715,8 +19087,8 @@
       "type": "config",
       "language": "javascript",
       "framework": null,
-      "size": 81,
-      "loc": 81,
+      "size": 80,
+      "loc": 80,
       "group": 30,
       "imports": [
         "@eslint/js",
@@ -18801,10 +19173,11 @@
         "backend/app/routers/alerts.py"
       ],
       "layer": "frontend",
-      "direct_dependents": 3,
+      "direct_dependents": 4,
       "transitive_dependents": 4,
-      "blast_score": 5.0,
+      "blast_score": 6.0,
       "imported_by": [
+        "frontend/src/pages/Alerts/AlertLogsPanel.tsx",
         "frontend/src/pages/Alerts/AlertRuleModal.test.tsx",
         "frontend/src/pages/Alerts/AlertRuleModal.tsx",
         "frontend/src/pages/Alerts/AlertRulesPanel.tsx"
@@ -18880,7 +19253,7 @@
     },
     {
       "id": "frontend/src/api/analysis.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 69,
@@ -18956,7 +19329,7 @@
     },
     {
       "id": "frontend/src/api/auth.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 35,
@@ -19052,8 +19425,8 @@
       ],
       "layer": "frontend",
       "direct_dependents": 20,
-      "transitive_dependents": 67,
-      "blast_score": 53.5,
+      "transitive_dependents": 74,
+      "blast_score": 57.0,
       "imported_by": [
         "frontend/src/api/alerts.ts",
         "frontend/src/api/analysis.ts",
@@ -19099,7 +19472,7 @@
     },
     {
       "id": "frontend/src/api/journal.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 147,
@@ -19181,7 +19554,7 @@
     },
     {
       "id": "frontend/src/api/news.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 46,
@@ -19240,7 +19613,7 @@
     },
     {
       "id": "frontend/src/api/outcomes.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 217,
@@ -19393,11 +19766,11 @@
     },
     {
       "id": "frontend/src/api/scanner.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
-      "size": 788,
-      "loc": 788,
+      "size": 809,
+      "loc": 809,
       "group": 33,
       "imports": [
         "frontend/src/api/client.ts",
@@ -19409,9 +19782,9 @@
         "backend/app/routers/system.py"
       ],
       "layer": "frontend",
-      "direct_dependents": 22,
-      "transitive_dependents": 15,
-      "blast_score": 29.5,
+      "direct_dependents": 31,
+      "transitive_dependents": 13,
+      "blast_score": 37.5,
       "imported_by": [
         "frontend/src/components/CreateUniverseModal.tsx",
         "frontend/src/components/NewsSettings.tsx",
@@ -19419,20 +19792,29 @@
         "frontend/src/components/QualityReportModal.tsx",
         "frontend/src/components/RecentEvents.tsx",
         "frontend/src/components/ReviewControls.tsx",
+        "frontend/src/components/ScannerConfig.tsx",
         "frontend/src/components/ScannerResults.test.tsx",
         "frontend/src/components/ScannerResults.tsx",
         "frontend/src/components/SignalReviewStats.tsx",
         "frontend/src/components/SyncUniverseModal.tsx",
         "frontend/src/components/UniverseDetailsModal.tsx",
         "frontend/src/components/UniverseFormModal.tsx",
+        "frontend/src/components/ui/Chart.tsx",
         "frontend/src/components/ui/StockChart.tsx",
+        "frontend/src/hooks/useScannerState.ts",
         "frontend/src/hooks/useScannerWs.ts",
         "frontend/src/hooks/useScorecard.ts",
         "frontend/src/pages/Dashboard.tsx",
         "frontend/src/pages/EdgeExplorer.tsx",
         "frontend/src/pages/PreMarketMovers.tsx",
+        "frontend/src/pages/Scanner/ResultsPanel.tsx",
+        "frontend/src/pages/Scanner/ScanConfigPanel.tsx",
+        "frontend/src/pages/Scanner/ScanStatusCard.tsx",
         "frontend/src/pages/Scanner/index.tsx",
         "frontend/src/pages/Settings.tsx",
+        "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
+        "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
+        "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx",
         "frontend/src/pages/StockDetailPage/index.tsx",
         "frontend/src/pages/Universes.tsx"
       ],
@@ -19582,92 +19964,110 @@
           "exported": true
         },
         {
-          "name": "ScannerStatusBlock",
+          "name": "EdgeDistributionEvent",
           "line": 309,
           "kind": "type",
           "exported": true
         },
         {
+          "name": "EdgeDistributionResponse",
+          "line": 317,
+          "kind": "type",
+          "exported": true
+        },
+        {
+          "name": "EdgeStatEntry",
+          "line": 321,
+          "kind": "type",
+          "exported": true
+        },
+        {
+          "name": "ScannerStatusBlock",
+          "line": 330,
+          "kind": "type",
+          "exported": true
+        },
+        {
           "name": "UniverseSummary",
-          "line": 372,
+          "line": 393,
           "kind": "type",
           "exported": true
         },
         {
           "name": "TaskEnqueueResponse",
-          "line": 418,
+          "line": 439,
           "kind": "type",
           "exported": true
         },
         {
           "name": "QualityGapEntry",
-          "line": 464,
+          "line": 485,
           "kind": "type",
           "exported": true
         },
         {
           "name": "CoveragePartialDay",
-          "line": 471,
+          "line": 492,
           "kind": "type",
           "exported": true
         },
         {
           "name": "CoverageDetail",
-          "line": 478,
+          "line": 499,
           "kind": "type",
           "exported": true
         },
         {
           "name": "QualityTickerResult",
-          "line": 487,
-          "kind": "type",
-          "exported": true
-        },
-        {
-          "name": "NormalizationProgress",
           "line": 508,
           "kind": "type",
           "exported": true
         },
         {
+          "name": "NormalizationProgress",
+          "line": 529,
+          "kind": "type",
+          "exported": true
+        },
+        {
           "name": "QualityReport",
-          "line": 521,
+          "line": 542,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ExportAggregatesOptions",
-          "line": 567,
+          "line": 588,
           "kind": "type",
           "exported": true
         },
         {
           "name": "OHLCVRow",
-          "line": 608,
+          "line": 629,
           "kind": "type",
           "exported": true
         },
         {
           "name": "DataProvider",
-          "line": 696,
+          "line": 717,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ClearEventsResponse",
-          "line": 733,
+          "line": 754,
           "kind": "type",
           "exported": true
         },
         {
           "name": "SignalQualityDecile",
-          "line": 749,
+          "line": 770,
           "kind": "type",
           "exported": true
         },
         {
           "name": "SignalQualityDistributionResponse",
-          "line": 756,
+          "line": 777,
           "kind": "type",
           "exported": true
         },
@@ -19709,205 +20109,205 @@
         },
         {
           "name": "fetchScanStatusBlock",
-          "line": 320,
+          "line": 341,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchScannerConfigs",
-          "line": 330,
+          "line": 351,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchScannerHistory",
-          "line": 335,
+          "line": 356,
           "kind": "const",
           "exported": true
         },
         {
           "name": "submitReview",
-          "line": 340,
+          "line": 361,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchReviewStats",
-          "line": 348,
+          "line": 369,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchMarketStats",
-          "line": 357,
+          "line": 378,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchPreMarketMovers",
-          "line": 362,
+          "line": 383,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniversesForTicker",
-          "line": 377,
+          "line": 398,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchStockUniverses",
-          "line": 382,
+          "line": 403,
           "kind": "const",
           "exported": true
         },
         {
           "name": "refreshUniverseStats",
-          "line": 387,
+          "line": 408,
           "kind": "const",
           "exported": true
         },
         {
           "name": "createStockUniverse",
-          "line": 392,
+          "line": 413,
           "kind": "const",
           "exported": true
         },
         {
           "name": "deleteStockUniverse",
-          "line": 401,
+          "line": 422,
           "kind": "const",
           "exported": true
         },
         {
           "name": "updateStockUniverse",
-          "line": 405,
+          "line": 426,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncFundamentals",
-          "line": 424,
+          "line": 445,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncMetrics",
-          "line": 429,
+          "line": 450,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncTickerDetails",
-          "line": 434,
+          "line": 455,
           "kind": "const",
           "exported": true
         },
         {
           "name": "stopSync",
-          "line": 439,
+          "line": 460,
           "kind": "const",
           "exported": true
         },
         {
           "name": "refreshUniverse",
-          "line": 444,
+          "line": 465,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniverseStocks",
-          "line": 449,
+          "line": 470,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncMissingAggregates",
-          "line": 454,
+          "line": 475,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniverseSyncStatus",
-          "line": 459,
+          "line": 480,
           "kind": "const",
           "exported": true
         },
         {
           "name": "deleteTickerAggregates",
-          "line": 544,
+          "line": 565,
           "kind": "const",
           "exported": true
         },
         {
           "name": "triggerQualityAnalysis",
-          "line": 552,
+          "line": 573,
           "kind": "const",
           "exported": true
         },
         {
           "name": "triggerNormalization",
-          "line": 557,
+          "line": 578,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchQualityReport",
-          "line": 562,
+          "line": 583,
           "kind": "const",
           "exported": true
         },
         {
           "name": "exportUniverseAggregates",
-          "line": 576,
+          "line": 597,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncUniverseAggregates",
-          "line": 588,
+          "line": 609,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchHistoricalData",
-          "line": 622,
+          "line": 643,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchProviders",
-          "line": 703,
+          "line": 724,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchStorageStats",
-          "line": 710,
+          "line": 731,
           "kind": "const",
           "exported": true
         },
         {
           "name": "createScannerWebSocket",
-          "line": 718,
+          "line": 739,
           "kind": "const",
           "exported": true
         },
         {
           "name": "clearScannerEvents",
-          "line": 738,
+          "line": 759,
           "kind": "const",
           "exported": true
         },
         {
           "name": "getSignalQualityDistribution",
-          "line": 761,
+          "line": 782,
           "kind": "const",
           "exported": true
         },
         {
           "name": "handleApiError",
-          "line": 776,
+          "line": 797,
           "kind": "const",
           "exported": true
         }
@@ -19915,7 +20315,7 @@
     },
     {
       "id": "frontend/src/api/stocks.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 65,
@@ -19925,10 +20325,12 @@
         "frontend/src/api/client.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 1,
+      "direct_dependents": 3,
       "transitive_dependents": 2,
-      "blast_score": 2.0,
+      "blast_score": 4.0,
       "imported_by": [
+        "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
+        "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
         "frontend/src/pages/StockDetailPage/index.tsx"
       ],
       "symbols": [
@@ -19966,7 +20368,7 @@
     },
     {
       "id": "frontend/src/api/system.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 55,
@@ -20057,12 +20459,13 @@
         "backend/app/routers/auto_trading.py"
       ],
       "layer": "frontend",
-      "direct_dependents": 7,
-      "transitive_dependents": 7,
-      "blast_score": 10.5,
+      "direct_dependents": 8,
+      "transitive_dependents": 6,
+      "blast_score": 11.0,
       "imported_by": [
         "frontend/src/pages/Alerts/AlertRuleModal.tsx",
         "frontend/src/pages/Alerts/index.tsx",
+        "frontend/src/pages/AutoTrading/AccountPanel.tsx",
         "frontend/src/pages/AutoTrading/ConfigPanel.test.tsx",
         "frontend/src/pages/AutoTrading/ConfigPanel.tsx",
         "frontend/src/pages/AutoTrading/OrdersPanel.tsx",
@@ -20348,8 +20751,8 @@
       "type": "component",
       "language": "typescript",
       "framework": null,
-      "size": 281,
-      "loc": 281,
+      "size": 282,
+      "loc": 282,
       "group": 34,
       "imports": [
         "react",
@@ -20504,8 +20907,8 @@
       "type": "component",
       "language": "typescript",
       "framework": null,
-      "size": 754,
-      "loc": 754,
+      "size": 755,
+      "loc": 755,
       "group": 34,
       "imports": [
         "react",
@@ -20578,12 +20981,13 @@
       "type": "component",
       "language": "typescript",
       "framework": null,
-      "size": 137,
-      "loc": 137,
+      "size": 141,
+      "loc": 141,
       "group": 34,
       "imports": [
         "react",
-        "lucide-react"
+        "lucide-react",
+        "frontend/src/api/scanner.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -20666,8 +21070,8 @@
       "type": "component",
       "language": "typescript",
       "framework": null,
-      "size": 205,
-      "loc": 205,
+      "size": 206,
+      "loc": 206,
       "group": 34,
       "imports": [
         "react",
@@ -21061,12 +21465,14 @@
       "type": "component",
       "language": "typescript",
       "framework": null,
-      "size": 135,
-      "loc": 135,
+      "size": 138,
+      "loc": 138,
       "group": 36,
       "imports": [
         "react",
-        "frontend/src/components/ui/StockChart.tsx"
+        "frontend/src/components/ui/StockChart.tsx",
+        "frontend/src/api/scanner.ts",
+        "frontend/src/hooks/useLiveStockData.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 2,
@@ -21208,8 +21614,8 @@
       "type": "component",
       "language": "typescript",
       "framework": null,
-      "size": 586,
-      "loc": 586,
+      "size": 590,
+      "loc": 590,
       "group": 36,
       "imports": [
         "react",
@@ -21226,7 +21632,7 @@
       "symbols": [
         {
           "name": "StockBarRow",
-          "line": 22,
+          "line": 28,
           "kind": "type",
           "exported": true
         }
@@ -21265,11 +21671,13 @@
         "frontend/src/api/client.ts"
       ],
       "layer": "frontend",
-      "direct_dependents": 2,
-      "transitive_dependents": 2,
-      "blast_score": 3.0,
+      "direct_dependents": 4,
+      "transitive_dependents": 4,
+      "blast_score": 6.0,
       "imported_by": [
+        "frontend/src/components/ui/Chart.tsx",
         "frontend/src/hooks/useLiveStockData.test.ts",
+        "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
         "frontend/src/pages/StockDetailPage/index.tsx"
       ],
       "symbols": [
@@ -21371,11 +21779,12 @@
       "type": "hook",
       "language": "typescript",
       "framework": null,
-      "size": 108,
-      "loc": 108,
+      "size": 109,
+      "loc": 109,
       "group": 37,
       "imports": [
-        "react"
+        "react",
+        "frontend/src/api/scanner.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 4,
@@ -21390,61 +21799,61 @@
       "symbols": [
         {
           "name": "useScannerState",
-          "line": 65,
+          "line": 66,
           "kind": "function",
           "exported": true
         },
         {
           "name": "PersistedSelection",
-          "line": 6,
+          "line": 7,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ActiveScanRef",
-          "line": 11,
+          "line": 12,
           "kind": "type",
           "exported": true
         },
         {
           "name": "LiveProgress",
-          "line": 21,
+          "line": 22,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ACTIVE_SCAN_LS_KEY",
-          "line": 3,
-          "kind": "const",
-          "exported": true
-        },
-        {
-          "name": "SELECTION_LS_KEY",
           "line": 4,
           "kind": "const",
           "exported": true
         },
         {
+          "name": "SELECTION_LS_KEY",
+          "line": 5,
+          "kind": "const",
+          "exported": true
+        },
+        {
           "name": "EMPTY_PROGRESS",
-          "line": 37,
+          "line": 38,
           "kind": "const",
           "exported": true
         },
         {
           "name": "lastCompletedWeekday",
-          "line": 43,
+          "line": 44,
           "kind": "const",
           "exported": true
         },
         {
           "name": "todayIso",
-          "line": 52,
+          "line": 53,
           "kind": "const",
           "exported": true
         },
         {
           "name": "loadPersistedSelection",
-          "line": 54,
+          "line": 55,
           "kind": "const",
           "exported": true
         }
@@ -21452,7 +21861,7 @@
     },
     {
       "id": "frontend/src/hooks/useScannerWs.test.ts",
-      "type": "component",
+      "type": "module",
       "language": "typescript",
       "framework": null,
       "size": 150,
@@ -21509,8 +21918,8 @@
       "type": "module",
       "language": "typescript",
       "framework": null,
-      "size": 62,
-      "loc": 62,
+      "size": 63,
+      "loc": 63,
       "group": 37,
       "imports": [
         "vitest",
@@ -21771,8 +22180,8 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 170,
-      "loc": 170,
+      "size": 173,
+      "loc": 173,
       "group": 38,
       "imports": [
         "react",
@@ -21793,7 +22202,7 @@
       "symbols": [
         {
           "name": "ActiveWatchlist",
-          "line": 95,
+          "line": 98,
           "kind": "function",
           "exported": true
         }
@@ -21804,12 +22213,13 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 105,
-      "loc": 105,
+      "size": 106,
+      "loc": 106,
       "group": 39,
       "imports": [
         "frontend/src/components/ui/Card.tsx",
-        "frontend/src/components/ui/Button.tsx"
+        "frontend/src/components/ui/Button.tsx",
+        "frontend/src/api/alerts.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -21821,25 +22231,25 @@
       "symbols": [
         {
           "name": "AlertActivityCard",
-          "line": 13,
+          "line": 14,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AlertLogsPanel",
-          "line": 52,
+          "line": 53,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AlertActivityCardProps",
-          "line": 9,
+          "line": 10,
           "kind": "type",
           "exported": true
         },
         {
           "name": "AlertLogsPanelProps",
-          "line": 48,
+          "line": 49,
           "kind": "type",
           "exported": true
         }
@@ -22026,14 +22436,15 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 174,
-      "loc": 174,
+      "size": 175,
+      "loc": 175,
       "group": 40,
       "imports": [
         "react",
         "frontend/src/components/ui/Card.tsx",
         "frontend/src/components/ui/Button.tsx",
-        "frontend/src/pages/AutoTrading/components.tsx"
+        "frontend/src/pages/AutoTrading/components.tsx",
+        "frontend/src/api/trading.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -22045,13 +22456,13 @@
       "symbols": [
         {
           "name": "AccountPanel",
-          "line": 18,
+          "line": 19,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AccountPanelProps",
-          "line": 9,
+          "line": 10,
           "kind": "type",
           "exported": true
         }
@@ -22432,8 +22843,8 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 406,
-      "loc": 406,
+      "size": 407,
+      "loc": 407,
       "group": 41,
       "imports": [
         "react",
@@ -22443,8 +22854,7 @@
         "frontend/src/api/scanner.ts",
         "frontend/src/api/client.ts",
         "frontend/src/components/CorrelationHeatmap.tsx",
-        "frontend/src/api/analysis.ts",
-        "backend/app/routers/scanner.py"
+        "frontend/src/api/analysis.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -22459,8 +22869,8 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 497,
-      "loc": 497,
+      "size": 498,
+      "loc": 498,
       "group": 41,
       "imports": [
         "react",
@@ -22592,12 +23002,13 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 29,
-      "loc": 29,
+      "size": 30,
+      "loc": 30,
       "group": 43,
       "imports": [
         "frontend/src/components/ScannerResults.tsx",
-        "frontend/src/components/SignalReviewStats.tsx"
+        "frontend/src/components/SignalReviewStats.tsx",
+        "frontend/src/api/scanner.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -22609,13 +23020,13 @@
       "symbols": [
         {
           "name": "ResultsPanel",
-          "line": 12,
+          "line": 13,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ResultsPanelProps",
-          "line": 5,
+          "line": 6,
           "kind": "type",
           "exported": true
         }
@@ -22646,8 +23057,8 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 187,
-      "loc": 187,
+      "size": 188,
+      "loc": 188,
       "group": 43,
       "imports": [
         "react",
@@ -22657,7 +23068,8 @@
         "frontend/src/components/ui/Button.tsx",
         "frontend/src/components/ScannerConfig.tsx",
         "frontend/src/hooks/useScannerState.ts",
-        "frontend/src/pages/Scanner/ScanStatusCard.tsx"
+        "frontend/src/pages/Scanner/ScanStatusCard.tsx",
+        "frontend/src/api/scanner.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 2,
@@ -22670,13 +23082,13 @@
       "symbols": [
         {
           "name": "ScanConfigPanel",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanConfigPanelProps",
-          "line": 40,
+          "line": 41,
           "kind": "type",
           "exported": true
         }
@@ -22687,13 +23099,14 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 109,
-      "loc": 109,
+      "size": 110,
+      "loc": 110,
       "group": 43,
       "imports": [
         "date-fns",
         "lucide-react",
-        "frontend/src/components/ui/Card.tsx"
+        "frontend/src/components/ui/Card.tsx",
+        "frontend/src/api/scanner.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -22705,13 +23118,13 @@
       "symbols": [
         {
           "name": "ScanStatusCard",
-          "line": 13,
+          "line": 14,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanStatusCardProps",
-          "line": 6,
+          "line": 7,
           "kind": "type",
           "exported": true
         }
@@ -22742,8 +23155,8 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 179,
-      "loc": 179,
+      "size": 180,
+      "loc": 180,
       "group": 43,
       "imports": [
         "react",
@@ -22843,13 +23256,16 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 183,
-      "loc": 183,
+      "size": 187,
+      "loc": 187,
       "group": 44,
       "imports": [
         "lucide-react",
         "frontend/src/components/ui/Card.tsx",
-        "frontend/src/components/ui/Chart.tsx"
+        "frontend/src/components/ui/Chart.tsx",
+        "frontend/src/api/scanner.ts",
+        "frontend/src/hooks/useLiveStockData.ts",
+        "frontend/src/api/stocks.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -22861,13 +23277,13 @@
       "symbols": [
         {
           "name": "ChartPanel",
-          "line": 29,
+          "line": 33,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ChartPanelProps",
-          "line": 7,
+          "line": 11,
           "kind": "type",
           "exported": true
         }
@@ -22878,13 +23294,15 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 44,
-      "loc": 44,
+      "size": 46,
+      "loc": 46,
       "group": 44,
       "imports": [
         "lucide-react",
         "frontend/src/components/ui/Card.tsx",
-        "frontend/src/components/NewsFeed.tsx"
+        "frontend/src/components/NewsFeed.tsx",
+        "frontend/src/api/stocks.ts",
+        "frontend/src/api/scanner.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -22896,13 +23314,13 @@
       "symbols": [
         {
           "name": "MetadataPanel",
-          "line": 13,
+          "line": 15,
           "kind": "function",
           "exported": true
         },
         {
           "name": "MetadataPanelProps",
-          "line": 6,
+          "line": 8,
           "kind": "type",
           "exported": true
         }
@@ -22913,14 +23331,15 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 123,
-      "loc": 123,
+      "size": 124,
+      "loc": 124,
       "group": 44,
       "imports": [
         "lucide-react",
         "frontend/src/components/ui/Card.tsx",
         "frontend/src/components/RecentEvents.tsx",
-        "frontend/src/components/ForceScanDialog.tsx"
+        "frontend/src/components/ForceScanDialog.tsx",
+        "frontend/src/api/scanner.ts"
       ],
       "layer": "frontend",
       "direct_dependents": 1,
@@ -22932,19 +23351,19 @@
       "symbols": [
         {
           "name": "ScannerHistoryPanel",
-          "line": 30,
+          "line": 31,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanTaskState",
-          "line": 7,
+          "line": 8,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScannerHistoryPanelProps",
-          "line": 14,
+          "line": 15,
           "kind": "type",
           "exported": true
         }
@@ -22955,8 +23374,8 @@
       "type": "route",
       "language": "typescript",
       "framework": null,
-      "size": 298,
-      "loc": 298,
+      "size": 292,
+      "loc": 292,
       "group": 44,
       "imports": [
         "react",
@@ -23031,8 +23450,8 @@
       "type": "module",
       "language": "typescript",
       "framework": null,
-      "size": 58,
-      "loc": 58,
+      "size": 61,
+      "loc": 61,
       "group": 45,
       "imports": [],
       "layer": "frontend",
@@ -23048,7 +23467,7 @@
       "symbols": [
         {
           "name": "installMockWebSocket",
-          "line": 50,
+          "line": 52,
           "kind": "function",
           "exported": true
         },
@@ -23469,8 +23888,8 @@
       "imports": [],
       "layer": "frontend",
       "direct_dependents": 26,
-      "transitive_dependents": 32,
-      "blast_score": 42.0,
+      "transitive_dependents": 33,
+      "blast_score": 42.5,
       "imported_by": [
         "frontend/src/App.tsx",
         "frontend/src/api/alerts.ts",
@@ -23564,8 +23983,8 @@
       "imports": [],
       "layer": "frontend",
       "direct_dependents": 1,
-      "transitive_dependents": 87,
-      "blast_score": 44.5,
+      "transitive_dependents": 94,
+      "blast_score": 48.0,
       "imported_by": [
         "frontend/src/api/client.ts"
       ]
@@ -33332,92 +33751,110 @@
           "exported": true
         },
         {
-          "name": "ScannerStatusBlock",
+          "name": "EdgeDistributionEvent",
           "line": 309,
           "kind": "type",
           "exported": true
         },
         {
+          "name": "EdgeDistributionResponse",
+          "line": 317,
+          "kind": "type",
+          "exported": true
+        },
+        {
+          "name": "EdgeStatEntry",
+          "line": 321,
+          "kind": "type",
+          "exported": true
+        },
+        {
+          "name": "ScannerStatusBlock",
+          "line": 330,
+          "kind": "type",
+          "exported": true
+        },
+        {
           "name": "UniverseSummary",
-          "line": 372,
+          "line": 393,
           "kind": "type",
           "exported": true
         },
         {
           "name": "TaskEnqueueResponse",
-          "line": 418,
+          "line": 439,
           "kind": "type",
           "exported": true
         },
         {
           "name": "QualityGapEntry",
-          "line": 464,
+          "line": 485,
           "kind": "type",
           "exported": true
         },
         {
           "name": "CoveragePartialDay",
-          "line": 471,
+          "line": 492,
           "kind": "type",
           "exported": true
         },
         {
           "name": "CoverageDetail",
-          "line": 478,
+          "line": 499,
           "kind": "type",
           "exported": true
         },
         {
           "name": "QualityTickerResult",
-          "line": 487,
-          "kind": "type",
-          "exported": true
-        },
-        {
-          "name": "NormalizationProgress",
           "line": 508,
           "kind": "type",
           "exported": true
         },
         {
+          "name": "NormalizationProgress",
+          "line": 529,
+          "kind": "type",
+          "exported": true
+        },
+        {
           "name": "QualityReport",
-          "line": 521,
+          "line": 542,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ExportAggregatesOptions",
-          "line": 567,
+          "line": 588,
           "kind": "type",
           "exported": true
         },
         {
           "name": "OHLCVRow",
-          "line": 608,
+          "line": 629,
           "kind": "type",
           "exported": true
         },
         {
           "name": "DataProvider",
-          "line": 696,
+          "line": 717,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ClearEventsResponse",
-          "line": 733,
+          "line": 754,
           "kind": "type",
           "exported": true
         },
         {
           "name": "SignalQualityDecile",
-          "line": 749,
+          "line": 770,
           "kind": "type",
           "exported": true
         },
         {
           "name": "SignalQualityDistributionResponse",
-          "line": 756,
+          "line": 777,
           "kind": "type",
           "exported": true
         },
@@ -33459,205 +33896,205 @@
         },
         {
           "name": "fetchScanStatusBlock",
-          "line": 320,
+          "line": 341,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchScannerConfigs",
-          "line": 330,
+          "line": 351,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchScannerHistory",
-          "line": 335,
+          "line": 356,
           "kind": "const",
           "exported": true
         },
         {
           "name": "submitReview",
-          "line": 340,
+          "line": 361,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchReviewStats",
-          "line": 348,
+          "line": 369,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchMarketStats",
-          "line": 357,
+          "line": 378,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchPreMarketMovers",
-          "line": 362,
+          "line": 383,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniversesForTicker",
-          "line": 377,
+          "line": 398,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchStockUniverses",
-          "line": 382,
+          "line": 403,
           "kind": "const",
           "exported": true
         },
         {
           "name": "refreshUniverseStats",
-          "line": 387,
+          "line": 408,
           "kind": "const",
           "exported": true
         },
         {
           "name": "createStockUniverse",
-          "line": 392,
+          "line": 413,
           "kind": "const",
           "exported": true
         },
         {
           "name": "deleteStockUniverse",
-          "line": 401,
+          "line": 422,
           "kind": "const",
           "exported": true
         },
         {
           "name": "updateStockUniverse",
-          "line": 405,
+          "line": 426,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncFundamentals",
-          "line": 424,
+          "line": 445,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncMetrics",
-          "line": 429,
+          "line": 450,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncTickerDetails",
-          "line": 434,
+          "line": 455,
           "kind": "const",
           "exported": true
         },
         {
           "name": "stopSync",
-          "line": 439,
+          "line": 460,
           "kind": "const",
           "exported": true
         },
         {
           "name": "refreshUniverse",
-          "line": 444,
+          "line": 465,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniverseStocks",
-          "line": 449,
+          "line": 470,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncMissingAggregates",
-          "line": 454,
+          "line": 475,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniverseSyncStatus",
-          "line": 459,
+          "line": 480,
           "kind": "const",
           "exported": true
         },
         {
           "name": "deleteTickerAggregates",
-          "line": 544,
+          "line": 565,
           "kind": "const",
           "exported": true
         },
         {
           "name": "triggerQualityAnalysis",
-          "line": 552,
+          "line": 573,
           "kind": "const",
           "exported": true
         },
         {
           "name": "triggerNormalization",
-          "line": 557,
+          "line": 578,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchQualityReport",
-          "line": 562,
+          "line": 583,
           "kind": "const",
           "exported": true
         },
         {
           "name": "exportUniverseAggregates",
-          "line": 576,
+          "line": 597,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncUniverseAggregates",
-          "line": 588,
+          "line": 609,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchHistoricalData",
-          "line": 622,
+          "line": 643,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchProviders",
-          "line": 703,
+          "line": 724,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchStorageStats",
-          "line": 710,
+          "line": 731,
           "kind": "const",
           "exported": true
         },
         {
           "name": "createScannerWebSocket",
-          "line": 718,
+          "line": 739,
           "kind": "const",
           "exported": true
         },
         {
           "name": "clearScannerEvents",
-          "line": 738,
+          "line": 759,
           "kind": "const",
           "exported": true
         },
         {
           "name": "getSignalQualityDistribution",
-          "line": 761,
+          "line": 782,
           "kind": "const",
           "exported": true
         },
         {
           "name": "handleApiError",
-          "line": 776,
+          "line": 797,
           "kind": "const",
           "exported": true
         },
@@ -33927,7 +34364,7 @@
         },
         {
           "name": "StockBarRow",
-          "line": 22,
+          "line": 28,
           "kind": "type",
           "exported": true
         },
@@ -33963,61 +34400,61 @@
         },
         {
           "name": "useScannerState",
-          "line": 65,
+          "line": 66,
           "kind": "function",
           "exported": true
         },
         {
           "name": "PersistedSelection",
-          "line": 6,
+          "line": 7,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ActiveScanRef",
-          "line": 11,
+          "line": 12,
           "kind": "type",
           "exported": true
         },
         {
           "name": "LiveProgress",
-          "line": 21,
+          "line": 22,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ACTIVE_SCAN_LS_KEY",
-          "line": 3,
-          "kind": "const",
-          "exported": true
-        },
-        {
-          "name": "SELECTION_LS_KEY",
           "line": 4,
           "kind": "const",
           "exported": true
         },
         {
+          "name": "SELECTION_LS_KEY",
+          "line": 5,
+          "kind": "const",
+          "exported": true
+        },
+        {
           "name": "EMPTY_PROGRESS",
-          "line": 37,
+          "line": 38,
           "kind": "const",
           "exported": true
         },
         {
           "name": "lastCompletedWeekday",
-          "line": 43,
+          "line": 44,
           "kind": "const",
           "exported": true
         },
         {
           "name": "todayIso",
-          "line": 52,
+          "line": 53,
           "kind": "const",
           "exported": true
         },
         {
           "name": "loadPersistedSelection",
-          "line": 54,
+          "line": 55,
           "kind": "const",
           "exported": true
         },
@@ -34131,31 +34568,31 @@
         },
         {
           "name": "ActiveWatchlist",
-          "line": 95,
+          "line": 98,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AlertActivityCard",
-          "line": 13,
+          "line": 14,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AlertLogsPanel",
-          "line": 52,
+          "line": 53,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AlertActivityCardProps",
-          "line": 9,
+          "line": 10,
           "kind": "type",
           "exported": true
         },
         {
           "name": "AlertLogsPanelProps",
-          "line": 48,
+          "line": 49,
           "kind": "type",
           "exported": true
         },
@@ -34197,13 +34634,13 @@
         },
         {
           "name": "AccountPanel",
-          "line": 18,
+          "line": 19,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AccountPanelProps",
-          "line": 9,
+          "line": 10,
           "kind": "type",
           "exported": true
         },
@@ -34359,85 +34796,85 @@
         },
         {
           "name": "ResultsPanel",
-          "line": 12,
+          "line": 13,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ResultsPanelProps",
-          "line": 5,
+          "line": 6,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScanConfigPanel",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanConfigPanelProps",
-          "line": 40,
+          "line": 41,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScanStatusCard",
-          "line": 13,
+          "line": 14,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanStatusCardProps",
-          "line": 6,
+          "line": 7,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ChartPanel",
-          "line": 29,
+          "line": 33,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ChartPanelProps",
-          "line": 7,
+          "line": 11,
           "kind": "type",
           "exported": true
         },
         {
           "name": "MetadataPanel",
-          "line": 13,
+          "line": 15,
           "kind": "function",
           "exported": true
         },
         {
           "name": "MetadataPanelProps",
-          "line": 6,
+          "line": 8,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScannerHistoryPanel",
-          "line": 30,
+          "line": 31,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanTaskState",
-          "line": 7,
+          "line": 8,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScannerHistoryPanelProps",
-          "line": 14,
+          "line": 15,
           "kind": "type",
           "exported": true
         },
         {
           "name": "installMockWebSocket",
-          "line": 50,
+          "line": 52,
           "kind": "function",
           "exported": true
         },
@@ -34530,8 +34967,8 @@
       ],
       "layer": "infrastructure",
       "direct_dependents": 30,
-      "transitive_dependents": 88,
-      "blast_score": 74.0,
+      "transitive_dependents": 95,
+      "blast_score": 77.5,
       "imported_by": [
         "backend/app/core/cache.py",
         "backend/app/main.py",
@@ -43999,92 +44436,110 @@
           "exported": true
         },
         {
-          "name": "ScannerStatusBlock",
+          "name": "EdgeDistributionEvent",
           "line": 309,
           "kind": "type",
           "exported": true
         },
         {
+          "name": "EdgeDistributionResponse",
+          "line": 317,
+          "kind": "type",
+          "exported": true
+        },
+        {
+          "name": "EdgeStatEntry",
+          "line": 321,
+          "kind": "type",
+          "exported": true
+        },
+        {
+          "name": "ScannerStatusBlock",
+          "line": 330,
+          "kind": "type",
+          "exported": true
+        },
+        {
           "name": "UniverseSummary",
-          "line": 372,
+          "line": 393,
           "kind": "type",
           "exported": true
         },
         {
           "name": "TaskEnqueueResponse",
-          "line": 418,
+          "line": 439,
           "kind": "type",
           "exported": true
         },
         {
           "name": "QualityGapEntry",
-          "line": 464,
+          "line": 485,
           "kind": "type",
           "exported": true
         },
         {
           "name": "CoveragePartialDay",
-          "line": 471,
+          "line": 492,
           "kind": "type",
           "exported": true
         },
         {
           "name": "CoverageDetail",
-          "line": 478,
+          "line": 499,
           "kind": "type",
           "exported": true
         },
         {
           "name": "QualityTickerResult",
-          "line": 487,
-          "kind": "type",
-          "exported": true
-        },
-        {
-          "name": "NormalizationProgress",
           "line": 508,
           "kind": "type",
           "exported": true
         },
         {
+          "name": "NormalizationProgress",
+          "line": 529,
+          "kind": "type",
+          "exported": true
+        },
+        {
           "name": "QualityReport",
-          "line": 521,
+          "line": 542,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ExportAggregatesOptions",
-          "line": 567,
+          "line": 588,
           "kind": "type",
           "exported": true
         },
         {
           "name": "OHLCVRow",
-          "line": 608,
+          "line": 629,
           "kind": "type",
           "exported": true
         },
         {
           "name": "DataProvider",
-          "line": 696,
+          "line": 717,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ClearEventsResponse",
-          "line": 733,
+          "line": 754,
           "kind": "type",
           "exported": true
         },
         {
           "name": "SignalQualityDecile",
-          "line": 749,
+          "line": 770,
           "kind": "type",
           "exported": true
         },
         {
           "name": "SignalQualityDistributionResponse",
-          "line": 756,
+          "line": 777,
           "kind": "type",
           "exported": true
         },
@@ -44126,205 +44581,205 @@
         },
         {
           "name": "fetchScanStatusBlock",
-          "line": 320,
+          "line": 341,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchScannerConfigs",
-          "line": 330,
+          "line": 351,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchScannerHistory",
-          "line": 335,
+          "line": 356,
           "kind": "const",
           "exported": true
         },
         {
           "name": "submitReview",
-          "line": 340,
+          "line": 361,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchReviewStats",
-          "line": 348,
+          "line": 369,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchMarketStats",
-          "line": 357,
+          "line": 378,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchPreMarketMovers",
-          "line": 362,
+          "line": 383,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniversesForTicker",
-          "line": 377,
+          "line": 398,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchStockUniverses",
-          "line": 382,
+          "line": 403,
           "kind": "const",
           "exported": true
         },
         {
           "name": "refreshUniverseStats",
-          "line": 387,
+          "line": 408,
           "kind": "const",
           "exported": true
         },
         {
           "name": "createStockUniverse",
-          "line": 392,
+          "line": 413,
           "kind": "const",
           "exported": true
         },
         {
           "name": "deleteStockUniverse",
-          "line": 401,
+          "line": 422,
           "kind": "const",
           "exported": true
         },
         {
           "name": "updateStockUniverse",
-          "line": 405,
+          "line": 426,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncFundamentals",
-          "line": 424,
+          "line": 445,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncMetrics",
-          "line": 429,
+          "line": 450,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncTickerDetails",
-          "line": 434,
+          "line": 455,
           "kind": "const",
           "exported": true
         },
         {
           "name": "stopSync",
-          "line": 439,
+          "line": 460,
           "kind": "const",
           "exported": true
         },
         {
           "name": "refreshUniverse",
-          "line": 444,
+          "line": 465,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniverseStocks",
-          "line": 449,
+          "line": 470,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncMissingAggregates",
-          "line": 454,
+          "line": 475,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchUniverseSyncStatus",
-          "line": 459,
+          "line": 480,
           "kind": "const",
           "exported": true
         },
         {
           "name": "deleteTickerAggregates",
-          "line": 544,
+          "line": 565,
           "kind": "const",
           "exported": true
         },
         {
           "name": "triggerQualityAnalysis",
-          "line": 552,
+          "line": 573,
           "kind": "const",
           "exported": true
         },
         {
           "name": "triggerNormalization",
-          "line": 557,
+          "line": 578,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchQualityReport",
-          "line": 562,
+          "line": 583,
           "kind": "const",
           "exported": true
         },
         {
           "name": "exportUniverseAggregates",
-          "line": 576,
+          "line": 597,
           "kind": "const",
           "exported": true
         },
         {
           "name": "syncUniverseAggregates",
-          "line": 588,
+          "line": 609,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchHistoricalData",
-          "line": 622,
+          "line": 643,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchProviders",
-          "line": 703,
+          "line": 724,
           "kind": "const",
           "exported": true
         },
         {
           "name": "fetchStorageStats",
-          "line": 710,
+          "line": 731,
           "kind": "const",
           "exported": true
         },
         {
           "name": "createScannerWebSocket",
-          "line": 718,
+          "line": 739,
           "kind": "const",
           "exported": true
         },
         {
           "name": "clearScannerEvents",
-          "line": 738,
+          "line": 759,
           "kind": "const",
           "exported": true
         },
         {
           "name": "getSignalQualityDistribution",
-          "line": 761,
+          "line": 782,
           "kind": "const",
           "exported": true
         },
         {
           "name": "handleApiError",
-          "line": 776,
+          "line": 797,
           "kind": "const",
           "exported": true
         },
@@ -44594,7 +45049,7 @@
         },
         {
           "name": "StockBarRow",
-          "line": 22,
+          "line": 28,
           "kind": "type",
           "exported": true
         },
@@ -44630,61 +45085,61 @@
         },
         {
           "name": "useScannerState",
-          "line": 65,
+          "line": 66,
           "kind": "function",
           "exported": true
         },
         {
           "name": "PersistedSelection",
-          "line": 6,
+          "line": 7,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ActiveScanRef",
-          "line": 11,
+          "line": 12,
           "kind": "type",
           "exported": true
         },
         {
           "name": "LiveProgress",
-          "line": 21,
+          "line": 22,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ACTIVE_SCAN_LS_KEY",
-          "line": 3,
-          "kind": "const",
-          "exported": true
-        },
-        {
-          "name": "SELECTION_LS_KEY",
           "line": 4,
           "kind": "const",
           "exported": true
         },
         {
+          "name": "SELECTION_LS_KEY",
+          "line": 5,
+          "kind": "const",
+          "exported": true
+        },
+        {
           "name": "EMPTY_PROGRESS",
-          "line": 37,
+          "line": 38,
           "kind": "const",
           "exported": true
         },
         {
           "name": "lastCompletedWeekday",
-          "line": 43,
+          "line": 44,
           "kind": "const",
           "exported": true
         },
         {
           "name": "todayIso",
-          "line": 52,
+          "line": 53,
           "kind": "const",
           "exported": true
         },
         {
           "name": "loadPersistedSelection",
-          "line": 54,
+          "line": 55,
           "kind": "const",
           "exported": true
         },
@@ -44798,31 +45253,31 @@
         },
         {
           "name": "ActiveWatchlist",
-          "line": 95,
+          "line": 98,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AlertActivityCard",
-          "line": 13,
+          "line": 14,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AlertLogsPanel",
-          "line": 52,
+          "line": 53,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AlertActivityCardProps",
-          "line": 9,
+          "line": 10,
           "kind": "type",
           "exported": true
         },
         {
           "name": "AlertLogsPanelProps",
-          "line": 48,
+          "line": 49,
           "kind": "type",
           "exported": true
         },
@@ -44864,13 +45319,13 @@
         },
         {
           "name": "AccountPanel",
-          "line": 18,
+          "line": 19,
           "kind": "function",
           "exported": true
         },
         {
           "name": "AccountPanelProps",
-          "line": 9,
+          "line": 10,
           "kind": "type",
           "exported": true
         },
@@ -45026,85 +45481,85 @@
         },
         {
           "name": "ResultsPanel",
-          "line": 12,
+          "line": 13,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ResultsPanelProps",
-          "line": 5,
+          "line": 6,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScanConfigPanel",
-          "line": 64,
+          "line": 65,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanConfigPanelProps",
-          "line": 40,
+          "line": 41,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScanStatusCard",
-          "line": 13,
+          "line": 14,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanStatusCardProps",
-          "line": 6,
+          "line": 7,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ChartPanel",
-          "line": 29,
+          "line": 33,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ChartPanelProps",
-          "line": 7,
+          "line": 11,
           "kind": "type",
           "exported": true
         },
         {
           "name": "MetadataPanel",
-          "line": 13,
+          "line": 15,
           "kind": "function",
           "exported": true
         },
         {
           "name": "MetadataPanelProps",
-          "line": 6,
+          "line": 8,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScannerHistoryPanel",
-          "line": 30,
+          "line": 31,
           "kind": "function",
           "exported": true
         },
         {
           "name": "ScanTaskState",
-          "line": 7,
+          "line": 8,
           "kind": "type",
           "exported": true
         },
         {
           "name": "ScannerHistoryPanelProps",
-          "line": 14,
+          "line": 15,
           "kind": "type",
           "exported": true
         },
         {
           "name": "installMockWebSocket",
-          "line": 50,
+          "line": 52,
           "kind": "function",
           "exported": true
         },
@@ -45404,6 +45859,54 @@
           "exported": true
         },
         {
+          "name": "parse_file_hunks",
+          "line": 32,
+          "kind": "function",
+          "exported": true,
+          "doc": "Return list of hunk dicts for one file from a unified diff."
+        },
+        {
+          "name": "overlaps",
+          "line": 61,
+          "kind": "function",
+          "exported": true,
+          "doc": "True if the old-file line ranges of two hunks overlap."
+        },
+        {
+          "name": "_apply_hunk",
+          "line": 69,
+          "kind": "function",
+          "exported": false,
+          "doc": "Return lines produced by hunk: added lines and context lines (no removed)."
+        },
+        {
+          "name": "is_formatter_only",
+          "line": 83,
+          "kind": "function",
+          "exported": true,
+          "doc": "Check if applying actual hunk to base_lines produces the same file content"
+        },
+        {
+          "name": "_run_formatter",
+          "line": 126,
+          "kind": "function",
+          "exported": false,
+          "doc": "Apply ruff format + ruff check --fix --select I to content, return result."
+        },
+        {
+          "name": "filter_diff",
+          "line": 167,
+          "kind": "function",
+          "exported": true,
+          "doc": "Strip formatter-only hunks from raw_diff for each file in py_files."
+        },
+        {
+          "name": "main",
+          "line": 254,
+          "kind": "function",
+          "exported": true
+        },
+        {
           "name": "test_command_wires_the_contract",
           "line": 6,
           "kind": "function",
@@ -45516,6 +46019,173 @@
           "line": 6,
           "kind": "function",
           "exported": true
+        },
+        {
+          "name": "test_step_30_invokes_filter_script",
+          "line": 9,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_guards_on_ruff_absence_via_script",
+          "line": 14,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_writes_py_files_list",
+          "line": 20,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_30_pre_triage_annotation_variable",
+          "line": 26,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_step_31_uses_triaged_diff",
+          "line": 32,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_formatter_exception_rule_present",
+          "line": 9,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_formatter_rule_precedes_oos_bullet_format",
+          "line": 17,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_returns_two_hunks",
+          "line": 41,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_captures_hunk_lines",
+          "line": 46,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_parse_file_hunks_unknown_file_returns_empty",
+          "line": 53,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_overlaps_true_when_adjacent",
+          "line": 61,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_overlaps_false_when_disjoint",
+          "line": 68,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_hunk",
+          "line": 79,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build a hunk dict with the given body (list of diff lines, no @@ header)."
+        },
+        {
+          "name": "test_apply_hunk_produces_added_and_context_lines",
+          "line": 90,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_apply_hunk_skips_removed_lines",
+          "line": 100,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_true_for_reorder_despite_different_diff_grouping",
+          "line": 112,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_false_when_actual_adds_feature_line",
+          "line": 128,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_false_when_no_overlap",
+          "line": 142,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_make_mock_run",
+          "line": 177,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "test_filter_diff_strips_formatter_only_hunk",
+          "line": 191,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_leaves_interleaved_hunk_intact",
+          "line": 201,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_new_file_skipped",
+          "line": 221,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_filter_diff_no_ruff_returns_raw",
+          "line": 243,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_is_formatter_only_true_when_second_formatter_hunk_matches",
+          "line": 254,
+          "kind": "function",
+          "exported": true,
+          "doc": "First overlapping fmt hunk doesn't match; second does \u2014 should still return True"
+        },
+        {
+          "name": "test_apply_hunk_ignores_no_newline_marker",
+          "line": 280,
+          "kind": "function",
+          "exported": true,
+          "doc": "Lines starting with \\ (the diff no-newline marker) should be silently skipped."
+        },
+        {
+          "name": "test_run_formatter_returns_content_unchanged_on_ruff_format_error",
+          "line": 291,
+          "kind": "function",
+          "exported": true,
+          "doc": "If ruff format exits non-zero, _run_formatter returns the original content."
+        },
+        {
+          "name": "test_filter_diff_body_line_starting_with_triple_dash_not_treated_as_file_header",
+          "line": 313,
+          "kind": "function",
+          "exported": true,
+          "doc": "A removed body line whose content starts with '-- ' (diff line '--- ...') must n"
         },
         {
           "name": "test_report_node_renders_code_review_section",
@@ -52879,6 +53549,48 @@
       "kind": "imports"
     },
     {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "difflib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "os",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "re",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "shutil",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "subprocess",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "sys",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/scripts/fmt_hunk_filter.py",
+      "target": "tempfile",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "dark-factory/tests/test_code_review_command.py",
       "target": "pathlib",
       "weight": 1,
@@ -52929,6 +53641,54 @@
     {
       "source": "dark-factory/tests/test_config_code_review.py",
       "target": "yaml",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_conformance_formatter_step.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_conformance_prompt_formatter_rule.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "sys",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "textwrap",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "pathlib",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "fmt_hunk_filter",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "dark-factory/tests/test_fmt_hunk_filter.py",
+      "target": "os",
       "weight": 1,
       "kind": "imports"
     },
@@ -53554,7 +54314,7 @@
       "source": "frontend/src/App.tsx",
       "target": "frontend/src/api/auth.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/App.tsx",
@@ -53776,7 +54536,7 @@
       "source": "frontend/src/components/CorrelationHeatmap.tsx",
       "target": "frontend/src/api/analysis.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/CreateUniverseModal.tsx",
@@ -53806,7 +54566,7 @@
       "source": "frontend/src/components/CreateUniverseModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ExportUniverseModal.tsx",
@@ -53896,7 +54656,7 @@
       "source": "frontend/src/components/Layout.tsx",
       "target": "frontend/src/api/system.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/Layout.tsx",
@@ -53926,7 +54686,7 @@
       "source": "frontend/src/components/NewsFeed.tsx",
       "target": "frontend/src/api/news.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/NewsFeed.tsx",
@@ -53956,13 +54716,13 @@
       "source": "frontend/src/components/NewsSettings.tsx",
       "target": "frontend/src/api/news.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/NewsSettings.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/QualityReportModal.test.tsx",
@@ -53992,7 +54752,7 @@
       "source": "frontend/src/components/QualityReportModal.test.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/QualityReportModal.tsx",
@@ -54034,7 +54794,7 @@
       "source": "frontend/src/components/QualityReportModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/RecentEvents.tsx",
@@ -54070,7 +54830,7 @@
       "source": "frontend/src/components/RecentEvents.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ReviewControls.tsx",
@@ -54094,7 +54854,7 @@
       "source": "frontend/src/components/ReviewControls.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ScannerConfig.tsx",
@@ -54105,6 +54865,12 @@
     {
       "source": "frontend/src/components/ScannerConfig.tsx",
       "target": "lucide-react",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "frontend/src/components/ScannerConfig.tsx",
+      "target": "frontend/src/api/scanner.ts",
       "weight": 1,
       "kind": "imports"
     },
@@ -54136,7 +54902,7 @@
       "source": "frontend/src/components/ScannerResults.test.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ScannerResults.tsx",
@@ -54166,7 +54932,7 @@
       "source": "frontend/src/components/ScannerResults.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/SignalReviewStats.tsx",
@@ -54196,7 +54962,7 @@
       "source": "frontend/src/components/SignalReviewStats.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/SyncUniverseModal.tsx",
@@ -54232,7 +54998,7 @@
       "source": "frontend/src/components/SyncUniverseModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/SystemActivityMonitor.tsx",
@@ -54340,7 +55106,7 @@
       "source": "frontend/src/components/UniverseDetailsModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/UniverseFormModal.test.tsx",
@@ -54394,7 +55160,7 @@
       "source": "frontend/src/components/UniverseFormModal.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/BackfillPanel.tsx",
@@ -54424,7 +55190,7 @@
       "source": "frontend/src/components/scorecard/DistributionChart.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/EdgeDecayChart.tsx",
@@ -54436,7 +55202,7 @@
       "source": "frontend/src/components/scorecard/EdgeDecayChart.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/HeroMetrics.tsx",
@@ -54448,7 +55214,7 @@
       "source": "frontend/src/components/scorecard/HeroMetrics.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/IntervalTable.tsx",
@@ -54460,7 +55226,7 @@
       "source": "frontend/src/components/scorecard/IntervalTable.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/ScannerSummaryCard.tsx",
@@ -54484,7 +55250,7 @@
       "source": "frontend/src/components/scorecard/ScannerSummaryCard.tsx",
       "target": "frontend/src/api/outcomes.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/scorecard/SignalTable.tsx",
@@ -54545,6 +55311,18 @@
       "target": "frontend/src/components/ui/StockChart.tsx",
       "weight": 1,
       "kind": "renders"
+    },
+    {
+      "source": "frontend/src/components/ui/Chart.tsx",
+      "target": "frontend/src/api/scanner.ts",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "frontend/src/components/ui/Chart.tsx",
+      "target": "frontend/src/hooks/useLiveStockData.ts",
+      "weight": 1,
+      "kind": "imports"
     },
     {
       "source": "frontend/src/components/ui/GlobalErrorToast.test.tsx",
@@ -54616,7 +55394,7 @@
       "source": "frontend/src/components/ui/StockChart.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/hooks/useLiveStockData.test.ts",
@@ -54705,6 +55483,12 @@
     {
       "source": "frontend/src/hooks/useScannerState.ts",
       "target": "react",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "frontend/src/hooks/useScannerState.ts",
+      "target": "frontend/src/api/scanner.ts",
       "weight": 1,
       "kind": "imports"
     },
@@ -54979,6 +55763,12 @@
       "kind": "renders"
     },
     {
+      "source": "frontend/src/pages/Alerts/AlertLogsPanel.tsx",
+      "target": "frontend/src/api/alerts.ts",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "frontend/src/pages/Alerts/AlertRuleModal.test.tsx",
       "target": "vitest",
       "weight": 1,
@@ -55169,6 +55959,12 @@
       "target": "frontend/src/pages/AutoTrading/components.tsx",
       "weight": 1,
       "kind": "renders"
+    },
+    {
+      "source": "frontend/src/pages/AutoTrading/AccountPanel.tsx",
+      "target": "frontend/src/api/trading.ts",
+      "weight": 1,
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/AutoTrading/AutoTrading.test.tsx",
@@ -55474,7 +56270,7 @@
       "source": "frontend/src/pages/Dashboard.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/EdgeExplorer.tsx",
@@ -55504,7 +56300,7 @@
       "source": "frontend/src/pages/EdgeExplorer.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/EdgeExplorer.tsx",
@@ -55522,7 +56318,7 @@
       "source": "frontend/src/pages/EdgeExplorer.tsx",
       "target": "frontend/src/api/analysis.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Journal.tsx",
@@ -55564,7 +56360,7 @@
       "source": "frontend/src/pages/Journal.tsx",
       "target": "frontend/src/api/journal.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Login/Login.test.tsx",
@@ -55606,7 +56402,7 @@
       "source": "frontend/src/pages/Login/index.tsx",
       "target": "frontend/src/api/auth.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/PreMarketMovers.tsx",
@@ -55636,7 +56432,7 @@
       "source": "frontend/src/pages/PreMarketMovers.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Scanner/LiveProgressPanel.tsx",
@@ -55667,6 +56463,12 @@
       "target": "frontend/src/components/SignalReviewStats.tsx",
       "weight": 1,
       "kind": "renders"
+    },
+    {
+      "source": "frontend/src/pages/Scanner/ResultsPanel.tsx",
+      "target": "frontend/src/api/scanner.ts",
+      "weight": 1,
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Scanner/ScanConfigPanel.test.tsx",
@@ -55741,6 +56543,12 @@
       "kind": "renders"
     },
     {
+      "source": "frontend/src/pages/Scanner/ScanConfigPanel.tsx",
+      "target": "frontend/src/api/scanner.ts",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "frontend/src/pages/Scanner/ScanStatusCard.tsx",
       "target": "date-fns",
       "weight": 1,
@@ -55757,6 +56565,12 @@
       "target": "frontend/src/components/ui/Card.tsx",
       "weight": 1,
       "kind": "renders"
+    },
+    {
+      "source": "frontend/src/pages/Scanner/ScanStatusCard.tsx",
+      "target": "frontend/src/api/scanner.ts",
+      "weight": 1,
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/Scanner/Scanner.test.tsx",
@@ -55822,7 +56636,7 @@
       "source": "frontend/src/pages/Scanner/index.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/ScorecardDetail.tsx",
@@ -55969,6 +56783,24 @@
       "kind": "renders"
     },
     {
+      "source": "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
+      "target": "frontend/src/api/scanner.ts",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
+      "target": "frontend/src/hooks/useLiveStockData.ts",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "frontend/src/pages/StockDetailPage/ChartPanel.tsx",
+      "target": "frontend/src/api/stocks.ts",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
       "target": "lucide-react",
       "weight": 1,
@@ -55985,6 +56817,18 @@
       "target": "frontend/src/components/NewsFeed.tsx",
       "weight": 1,
       "kind": "renders"
+    },
+    {
+      "source": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
+      "target": "frontend/src/api/stocks.ts",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "frontend/src/pages/StockDetailPage/MetadataPanel.tsx",
+      "target": "frontend/src/api/scanner.ts",
+      "weight": 1,
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx",
@@ -56009,6 +56853,12 @@
       "target": "frontend/src/components/ForceScanDialog.tsx",
       "weight": 1,
       "kind": "renders"
+    },
+    {
+      "source": "frontend/src/pages/StockDetailPage/ScannerHistoryPanel.tsx",
+      "target": "frontend/src/api/scanner.ts",
+      "weight": 1,
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
@@ -56044,19 +56894,19 @@
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
       "target": "frontend/src/api/stocks.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
       "target": "frontend/src/api/system.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/pages/StockDetailPage/index.tsx",
@@ -56146,7 +56996,7 @@
       "source": "frontend/src/pages/Universes.tsx",
       "target": "frontend/src/api/scanner.ts",
       "weight": 1,
-      "kind": "renders"
+      "kind": "imports"
     },
     {
       "source": "frontend/src/test-setup.ts",
@@ -56649,12 +57499,6 @@
     {
       "source": "frontend/src/api/journal.ts",
       "target": "backend/app/routers/journal.py",
-      "weight": 1,
-      "kind": "api-call"
-    },
-    {
-      "source": "frontend/src/pages/EdgeExplorer.tsx",
-      "target": "backend/app/routers/scanner.py",
       "weight": 1,
       "kind": "api-call"
     }
