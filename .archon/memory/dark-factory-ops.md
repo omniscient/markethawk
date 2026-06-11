@@ -65,7 +65,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## DAG Trigger Rules
 
-- [PATTERN] Every OR-join node in `archon-dark-factory.yaml` — a node whose `depends_on` list contains mutually-exclusive upstream branches (one is always skipped per intent) — must declare `trigger_rule: none_failed_min_one_success` (or `one_success`). The default `all_success` treats a skipped upstream as non-success and silently skips the join and all its descendants. The four current OR-join nodes are `validate`, `de-conflict`, `status-in-review`, and `report`; when adding a new one, also update `REQUIRED_OR_JOIN_NODES` and `EXPECTED_TRIGGER_RULE_COUNT` in `dark-factory/scripts/check_workflow_dag.py`. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:implement -->
+- [PATTERN] Every OR-join node in `archon-dark-factory.yaml` — a node whose `depends_on` list contains mutually-exclusive upstream branches (one is always skipped per intent) — must declare `trigger_rule: none_failed_min_one_success` (or `one_success`). The default `all_success` treats a skipped upstream as non-success and silently skips the join and all its descendants. The four known OR-join nodes (`validate`, `de-conflict`, `status-in-review`, `report`) are in `REQUIRED_OR_JOIN_NODES` in `dark-factory/scripts/check_workflow_dag.py`; when adding a new OR-join, also add its ID there. The structural check in `check_workflow_dag.py` additionally flags any node whose ALL upstreams carry a `when:` condition and that lacks a skip-tolerant rule — this catches newly-added OR-joins even if they are not in the allowlist yet. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:implement -->
 
 ## Refine-Branch Pre-Implementation
 
