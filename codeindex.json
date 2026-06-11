@@ -1,8 +1,8 @@
 {
   "meta": {
     "root": "markethawk/",
-    "total_files": 487,
-    "total_loc": 69460,
+    "total_files": 490,
+    "total_loc": 70413,
     "languages": [
       "python",
       "javascript",
@@ -1386,6 +1386,39 @@
       ]
     },
     {
+      "id": "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
+      "type": "module",
+      "language": "python",
+      "size": 100,
+      "loc": 100,
+      "group": 2,
+      "imports": [
+        "typing",
+        "sqlalchemy",
+        "alembic",
+        "json"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "upgrade",
+          "line": 25,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "downgrade",
+          "line": 93,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
       "id": "backend/app/alembic/versions/fa2957d31876_expand_column_lengths.py",
       "type": "module",
       "language": "python",
@@ -1563,8 +1596,8 @@
       "id": "backend/app/core/celery_app.py",
       "type": "module",
       "language": "python",
-      "size": 73,
-      "loc": 73,
+      "size": 78,
+      "loc": 78,
       "group": 3,
       "imports": [
         "os",
@@ -5476,8 +5509,8 @@
       "id": "backend/app/services/event_helpers.py",
       "type": "module",
       "language": "python",
-      "size": 120,
-      "loc": 120,
+      "size": 129,
+      "loc": 129,
       "group": 8,
       "imports": [
         "typing"
@@ -5490,14 +5523,14 @@
       "symbols": [
         {
           "name": "generate_event_summary",
-          "line": 97,
+          "line": 106,
           "kind": "function",
           "exported": true,
           "doc": "Generate a human-readable summary for a scanner event."
         },
         {
           "name": "compute_event_severity",
-          "line": 110,
+          "line": 119,
           "kind": "function",
           "exported": true,
           "doc": "Compute the severity level for a scanner event."
@@ -6000,8 +6033,8 @@
       "id": "backend/app/services/outcome_service.py",
       "type": "module",
       "language": "python",
-      "size": 226,
-      "loc": 226,
+      "size": 227,
+      "loc": 227,
       "group": 8,
       "imports": [
         "logging",
@@ -6746,6 +6779,79 @@
       ]
     },
     {
+      "id": "backend/app/services/trend_pullback_scan.py",
+      "type": "module",
+      "language": "python",
+      "size": 422,
+      "loc": 422,
+      "group": 8,
+      "imports": [
+        "__future__",
+        "logging",
+        "time",
+        "datetime",
+        "typing",
+        "zoneinfo",
+        "pandas",
+        "sqlalchemy",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "_get_daily_bars",
+          "line": 50,
+          "kind": "function",
+          "exported": false,
+          "doc": "Fetch up to `lookback` daily bars ending on event_date (inclusive), ascending."
+        },
+        {
+          "name": "_calc_rsi",
+          "line": 78,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_calc_atr",
+          "line": 88,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_evaluate_ticker",
+          "line": 100,
+          "kind": "function",
+          "exported": false,
+          "doc": "Evaluate one ticker against the trend_pullback criteria."
+        },
+        {
+          "name": "run_trend_pullback_scan",
+          "line": 259,
+          "kind": "function",
+          "exported": true,
+          "doc": "Run the trend_pullback scanner over a date range."
+        },
+        {
+          "name": "run_trend_pullback_scan_for_date",
+          "line": 378,
+          "kind": "function",
+          "exported": true,
+          "doc": "Single-ticker single-date wrapper used by run_range_scan's scanner_map."
+        },
+        {
+          "name": "_orchestrator_run",
+          "line": 394,
+          "kind": "function",
+          "exported": false,
+          "doc": "Adapter: maps the standard ScannerFn signature to run_trend_pullback_scan."
+        }
+      ]
+    },
+    {
       "id": "backend/app/services/universe_export.py",
       "type": "module",
       "language": "python",
@@ -6974,8 +7080,8 @@
       "id": "backend/app/tasks/scanning.py",
       "type": "module",
       "language": "python",
-      "size": 759,
-      "loc": 759,
+      "size": 849,
+      "loc": 849,
       "group": 9,
       "imports": [
         "asyncio",
@@ -7010,49 +7116,56 @@
         },
         {
           "name": "_run_universe_scan_logic",
-          "line": 141,
+          "line": 145,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
         },
         {
           "name": "evaluate_scanner_alerts",
-          "line": 328,
+          "line": 333,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 361,
+          "line": 366,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 415,
+          "line": 420,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 504,
+          "line": 509,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 608,
+          "line": 613,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
+          "name": "run_trend_pullback_scheduled",
+          "line": 698,
+          "kind": "function",
+          "exported": true,
+          "doc": "Nightly 02:00 UTC task: run trend_pullback for today's date over all active"
+        },
+        {
           "name": "validate_scheduled_scanner_configs",
-          "line": 697,
+          "line": 787,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
@@ -14084,6 +14197,145 @@
       ]
     },
     {
+      "id": "backend/tests/services/test_trend_pullback_scan.py",
+      "type": "module",
+      "language": "python",
+      "size": 326,
+      "loc": 326,
+      "group": 20,
+      "imports": [
+        "asyncio",
+        "datetime",
+        "typing",
+        "unittest",
+        "app"
+      ],
+      "layer": "backend",
+      "direct_dependents": 0,
+      "transitive_dependents": 0,
+      "blast_score": 0.0,
+      "imported_by": [],
+      "symbols": [
+        {
+          "name": "_bar",
+          "line": 12,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_uptrend_bars",
+          "line": 27,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build n bars in a smooth uptrend: close rises from base to base*1.3."
+        },
+        {
+          "name": "_run_scan",
+          "line": 40,
+          "kind": "function",
+          "exported": false,
+          "doc": "Run trend_pullback scan with mocked _get_daily_bars and _save_event."
+        },
+        {
+          "name": "_pullback_bars",
+          "line": 76,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build bars that satisfy all trend_pullback criteria:"
+        },
+        {
+          "name": "test_module_importable",
+          "line": 121,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_orchestrator_registration",
+          "line": 130,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_no_bars_skipped",
+          "line": 140,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_insufficient_history_skipped",
+          "line": 149,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_downtrend_does_not_fire",
+          "line": 159,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_below_price_floor_does_not_fire",
+          "line": 174,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_high_rsi_does_not_fire",
+          "line": 185,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_too_far_from_high_does_not_fire",
+          "line": 197,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_pullback_too_deep_does_not_fire",
+          "line": 217,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_pullback_too_shallow_does_not_fire",
+          "line": 227,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_low_dollar_volume_does_not_fire",
+          "line": 237,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_diagnostics_populated",
+          "line": 250,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_scan_for_date_wrapper",
+          "line": 279,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_severity_high_when_shallow_and_rsi_very_low",
+          "line": 295,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_severity_medium_otherwise",
+          "line": 305,
+          "kind": "function",
+          "exported": true
+        }
+      ]
+    },
+    {
       "id": "backend/tests/services/test_universe_stats_service.py",
       "type": "module",
       "language": "python",
@@ -16723,9 +16975,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 55,
+      "direct_dependents": 56,
       "transitive_dependents": 80,
-      "blast_score": 95.0,
+      "blast_score": 96.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/error_tracking.py",
@@ -16764,6 +17016,7 @@
         "backend/app/services/stock_data.py",
         "backend/app/services/stock_screener.py",
         "backend/app/services/timeseries_forecast.py",
+        "backend/app/services/trend_pullback_scan.py",
         "backend/app/services/universe_orchestrator.py",
         "backend/app/services/websocket_manager.py",
         "backend/app/tasks/quality.py",
@@ -16793,9 +17046,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 42,
+      "direct_dependents": 43,
       "transitive_dependents": 0,
-      "blast_score": 42.0,
+      "blast_score": 43.0,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/alembic/versions/0b4b1c3739b4_add_missing_model_tables.py",
@@ -16838,6 +17091,7 @@
         "backend/app/alembic/versions/f33989688da3_add_alerting_tables.py",
         "backend/app/alembic/versions/f652e7838258_add_scanner_runs_table.py",
         "backend/app/alembic/versions/f670d3191d9d_add_edge_metrics_to_volume_event.py",
+        "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
         "backend/app/alembic/versions/fa2957d31876_expand_column_lengths.py"
       ]
     },
@@ -16850,9 +17104,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 159,
+      "direct_dependents": 161,
       "transitive_dependents": 109,
-      "blast_score": 213.5,
+      "blast_score": 215.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -16888,6 +17142,7 @@
         "backend/app/alembic/versions/f33989688da3_add_alerting_tables.py",
         "backend/app/alembic/versions/f652e7838258_add_scanner_runs_table.py",
         "backend/app/alembic/versions/f670d3191d9d_add_edge_metrics_to_volume_event.py",
+        "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
         "backend/app/alembic/versions/fa2957d31876_expand_column_lengths.py",
         "backend/app/core/auth.py",
         "backend/app/core/database.py",
@@ -16966,6 +17221,7 @@
         "backend/app/services/stock_data.py",
         "backend/app/services/stock_screener.py",
         "backend/app/services/system_service.py",
+        "backend/app/services/trend_pullback_scan.py",
         "backend/app/services/universe_export.py",
         "backend/app/services/universe_orchestrator.py",
         "backend/app/services/universe_stats.py",
@@ -17024,9 +17280,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 213,
+      "direct_dependents": 215,
       "transitive_dependents": 109,
-      "blast_score": 267.5,
+      "blast_score": 269.5,
       "imported_by": [
         "backend/app/alembic/env.py",
         "backend/app/core/__init__.py",
@@ -17125,6 +17381,7 @@
         "backend/app/services/stock_data.py",
         "backend/app/services/stock_screener.py",
         "backend/app/services/system_service.py",
+        "backend/app/services/trend_pullback_scan.py",
         "backend/app/services/universe_export.py",
         "backend/app/services/universe_orchestrator.py",
         "backend/app/services/universe_stats.py",
@@ -17219,6 +17476,7 @@
         "backend/tests/services/test_stock_screener.py",
         "backend/tests/services/test_system_service.py",
         "backend/tests/services/test_timeseries_forecast.py",
+        "backend/tests/services/test_trend_pullback_scan.py",
         "backend/tests/services/test_universe_stats_service.py",
         "backend/tests/tasks/test_metrics_instrumentation.py",
         "backend/tests/tasks/test_package_exports.py",
@@ -17332,9 +17590,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 126,
+      "direct_dependents": 129,
       "transitive_dependents": 92,
-      "blast_score": 172.0,
+      "blast_score": 175.0,
       "imported_by": [
         "backend/app/alembic/versions/0b4b1c3739b4_add_missing_model_tables.py",
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
@@ -17377,6 +17635,7 @@
         "backend/app/alembic/versions/f33989688da3_add_alerting_tables.py",
         "backend/app/alembic/versions/f652e7838258_add_scanner_runs_table.py",
         "backend/app/alembic/versions/f670d3191d9d_add_edge_metrics_to_volume_event.py",
+        "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
         "backend/app/alembic/versions/fa2957d31876_expand_column_lengths.py",
         "backend/app/core/cache.py",
         "backend/app/core/database.py",
@@ -17444,6 +17703,7 @@
         "backend/app/services/stock_screener.py",
         "backend/app/services/system_service.py",
         "backend/app/services/timeseries_forecast.py",
+        "backend/app/services/trend_pullback_scan.py",
         "backend/app/services/universe_orchestrator.py",
         "backend/app/services/websocket_manager.py",
         "backend/live_scanner/bar_aggregator.py",
@@ -17454,6 +17714,7 @@
         "backend/tests/conftest.py",
         "backend/tests/fixtures/providers.py",
         "backend/tests/services/test_pocket_pivot.py",
+        "backend/tests/services/test_trend_pullback_scan.py",
         "dark-factory/scripts/code_review_payload.py",
         "services/tweet-monitor/app/browser.py",
         "services/tweet-monitor/app/classifier.py",
@@ -17473,13 +17734,14 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 28,
+      "direct_dependents": 29,
       "transitive_dependents": 60,
-      "blast_score": 58.0,
+      "blast_score": 59.0,
       "imported_by": [
         "backend/app/alembic/versions/1bf5e10f1111_seed_pocket_pivot_scanner_config.py",
         "backend/app/alembic/versions/e9bd09ec24b0_seed_outcome_config_and_data_requirements.py",
         "backend/app/alembic/versions/ed1162e42f12_seed_liquidity_hunt_scanner_config.py",
+        "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
         "backend/app/core/cache.py",
         "backend/app/routers/alerts.py",
         "backend/app/routers/live_data.py",
@@ -17568,9 +17830,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 137,
+      "direct_dependents": 139,
       "transitive_dependents": 110,
-      "blast_score": 192.0,
+      "blast_score": 194.0,
       "imported_by": [
         "backend/app/core/auth.py",
         "backend/app/core/error_tracking.py",
@@ -17654,6 +17916,7 @@
         "backend/app/services/stats.py",
         "backend/app/services/stock_data.py",
         "backend/app/services/system_service.py",
+        "backend/app/services/trend_pullback_scan.py",
         "backend/app/services/universe_export.py",
         "backend/app/services/universe_orchestrator.py",
         "backend/app/tasks/quality.py",
@@ -17698,6 +17961,7 @@
         "backend/tests/services/test_stock_data_service_methods.py",
         "backend/tests/services/test_stock_screener.py",
         "backend/tests/services/test_system_service.py",
+        "backend/tests/services/test_trend_pullback_scan.py",
         "backend/tests/tasks/test_scanning_tasks.py",
         "backend/tests/tasks/test_sync_tasks.py",
         "scripts/fetch_metrics.py",
@@ -17984,9 +18248,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 28,
+      "direct_dependents": 29,
       "transitive_dependents": 60,
-      "blast_score": 58.0,
+      "blast_score": 59.0,
       "imported_by": [
         "backend/app/core/error_tracking.py",
         "backend/app/main.py",
@@ -18014,6 +18278,7 @@
         "backend/tests/services/test_pocket_pivot.py",
         "backend/tests/services/test_scan_orchestrator.py",
         "backend/tests/services/test_scanner_refactor.py",
+        "backend/tests/services/test_trend_pullback_scan.py",
         "services/tweet-monitor/app/browser.py",
         "services/tweet-monitor/app/main.py"
       ]
@@ -18099,9 +18364,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 12,
+      "direct_dependents": 13,
       "transitive_dependents": 56,
-      "blast_score": 40.0,
+      "blast_score": 41.0,
       "imported_by": [
         "backend/app/main.py",
         "backend/app/providers/ibkr.py",
@@ -18109,6 +18374,7 @@
         "backend/app/services/oversold_bounce_scan.py",
         "backend/app/services/pocket_pivot.py",
         "backend/app/services/pre_market_scan.py",
+        "backend/app/services/trend_pullback_scan.py",
         "backend/app/tasks/quality.py",
         "backend/app/tasks/scanning.py",
         "backend/app/tasks/sync.py",
@@ -18251,15 +18517,16 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 10,
+      "direct_dependents": 11,
       "transitive_dependents": 0,
-      "blast_score": 10.0,
+      "blast_score": 11.0,
       "imported_by": [
         "backend/app/providers/ibkr_orders.py",
         "backend/app/services/auto_trade_service.py",
         "backend/app/services/liquidity_hunt.py",
         "backend/app/services/pocket_pivot.py",
         "backend/app/services/timeseries_forecast.py",
+        "backend/app/services/trend_pullback_scan.py",
         "dark-factory/scripts/code_review_payload.py",
         "services/tweet-monitor/app/classifier.py",
         "services/tweet-monitor/app/extractor.py",
@@ -18349,9 +18616,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 15,
+      "direct_dependents": 16,
       "transitive_dependents": 53,
-      "blast_score": 41.5,
+      "blast_score": 42.5,
       "imported_by": [
         "backend/app/routers/futures.py",
         "backend/app/routers/stocks.py",
@@ -18363,6 +18630,7 @@
         "backend/app/services/pre_market_scan.py",
         "backend/app/services/statistical_discovery.py",
         "backend/app/services/stock_data.py",
+        "backend/app/services/trend_pullback_scan.py",
         "backend/app/tasks/quality.py",
         "backend/tests/services/test_chart_indicators.py",
         "backend/tests/services/test_futures_data_service.py",
@@ -18570,9 +18838,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 16,
+      "direct_dependents": 17,
       "transitive_dependents": 0,
-      "blast_score": 16.0,
+      "blast_score": 17.0,
       "imported_by": [
         "backend/app/services/liquidity_hunt.py",
         "backend/app/services/outcome_service.py",
@@ -18583,6 +18851,7 @@
         "backend/app/services/session_metrics.py",
         "backend/app/services/stock_data.py",
         "backend/app/services/system_service.py",
+        "backend/app/services/trend_pullback_scan.py",
         "backend/app/tasks/sync.py",
         "backend/app/utils/session.py",
         "backend/live_scanner/bar_aggregator.py",
@@ -18774,9 +19043,9 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 36,
+      "direct_dependents": 37,
       "transitive_dependents": 0,
-      "blast_score": 36.0,
+      "blast_score": 37.0,
       "imported_by": [
         "backend/tests/api/conftest.py",
         "backend/tests/api/test_analysis.py",
@@ -18805,6 +19074,7 @@
         "backend/tests/services/test_stock_data_service_methods.py",
         "backend/tests/services/test_system_service.py",
         "backend/tests/services/test_timeseries_forecast.py",
+        "backend/tests/services/test_trend_pullback_scan.py",
         "backend/tests/services/test_universe_stats_service.py",
         "backend/tests/tasks/test_paper_exit.py",
         "backend/tests/tasks/test_quality_tasks.py",
@@ -25459,6 +25729,18 @@
         },
         {
           "name": "upgrade",
+          "line": 25,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "downgrade",
+          "line": 93,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "upgrade",
           "line": 21,
           "kind": "function",
           "exported": true
@@ -27644,14 +27926,14 @@
         },
         {
           "name": "generate_event_summary",
-          "line": 97,
+          "line": 106,
           "kind": "function",
           "exported": true,
           "doc": "Generate a human-readable summary for a scanner event."
         },
         {
           "name": "compute_event_severity",
-          "line": 110,
+          "line": 119,
           "kind": "function",
           "exported": true,
           "doc": "Compute the severity level for a scanner event."
@@ -28292,6 +28574,53 @@
           "doc": "Z-score of actual pre-market volume vs. TimesFM forecast distribution."
         },
         {
+          "name": "_get_daily_bars",
+          "line": 50,
+          "kind": "function",
+          "exported": false,
+          "doc": "Fetch up to `lookback` daily bars ending on event_date (inclusive), ascending."
+        },
+        {
+          "name": "_calc_rsi",
+          "line": 78,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_calc_atr",
+          "line": 88,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_evaluate_ticker",
+          "line": 100,
+          "kind": "function",
+          "exported": false,
+          "doc": "Evaluate one ticker against the trend_pullback criteria."
+        },
+        {
+          "name": "run_trend_pullback_scan",
+          "line": 259,
+          "kind": "function",
+          "exported": true,
+          "doc": "Run the trend_pullback scanner over a date range."
+        },
+        {
+          "name": "run_trend_pullback_scan_for_date",
+          "line": 378,
+          "kind": "function",
+          "exported": true,
+          "doc": "Single-ticker single-date wrapper used by run_range_scan's scanner_map."
+        },
+        {
+          "name": "_orchestrator_run",
+          "line": 394,
+          "kind": "function",
+          "exported": false,
+          "doc": "Adapter: maps the standard ScannerFn signature to run_trend_pullback_scan."
+        },
+        {
           "name": "export_aggregates",
           "line": 43,
           "kind": "function",
@@ -28400,49 +28729,56 @@
         },
         {
           "name": "_run_universe_scan_logic",
-          "line": 141,
+          "line": 145,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
         },
         {
           "name": "evaluate_scanner_alerts",
-          "line": 328,
+          "line": 333,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 361,
+          "line": 366,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 415,
+          "line": 420,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 504,
+          "line": 509,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 608,
+          "line": 613,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
+          "name": "run_trend_pullback_scheduled",
+          "line": 698,
+          "kind": "function",
+          "exported": true,
+          "doc": "Nightly 02:00 UTC task: run trend_pullback for today's date over all active"
+        },
+        {
           "name": "validate_scheduled_scanner_configs",
-          "line": 697,
+          "line": 787,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
@@ -33293,6 +33629,123 @@
         {
           "name": "test_compute_anomaly_score_zero_when_equal_to_mean",
           "line": 133,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_bar",
+          "line": 12,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_uptrend_bars",
+          "line": 27,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build n bars in a smooth uptrend: close rises from base to base*1.3."
+        },
+        {
+          "name": "_run_scan",
+          "line": 40,
+          "kind": "function",
+          "exported": false,
+          "doc": "Run trend_pullback scan with mocked _get_daily_bars and _save_event."
+        },
+        {
+          "name": "_pullback_bars",
+          "line": 76,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build bars that satisfy all trend_pullback criteria:"
+        },
+        {
+          "name": "test_module_importable",
+          "line": 121,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_orchestrator_registration",
+          "line": 130,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_no_bars_skipped",
+          "line": 140,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_insufficient_history_skipped",
+          "line": 149,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_downtrend_does_not_fire",
+          "line": 159,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_below_price_floor_does_not_fire",
+          "line": 174,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_high_rsi_does_not_fire",
+          "line": 185,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_too_far_from_high_does_not_fire",
+          "line": 197,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_pullback_too_deep_does_not_fire",
+          "line": 217,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_pullback_too_shallow_does_not_fire",
+          "line": 227,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_low_dollar_volume_does_not_fire",
+          "line": 237,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_diagnostics_populated",
+          "line": 250,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_scan_for_date_wrapper",
+          "line": 279,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_severity_high_when_shallow_and_rsi_very_low",
+          "line": 295,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_severity_medium_otherwise",
+          "line": 305,
           "kind": "function",
           "exported": true
         },
@@ -36372,6 +36825,18 @@
         },
         {
           "name": "upgrade",
+          "line": 25,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "downgrade",
+          "line": 93,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "upgrade",
           "line": 21,
           "kind": "function",
           "exported": true
@@ -38557,14 +39022,14 @@
         },
         {
           "name": "generate_event_summary",
-          "line": 97,
+          "line": 106,
           "kind": "function",
           "exported": true,
           "doc": "Generate a human-readable summary for a scanner event."
         },
         {
           "name": "compute_event_severity",
-          "line": 110,
+          "line": 119,
           "kind": "function",
           "exported": true,
           "doc": "Compute the severity level for a scanner event."
@@ -39205,6 +39670,53 @@
           "doc": "Z-score of actual pre-market volume vs. TimesFM forecast distribution."
         },
         {
+          "name": "_get_daily_bars",
+          "line": 50,
+          "kind": "function",
+          "exported": false,
+          "doc": "Fetch up to `lookback` daily bars ending on event_date (inclusive), ascending."
+        },
+        {
+          "name": "_calc_rsi",
+          "line": 78,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_calc_atr",
+          "line": 88,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_evaluate_ticker",
+          "line": 100,
+          "kind": "function",
+          "exported": false,
+          "doc": "Evaluate one ticker against the trend_pullback criteria."
+        },
+        {
+          "name": "run_trend_pullback_scan",
+          "line": 259,
+          "kind": "function",
+          "exported": true,
+          "doc": "Run the trend_pullback scanner over a date range."
+        },
+        {
+          "name": "run_trend_pullback_scan_for_date",
+          "line": 378,
+          "kind": "function",
+          "exported": true,
+          "doc": "Single-ticker single-date wrapper used by run_range_scan's scanner_map."
+        },
+        {
+          "name": "_orchestrator_run",
+          "line": 394,
+          "kind": "function",
+          "exported": false,
+          "doc": "Adapter: maps the standard ScannerFn signature to run_trend_pullback_scan."
+        },
+        {
           "name": "export_aggregates",
           "line": 43,
           "kind": "function",
@@ -39313,49 +39825,56 @@
         },
         {
           "name": "_run_universe_scan_logic",
-          "line": 141,
+          "line": 145,
           "kind": "function",
           "exported": false,
           "doc": "Testable core of run_universe_scan. No Redis/Celery/OTel imports needed."
         },
         {
           "name": "evaluate_scanner_alerts",
-          "line": 328,
+          "line": 333,
           "kind": "function",
           "exported": true,
           "doc": "Evaluate all active alert rules against a newly-saved ScannerEvent."
         },
         {
           "name": "run_range_scan",
-          "line": 361,
+          "line": 366,
           "kind": "function",
           "exported": true,
           "doc": "Background task: run selected scanners over a date range for one ticker."
         },
         {
           "name": "run_liquidity_hunt_scheduled",
-          "line": 415,
+          "line": 420,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run liquidity_hunt_pre and liquidity_hunt_post"
         },
         {
           "name": "run_universe_scan",
-          "line": 504,
+          "line": 509,
           "kind": "function",
           "exported": true,
           "doc": "Run a scanner across (universe, [start_date..end_date]) with progress reporting."
         },
         {
           "name": "run_pocket_pivot_scheduled",
-          "line": 608,
+          "line": 613,
           "kind": "function",
           "exported": true,
           "doc": "Nightly 02:00 UTC task: run pocket_pivot for today's date over all active"
         },
         {
+          "name": "run_trend_pullback_scheduled",
+          "line": 698,
+          "kind": "function",
+          "exported": true,
+          "doc": "Nightly 02:00 UTC task: run trend_pullback for today's date over all active"
+        },
+        {
           "name": "validate_scheduled_scanner_configs",
-          "line": 697,
+          "line": 787,
           "kind": "function",
           "exported": true,
           "doc": "Check that every beat-scheduled scanner type has at least one active"
@@ -44206,6 +44725,123 @@
         {
           "name": "test_compute_anomaly_score_zero_when_equal_to_mean",
           "line": 133,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "_bar",
+          "line": 12,
+          "kind": "function",
+          "exported": false
+        },
+        {
+          "name": "_uptrend_bars",
+          "line": 27,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build n bars in a smooth uptrend: close rises from base to base*1.3."
+        },
+        {
+          "name": "_run_scan",
+          "line": 40,
+          "kind": "function",
+          "exported": false,
+          "doc": "Run trend_pullback scan with mocked _get_daily_bars and _save_event."
+        },
+        {
+          "name": "_pullback_bars",
+          "line": 76,
+          "kind": "function",
+          "exported": false,
+          "doc": "Build bars that satisfy all trend_pullback criteria:"
+        },
+        {
+          "name": "test_module_importable",
+          "line": 121,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_orchestrator_registration",
+          "line": 130,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_no_bars_skipped",
+          "line": 140,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_insufficient_history_skipped",
+          "line": 149,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_downtrend_does_not_fire",
+          "line": 159,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_below_price_floor_does_not_fire",
+          "line": 174,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_high_rsi_does_not_fire",
+          "line": 185,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_too_far_from_high_does_not_fire",
+          "line": 197,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_pullback_too_deep_does_not_fire",
+          "line": 217,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_pullback_too_shallow_does_not_fire",
+          "line": 227,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_low_dollar_volume_does_not_fire",
+          "line": 237,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_diagnostics_populated",
+          "line": 250,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_scan_for_date_wrapper",
+          "line": 279,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_severity_high_when_shallow_and_rsi_very_low",
+          "line": 295,
+          "kind": "function",
+          "exported": true
+        },
+        {
+          "name": "test_severity_medium_otherwise",
+          "line": 305,
           "kind": "function",
           "exported": true
         },
@@ -48588,6 +49224,30 @@
       "kind": "imports"
     },
     {
+      "source": "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
+      "target": "typing",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
+      "target": "sqlalchemy",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
+      "target": "alembic",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/alembic/versions/f7e8d9c0b1a2_seed_trend_pullback_scanner_config.py",
+      "target": "json",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
       "source": "backend/app/alembic/versions/fa2957d31876_expand_column_lengths.py",
       "target": "typing",
       "weight": 1,
@@ -51828,6 +52488,60 @@
       "kind": "imports"
     },
     {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "__future__",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "logging",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "time",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "datetime",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "typing",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "zoneinfo",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "pandas",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "sqlalchemy",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/app/services/trend_pullback_scan.py",
+      "target": "app",
+      "weight": 5,
+      "kind": "imports"
+    },
+    {
       "source": "backend/app/services/universe_export.py",
       "target": "csv",
       "weight": 1,
@@ -52064,7 +52778,7 @@
     {
       "source": "backend/app/tasks/scanning.py",
       "target": "app",
-      "weight": 27,
+      "weight": 32,
       "kind": "imports"
     },
     {
@@ -54297,6 +55011,36 @@
       "source": "backend/tests/services/test_timeseries_forecast.py",
       "target": "app",
       "weight": 2,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/services/test_trend_pullback_scan.py",
+      "target": "asyncio",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/services/test_trend_pullback_scan.py",
+      "target": "datetime",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/services/test_trend_pullback_scan.py",
+      "target": "typing",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/services/test_trend_pullback_scan.py",
+      "target": "unittest",
+      "weight": 1,
+      "kind": "imports"
+    },
+    {
+      "source": "backend/tests/services/test_trend_pullback_scan.py",
+      "target": "app",
+      "weight": 8,
       "kind": "imports"
     },
     {
