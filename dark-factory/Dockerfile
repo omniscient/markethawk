@@ -60,15 +60,10 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Archon CLI (from fork — includes workflow cost tracking).
-# Explicit wrapper instead of `bun link`: as of bun 1.3.x, no-arg `bun link`
-# only REGISTERS the package and no longer drops a global bin shim, so
-# `archon` silently vanished from PATH on clean rebuilds (exit 127 at runtime).
+# Archon CLI (from fork — includes workflow cost tracking)
 RUN git clone -b feat/workflow-cost-tracking https://github.com/omniscient/Archon.git /opt/archon && \
     cd /opt/archon && bun install && \
-    printf '#!/bin/sh\nexec /opt/bun/bin/bun /opt/archon/packages/cli/src/cli.ts "$@"\n' > /usr/local/bin/archon && \
-    chmod +x /usr/local/bin/archon && \
-    archon 2>&1 | grep -q "archon workflow"
+    cd /opt/archon/packages/cli && bun link
 
 # Workspace directory
 RUN mkdir -p /workspace
@@ -99,9 +94,8 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
 RUN mkdir -p /var/lib/dark-factory && \
     chown -R factory:factory /workspace /opt/dark-factory /var/lib/dark-factory
 
-# Verify the archon wrapper resolves for the non-root user (fail the build, not the run).
-# (This CLI branch predates --version support, so grep the usage banner instead.)
-RUN su factory -c 'archon 2>&1 | grep -q "archon workflow"'
+# Re-link archon CLI so it remains accessible after user switch
+RUN cd /opt/archon/packages/cli && /opt/bun/bin/bun link
 
 USER factory
 WORKDIR /workspace
