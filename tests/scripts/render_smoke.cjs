@@ -17,6 +17,7 @@ const ROOT = path.resolve(__dirname, "..", "..");
 const echartsPath = path.join(ROOT, "scripts", "echarts.min.js");
 const templatePath = path.join(ROOT, "scripts", "template.html");
 const metricsPath = path.join(ROOT, "metrics.json");
+const scorecardPath = path.join(ROOT, "scorecard.json");
 
 for (const p of [echartsPath, templatePath, metricsPath]) {
   if (!fs.existsSync(p)) {
@@ -38,9 +39,12 @@ if (!echarts || !echarts.init) {
 }
 
 const template = fs.readFileSync(templatePath, "utf8");
-const metrics = fs.readFileSync(metricsPath, "utf8");
+const metricsObj = JSON.parse(fs.readFileSync(metricsPath, "utf8"));
+if (fs.existsSync(scorecardPath)) {
+  metricsObj.scorecard = JSON.parse(fs.readFileSync(scorecardPath, "utf8"));
+}
 const scripts = [...template.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-const code = scripts[1].replace("{{METRICS_JSON}}", metrics);
+const code = scripts[1].replace("{{METRICS_JSON}}", JSON.stringify(metricsObj));
 
 let lastId = null;
 const fakeEl = () => ({

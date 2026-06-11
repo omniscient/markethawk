@@ -225,6 +225,22 @@
     </div>
   </section>
 
+  <!-- ── Section 7: Factory Scorecard (#331) ── -->
+  <section id="s-scorecard">
+    <h2>Factory Scorecard</h2>
+    <div class="kpi-grid" id="scorecard-kpis"></div>
+    <div class="chart-grid-2" style="margin-top:1rem">
+      <div class="chart-panel">
+        <h3>Merge-rate triad</h3>
+        <div class="chart-box" id="chart-triad"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Success by size</h3>
+        <div class="chart-box" id="chart-triad-by-size"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Issue table ── -->
   <section id="s-table">
     <h2>All Issues</h2>
@@ -624,6 +640,57 @@ function buildWeeklyTimeseries() {
     series:[{type:'pie',radius:['40%','70%'],data:typeKeys.map((k,i)=>({
       value:byType[k].total,name:k,itemStyle:{color:PALETTE[i%PALETTE.length]}})),
       label:{color:C.mut}}]
+  });
+})();
+
+// ── Section 7: Factory Scorecard (#331) ─────────────────────────────────────
+(function buildScorecard() {
+  const sc = M.scorecard;
+  const sect = document.getElementById('s-scorecard');
+  if (!sc) { if (sect) sect.style.display = 'none'; return; }
+
+  function kpi(label, value, sub) {
+    return `<div class="kpi-card">
+      <div class="label">${label}</div>
+      <div class="value">${value}</div>
+      ${sub ? `<div class="sub">${sub}</div>` : ''}
+    </div>`;
+  }
+  const t = sc.triad;
+  document.getElementById('scorecard-kpis').innerHTML = [
+    kpi('Merge rate', t.merge_rate_pct.toFixed(1) + '%',
+        `${t.merged_clean} clean · ${t.merged_with_edits} w/ edits · ${t.closed} closed`),
+    kpi('Rework rate', sc.rework.rework_rate_pct.toFixed(1) + '%',
+        `${sc.rework.regression_count} regressions / ${sc.rework.merged_factory_prs} merged PRs`),
+    kpi('2-week churn', sc.churn.churn_pct.toFixed(1) + '%',
+        `${sc.churn.added_lines.toLocaleString()} lines · ${sc.churn.commits_analyzed} commits`),
+    kpi('Window', sc.window.since, `→ ${sc.window.until}`),
+  ].join('');
+
+  const TRIAD_NAMES = ['Merged clean', 'Merged w/ edits', 'Closed', 'Open'];
+  const TRIAD_KEYS = ['merged_clean', 'merged_with_edits', 'closed', 'open'];
+  const TRIAD_COLORS = [C.green, C.amber, C.red, C.mut2];
+
+  eChart('chart-triad', {
+    legend:{data:TRIAD_NAMES,textStyle:{color:C.mut},bottom:0},
+    xAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    yAxis:{type:'category',data:['Factory PRs'],axisLabel:{color:C.mut2}},
+    series:TRIAD_KEYS.map((k,i)=>({
+      name:TRIAD_NAMES[i],type:'bar',stack:'t',data:[t[k]],
+      itemStyle:{color:TRIAD_COLORS[i]},
+    }))
+  });
+
+  const sizes = ['S','M','L','XL','unknown'].filter(s => sc.by_size[s]);
+  eChart('chart-triad-by-size', {
+    legend:{data:TRIAD_NAMES,textStyle:{color:C.mut},bottom:0},
+    xAxis:{type:'category',data:sizes,axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:TRIAD_KEYS.map((k,i)=>({
+      name:TRIAD_NAMES[i],type:'bar',stack:'t',
+      data:sizes.map(s=>sc.by_size[s][k]||0),
+      itemStyle:{color:TRIAD_COLORS[i]},
+    }))
   });
 })();
 
