@@ -63,6 +63,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] AI credentials (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `GH_TOKEN` belong in `.archon/.env`, not in `.env`. The `.archon/.env` file is gitignored to keep secrets out of the repo. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+## DAG Trigger Rules
+
+- [AVOID] Do not substitute the sync tripwire (count of trigger_rule-bearing nodes == len(REQUIRED_OR_JOIN_NODES)) in check_workflow_dag.py with structural `when:`-based detection — the spec requires the count mechanism explicitly; the substitution was flagged as a material conformance violation. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:conformance path:dark-factory/scripts/ -->
+- [AVOID] Do not add structural OR-join detection (checking whether all upstreams carry a `when:` condition) to a ticket where the spec listed it as Non-Goal (v1) — it changes what gets built and will be caught as a material conformance deviation even when the intent is to improve coverage. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:conformance path:dark-factory/scripts/ -->
+- [PATTERN] Every OR-join node in `archon-dark-factory.yaml` — a node whose `depends_on` list contains mutually-exclusive upstream branches (one is always skipped per intent) — must declare `trigger_rule: none_failed_min_one_success` (or `one_success`). The default `all_success` treats a skipped upstream as non-success and silently skips the join and all its descendants. The four known OR-join nodes (`validate`, `de-conflict`, `status-in-review`, `report`) are enumerated in `REQUIRED_OR_JOIN_NODES` in `dark-factory/scripts/check_workflow_dag.py`; when adding a new OR-join, add its ID there too. A sync tripwire (count of trigger_rule-bearing nodes must equal `len(REQUIRED_OR_JOIN_NODES)`) fires with an "update REQUIRED_OR_JOIN_NODES" prompt if the count drifts. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:conformance -->
+
 ## Refine-Branch Pre-Implementation
 
 - [PATTERN] When the architect subagent implements plan tasks during validation (indicated by "Verdict: Approved (implemented directly...)" in the issue comment), cherry-pick those commits from `origin/refine/issue-NNN-...` onto the feat branch rather than reimplementing from scratch: `git log --oneline main..origin/refine/<branch>` to find the commits, then `git cherry-pick <hashes>` in chronological order. <!-- issue:#173 date:2026-06-04 expires:2026-12-04 source:implement -->
