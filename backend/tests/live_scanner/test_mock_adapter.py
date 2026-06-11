@@ -1,4 +1,5 @@
 import pytest
+
 from live_scanner.mock_adapter import MockLiveAdapter
 from live_scanner.provider import LiveDataProvider
 

@@ -3,6 +3,7 @@
 from datetime import date
 
 import pytest
+
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.scanner_run import ScannerRun

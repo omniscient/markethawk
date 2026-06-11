@@ -3,9 +3,10 @@
 from datetime import date, datetime
 
 import pytest
+from sqlalchemy.orm import Session
+
 from app.models.scanner_event import ScannerEvent
 from app.models.signal_review import SignalReview
-from sqlalchemy.orm import Session
 
 
 @pytest.fixture

@@ -4,9 +4,10 @@ Seed helpers for signal analysis tests.
 
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import Session
+
 from app.models.signal_analysis_run import SignalAnalysisRun
 from app.models.signal_cluster import SignalCluster
-from sqlalchemy.orm import Session
 
 
 def seed_completed_analysis_run(db: Session) -> SignalAnalysisRun:

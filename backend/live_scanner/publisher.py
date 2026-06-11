@@ -17,11 +17,11 @@ import uuid as uuid_module
 from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
+
 from app.core.database import SessionLocal
 from app.models.scanner_event import ScannerEvent
 from app.services.event_helpers import compute_event_severity, generate_event_summary
 from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
-
 from live_scanner.bar_aggregator import ET, MinuteBar
 from live_scanner.conditions import ConditionResult
 

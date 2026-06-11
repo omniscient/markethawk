@@ -6,10 +6,10 @@ IBKR is never called — the mock_futures_provider fixture intercepts all provid
 
 from unittest.mock import patch
 
-from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.main import app
 from tests.fixtures.futures import (
     seed_futures_aggregates,
     seed_futures_contracts,
