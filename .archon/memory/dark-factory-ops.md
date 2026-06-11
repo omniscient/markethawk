@@ -25,6 +25,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not embed data directly in Alembic migration files — migrations are schema-only. Feature-specific seed data goes in `dark-factory/seed/99_feature.sql` (idempotent, `ON CONFLICT DO NOTHING`). Data needed across multiple features goes in a new numbered baseline module. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+## Diff Computation
+
+- [PATTERN] When fetching base file content to compute a formatter delta for a `main...HEAD` three-dot diff, use `git merge-base main HEAD` for the base ref, then `git show "$MERGE_BASE:{filepath}"`. Using `git show "main:{filepath}"` references main's current tip — on branches where main later updated the file, the wrong base produces false positives (feature hunk mis-classified as formatter-only) or false negatives. path:dark-factory/scripts/fmt_hunk_filter.py <!-- issue:#276 date:2026-06-11 expires:2026-12-11 source:implement -->
+
 ## Scope Enforcement
 
 - [PATTERN] When an out-of-scope defect is noticed during implementation, write it to `$ARTIFACTS_DIR/out-of-scope.md` with `- <file>: <one-sentence description>` and leave the defect unfixed. The conformance gate reads this file and converts each entry into a `scope-spillover`-labelled backlog ticket automatically. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
