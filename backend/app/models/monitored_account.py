@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
-
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class MonitoredAccount(Base):
@@ -19,13 +18,11 @@ class MonitoredAccount(Base):
     classification_config = Column(JSONB, nullable=False, default=dict)
     last_poll_at = Column(DateTime, nullable=True)
     last_tweet_id = Column(String(30), nullable=True)
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     tweet_signals = relationship(

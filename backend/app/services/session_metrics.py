@@ -1,12 +1,13 @@
 """Session and day metrics computation — extracted from ScannerService."""
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any, Dict, List
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
 from app.models.stock_aggregate import StockAggregate
+from app.utils.time import to_utc_naive
 
 _ET = ZoneInfo("America/New_York")
 
@@ -93,8 +94,8 @@ def calculate_day_metrics(ticker: str, event_date: date, db: Session) -> Dict[st
     day_end_et = datetime.combine(event_date, datetime.max.time(), tzinfo=_ET)
 
     # Convert to UTC and strip tzinfo for DB comparison (since DB stores naive UTC)
-    day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
-    day_end_utc = day_end_et.astimezone(timezone.utc).replace(tzinfo=None)
+    day_start_utc = to_utc_naive(day_start_et)
+    day_end_utc = to_utc_naive(day_end_et)
 
     aggs = (
         db.query(StockAggregate)

@@ -15,6 +15,7 @@ from app.core.database import get_db
 from app.exceptions import DataFetchError
 from app.services import StockDataService
 from app.utils.session import get_market_today
+from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/stocks", tags=["stocks"])
 
@@ -258,7 +259,7 @@ def sync_missing_stock_aggregates(
     ticker = ticker.upper()
     is_futures = StockDataService.is_futures_ticker(db, ticker)
 
-    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_utc = utc_now()
     today = now_utc.strftime("%Y-%m-%d")
 
     task_ids: list = []

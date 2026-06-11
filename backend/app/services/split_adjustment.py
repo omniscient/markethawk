@@ -15,6 +15,7 @@ from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.stock_aggregate import StockAggregate
 from app.models.stock_split import StockSplit
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class SplitAdjustmentService:
             db, ticker, exec_date, factor
         )
 
-        split.adjustments_applied_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        split.adjustments_applied_at = utc_now()
 
         logger.info(
             "Split adjustment applied: %s %s (factor=%.4f) — events=%d, summaries=%d",

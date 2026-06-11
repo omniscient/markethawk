@@ -2,11 +2,10 @@
 ScannerOutcomeSummary SQLAlchemy model.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class ScannerOutcomeSummary(Base):
@@ -35,11 +34,9 @@ class ScannerOutcomeSummary(Base):
     is_complete = Column(Boolean, default=False, index=True)
     completed_at = Column(DateTime, nullable=True)
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )

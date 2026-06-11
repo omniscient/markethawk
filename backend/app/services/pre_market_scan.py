@@ -17,6 +17,7 @@ from app.services.scan_enrichment import _SECTOR_ETF_MAP
 from app.services.scan_orchestrator import ScannerDescriptor, register
 from app.services.timeseries_forecast import compute_anomaly_score
 from app.utils.session import get_market_today
+from app.utils.time import to_utc_naive
 
 if TYPE_CHECKING:
     from app.models.scanner_run import ScannerRun
@@ -40,15 +41,9 @@ async def run_pre_market_scan(
     failed: List[Dict[str, Any]] = []
     _ET = ZoneInfo("America/New_York")
     day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
-    day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
-    day_end_utc = (
-        (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
-    )
-    hist_start_utc = (
-        (day_start_et - timedelta(days=90))
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
+    day_start_utc = to_utc_naive(day_start_et)
+    day_end_utc = to_utc_naive((day_start_et + timedelta(days=1)))
+    hist_start_utc = to_utc_naive(day_start_et - timedelta(days=90))
 
     # Read TimesFM config once before the ticker loop
     _timesfm_config_keys = [

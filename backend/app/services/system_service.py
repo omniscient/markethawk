@@ -10,6 +10,8 @@ import redis.asyncio as aioredis
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.utils.time import utc_now
+
 logger = __import__("logging").getLogger(__name__)
 
 ET = zoneinfo.ZoneInfo("America/New_York")
@@ -269,9 +271,7 @@ class SystemService:
             )
 
         # DB: quality + normalization tasks
-        stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
-            hours=4
-        )
+        stale_cutoff = utc_now() - timedelta(hours=4)
         quality_reports = (
             db.query(UniverseQualityReport)
             .filter(

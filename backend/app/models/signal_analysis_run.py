@@ -1,9 +1,8 @@
-from datetime import datetime, timezone
-
 from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class SignalAnalysisRun(Base):
@@ -21,7 +20,7 @@ class SignalAnalysisRun(Base):
     error_message = Column(Text, nullable=True)
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
         index=True,
     )
     completed_at = Column(DateTime, nullable=True)

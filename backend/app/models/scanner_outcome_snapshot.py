@@ -2,8 +2,6 @@
 ScannerOutcomeSnapshot SQLAlchemy model.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import (
     BigInteger,
     Column,
@@ -16,6 +14,7 @@ from sqlalchemy import (
 )
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class ScannerOutcomeSnapshot(Base):
@@ -37,9 +36,7 @@ class ScannerOutcomeSnapshot(Base):
     captured_at = Column(DateTime, nullable=True)
     status = Column(String(20), nullable=False, default="pending", index=True)
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
 
     __table_args__ = (
         UniqueConstraint(

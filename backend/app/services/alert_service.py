@@ -12,7 +12,7 @@ import json
 import logging
 import smtplib
 import ssl
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Dict, List, Optional
@@ -25,6 +25,7 @@ from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +72,7 @@ class AlertRuleService:
         if rule.cooldown_minutes <= 0:
             return False
 
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
-            minutes=rule.cooldown_minutes
-        )
+        cutoff = utc_now() - timedelta(minutes=rule.cooldown_minutes)
         recent = (
             db.query(AlertDeliveryLog)
             .filter(

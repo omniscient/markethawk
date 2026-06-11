@@ -2,8 +2,6 @@
 StockSplit SQLAlchemy model.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import (
     Column,
     Date,
@@ -15,6 +13,7 @@ from sqlalchemy import (
 )
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class StockSplit(Base):
@@ -28,9 +27,7 @@ class StockSplit(Base):
     split_from = Column(Numeric, nullable=False)
     split_to = Column(Numeric, nullable=False)
     source = Column(String(20), nullable=False, default="polygon")
-    detected_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    detected_at = Column(DateTime, default=utc_now)
     adjustments_applied_at = Column(DateTime, nullable=True)
 
     __table_args__ = (

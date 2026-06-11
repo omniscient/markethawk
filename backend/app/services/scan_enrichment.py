@@ -1,7 +1,7 @@
 """Batch ticker enrichment for scanner runs — extracted from ScannerService."""
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
@@ -15,6 +15,7 @@ from app.models.stock_aggregate import StockAggregate
 from app.models.stock_split import StockSplit
 from app.models.ticker_reference import TickerReference
 from app.services.catalyst_parser import CatalystParser
+from app.utils.time import to_utc_naive
 
 _ET = ZoneInfo("America/New_York")
 
@@ -52,13 +53,9 @@ def _get_batch_enrichment_data_impl(
     tickers: List[str], event_date: date, db: Session
 ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any], Dict[str, Optional[float]]]:
     day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
-    day_start_utc = day_start_et.astimezone(timezone.utc).replace(tzinfo=None)
-    day_end_utc = (
-        (day_start_et + timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
-    )
-    prev_day_start_utc = (
-        (day_start_et - timedelta(days=1)).astimezone(timezone.utc).replace(tzinfo=None)
-    )
+    day_start_utc = to_utc_naive(day_start_et)
+    day_end_utc = to_utc_naive((day_start_et + timedelta(days=1)))
+    prev_day_start_utc = to_utc_naive((day_start_et - timedelta(days=1)))
 
     # 1. Fetch MonitoredStock records
     monitored_records = (

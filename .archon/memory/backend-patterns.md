@@ -53,6 +53,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Never use `except (pybreaker.CircuitBreakerError, Exception)` — `CircuitBreakerError` is an `Exception` subclass so the tuple is redundant, and the broad catch masks real defects as missing data. Use two separate handlers: `except pybreaker.CircuitBreakerError` → raise `ProviderError`, `except Exception` → log and return empty. <!-- issue:#205 date:2026-06-07 expires:2026-12-07 source:implement -->
 
+## Backend: Utilities
+
+- [PATTERN] Use `from app.utils.time import utc_now, to_utc_naive` for any naive-UTC datetime need: `utc_now()` replaces `datetime.now(timezone.utc).replace(tzinfo=None)`, `to_utc_naive(dt)` replaces `.astimezone(timezone.utc).replace(tzinfo=None)`. Column defaults use the callable ref (`default=utc_now`), inline expressions call it (`utc_now()`). <!-- issue:#286 date:2026-06-11 expires:2026-12-11 source:implement -->
+
+- [PATTERN] Use `from app.utils.db import get_or_404` to replace Shape A 404 boilerplate (`db.query(Model).filter(Model.id==id).first(); if not obj: raise HTTPException(404)`). Call without storing the result (`get_or_404(db, Model, id, "Name")`) when the result isn't used downstream. <!-- issue:#286 date:2026-06-11 expires:2026-12-11 source:implement -->
+
 ## Backend: Middleware
 
 - [PATTERN] Pure-ASGI middleware classes (like `CSRFMiddleware`) should be defined at module level in `main.py`, not inside `create_app()` — module-level placement makes them importable by the test suite without triggering the full app factory. The `AuthMiddleware` is an exception because it closes over `EXEMPT_PREFIXES`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->

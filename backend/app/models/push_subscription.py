@@ -3,11 +3,10 @@ PushSubscription model — stores browser Web Push subscriptions.
 One row per browser/device that has granted push permission.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Column, DateTime, Integer, String, Text
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class PushSubscription(Base):
@@ -31,5 +30,5 @@ class PushSubscription(Base):
 
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
     )

@@ -20,6 +20,7 @@ from app.models.monitored_stock import MonitoredStock
 from app.models.stock_aggregate import StockAggregate
 from app.providers import DataProviderFactory
 from app.services.chart_indicators import ChartIndicatorsService
+from app.utils.time import utc_now
 
 
 class StockDataService:
@@ -335,7 +336,7 @@ class StockDataService:
             first_entry = db_range[1] if db_range else None
 
             # Use UTC-aware 'now' but strip tzinfo to match naive DB models if necessary
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = utc_now()
 
             # Determine target start date for full history/first fetch
             if period:

@@ -225,6 +225,22 @@
     </div>
   </section>
 
+  <!-- ── Section 7: Factory Scorecard (#331) ── -->
+  <section id="s-scorecard">
+    <h2>Factory Scorecard</h2>
+    <div class="kpi-grid" id="scorecard-kpis"></div>
+    <div class="chart-grid-2" style="margin-top:1rem">
+      <div class="chart-panel">
+        <h3>Merge-rate triad</h3>
+        <div class="chart-box" id="chart-triad"></div>
+      </div>
+      <div class="chart-panel">
+        <h3>Success by size</h3>
+        <div class="chart-box" id="chart-triad-by-size"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Issue table ── -->
   <section id="s-table">
     <h2>All Issues</h2>
@@ -3200,6 +3216,1010 @@ window.__METRICS__ = {
         "backlog": 23
       }
     ]
+  },
+  "scorecard": {
+    "generated_at": "2026-06-11T22:26:19.158457+00:00",
+    "window": {
+      "since": "2026-05-01",
+      "until": "2026-06-11"
+    },
+    "triad": {
+      "merged_clean": 99,
+      "merged_with_edits": 8,
+      "closed": 9,
+      "open": 2,
+      "merge_rate_pct": 92.2
+    },
+    "rework": {
+      "regression_count": 0,
+      "merged_factory_prs": 107,
+      "rework_rate_pct": 0.0
+    },
+    "churn": {
+      "added_lines": 39724,
+      "surviving_lines": 34956,
+      "churn_pct": 12.0,
+      "commits_analyzed": 178,
+      "commits_too_young": 263
+    },
+    "by_size": {
+      "S": {
+        "merged_clean": 22,
+        "merged_with_edits": 3,
+        "closed": 0,
+        "open": 1
+      },
+      "M": {
+        "merged_clean": 33,
+        "merged_with_edits": 3,
+        "closed": 0,
+        "open": 1
+      },
+      "unknown": {
+        "merged_clean": 28,
+        "merged_with_edits": 2,
+        "closed": 8,
+        "open": 0
+      },
+      "L": {
+        "merged_clean": 16,
+        "merged_with_edits": 0,
+        "closed": 0,
+        "open": 0
+      },
+      "XL": {
+        "merged_clean": 0,
+        "merged_with_edits": 0,
+        "closed": 1,
+        "open": 0
+      }
+    },
+    "prs": [
+      {
+        "number": 8,
+        "title": "chore: add dark-factory verified marker (issue #7)",
+        "classification": "closed",
+        "issue": 7,
+        "size": "unknown",
+        "merged_at": null
+      },
+      {
+        "number": 9,
+        "title": "chore: add dark-factory verified comment to CLAUDE.md",
+        "classification": "closed",
+        "issue": 7,
+        "size": "unknown",
+        "merged_at": null
+      },
+      {
+        "number": 10,
+        "title": "chore: dry run \u2014 verify dark factory pipeline (#7)",
+        "classification": "closed",
+        "issue": 7,
+        "size": "unknown",
+        "merged_at": null
+      },
+      {
+        "number": 11,
+        "title": "chore: add dark-factory verified comment to CLAUDE.md",
+        "classification": "closed",
+        "issue": 7,
+        "size": "unknown",
+        "merged_at": null
+      },
+      {
+        "number": 12,
+        "title": "chore: dry run \u2014 verify dark factory pipeline (issue #7)",
+        "classification": "closed",
+        "issue": 7,
+        "size": "unknown",
+        "merged_at": null
+      },
+      {
+        "number": 13,
+        "title": "chore: add dark-factory verified comment to CLAUDE.md",
+        "classification": "closed",
+        "issue": 7,
+        "size": "unknown",
+        "merged_at": null
+      },
+      {
+        "number": 14,
+        "title": "chore: add dark-factory verified comment to CLAUDE.md",
+        "classification": "closed",
+        "issue": 7,
+        "size": "unknown",
+        "merged_at": null
+      },
+      {
+        "number": 15,
+        "title": "docs: add dark-factory verified marker (closes #7)",
+        "classification": "closed",
+        "issue": 7,
+        "size": "unknown",
+        "merged_at": null
+      },
+      {
+        "number": 17,
+        "title": "Scan Status badge should show 'Scheduled' when next_run is set",
+        "classification": "merged_clean",
+        "issue": 16,
+        "size": "S",
+        "merged_at": "2026-05-14T01:45:22Z"
+      },
+      {
+        "number": 26,
+        "title": "Dark factory: fetch PR review comments on Continue",
+        "classification": "merged_clean",
+        "issue": 18,
+        "size": "S",
+        "merged_at": "2026-05-04T02:08:41Z"
+      },
+      {
+        "number": 36,
+        "title": "Clear scanner event history per stock",
+        "classification": "merged_clean",
+        "issue": 3,
+        "size": "M",
+        "merged_at": "2026-05-11T17:51:27Z"
+      },
+      {
+        "number": 37,
+        "title": "feat(tests): testcontainers Postgres + fixture library + scanner API tests (#27)",
+        "classification": "merged_clean",
+        "issue": 25,
+        "size": "M",
+        "merged_at": "2026-05-11T19:48:57Z"
+      },
+      {
+        "number": 38,
+        "title": "Universe endpoint integration tests",
+        "classification": "merged_clean",
+        "issue": 28,
+        "size": "S",
+        "merged_at": "2026-05-11T21:04:22Z"
+      },
+      {
+        "number": 39,
+        "title": "Journal fixtures + endpoint integration tests",
+        "classification": "merged_clean",
+        "issue": 29,
+        "size": "S",
+        "merged_at": "2026-05-13T11:53:02Z"
+      },
+      {
+        "number": 40,
+        "title": "Alerts fixtures + endpoint integration tests",
+        "classification": "merged_clean",
+        "issue": 30,
+        "size": "S",
+        "merged_at": "2026-05-12T00:18:01Z"
+      },
+      {
+        "number": 41,
+        "title": "Outcomes fixtures + endpoint integration tests",
+        "classification": "merged_clean",
+        "issue": 31,
+        "size": "S",
+        "merged_at": "2026-05-13T11:55:16Z"
+      },
+      {
+        "number": 43,
+        "title": "System config endpoint integration tests",
+        "classification": "merged_clean",
+        "issue": 32,
+        "size": "S",
+        "merged_at": "2026-05-13T12:16:02Z"
+      },
+      {
+        "number": 44,
+        "title": "Mocked Polygon provider + stocks endpoint tests",
+        "classification": "merged_clean",
+        "issue": 33,
+        "size": "S",
+        "merged_at": "2026-05-13T13:59:53Z"
+      },
+      {
+        "number": 47,
+        "title": "Mocked futures providers + endpoint tests",
+        "classification": "merged_with_edits",
+        "issue": 35,
+        "size": "S",
+        "merged_at": "2026-05-13T17:16:52Z"
+      },
+      {
+        "number": 49,
+        "title": "Mocked Polygon news + endpoint tests",
+        "classification": "merged_clean",
+        "issue": 34,
+        "size": "S",
+        "merged_at": "2026-05-13T17:07:18Z"
+      },
+      {
+        "number": 50,
+        "title": "feat: Dynamic volume thresholds via TimesFM (Phase 1)",
+        "classification": "merged_clean",
+        "issue": 20,
+        "size": "unknown",
+        "merged_at": "2026-05-13T19:13:29Z"
+      },
+      {
+        "number": 51,
+        "title": "Dark Factory should be a bit more verbose as it progresses in each tickets",
+        "classification": "merged_clean",
+        "issue": 48,
+        "size": "unknown",
+        "merged_at": "2026-05-13T19:11:17Z"
+      },
+      {
+        "number": 53,
+        "title": "feat(dark-factory): smart continue skips redundant DB bootstrap (#19)",
+        "classification": "merged_clean",
+        "issue": 19,
+        "size": "S",
+        "merged_at": "2026-05-13T21:16:34Z"
+      },
+      {
+        "number": 55,
+        "title": "Dark Factory shjould include project related documentation adjustments.",
+        "classification": "merged_clean",
+        "issue": 46,
+        "size": "unknown",
+        "merged_at": "2026-05-14T01:43:12Z"
+      },
+      {
+        "number": 56,
+        "title": "feat(phase-2a): Feature enrichment at signal time",
+        "classification": "merged_clean",
+        "issue": 21,
+        "size": "unknown",
+        "merged_at": "2026-05-14T15:29:39Z"
+      },
+      {
+        "number": 57,
+        "title": "feat(phase-2b): Statistical discovery engine",
+        "classification": "merged_clean",
+        "issue": 22,
+        "size": "unknown",
+        "merged_at": "2026-05-21T20:44:48Z"
+      },
+      {
+        "number": 58,
+        "title": "feat(phase-2c): Signal quality ranker",
+        "classification": "merged_clean",
+        "issue": 23,
+        "size": "unknown",
+        "merged_at": "2026-05-21T21:19:30Z"
+      },
+      {
+        "number": 59,
+        "title": "feat: scanner validation skill \u2014 guided day-by-day QA walkthrough",
+        "classification": "merged_clean",
+        "issue": 5,
+        "size": "L",
+        "merged_at": "2026-05-22T20:52:27Z"
+      },
+      {
+        "number": 65,
+        "title": "Deepen the Scanner module into a Scan Orchestrator with registry",
+        "classification": "merged_clean",
+        "issue": 60,
+        "size": "L",
+        "merged_at": "2026-05-23T18:48:54Z"
+      },
+      {
+        "number": 66,
+        "title": "refactor(#63): deepen FuturesDataService to a 2-method public interface",
+        "classification": "merged_clean",
+        "issue": 63,
+        "size": "M",
+        "merged_at": "2026-05-23T18:46:48Z"
+      },
+      {
+        "number": 67,
+        "title": "refactor: widen provider seam \u2014 honest sync interface + get_snapshots (#61)",
+        "classification": "merged_clean",
+        "issue": 61,
+        "size": "M",
+        "merged_at": "2026-05-23T18:50:51Z"
+      },
+      {
+        "number": 68,
+        "title": "Extract business logic from Scanner and Universe routers",
+        "classification": "merged_with_edits",
+        "issue": 62,
+        "size": "M",
+        "merged_at": "2026-05-23T19:16:41Z"
+      },
+      {
+        "number": 69,
+        "title": "feat(#64): standardize error handling with typed exception hierarchy",
+        "classification": "merged_clean",
+        "issue": 64,
+        "size": "M",
+        "merged_at": "2026-05-24T18:05:04Z"
+      },
+      {
+        "number": 71,
+        "title": "feat: human signal review and quality feedback loop (#6)",
+        "classification": "merged_clean",
+        "issue": 6,
+        "size": "L",
+        "merged_at": "2026-05-24T20:00:37Z"
+      },
+      {
+        "number": 77,
+        "title": "feat: deepen test coverage \u2014 61% gate, new service/router tests, SA 2.0 isolation fix",
+        "classification": "merged_clean",
+        "issue": 72,
+        "size": "unknown",
+        "merged_at": "2026-05-25T23:41:22Z"
+      },
+      {
+        "number": 79,
+        "title": "feat: tweet-monitor microservice \u2014 scrape X accounts for real-time stock callouts",
+        "classification": "merged_clean",
+        "issue": 78,
+        "size": "L",
+        "merged_at": "2026-05-26T00:37:40Z"
+      },
+      {
+        "number": 80,
+        "title": "refactor: split tasks.py god module into domain-focused task modules",
+        "classification": "merged_clean",
+        "issue": 73,
+        "size": "M",
+        "merged_at": "2026-05-26T23:49:18Z"
+      },
+      {
+        "number": 81,
+        "title": "refactor: abstract live scanner IBKR coupling behind provider seam (#75)",
+        "classification": "merged_clean",
+        "issue": 75,
+        "size": "M",
+        "merged_at": "2026-05-26T23:49:57Z"
+      },
+      {
+        "number": 82,
+        "title": "refactor: extract orchestration logic from oversized routers",
+        "classification": "merged_clean",
+        "issue": 76,
+        "size": "M",
+        "merged_at": "2026-05-26T23:55:05Z"
+      },
+      {
+        "number": 83,
+        "title": "refactor: decompose monolithic frontend page components",
+        "classification": "merged_clean",
+        "issue": 74,
+        "size": "L",
+        "merged_at": "2026-05-27T01:01:28Z"
+      },
+      {
+        "number": 108,
+        "title": "feat(auth): Add JWT authentication and restrict CORS origins (#84)",
+        "classification": "merged_with_edits",
+        "issue": 84,
+        "size": "M",
+        "merged_at": "2026-05-28T01:35:28Z"
+      },
+      {
+        "number": 109,
+        "title": "Configure SQLAlchemy connection pooling",
+        "classification": "merged_clean",
+        "issue": 85,
+        "size": "S",
+        "merged_at": "2026-05-28T00:29:49Z"
+      },
+      {
+        "number": 110,
+        "title": "Bind management service ports to localhost only",
+        "classification": "merged_clean",
+        "issue": 86,
+        "size": "S",
+        "merged_at": "2026-05-28T00:31:44Z"
+      },
+      {
+        "number": 111,
+        "title": "feat(rate-limiting): add SlowAPI middleware with Redis-backed rate limiting (#87)",
+        "classification": "merged_with_edits",
+        "issue": 87,
+        "size": "S",
+        "merged_at": "2026-05-28T17:39:57Z"
+      },
+      {
+        "number": 112,
+        "title": "feat(config): migrate Settings to pydantic-settings BaseSettings (#91)",
+        "classification": "merged_clean",
+        "issue": 91,
+        "size": "M",
+        "merged_at": "2026-05-28T17:35:55Z"
+      },
+      {
+        "number": 113,
+        "title": "feat(ts): Enable TypeScript strict mode incrementally (#92)",
+        "classification": "merged_clean",
+        "issue": 92,
+        "size": "M",
+        "merged_at": "2026-05-28T17:36:58Z"
+      },
+      {
+        "number": 114,
+        "title": "Add resource limits (memory/CPU) to all Docker services",
+        "classification": "merged_clean",
+        "issue": 93,
+        "size": "S",
+        "merged_at": "2026-05-29T11:08:25Z"
+      },
+      {
+        "number": 115,
+        "title": "feat(metrics): Add Prometheus metrics and Grafana dashboards (#95)",
+        "classification": "merged_clean",
+        "issue": 95,
+        "size": "L",
+        "merged_at": "2026-05-28T19:30:35Z"
+      },
+      {
+        "number": 116,
+        "title": "feat: extract business logic from thick routers into services (#96)",
+        "classification": "merged_clean",
+        "issue": 96,
+        "size": "M",
+        "merged_at": "2026-05-28T19:28:27Z"
+      },
+      {
+        "number": 117,
+        "title": "feat(#97): add pre-commit hooks (ruff lint, ruff format, ESLint)",
+        "classification": "merged_clean",
+        "issue": 97,
+        "size": "S",
+        "merged_at": "2026-05-29T10:58:06Z"
+      },
+      {
+        "number": 118,
+        "title": "feat(frontend): install Vitest and add 58 tests for hooks and GlobalErrorToast (#89)",
+        "classification": "merged_clean",
+        "issue": 89,
+        "size": "L",
+        "merged_at": "2026-05-29T10:57:33Z"
+      },
+      {
+        "number": 119,
+        "title": "docs(adr): write ADRs 004-009 for key architectural decisions",
+        "classification": "merged_clean",
+        "issue": 99,
+        "size": "M",
+        "merged_at": "2026-05-29T10:58:44Z"
+      },
+      {
+        "number": 120,
+        "title": "feat(tracing): distributed tracing via OpenTelemetry + Jaeger (#103)",
+        "classification": "merged_clean",
+        "issue": 103,
+        "size": "L",
+        "merged_at": "2026-05-29T16:16:00Z"
+      },
+      {
+        "number": 121,
+        "title": "feat(api): add URL prefix versioning \u2014 /api/v1/ for all application routes",
+        "classification": "merged_clean",
+        "issue": 105,
+        "size": "L",
+        "merged_at": "2026-05-29T13:10:51Z"
+      },
+      {
+        "number": 123,
+        "title": "perf: add eager loading to eliminate N+1 query hotspots (#100)",
+        "classification": "merged_clean",
+        "issue": 100,
+        "size": "M",
+        "merged_at": "2026-05-29T14:29:05Z"
+      },
+      {
+        "number": 127,
+        "title": "feat(frontend): add code splitting with React.lazy and Suspense (#102)",
+        "classification": "merged_clean",
+        "issue": 102,
+        "size": "M",
+        "merged_at": "2026-05-29T15:10:12Z"
+      },
+      {
+        "number": 128,
+        "title": "feat(ci): extend CI with frontend type check, build, migration validation, and dependency audit",
+        "classification": "merged_clean",
+        "issue": 88,
+        "size": "M",
+        "merged_at": "2026-05-29T18:11:18Z"
+      },
+      {
+        "number": 131,
+        "title": "feat: migrate FastAPI routers to async def (async SQLAlchemy phase 1)",
+        "classification": "closed",
+        "issue": 101,
+        "size": "XL",
+        "merged_at": null
+      },
+      {
+        "number": 138,
+        "title": "Dark factory: collision-free dynamic preview port allocation (replace ISSUE % 100 slot)",
+        "classification": "merged_clean",
+        "issue": 124,
+        "size": "unknown",
+        "merged_at": "2026-05-30T18:24:01Z"
+      },
+      {
+        "number": 139,
+        "title": "feat(cache): implement Redis application caching for hot endpoints (#98)",
+        "classification": "merged_clean",
+        "issue": 98,
+        "size": "M",
+        "merged_at": "2026-05-30T18:25:57Z"
+      },
+      {
+        "number": 150,
+        "title": "CI: validate .archon/workflows/*.yaml parses before merge",
+        "classification": "merged_clean",
+        "issue": 143,
+        "size": "unknown",
+        "merged_at": "2026-06-02T00:11:43Z"
+      },
+      {
+        "number": 151,
+        "title": "feat(scanner): add pocket pivot scanner (#140)",
+        "classification": "merged_clean",
+        "issue": 140,
+        "size": "unknown",
+        "merged_at": "2026-06-02T02:08:47Z"
+      },
+      {
+        "number": 152,
+        "title": "feat: agent memory system for dark factory and refinement pipeline (#149)",
+        "classification": "merged_clean",
+        "issue": 149,
+        "size": "unknown",
+        "merged_at": "2026-06-02T19:08:33Z"
+      },
+      {
+        "number": 153,
+        "title": "Local dev bind-mounts the working tree into running containers (editing source mutates the live stack)",
+        "classification": "merged_clean",
+        "issue": 146,
+        "size": "unknown",
+        "merged_at": "2026-06-02T17:39:52Z"
+      },
+      {
+        "number": 154,
+        "title": "dark-factory scheduler: back off and stop comment-spamming on repeated identical failures",
+        "classification": "merged_clean",
+        "issue": 144,
+        "size": "unknown",
+        "merged_at": "2026-06-02T17:40:45Z"
+      },
+      {
+        "number": 155,
+        "title": "Set up container registry and CI/CD deployment pipeline",
+        "classification": "merged_clean",
+        "issue": 104,
+        "size": "L",
+        "merged_at": "2026-06-03T02:15:50Z"
+      },
+      {
+        "number": 163,
+        "title": "fix(#160): dark factory scheduler circuit-breaker + opt-in refinement gate",
+        "classification": "merged_clean",
+        "issue": 160,
+        "size": "M",
+        "merged_at": "2026-06-03T21:02:05Z"
+      },
+      {
+        "number": 164,
+        "title": "Dark factory: verify spec conformance at plan and code stages (tiered gate + attestation)",
+        "classification": "merged_clean",
+        "issue": 162,
+        "size": "M",
+        "merged_at": "2026-06-03T20:25:53Z"
+      },
+      {
+        "number": 165,
+        "title": "feat(frontend): centralise WebSocket URLs behind wsUrl() helper, add ESLint guard",
+        "classification": "merged_clean",
+        "issue": 158,
+        "size": "M",
+        "merged_at": "2026-06-03T23:59:02Z"
+      },
+      {
+        "number": 166,
+        "title": "Scheduled scanner beat tasks are a no-op: seeded ScannerConfigs lack parameters.universe_id",
+        "classification": "merged_clean",
+        "issue": 156,
+        "size": "unknown",
+        "merged_at": "2026-06-04T00:20:52Z"
+      },
+      {
+        "number": 167,
+        "title": "Integrate codeindex into the dark factory",
+        "classification": "merged_clean",
+        "issue": 159,
+        "size": "M",
+        "merged_at": "2026-06-04T00:24:48Z"
+      },
+      {
+        "number": 175,
+        "title": "docs(#168): give every drifting fact one canonical owner",
+        "classification": "merged_clean",
+        "issue": 168,
+        "size": "M",
+        "merged_at": "2026-06-04T01:49:07Z"
+      },
+      {
+        "number": 176,
+        "title": "docs(#169): one canonical module map \u2014 strip PROJECT_STRUCTURE prose",
+        "classification": "merged_clean",
+        "issue": 169,
+        "size": "M",
+        "merged_at": "2026-06-04T01:56:10Z"
+      },
+      {
+        "number": 180,
+        "title": "Differentiate preview-environment creation: skip the stack for non-runtime changes",
+        "classification": "merged_clean",
+        "issue": 178,
+        "size": "unknown",
+        "merged_at": "2026-06-04T03:22:12Z"
+      },
+      {
+        "number": 181,
+        "title": "docs: fix Docs/ vs docs/ casing collision (breaks links in Linux dark factory)",
+        "classification": "merged_clean",
+        "issue": 171,
+        "size": "S",
+        "merged_at": "2026-06-04T03:45:07Z"
+      },
+      {
+        "number": 182,
+        "title": "docs: consolidate competing agent-instruction systems (retire orphaned .agent/skills)",
+        "classification": "merged_clean",
+        "issue": 170,
+        "size": "M",
+        "merged_at": "2026-06-04T12:41:11Z"
+      },
+      {
+        "number": 185,
+        "title": "Pilot: evaluate repowise structural layers vs codeindex",
+        "classification": "merged_with_edits",
+        "issue": 177,
+        "size": "M",
+        "merged_at": "2026-06-04T15:25:28Z"
+      },
+      {
+        "number": 186,
+        "title": "docs: ADR hygiene \u2014 renumber duplicate 0010 and add a decision-log index",
+        "classification": "merged_clean",
+        "issue": 172,
+        "size": "S",
+        "merged_at": "2026-06-04T12:39:02Z"
+      },
+      {
+        "number": 187,
+        "title": "Direct-to-PR mode: opt-in single-gate autonomous flow for the dark factory",
+        "classification": "merged_clean",
+        "issue": 183,
+        "size": "L",
+        "merged_at": "2026-06-04T12:53:35Z"
+      },
+      {
+        "number": 188,
+        "title": "docs: archive write-once specs/plans (separate historical residue from living docs)",
+        "classification": "merged_clean",
+        "issue": 173,
+        "size": "M",
+        "merged_at": "2026-06-04T14:26:14Z"
+      },
+      {
+        "number": 189,
+        "title": "docs(#174): add missing diagram layer (topology, scan flow, domain model, factory pipeline)",
+        "classification": "merged_clean",
+        "issue": 174,
+        "size": "M",
+        "merged_at": "2026-06-04T23:52:56Z"
+      },
+      {
+        "number": 208,
+        "title": "Compare Dark Factory implementation against the Agyn multi-agent SE paper (arXiv:2602.01465v2)",
+        "classification": "merged_clean",
+        "issue": 184,
+        "size": "L",
+        "merged_at": "2026-06-04T16:11:10Z"
+      },
+      {
+        "number": 209,
+        "title": "Dark factory: flag & excise out-of-scope incidental changes (scope enforcement at the conformance gate)",
+        "classification": "merged_clean",
+        "issue": 206,
+        "size": "M",
+        "merged_at": "2026-06-04T15:39:08Z"
+      },
+      {
+        "number": 211,
+        "title": "seed: review scanner_config seed file changes (universe_id fix + pocket_pivot simplification)",
+        "classification": "merged_clean",
+        "issue": 207,
+        "size": "S",
+        "merged_at": "2026-06-04T23:28:03Z"
+      },
+      {
+        "number": 216,
+        "title": "Dark factory: auto-detect and resolve merge conflicts on in-review PRs",
+        "classification": "merged_clean",
+        "issue": 210,
+        "size": "L",
+        "merged_at": "2026-06-04T18:25:53Z"
+      },
+      {
+        "number": 220,
+        "title": "[#190] Reject empty/weak JWT_SECRET_KEY at startup",
+        "classification": "merged_with_edits",
+        "issue": 190,
+        "size": "S",
+        "merged_at": "2026-06-05T04:55:35Z"
+      },
+      {
+        "number": 225,
+        "title": "[arch-v2][HIGH] Authenticate WebSocket connections (currently bypass auth)",
+        "classification": "merged_clean",
+        "issue": 191,
+        "size": "M",
+        "merged_at": "2026-06-07T13:22:39Z"
+      },
+      {
+        "number": 228,
+        "title": "[arch-v2][HIGH] Frontend tsc --noEmit is red \u2014 build/CI gate broken",
+        "classification": "merged_clean",
+        "issue": 193,
+        "size": "S",
+        "merged_at": "2026-06-06T03:18:29Z"
+      },
+      {
+        "number": 230,
+        "title": "[arch-v2][HIGH] Add CSRF protection for cookie-based auth",
+        "classification": "merged_clean",
+        "issue": 192,
+        "size": "M",
+        "merged_at": "2026-06-06T13:10:07Z"
+      },
+      {
+        "number": 232,
+        "title": "[arch-v2][HIGH] Celery/worker Prometheus metrics never scraped",
+        "classification": "merged_clean",
+        "issue": 194,
+        "size": "M",
+        "merged_at": "2026-06-06T13:13:01Z"
+      },
+      {
+        "number": 234,
+        "title": "[arch-v2][MED] Add brute-force rate limit to login/register",
+        "classification": "merged_clean",
+        "issue": 196,
+        "size": "S",
+        "merged_at": "2026-06-06T03:20:31Z"
+      },
+      {
+        "number": 242,
+        "title": "[arch-v2][MED] CI lint/audit gates are non-enforcing (ESLint TS rules + non-blocking audits)",
+        "classification": "merged_clean",
+        "issue": 197,
+        "size": "S",
+        "merged_at": "2026-06-06T03:13:11Z"
+      },
+      {
+        "number": 243,
+        "title": "refactor(services): decompose scanner.py + futures_data.py god modules (#199)",
+        "classification": "merged_clean",
+        "issue": 199,
+        "size": "L",
+        "merged_at": "2026-06-06T03:16:14Z"
+      },
+      {
+        "number": 244,
+        "title": "[arch-v2][MED] Enforce secure cookies + TLS termination",
+        "classification": "merged_clean",
+        "issue": 202,
+        "size": "M",
+        "merged_at": "2026-06-07T19:18:31Z"
+      },
+      {
+        "number": 245,
+        "title": "[arch-v2][MED] Harden Docker socket mount (dark-factory / scheduler) + non-root containers",
+        "classification": "merged_clean",
+        "issue": 203,
+        "size": "M",
+        "merged_at": "2026-06-07T13:33:46Z"
+      },
+      {
+        "number": 248,
+        "title": "[arch-v2][LOW] Add circuit breakers + outbound request timeouts",
+        "classification": "merged_clean",
+        "issue": 205,
+        "size": "M",
+        "merged_at": "2026-06-07T19:19:01Z"
+      },
+      {
+        "number": 251,
+        "title": "[arch-v2][MED] Expand frontend test breadth (pages/components) + honest coverage",
+        "classification": "merged_clean",
+        "issue": 198,
+        "size": "L",
+        "merged_at": "2026-06-06T14:01:13Z"
+      },
+      {
+        "number": 265,
+        "title": "[arch-v2][MED] Codeindex artifacts referenced as committed but absent",
+        "classification": "merged_clean",
+        "issue": 200,
+        "size": "S",
+        "merged_at": "2026-06-07T14:52:49Z"
+      },
+      {
+        "number": 270,
+        "title": "feat(coverage): include Celery tasks in coverage measurement (#204)",
+        "classification": "merged_clean",
+        "issue": 204,
+        "size": "M",
+        "merged_at": "2026-06-07T19:13:57Z"
+      },
+      {
+        "number": 273,
+        "title": "Revamp the dark-factory .archon/memory system \u2014 too eager, persists unverified/low-value lessons",
+        "classification": "merged_clean",
+        "issue": 254,
+        "size": "L",
+        "merged_at": "2026-06-09T23:11:52Z"
+      },
+      {
+        "number": 277,
+        "title": "Review all the self-improvement made and make sure they work well",
+        "classification": "merged_clean",
+        "issue": 213,
+        "size": "unknown",
+        "merged_at": "2026-06-10T01:31:02Z"
+      },
+      {
+        "number": 278,
+        "title": "fix(seed): restore universe_id + correct Pocket Pivot (Evening) row in 01_scanner_configs.sql (canonical)",
+        "classification": "merged_clean",
+        "issue": 223,
+        "size": "unknown",
+        "merged_at": "2026-06-10T01:38:46Z"
+      },
+      {
+        "number": 279,
+        "title": "Add unit tests for calculateDoubleSuperTrend (frontend/src/utils/indicators.ts)",
+        "classification": "merged_clean",
+        "issue": 249,
+        "size": "unknown",
+        "merged_at": "2026-06-10T02:43:04Z"
+      },
+      {
+        "number": 280,
+        "title": "Fix no-unused-expressions in ExportUniverseModal.tsx (ternary-as-statement)",
+        "classification": "merged_clean",
+        "issue": 240,
+        "size": "unknown",
+        "merged_at": "2026-06-10T02:54:16Z"
+      },
+      {
+        "number": 282,
+        "title": "Add vite-env.d.ts scaffold file to frontend (scope spillover from #193)",
+        "classification": "merged_clean",
+        "issue": 226,
+        "size": "unknown",
+        "merged_at": "2026-06-10T03:07:28Z"
+      },
+      {
+        "number": 295,
+        "title": "Fix prefer-const violation in StockChart.tsx (allMarkers never reassigned)",
+        "classification": "merged_clean",
+        "issue": 241,
+        "size": "unknown",
+        "merged_at": "2026-06-10T09:49:04Z"
+      },
+      {
+        "number": 296,
+        "title": "test: add P1.5-1 increment_retry and P1.5-5 trip_to_blocked scheduler tests",
+        "classification": "merged_clean",
+        "issue": 215,
+        "size": "unknown",
+        "merged_at": "2026-06-10T10:43:59Z"
+      },
+      {
+        "number": 297,
+        "title": "Ratchet frontend coverage thresholds to 35%/25% (follow-up from #198)",
+        "classification": "merged_clean",
+        "issue": 250,
+        "size": "unknown",
+        "merged_at": "2026-06-11T16:27:54Z"
+      },
+      {
+        "number": 298,
+        "title": "[arch-v2][MED] Documentation hygiene: sync/async drift, stale tables, ADR numbering, docs casing",
+        "classification": "merged_clean",
+        "issue": 201,
+        "size": "S",
+        "merged_at": "2026-06-10T14:40:51Z"
+      },
+      {
+        "number": 304,
+        "title": "Add codeindex ops lessons to factory memory (spillover from #200)",
+        "classification": "merged_clean",
+        "issue": 264,
+        "size": "unknown",
+        "merged_at": "2026-06-10T22:14:56Z"
+      },
+      {
+        "number": 318,
+        "title": "Dark-factory scope-enforcement over-reports ruff/isort reformatting of touched files as scope spillover",
+        "classification": "merged_with_edits",
+        "issue": 276,
+        "size": "unknown",
+        "merged_at": "2026-06-11T19:31:57Z"
+      },
+      {
+        "number": 321,
+        "title": "fix(#285): add ruff to CI + clear 67 lint violations",
+        "classification": "merged_clean",
+        "issue": 285,
+        "size": "unknown",
+        "merged_at": "2026-06-11T16:48:38Z"
+      },
+      {
+        "number": 327,
+        "title": "[arch-v3][MED] Decompose DiscoveryService.run_screen into asset-class screeners (CC~43)",
+        "classification": "merged_with_edits",
+        "issue": 287,
+        "size": "unknown",
+        "merged_at": "2026-06-11T18:36:28Z"
+      },
+      {
+        "number": 328,
+        "title": "chore: review non-root user setup in backend/frontend/dark-factory Dockerfiles",
+        "classification": "merged_clean",
+        "issue": 266,
+        "size": "unknown",
+        "merged_at": "2026-06-11T19:02:08Z"
+      },
+      {
+        "number": 330,
+        "title": "Dark-factory scope-enforcement over-reports ruff/isort reformatting of touched files as scope spillover",
+        "classification": "merged_clean",
+        "issue": 276,
+        "size": "unknown",
+        "merged_at": "2026-06-11T19:54:24Z"
+      },
+      {
+        "number": 341,
+        "title": "[arch-v3][MED] Consolidate time-normalization duplication into app/utils/time.py + get_or_404 helper",
+        "classification": "merged_clean",
+        "issue": 286,
+        "size": "unknown",
+        "merged_at": "2026-06-11T20:50:33Z"
+      },
+      {
+        "number": 342,
+        "title": "Implement trend_pullback daily scanner (trend-following pullback signals)",
+        "classification": "open",
+        "issue": 299,
+        "size": "M",
+        "merged_at": null
+      },
+      {
+        "number": 344,
+        "title": "[dark-factory] Guard against OR-join trigger_rule regressions in the workflow DAG",
+        "classification": "open",
+        "issue": 224,
+        "size": "S",
+        "merged_at": null
+      }
+    ]
   }
 };
 
@@ -3510,9 +4530,10 @@ function buildWeeklyTimeseries() {
   }
   const tmData=Object.entries(labelCounts).map(([n,v])=>({name:n,value:v}))
     .sort((a,b)=>b.value-a.value);
-  // NOTE: colorSaturation in a treemap level throws "e.charAt is not a function"
-  // in real ECharts (no level color to saturate). Map the palette by node index
-  // at the level instead — see test_render_report.py::test_template_treemap_*.
+  // NOTE: a treemap level's colorSaturation throws "e.charAt is not a function"
+  // in real ECharts (no level colour to saturate) — that blanks this chart AND
+  // every chart after it AND the table. Map the palette by node index instead.
+  // Guarded by tests/scripts/render_smoke.cjs.
   eChart('chart-treemap',{
     series:[{type:'treemap',data:tmData,roam:false,breadcrumb:{show:false},
       label:{show:true,formatter:'{b}: {c}',fontSize:11,color:'#0a0b0e'},
@@ -3570,6 +4591,57 @@ function buildWeeklyTimeseries() {
     series:[{type:'pie',radius:['40%','70%'],data:typeKeys.map((k,i)=>({
       value:byType[k].total,name:k,itemStyle:{color:PALETTE[i%PALETTE.length]}})),
       label:{color:C.mut}}]
+  });
+})();
+
+// ── Section 7: Factory Scorecard (#331) ─────────────────────────────────────
+(function buildScorecard() {
+  const sc = M.scorecard;
+  const sect = document.getElementById('s-scorecard');
+  if (!sc) { if (sect) sect.style.display = 'none'; return; }
+
+  function kpi(label, value, sub) {
+    return `<div class="kpi-card">
+      <div class="label">${label}</div>
+      <div class="value">${value}</div>
+      ${sub ? `<div class="sub">${sub}</div>` : ''}
+    </div>`;
+  }
+  const t = sc.triad;
+  document.getElementById('scorecard-kpis').innerHTML = [
+    kpi('Merge rate', t.merge_rate_pct.toFixed(1) + '%',
+        `${t.merged_clean} clean · ${t.merged_with_edits} w/ edits · ${t.closed} closed`),
+    kpi('Rework rate', sc.rework.rework_rate_pct.toFixed(1) + '%',
+        `${sc.rework.regression_count} regressions / ${sc.rework.merged_factory_prs} merged PRs`),
+    kpi('2-week churn', sc.churn.churn_pct.toFixed(1) + '%',
+        `${sc.churn.added_lines.toLocaleString()} lines · ${sc.churn.commits_analyzed} commits`),
+    kpi('Window', sc.window.since, `→ ${sc.window.until}`),
+  ].join('');
+
+  const TRIAD_NAMES = ['Merged clean', 'Merged w/ edits', 'Closed', 'Open'];
+  const TRIAD_KEYS = ['merged_clean', 'merged_with_edits', 'closed', 'open'];
+  const TRIAD_COLORS = [C.green, C.amber, C.red, C.mut2];
+
+  eChart('chart-triad', {
+    legend:{data:TRIAD_NAMES,textStyle:{color:C.mut},bottom:0},
+    xAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'category',data:['Factory PRs'],axisLabel:{color:C.mut2}},
+    series:TRIAD_KEYS.map((k,i)=>({
+      name:TRIAD_NAMES[i],type:'bar',stack:'t',data:[t[k]],
+      itemStyle:{color:TRIAD_COLORS[i]},
+    }))
+  });
+
+  const sizes = ['S','M','L','XL','unknown'].filter(s => sc.by_size[s]);
+  eChart('chart-triad-by-size', {
+    legend:{data:TRIAD_NAMES,textStyle:{color:C.mut},bottom:0},
+    xAxis:{type:'category',data:sizes,axisLabel:{color:C.mut2},axisLine:{lineStyle:{color:C.line}}},
+    yAxis:{type:'value',splitLine:{lineStyle:{color:C.line}},axisLabel:{color:C.mut2}},
+    series:TRIAD_KEYS.map((k,i)=>({
+      name:TRIAD_NAMES[i],type:'bar',stack:'t',
+      data:sizes.map(s=>sc.by_size[s][k]||0),
+      itemStyle:{color:TRIAD_COLORS[i]},
+    }))
   });
 })();
 

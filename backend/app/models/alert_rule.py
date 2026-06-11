@@ -2,13 +2,12 @@
 AlertRule model — user-defined alert rules for scanner events.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class AlertRule(Base):
@@ -61,10 +60,10 @@ class AlertRule(Base):
 
     created_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
     )
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )
