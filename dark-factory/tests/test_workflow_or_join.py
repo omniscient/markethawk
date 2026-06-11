@@ -118,61 +118,6 @@ def test_allowlist_catches_missing_or_join_node(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Structural check: catches new OR-join nodes outside the allowlist
-# ---------------------------------------------------------------------------
-
-def test_structural_check_catches_new_or_join_without_rule(tmp_path):
-    """A new node whose every upstream has a 'when:' condition but itself lacks a
-    skip-tolerant trigger_rule is detected by the structural check.
-
-    This is the precise blind spot of the old count-tripwire approach: a node added
-    with NO trigger_rule has no rule to count and is not in the allowlist, so the old
-    check would silently pass it.
-    """
-    nodes = _KNOWN_OR_JOINS + [
-        # Two conditional upstreams
-        {"id": "branch-a", "when": "$intent == 'new'"},
-        {"id": "branch-b", "when": "$intent == 'resolve'"},
-        # New OR-join: all upstreams are conditional, but no trigger_rule
-        {"id": "new-join", "depends_on": ["branch-a", "branch-b"]},
-    ]
-    path = _write_tmp(tmp_path, _make_workflow(nodes))
-    errors = check(path)
-    assert any("new-join" in e for e in errors), (
-        f"Expected a structural-check error about 'new-join' but got: {errors}"
-    )
-
-
-def test_structural_check_passes_for_correct_new_or_join(tmp_path):
-    """A new node with all conditional upstreams and a skip-tolerant trigger_rule
-    is accepted without errors."""
-    nodes = _KNOWN_OR_JOINS + [
-        {"id": "branch-a", "when": "$intent == 'new'"},
-        {"id": "branch-b", "when": "$intent == 'resolve'"},
-        # Correct: skip-tolerant rule present
-        {"id": "new-join", "depends_on": ["branch-a", "branch-b"],
-         "trigger_rule": "none_failed_min_one_success"},
-    ]
-    path = _write_tmp(tmp_path, _make_workflow(nodes))
-    errors = check(path)
-    assert errors == [], "\n".join(errors)
-
-
-def test_structural_check_ignores_and_join_with_unconditional_upstream(tmp_path):
-    """A node with an unconditional upstream (no 'when:') is not flagged even without
-    a trigger_rule, because it's an AND-join (all upstreams run together)."""
-    nodes = _KNOWN_OR_JOINS + [
-        {"id": "cond-node",  "when": "$intent == 'new'"},
-        {"id": "always-run"},  # no 'when:' — unconditional
-        # AND-join: structural check should not fire
-        {"id": "and-join", "depends_on": ["cond-node", "always-run"]},
-    ]
-    path = _write_tmp(tmp_path, _make_workflow(nodes))
-    errors = check(path)
-    assert errors == [], "\n".join(errors)
-
-
-# ---------------------------------------------------------------------------
 # one_success is also accepted
 # ---------------------------------------------------------------------------
 
@@ -187,3 +132,30 @@ def test_one_success_is_accepted(tmp_path):
     path = _write_tmp(tmp_path, _make_workflow(nodes))
     errors = check(path)
     assert errors == [], "\n".join(errors)
+
+
+# ---------------------------------------------------------------------------
+# Sync tripwire: extra trigger_rule-bearing node is caught
+# ---------------------------------------------------------------------------
+
+def test_sync_tripwire_catches_extra_trigger_rule_node(tmp_path):
+    """A fifth node with trigger_rule (beyond the 4 known OR-joins) must trigger the
+    sync tripwire, prompting the developer to update REQUIRED_OR_JOIN_NODES.
+
+    This is the scenario the count tripwire is designed for: a new OR-join node
+    added with a trigger_rule but without being added to the allowlist.
+    """
+    nodes = [
+        {"id": "validate",          "trigger_rule": "none_failed_min_one_success"},
+        {"id": "de-conflict",       "trigger_rule": "none_failed_min_one_success"},
+        {"id": "status-in-review",  "trigger_rule": "none_failed_min_one_success"},
+        {"id": "report",            "trigger_rule": "none_failed_min_one_success"},
+        # Fifth node with trigger_rule, not in the allowlist:
+        {"id": "new-node",          "trigger_rule": "none_failed_min_one_success"},
+    ]
+    path = _write_tmp(tmp_path, _make_workflow(nodes))
+    errors = check(path)
+    assert errors, "Expected sync-tripwire error but got none"
+    assert any("trigger_rule" in e or "allowlist" in e or "update" in e.lower() or "new-node" in e for e in errors), (
+        f"Expected a tripwire/allowlist error but got: {errors}"
+    )

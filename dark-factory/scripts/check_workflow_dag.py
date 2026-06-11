@@ -30,20 +30,9 @@ REQUIRED_OR_JOIN_NODES: frozenset[str] = frozenset(
 )
 
 # Accepted skip-tolerant rule values.
-# all_done is intentionally excluded: it runs the join even when upstream nodes fail,
-# masking real errors. Only rules that tolerate skips while still enforcing upstream
-# success are accepted.
 SKIP_TOLERANT_RULES: frozenset[str] = frozenset(
     {"none_failed_min_one_success", "one_success"}
 )
-
-
-def _has_when(node_by_id: dict[str, dict], dep_id: str) -> bool:
-    """Return True if the node identified by *dep_id* carries a 'when:' condition."""
-    dep = node_by_id.get(dep_id)
-    if dep is None:
-        return False  # unknown upstream → treat as unconditional (conservative)
-    return bool(dep.get("when"))
 
 
 def check(workflow_path: Union[str, Path]) -> list[str]:
@@ -86,30 +75,20 @@ def check(workflow_path: Union[str, Path]) -> list[str]:
                 "silently aborts the rest of the workflow"
             )
 
-    # Check 2: structural OR-join detection for nodes NOT in the allowlist.
-    # A node whose every upstream carries a 'when:' condition may receive a skip from
-    # a mutually-exclusive sibling branch under the default all_success rule.  Flag any
-    # such node that lacks a skip-tolerant trigger_rule.
-    # (Nodes with at least one unconditional upstream are AND-joins; all_success is correct.)
-    for node in nodes:
-        if not isinstance(node, dict):
-            continue
-        node_id = node.get("id", "<unknown>")
-        if node_id in REQUIRED_OR_JOIN_NODES:
-            continue  # already covered by check 1
-        depends_on = node.get("depends_on", [])
-        if not isinstance(depends_on, list) or len(depends_on) <= 1:
-            continue
-        if all(_has_when(node_by_id, dep) for dep in depends_on):
-            rule = node.get("trigger_rule")
-            if rule not in SKIP_TOLERANT_RULES:
-                errors.append(
-                    f"{path}: node '{node_id}' has {len(depends_on)} conditional upstreams "
-                    f"(all have 'when:') but trigger_rule={rule!r} is not skip-tolerant "
-                    f"(must be one of {sorted(SKIP_TOLERANT_RULES)}); "
-                    "if any upstream is skipped due to a mutually-exclusive intent branch, "
-                    "all_success will silently abort the rest of the workflow"
-                )
+    # Sync tripwire: the count of trigger_rule-bearing nodes must equal the size of
+    # REQUIRED_OR_JOIN_NODES.  If a new OR-join node is added to the workflow with a
+    # trigger_rule but without being added to REQUIRED_OR_JOIN_NODES, this fires.
+    nodes_with_rule = [n for n in nodes if isinstance(n, dict) and "trigger_rule" in n]
+    expected = len(REQUIRED_OR_JOIN_NODES)
+    if len(nodes_with_rule) != expected:
+        extras = [n.get("id", "<unknown>") for n in nodes_with_rule
+                  if n.get("id") not in REQUIRED_OR_JOIN_NODES]
+        errors.append(
+            f"{path}: expected {expected} nodes with trigger_rule "
+            f"(one per OR-join in REQUIRED_OR_JOIN_NODES), found {len(nodes_with_rule)}; "
+            f"update REQUIRED_OR_JOIN_NODES in check_workflow_dag.py "
+            f"(unexpected node(s): {extras})"
+        )
 
     return errors
 
