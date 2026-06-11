@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 
 from scripts.fetch_scorecard import (
+    build_scorecard,
     classify_pr,
+    count_regressions,
     count_surviving_lines,
     in_window,
     is_factory_commit,
@@ -130,3 +132,87 @@ def test_count_surviving_lines_counts_only_header_lines_for_sha():
     assert count_surviving_lines(blame, sha) == 2
     assert count_surviving_lines(blame, other) == 1
     assert count_surviving_lines("", sha) == 0
+
+
+# ── aggregation ────────────────────────────────────────────────────────────────
+CHURN_STUB = {"added_lines": 100, "surviving_lines": 80, "churn_pct": 20.0,
+              "commits_analyzed": 5, "commits_too_young": 2}
+
+
+def test_build_scorecard_triad_and_merge_rate():
+    prs = [
+        _pr(number=1),                                                  # merged_clean
+        _pr(number=2, commits=[{"authors": [FACTORY]}, {"authors": [HUMAN]}]),  # with edits
+        _pr(number=3, state="CLOSED"),                                  # closed
+        _pr(number=4, state="OPEN"),                                    # open
+        _pr(number=5, commits=[{"authors": [HUMAN]}]),                  # not factory → ignored
+    ]
+    sc = build_scorecard(prs, {}, 0, CHURN_STUB, SINCE, UNTIL)
+    assert sc["triad"]["merged_clean"] == 1
+    assert sc["triad"]["merged_with_edits"] == 1
+    assert sc["triad"]["closed"] == 1
+    assert sc["triad"]["open"] == 1
+    # merge rate excludes open PRs: (1 clean + 1 edits) / 3 resolved
+    assert abs(sc["triad"]["merge_rate_pct"] - 66.7) < 0.1
+    assert len(sc["prs"]) == 4
+
+
+def test_build_scorecard_by_size_with_unknown_bucket():
+    prs = [
+        _pr(number=1, head="feat/issue-10-a"),
+        _pr(number=2, head="feat/issue-11-b"),
+        _pr(number=3, head="feat/no-issue-ref"),
+    ]
+    sc = build_scorecard(prs, {10: "S", 11: "L"}, 0, CHURN_STUB, SINCE, UNTIL)
+    assert sc["by_size"]["S"]["merged_clean"] == 1
+    assert sc["by_size"]["L"]["merged_clean"] == 1
+    assert sc["by_size"]["unknown"]["merged_clean"] == 1
+    # the dashboard reads all four keys unconditionally
+    assert set(sc["by_size"]["S"]) == {"merged_clean", "merged_with_edits", "closed", "open"}
+
+
+def test_build_scorecard_window_filters_by_created_at():
+    prs = [
+        _pr(number=1, created="2026-04-15T00:00:00Z", merged="2026-04-16T00:00:00Z"),
+        _pr(number=2, created="2026-05-15T00:00:00Z"),
+    ]
+    sc = build_scorecard(prs, {}, 0, CHURN_STUB, SINCE, UNTIL)
+    assert [p["number"] for p in sc["prs"]] == [2]
+    assert sc["triad"]["merged_clean"] == 1
+    assert sc["rework"]["merged_factory_prs"] == 1  # PR #1 merged pre-window
+
+
+def test_rework_denominator_uses_merged_at_not_created_at():
+    # created before the window but merged inside it → counts toward rework
+    # denominator (DORA counts deployments in period), not toward the triad.
+    prs = [
+        _pr(number=1, created="2026-04-15T00:00:00Z", merged="2026-05-02T00:00:00Z"),
+        _pr(number=2, created="2026-05-15T00:00:00Z", merged="2026-05-16T00:00:00Z"),
+    ]
+    sc = build_scorecard(prs, {}, 1, CHURN_STUB, SINCE, UNTIL)
+    assert sc["rework"]["merged_factory_prs"] == 2
+    assert sc["rework"]["regression_count"] == 1
+    assert abs(sc["rework"]["rework_rate_pct"] - 50.0) < 0.1
+    assert sc["triad"]["merged_clean"] == 1  # only #2 in triad
+
+
+def test_build_scorecard_zero_denominators():
+    sc = build_scorecard([], {}, 0, CHURN_STUB, SINCE, UNTIL)
+    assert sc["triad"]["merge_rate_pct"] == 0.0
+    assert sc["rework"]["rework_rate_pct"] == 0.0
+
+
+def test_rework_rate_can_exceed_100_pct():
+    # one bad PR can spawn several regression tickets — uncapped by design
+    prs = [_pr(number=1, merged="2026-05-16T00:00:00Z")]
+    sc = build_scorecard(prs, {}, 3, CHURN_STUB, SINCE, UNTIL)
+    assert sc["rework"]["rework_rate_pct"] == 300.0
+
+
+def test_count_regressions_filters_label_and_window():
+    items = [
+        {"createdAt": "2026-05-10T00:00:00Z", "labels": [{"name": "factory-regression"}]},
+        {"createdAt": "2026-04-10T00:00:00Z", "labels": [{"name": "factory-regression"}]},
+        {"createdAt": "2026-05-10T00:00:00Z", "labels": [{"name": "bug"}]},
+    ]
+    assert count_regressions(items, SINCE, UNTIL) == 1
