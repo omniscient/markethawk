@@ -56,6 +56,18 @@ jobs:
               sys.exit(1)
           print(f'All {len(glob.glob(".archon/workflows/*.yaml"))} workflow file(s) valid.')
 
+          # Semantic DAG check: OR-join nodes must declare a skip-tolerant trigger_rule.
+          # Catches the class of regression introduced by ce9e4a3 (issue #224).
+          sys.path.insert(0, 'dark-factory/scripts')
+          from check_workflow_dag import check as dag_check
+          dag_errors = dag_check('.archon/workflows/archon-dark-factory.yaml')
+          if dag_errors:
+              print('Archon workflow DAG validation failed:')
+              for e in dag_errors:
+                  print(f'  {e}')
+              sys.exit(1)
+          print('DAG trigger_rule check passed.')
+
       - name: Dependency audit
         run: |
           pip install pip-audit
