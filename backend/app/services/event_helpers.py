@@ -34,6 +34,10 @@ SUMMARY_GENERATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
         + (f" → ${ind.get('price_target', 0):.2f}" if ind.get("price_target") else "")
         + f" (conf {ind.get('confidence', 0):.0%})"
     ),
+    "trend_pullback": lambda ind: (
+        f"Pullback {ind.get('pullback_depth_pct', 0):.1f}% to SMA20, RSI5={ind.get('rsi5', 0):.0f}, "
+        f"{ind.get('pct_off_252d_high', 0):.1f}% off high"
+    ),
 }
 
 # Severity calculators for each scanner type
@@ -90,6 +94,11 @@ SEVERITY_CALCULATORS: Dict[str, Callable[[Dict[str, Any]], str]] = {
         else "medium"
         if ind.get("confidence", 0) > 0.7
         else "low"
+    ),
+    "trend_pullback": lambda ind: (
+        "high"
+        if ind.get("pullback_depth_pct", 100) <= 8 and ind.get("rsi5", 100) < 30
+        else "medium"
     ),
 }
 
