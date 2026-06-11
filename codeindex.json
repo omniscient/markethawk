@@ -2,7 +2,7 @@
   "meta": {
     "root": "markethawk/",
     "total_files": 493,
-    "total_loc": 69709,
+    "total_loc": 69770,
     "languages": [
       "python",
       "javascript",
@@ -15162,8 +15162,8 @@
       "id": "dark-factory/scripts/check_workflow_dag.py",
       "type": "module",
       "language": "python",
-      "size": 120,
-      "loc": 120,
+      "size": 139,
+      "loc": 139,
       "group": 22,
       "imports": [
         "__future__",
@@ -15179,15 +15179,22 @@
       "imported_by": [],
       "symbols": [
         {
+          "name": "_has_when",
+          "line": 41,
+          "kind": "function",
+          "exported": false,
+          "doc": "Return True if the node identified by *dep_id* carries a 'when:' condition."
+        },
+        {
           "name": "check",
-          "line": 45,
+          "line": 49,
           "kind": "function",
           "exported": true,
           "doc": "Validate OR-join trigger_rule semantics in *workflow_path*."
         },
         {
           "name": "main",
-          "line": 98,
+          "line": 117,
           "kind": "function",
           "exported": true
         }
@@ -15853,13 +15860,11 @@
       "id": "dark-factory/tests/test_workflow_or_join.py",
       "type": "module",
       "language": "python",
-      "size": 151,
-      "loc": 151,
+      "size": 190,
+      "loc": 190,
       "group": 23,
       "imports": [
         "sys",
-        "textwrap",
-        "io",
         "pathlib",
         "pytest",
         "yaml",
@@ -15873,55 +15878,69 @@
       "symbols": [
         {
           "name": "_make_workflow",
-          "line": 38,
+          "line": 31,
           "kind": "function",
           "exported": false,
           "doc": "Return minimal workflow YAML containing *nodes*."
         },
         {
           "name": "_write_tmp",
-          "line": 43,
+          "line": 36,
           "kind": "function",
           "exported": false
         },
         {
           "name": "test_current_workflow_passes",
-          "line": 53,
+          "line": 55,
           "kind": "function",
           "exported": true,
           "doc": "The live archon-dark-factory.yaml must have zero OR-join errors."
         },
         {
           "name": "test_regression_pre_fix_validate_missing_trigger_rule",
-          "line": 64,
+          "line": 66,
           "kind": "function",
           "exported": true,
           "doc": "A validate node with depends_on=[preview-up, preview-up-resolve] but NO"
         },
         {
           "name": "test_regression_all_success_trigger_rule",
-          "line": 82,
+          "line": 84,
           "kind": "function",
           "exported": true,
           "doc": "Explicitly setting trigger_rule: all_success on an OR-join node must be caught."
         },
         {
-          "name": "test_tripwire_fires_when_count_increases",
-          "line": 102,
+          "name": "test_allowlist_catches_missing_or_join_node",
+          "line": 104,
           "kind": "function",
           "exported": true,
-          "doc": "Adding a fifth trigger_rule node without updating the guard triggers the tripwir"
+          "doc": "Removing a known OR-join node from the workflow is flagged by the allowlist chec"
         },
         {
-          "name": "test_tripwire_fires_when_count_decreases",
-          "line": 119,
+          "name": "test_structural_check_catches_new_or_join_without_rule",
+          "line": 124,
           "kind": "function",
           "exported": true,
-          "doc": "Removing a trigger_rule node without updating the guard also triggers the tripwi"
+          "doc": "A new node whose every upstream has a 'when:' condition but itself lacks a"
+        },
+        {
+          "name": "test_structural_check_passes_for_correct_new_or_join",
+          "line": 146,
+          "kind": "function",
+          "exported": true,
+          "doc": "A new node with all conditional upstreams and a skip-tolerant trigger_rule"
+        },
+        {
+          "name": "test_structural_check_ignores_and_join_with_unconditional_upstream",
+          "line": 161,
+          "kind": "function",
+          "exported": true,
+          "doc": "A node with an unconditional upstream (no 'when:') is not flagged even without"
         },
         {
           "name": "test_one_success_is_accepted",
-          "line": 140,
+          "line": 179,
           "kind": "function",
           "exported": true,
           "doc": "one_success is a valid skip-tolerant trigger_rule and must not produce errors."
@@ -18736,13 +18755,12 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 3,
+      "direct_dependents": 2,
       "transitive_dependents": 0,
-      "blast_score": 3.0,
+      "blast_score": 2.0,
       "imported_by": [
         "backend/app/services/journal_service.py",
-        "backend/app/services/universe_export.py",
-        "dark-factory/tests/test_workflow_or_join.py"
+        "backend/app/services/universe_export.py"
       ]
     },
     {
@@ -19466,12 +19484,11 @@
       "group": 9000,
       "imports": [],
       "layer": "backend",
-      "direct_dependents": 2,
+      "direct_dependents": 1,
       "transitive_dependents": 0,
-      "blast_score": 2.0,
+      "blast_score": 1.0,
       "imported_by": [
-        "dark-factory/tests/test_fmt_hunk_filter.py",
-        "dark-factory/tests/test_workflow_or_join.py"
+        "dark-factory/tests/test_fmt_hunk_filter.py"
       ]
     },
     {
@@ -47119,15 +47136,22 @@
       "imported_by": [],
       "symbols": [
         {
+          "name": "_has_when",
+          "line": 41,
+          "kind": "function",
+          "exported": false,
+          "doc": "Return True if the node identified by *dep_id* carries a 'when:' condition."
+        },
+        {
           "name": "check",
-          "line": 45,
+          "line": 49,
           "kind": "function",
           "exported": true,
           "doc": "Validate OR-join trigger_rule semantics in *workflow_path*."
         },
         {
           "name": "main",
-          "line": 98,
+          "line": 117,
           "kind": "function",
           "exported": true
         },
@@ -47569,55 +47593,69 @@
         },
         {
           "name": "_make_workflow",
-          "line": 38,
+          "line": 31,
           "kind": "function",
           "exported": false,
           "doc": "Return minimal workflow YAML containing *nodes*."
         },
         {
           "name": "_write_tmp",
-          "line": 43,
+          "line": 36,
           "kind": "function",
           "exported": false
         },
         {
           "name": "test_current_workflow_passes",
-          "line": 53,
+          "line": 55,
           "kind": "function",
           "exported": true,
           "doc": "The live archon-dark-factory.yaml must have zero OR-join errors."
         },
         {
           "name": "test_regression_pre_fix_validate_missing_trigger_rule",
-          "line": 64,
+          "line": 66,
           "kind": "function",
           "exported": true,
           "doc": "A validate node with depends_on=[preview-up, preview-up-resolve] but NO"
         },
         {
           "name": "test_regression_all_success_trigger_rule",
-          "line": 82,
+          "line": 84,
           "kind": "function",
           "exported": true,
           "doc": "Explicitly setting trigger_rule: all_success on an OR-join node must be caught."
         },
         {
-          "name": "test_tripwire_fires_when_count_increases",
-          "line": 102,
+          "name": "test_allowlist_catches_missing_or_join_node",
+          "line": 104,
           "kind": "function",
           "exported": true,
-          "doc": "Adding a fifth trigger_rule node without updating the guard triggers the tripwir"
+          "doc": "Removing a known OR-join node from the workflow is flagged by the allowlist chec"
         },
         {
-          "name": "test_tripwire_fires_when_count_decreases",
-          "line": 119,
+          "name": "test_structural_check_catches_new_or_join_without_rule",
+          "line": 124,
           "kind": "function",
           "exported": true,
-          "doc": "Removing a trigger_rule node without updating the guard also triggers the tripwi"
+          "doc": "A new node whose every upstream has a 'when:' condition but itself lacks a"
+        },
+        {
+          "name": "test_structural_check_passes_for_correct_new_or_join",
+          "line": 146,
+          "kind": "function",
+          "exported": true,
+          "doc": "A new node with all conditional upstreams and a skip-tolerant trigger_rule"
+        },
+        {
+          "name": "test_structural_check_ignores_and_join_with_unconditional_upstream",
+          "line": 161,
+          "kind": "function",
+          "exported": true,
+          "doc": "A node with an unconditional upstream (no 'when:') is not flagged even without"
         },
         {
           "name": "test_one_success_is_accepted",
-          "line": 140,
+          "line": 179,
           "kind": "function",
           "exported": true,
           "doc": "one_success is a valid skip-tolerant trigger_rule and must not produce errors."
@@ -55100,18 +55138,6 @@
     {
       "source": "dark-factory/tests/test_workflow_or_join.py",
       "target": "sys",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "dark-factory/tests/test_workflow_or_join.py",
-      "target": "textwrap",
-      "weight": 1,
-      "kind": "imports"
-    },
-    {
-      "source": "dark-factory/tests/test_workflow_or_join.py",
-      "target": "io",
       "weight": 1,
       "kind": "imports"
     },
