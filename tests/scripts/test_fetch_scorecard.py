@@ -2,10 +2,12 @@ from datetime import datetime, timezone
 
 from scripts.fetch_scorecard import (
     classify_pr,
+    count_surviving_lines,
     in_window,
     is_factory_commit,
     is_factory_pr,
     linked_issue_number,
+    parse_numstat,
 )
 
 FACTORY = {"name": "MarketHawk Factory", "email": "factory@markethawk", "login": ""}
@@ -92,3 +94,30 @@ def test_in_window_inclusive_bounds():
     assert not in_window("2026-04-30T23:59:59Z", SINCE, UNTIL)
     assert not in_window("2026-06-12T00:00:01Z", SINCE, UNTIL)
     assert not in_window(None, SINCE, UNTIL)
+
+
+# ── churn arithmetic ───────────────────────────────────────────────────────────
+def test_parse_numstat_extracts_added_lines():
+    out = "10\t2\tbackend/app/main.py\n0\t5\tREADME.md\n-\t-\tdocs/img.png\n"
+    assert parse_numstat(out) == {"backend/app/main.py": 10}
+
+
+def test_parse_numstat_empty_output():
+    assert parse_numstat("") == {}
+
+
+def test_count_surviving_lines_counts_only_header_lines_for_sha():
+    sha = "a" * 40
+    other = "b" * 40
+    blame = "\n".join([
+        f"{sha} 1 1 2",
+        "author MarketHawk Factory",
+        "\tline one content",
+        f"{sha} 2 2",
+        "\tline two content",
+        f"{other} 1 3 1",
+        f"\t{sha} content line that mentions the sha",
+    ])
+    assert count_surviving_lines(blame, sha) == 2
+    assert count_surviving_lines(blame, other) == 1
+    assert count_surviving_lines("", sha) == 0
