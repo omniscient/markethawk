@@ -1,9 +1,9 @@
 """Integration tests for signal analysis endpoints."""
 
-from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.main import app
 from tests.fixtures.analysis import seed_completed_analysis_run
 
 client = TestClient(app)

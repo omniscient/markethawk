@@ -44,6 +44,7 @@ testcontainers[postgres]==4.10.0
 # Development
 python-multipart==0.0.27
 email-validator==2.3.0
+ruff==0.15.16
 
 # Browser Push Notifications (VAPID Web Push)
 pywebpush==2.0.0

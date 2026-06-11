@@ -90,8 +90,9 @@ const Chart: React.FC<ChartProps> = ({
     }
 
     // Fallback to Recharts for simple bar charts or other types
+    // Recharts needs an array of a union, not a union of arrays
     const commonProps = {
-      data: data as object[],
+      data: data as (StockBarRow | ScannerEvent)[],
       margin: { top: 5, right: 30, left: 20, bottom: 5 }
     };
 

@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
+
 from app.services.futures_data import FuturesDataService, _resolve_exchange
 
 # ---------------------------------------------------------------------------

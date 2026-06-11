@@ -35,6 +35,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
+      - name: Lint (ruff)
+        working-directory: backend
+        run: ruff check .
+
       - name: Validate Archon workflow YAML
         shell: python
         run: |

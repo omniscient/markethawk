@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import fakeredis.aioredis
 import pytest
+
 from app.services.system_service import SystemService
 
 # ── get_market_status ──────────────────────────────────────────────────────

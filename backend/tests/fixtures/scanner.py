@@ -5,9 +5,10 @@ Each function inserts rows and flushes; the caller's transaction provides rollba
 
 from datetime import timedelta
 
+from sqlalchemy.orm import Session
+
 from app.models import ScannerEvent, ScannerRun
 from app.utils.session import get_market_today
-from sqlalchemy.orm import Session
 
 
 def seed_scanner_runs(db: Session, universe_id: int | None = None) -> list[ScannerRun]:

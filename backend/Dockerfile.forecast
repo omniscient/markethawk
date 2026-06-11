@@ -16,4 +16,8 @@ RUN pip install --upgrade pip && \
 
 COPY . .
 
+# Runs as root intentionally: HuggingFace model weights (~800 MB) are cached at
+# /root/.cache/huggingface via the timesfm_cache named volume. Converting to a
+# non-root user requires relocating the cache path; tracked in a follow-up issue.
+
 CMD ["celery", "-A", "app.core.celery_app:celery_app", "worker", "-Q", "forecasting", "--concurrency=1", "--loglevel=info"]

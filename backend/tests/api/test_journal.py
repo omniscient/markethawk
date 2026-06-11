@@ -3,10 +3,10 @@ Integration tests for journal API endpoints.
 Runs against a real Postgres DB (via testcontainers).
 """
 
-from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.main import app
 from tests.fixtures.journal import seed_journal_entries, seed_tags, seed_trades
 
 client = TestClient(app)

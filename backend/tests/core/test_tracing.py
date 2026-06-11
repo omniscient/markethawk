@@ -25,9 +25,9 @@ def test_otel_trace_id_filter_no_active_span():
 
 def test_otel_trace_id_filter_with_active_span():
     """Filter populates trace_id/span_id fields when a span is active."""
-    from app.core.tracing import OtelTraceIdFilter
-    from opentelemetry import trace
     from opentelemetry.sdk.trace import TracerProvider
+
+    from app.core.tracing import OtelTraceIdFilter
 
     provider = TracerProvider()
     tracer = provider.get_tracer("test")
@@ -48,6 +48,7 @@ def test_otel_trace_id_filter_with_active_span():
 def test_setup_otel_noop_when_endpoint_empty(monkeypatch):
     """_setup_otel() is a no-op when OTEL_EXPORTER_OTLP_ENDPOINT is empty."""
     from opentelemetry import trace as otel_trace
+
     from app.core.tracing import setup_otel
 
     setup_otel(endpoint="", service_name="test", engine=None)
@@ -62,6 +63,7 @@ def test_setup_otel_registers_sdk_provider(monkeypatch):
     """_setup_otel() registers an SDK TracerProvider when endpoint is set."""
     from opentelemetry import trace as otel_trace
     from opentelemetry.sdk.trace import TracerProvider as SDKProvider
+
     from app.core.tracing import setup_otel
 
     # Use a fake endpoint — we don't actually connect
@@ -72,5 +74,4 @@ def test_setup_otel_registers_sdk_provider(monkeypatch):
     assert isinstance(provider, SDKProvider)
 
     # Restore default provider so other tests are not affected
-    from opentelemetry.trace import ProxyTracerProvider
     otel_trace._TRACER_PROVIDER = None
