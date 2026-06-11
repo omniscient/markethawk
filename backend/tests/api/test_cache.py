@@ -1,8 +1,6 @@
 """Unit tests for core/cache.py — all Redis calls are mocked."""
 import json
-import pytest
 from unittest.mock import MagicMock, patch
-
 
 # ---------------------------------------------------------------------------
 # get_redis

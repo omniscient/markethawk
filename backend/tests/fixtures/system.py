@@ -3,8 +3,9 @@ System config seed helpers.
 Each function inserts rows and flushes; the caller's transaction provides rollback.
 """
 
-from app.models.system_config import SystemConfig
 from sqlalchemy.orm import Session
+
+from app.models.system_config import SystemConfig
 
 
 def seed_system_config(db: Session) -> list[SystemConfig]:

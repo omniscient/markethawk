@@ -6,10 +6,11 @@ Each function inserts rows and flushes; the caller's transaction provides rollba
 from datetime import date, timedelta
 from decimal import Decimal
 
+from sqlalchemy.orm import Session
+
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
-from sqlalchemy.orm import Session
 
 
 def seed_outcomes(db: Session) -> dict:

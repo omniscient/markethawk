@@ -8,8 +8,9 @@ name must be patched, not `polygon.RESTClient` directly.)
 
 from unittest.mock import MagicMock, patch
 
-from app.services.discovery_service import DiscoveryService
 from sqlalchemy.orm import Session
+
+from app.services.discovery_service import DiscoveryService
 
 # ── sync_fundamental_data ──────────────────────────────────────────────────
 

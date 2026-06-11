@@ -4,10 +4,10 @@ Runs against a real Postgres DB (via testcontainers).
 Polygon is never called — the mock_polygon_provider fixture intercepts all provider calls.
 """
 
-from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.main import app
 from tests.fixtures.providers import (
     mock_polygon_provider,  # noqa: F401 — imported for fixture discovery
 )

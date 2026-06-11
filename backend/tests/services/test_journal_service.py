@@ -5,6 +5,8 @@ Tests for journal_service CRUD functions against the testcontainers DB.
 from decimal import Decimal
 
 import pytest
+from sqlalchemy.orm import Session
+
 from app.schemas.journal import JournalEntryCreate, TagCreate, TradeCreate, TradeUpdate
 from app.services.journal_service import (
     create_journal_entry,
@@ -17,7 +19,6 @@ from app.services.journal_service import (
     get_trades,
     update_trade,
 )
-from sqlalchemy.orm import Session
 
 # ── helpers ──────────────────────────────────────────────────────────────
 

@@ -5,7 +5,16 @@ ScannerConfig SQLAlchemy model.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy import Uuid as UUID
 from sqlalchemy.dialects.postgresql import JSONB
 
