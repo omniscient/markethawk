@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Discovery Screener Registry (issue #287)
+
+- [PATTERN] Put the `_SCREENER_REGISTRY` + `register_screener()` at module level in `discovery_service.py` (not in a separate `screener_registry.py`). The dispatch entry point and registry are co-located; two adapters don't warrant a third standalone file. <!-- issue:#287 date:2026-06-11 expires:2026-12-11 source:refine -->
+
+- [AVOID] Do not create a separate `screener_registry.py` for the discovery-screener registry. `scan_orchestrator.py` is standalone because it orchestrates many scanners across the system; the screener registry serves one caller (`DiscoveryService.run_screen`) and lives correctly inside that module. <!-- issue:#287 date:2026-06-11 expires:2026-12-11 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
