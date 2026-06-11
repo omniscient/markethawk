@@ -77,8 +77,13 @@ COPY docker-compose.yml /opt/dark-factory/docker-compose.yml
 COPY .claude/skills/refinement/ /opt/refinement-skills/
 RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
 
-# Non-root factory user — must be created AFTER all root-level installs
-RUN groupadd --gid 1000 factory && \
+# Non-root factory user — must be created AFTER all root-level installs.
+# ubuntu:24.04 ships a default 'ubuntu' user at UID/GID 1000; evict it first or
+# groupadd/useradd fail on any clean (--no-cache) build. Latent until the layer
+# cache is dropped — cached builds skipped this layer for months.
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    groupdel ubuntu 2>/dev/null || true && \
+    groupadd --gid 1000 factory && \
     useradd --uid 1000 --gid 1000 --create-home --home-dir /home/factory factory
 
 # Transfer workspace ownership to the factory user
