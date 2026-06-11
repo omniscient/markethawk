@@ -2,13 +2,12 @@
 SignalReview SQLAlchemy model.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class SignalReview(Base):
@@ -31,7 +30,7 @@ class SignalReview(Base):
     )  # {threshold, current_value, proposed_value, rationale, file, line_hint}
     reviewed_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
         nullable=False,
     )
     reviewed_by = Column(String(100), nullable=True)  # reserved for future multi-user

@@ -2,8 +2,6 @@
 Trade Journaling SQLAlchemy models.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import (
     Column,
     Date,
@@ -18,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 # Junction table for Trade <-> Tag many-to-many relationship
 trade_tags = Table(
@@ -77,13 +76,11 @@ class Trade(Base):
     tags = relationship("Tag", secondary=trade_tags)
     notes = Column(Text)
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
 
@@ -117,11 +114,9 @@ class JournalEntry(Base):
     content = Column(Text, nullable=False)
     sentiment = Column(String(20))  # "bullish", "bearish", "neutral"
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )

@@ -3,7 +3,6 @@ ScannerEvent SQLAlchemy model.
 """
 
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column,
@@ -21,6 +20,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class ScannerEvent(Base):
@@ -58,13 +58,11 @@ class ScannerEvent(Base):
 
     signal_quality_score = Column(Float, nullable=True)
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     reviews = relationship(

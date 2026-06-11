@@ -7,11 +7,10 @@ logic: when reading a continuous price series we select the "active" contract
 for each date based on these rollover events.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Column, Date, DateTime, Index, Integer, String
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class FuturesRollover(Base):
@@ -37,13 +36,11 @@ class FuturesRollover(Base):
     # "manual"   – user-overridden
     detection_method = Column(String(20), nullable=False, default="volume")
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     __table_args__ = (

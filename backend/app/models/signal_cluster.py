@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
-
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.schema import Index
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class SignalCluster(Base):
@@ -21,8 +20,6 @@ class SignalCluster(Base):
     centroid = Column(JSONB, nullable=False, default=dict)
     return_profile = Column(JSONB, nullable=False, default=dict)
     event_count = Column(Integer, nullable=False, default=0)
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
 
     __table_args__ = (Index("ix_signal_clusters_analysis_run_id", "analysis_run_id"),)

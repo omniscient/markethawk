@@ -2,11 +2,10 @@
 AlertDeliveryLog model — immutable audit trail for every notification attempt.
 """
 
-from datetime import datetime, timezone
-
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class AlertDeliveryLog(Base):
@@ -41,6 +40,6 @@ class AlertDeliveryLog(Base):
 
     delivered_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
         nullable=False,
     )

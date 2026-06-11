@@ -3,7 +3,6 @@ ScannerConfig SQLAlchemy model.
 """
 
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
@@ -19,6 +18,7 @@ from sqlalchemy import Uuid as UUID
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import Base
+from app.utils.time import utc_now
 
 
 class ScannerConfig(Base):
@@ -39,15 +39,11 @@ class ScannerConfig(Base):
     next_run = Column(DateTime)
     outcome_config = Column(JSONB, nullable=True)
     data_requirements = Column(JSONB, nullable=True)
-    universe_id = Column(
-        Integer, ForeignKey("stock_universes.id"), nullable=False
-    )
+    universe_id = Column(Integer, ForeignKey("stock_universes.id"), nullable=False)
 
-    created_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
-    )
+    created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=utc_now,
+        onupdate=utc_now,
     )
