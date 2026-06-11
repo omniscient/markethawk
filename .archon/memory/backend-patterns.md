@@ -53,6 +53,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Never use `except (pybreaker.CircuitBreakerError, Exception)` — `CircuitBreakerError` is an `Exception` subclass so the tuple is redundant, and the broad catch masks real defects as missing data. Use two separate handlers: `except pybreaker.CircuitBreakerError` → raise `ProviderError`, `except Exception` → log and return empty. <!-- issue:#205 date:2026-06-07 expires:2026-12-07 source:implement -->
 
+## Backend: Scanner Modules
+
+- [PATTERN] Scanner pipeline modules (e.g. `pre_market_scan.py`) use three private stages: `_detect(ticker, daily_bars, pre_market_volume, ...) -> RawSignal | None` (pure, no DB), `_enrich(raw_signals, enrichment_batch, ..., db) -> list[EnrichedSignal]` (batch over passing signals), `_persist(enriched, db, ...) -> list[dict]` (all DB writes + Prometheus). The public `run_pre_market_scan()` is the slim orchestrator: fetch bars per-ticker, call detect in loop, then enrich batch, then persist. OTel spans and per-ticker error handling stay in the orchestrator so stages remain testable in isolation. <!-- issue:#288 date:2026-06-11 expires:2026-12-11 source:refine -->
+
+- [AVOID] Do not place DB queries inside a scanner `_detect()` stage — detect must be pure (pre-fetched daily_bars and pre_market_volume passed as args) so it can be unit-tested without the DB fixture infrastructure. Applies to any scanner module following the detect/enrich/persist three-stage pattern established in #288. <!-- issue:#288 date:2026-06-11 expires:2026-12-11 source:refine -->
+
+- [PATTERN] Use `@dataclass` (not `TypedDict`) for domain value types and pipeline intermediates in `backend/app/services/` — no `TypedDict` exists anywhere in the backend. Use `frozen=True` for immutable stage outputs (e.g. `RawSignal`, `ScannerDescriptor`). Precedents: `scan_orchestrator.py`, `data_readiness.py`, `auto_trade_service.py`. <!-- issue:#288 date:2026-06-11 expires:2026-12-11 source:refine -->
+
 ## Backend: Middleware
 
 - [PATTERN] Pure-ASGI middleware classes (like `CSRFMiddleware`) should be defined at module level in `main.py`, not inside `create_app()` — module-level placement makes them importable by the test suite without triggering the full app factory. The `AuthMiddleware` is an exception because it closes over `EXEMPT_PREFIXES`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
