@@ -911,6 +911,7 @@ To proceed:
     [ -n "$DISPATCHED" ] && break
     ISSUE=$(get_issue_number "$item")
     if has_skip_label "$item"; then continue; fi
+    if has_above_ceiling_label "$item"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
 
     RETRIES=$(get_retry_count "$ISSUE")
