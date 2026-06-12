@@ -106,6 +106,7 @@ fi
 COST_MARKER="<!-- dark-factory-cost-report -->"
 REFINE_FAILURE_MARKER="<!-- df-refine-failure -->"
 FACTORY_FAILURE_MARKER="<!-- df-factory-failure -->"
+DF_POST_MORTEM_MARKER="<!-- df-post-mortem -->"
 
 post_or_update_comment() {
   local marker="$1"
@@ -123,6 +124,99 @@ post_or_update_comment() {
     gh issue comment "$ISSUE_NUM" --body-file "$TMPFILE" 2>/dev/null || true
   fi
   rm -f "$TMPFILE"
+}
+
+run_post_mortem() {
+  local exit_code="${1:-1}"
+  local transcript_file="${2:-}"
+
+  # Only run post-mortem for implement/continue failures, not pipeline phases
+  case "${INTENT:-fix}" in
+    refine|plan|deconflict) return 0 ;;
+  esac
+
+  [ -z "${ISSUE_NUM:-}" ] && return 0
+
+  # Gather evidence: transcript tail + artifacts
+  local transcript_tail=""
+  if [ -n "$transcript_file" ] && [ -f "$transcript_file" ]; then
+    transcript_tail=$(tail -200 "$transcript_file" 2>/dev/null || true)
+  fi
+
+  local artifacts_context=""
+  local ARTIFACTS_DIR="${HOME}/.archon/workspaces/omniscient/markethawk/artifacts/runs"
+  # Find the most recent run artifacts directory for this issue
+  local run_dir
+  run_dir=$(ls -dt "${ARTIFACTS_DIR}"/*/issue.json 2>/dev/null \
+    | xargs grep -l "\"resolved_number\": ${ISSUE_NUM}" 2>/dev/null \
+    | head -1 | xargs dirname 2>/dev/null || true)
+
+  if [ -n "$run_dir" ]; then
+    for f in implementation.md conformance.md review.md plan.md; do
+      if [ -f "${run_dir}/${f}" ]; then
+        artifacts_context="${artifacts_context}
+
+=== ${f} ===
+$(head -100 "${run_dir}/${f}" 2>/dev/null || true)"
+      fi
+    done
+  fi
+
+  local prompt
+  prompt="You are analyzing a failed dark factory run for issue #${ISSUE_NUM}.
+Exit code: ${exit_code}
+Intent: ${INTENT:-fix}
+
+Write a concise post-mortem paragraph (3-5 sentences) explaining:
+1. What phase or step likely failed (based on the transcript tail)
+2. The probable root cause
+3. What the next run should do differently
+
+Keep it factual and actionable. No markdown headers, just a plain paragraph.
+
+=== Transcript tail (last 200 lines) ===
+${transcript_tail:-<no transcript available>}
+${artifacts_context}"
+
+  local post_mortem_text
+  post_mortem_text=$(echo "$prompt" | claude -p --model claude-haiku-4-5-20251001 2>/dev/null || true)
+
+  if [ -z "$post_mortem_text" ]; then
+    post_mortem_text="Post-mortem generation failed — no output from haiku agent. Exit code was ${exit_code}. Check the factory logs for details."
+  fi
+
+  # Post idempotent marker comment
+  local PROMOTED_AT
+  PROMOTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  post_or_update_comment "$DF_POST_MORTEM_MARKER" \
+    "${DF_POST_MORTEM_MARKER}
+## Dark Factory — Post-Mortem
+
+${post_mortem_text}
+
+**Exit code:** ${exit_code} | **Phase:** ${INTENT:-fix} | **Timestamp:** ${PROMOTED_AT}
+
+---
+*Posted by MarketHawk Dark Factory*" || true
+
+  # Append to eval corpus and commit
+  local JSONL_PATH="${CLONE_DIR}/dark-factory/evals/factory-failures.jsonl"
+  if [ -d "${CLONE_DIR}" ] && [ -f "$JSONL_PATH" ]; then
+    local excerpt
+    excerpt=$(echo "$post_mortem_text" | head -c 500 | tr '\n' ' ')
+    printf '{"issue":%s,"title":"%s","phase":"%s","exit_code":%s,"postmortem":"%s","promoted_at":"%s"}\n' \
+      "${ISSUE_NUM}" \
+      "$(gh issue view "${ISSUE_NUM}" --repo "omniscient/markethawk" --json title --jq '.title' 2>/dev/null | sed 's/"/\\"/g' || echo "unknown")" \
+      "${INTENT:-fix}" \
+      "${exit_code}" \
+      "$(echo "$excerpt" | sed 's/"/\\"/g')" \
+      "$PROMOTED_AT" \
+      >> "$JSONL_PATH" 2>/dev/null || true
+
+    (cd "${CLONE_DIR}" && git add dark-factory/evals/factory-failures.jsonl \
+      && git commit -m "eval: record factory failure for issue #${ISSUE_NUM}" \
+      && git push origin "$(git branch --show-current)" 2>/dev/null) 2>/dev/null || true
+  fi
 }
 
 post_cost_report() {
@@ -265,6 +359,7 @@ docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
 *Posted by MarketHawk Refinement Pipeline*"
     else
       echo "Dark factory failed (exit $EXIT_CODE). Moving issue #$ISSUE_NUM back to Ready..."
+      run_post_mortem "$EXIT_CODE" "" || true
       set_board_status "$STATUS_BLOCKED" 2>/dev/null || true
       post_or_update_comment "$FACTORY_FAILURE_MARKER" \
         "${FACTORY_FAILURE_MARKER}
@@ -685,6 +780,7 @@ while true; do
       echo "Waking up and retrying..."
       continue
     fi
+    run_post_mortem "$EXIT_CODE" "$TMP_OUT" || true
     rm -f "$TMP_OUT"
     exit "$EXIT_CODE"
   fi

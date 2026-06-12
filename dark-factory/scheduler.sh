@@ -398,6 +398,10 @@ trip_to_blocked() {
   gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
     --add-label needs-discussion 2>/dev/null || true
 
+  # Promote to eval flywheel: factory-regression label marks this failure for replay benchmark
+  gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+    --add-label factory-regression 2>/dev/null || true
+
   # 3. Manual retry command varies by phase
   local retry_cmd
   case "$phase" in
