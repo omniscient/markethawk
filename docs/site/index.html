@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MarketHawk Docs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top">MarketHawk</a>
+    <nav aria-label="Primary">
+      <a href="#demo">Demo</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#comparison">Compare</a>
+      <a href="#safety">Safety</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <p class="eyebrow">AI-First human-in-the-loop market scanning</p>
+      <h1>MarketHawk</h1>
+      <p class="lede">A market scanning cockpit for connecting market data, news, alerts, reviews, execution notes, journal entries, and outcomes.</p>
+      <div class="hero-actions">
+        <a class="button primary" href="#demo">Run the 5-minute demo</a>
+        <a class="button" href="../../README.md">Read the README</a>
+      </div>
+    </section>
+
+    <section id="what" class="section two-column">
+      <div>
+        <p class="section-kicker">Positioning</p>
+        <h2>What MarketHawk is</h2>
+        <ul class="check-list">
+          <li>An AI-First scanner workflow for active traders who want a repeatable review loop.</li>
+          <li>A local-first cockpit that connects scanners, alerts, reviews, journal notes, and outcomes.</li>
+          <li>A way to make scanner ideas observable: what fired, what reviewers decided, and what happened next.</li>
+          <li>A bridge between discretionary review and systematic evidence.</li>
+        </ul>
+      </div>
+      <div>
+        <p class="section-kicker">Boundaries</p>
+        <h2>What MarketHawk is not</h2>
+        <ul class="x-list">
+          <li>Not a broker or broker replacement.</li>
+          <li>Not a promise of profitable trading.</li>
+          <li>Not a pure vectorized research engine.</li>
+          <li>Not a substitute for risk controls, compliance, or human judgment.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="demo" class="section band">
+      <div>
+        <p class="section-kicker">Start here</p>
+        <h2>Five-minute demo</h2>
+        <p>Run MarketHawk with deterministic sample data. No IBKR, Polygon, X, or live credentials required.</p>
+        <pre><code>make demo</code></pre>
+      </div>
+      <div class="info-grid">
+        <div class="info-card">
+          <span>Frontend</span>
+          <strong>http://localhost:3333</strong>
+        </div>
+        <div class="info-card">
+          <span>API</span>
+          <strong>http://localhost:8000</strong>
+        </div>
+        <div class="info-card">
+          <span>Login</span>
+          <strong>demo / markethawk-demo</strong>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture" class="section">
+      <p class="section-kicker">System shape</p>
+      <h2>Architecture</h2>
+      <div class="diagram architecture-diagram" role="img" aria-label="React frontend connects to FastAPI, which uses PostgreSQL, Redis, Celery workers, and provider data.">
+        <div class="node strong">React + Vite frontend</div>
+        <div class="connector">HTTP</div>
+        <div class="node strong">FastAPI backend</div>
+        <div class="connector">state</div>
+        <div class="node">PostgreSQL</div>
+        <div class="node">Redis</div>
+        <div class="node">Celery workers</div>
+        <div class="node accent">Polygon / IBKR / demo seed data</div>
+      </div>
+    </section>
+
+    <section id="flow" class="section">
+      <p class="section-kicker">Operating loop</p>
+      <h2>Data flow</h2>
+      <div class="diagram flow-diagram" role="img" aria-label="Data flows through scanner, alert, review, execution, journal, and outcome.">
+        <div class="flow-node">Data</div>
+        <div class="arrow">-></div>
+        <div class="flow-node">Scanner</div>
+        <div class="arrow">-></div>
+        <div class="flow-node">Alert</div>
+        <div class="arrow">-></div>
+        <div class="flow-node">Review</div>
+        <div class="arrow">-></div>
+        <div class="flow-node">Execution</div>
+        <div class="arrow">-></div>
+        <div class="flow-node">Journal</div>
+        <div class="arrow">-></div>
+        <div class="flow-node">Outcome</div>
+      </div>
+      <p>The outcome closes the loop: signal quality, follow-through, MFE/MAE, and review decisions inform future scanner tuning.</p>
+    </section>
+
+    <section id="screenshots" class="section band">
+      <div>
+        <p class="section-kicker">Visual tour</p>
+        <h2>Screenshots and GIFs</h2>
+        <p>Committed placeholders keep the docs self-contained. Replace them with real captures as the public demo stabilizes.</p>
+      </div>
+      <img class="screenshot" src="assets/dashboard-placeholder.svg" alt="MarketHawk dashboard placeholder showing scanner results, watchlist, review queue, and outcomes.">
+    </section>
+
+    <section id="comparison" class="section">
+      <p class="section-kicker">Competitive context</p>
+      <h2>Comparison</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tool</th>
+              <th>Primary positioning</th>
+              <th>Best at</th>
+              <th>MarketHawk difference</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>MarketHawk</th>
+              <td>AI-First human-in-the-loop scanner cockpit</td>
+              <td>Reviewing scanner signals, watchlists, alerts, outcomes, and journal context together</td>
+              <td>Optimized for the scanner-review-outcome loop rather than pure backtesting</td>
+            </tr>
+            <tr>
+              <th>Lean</th>
+              <td>Institutional-grade algorithmic trading platform</td>
+              <td>Multi-asset backtesting, live deployment, brokerage integrations</td>
+              <td>Lighter and focused on scanner operations and human review</td>
+            </tr>
+            <tr>
+              <th>NautilusTrader</th>
+              <td>Production-grade Rust-native trading engine</td>
+              <td>Low-latency, event-driven strategy execution</td>
+              <td>Prioritizes explainable scanner workflow over engine-level execution</td>
+            </tr>
+            <tr>
+              <th>vectorbt</th>
+              <td>Test thousands of ideas quickly</td>
+              <td>Vectorized research and parameter sweeps</td>
+              <td>Captures review decisions, alerts, and outcomes around operational scanner use</td>
+            </tr>
+            <tr>
+              <th>backtrader</th>
+              <td>Ease-of-use Python backtesting</td>
+              <td>Scriptable local strategy backtests</td>
+              <td>Adds a full-stack UI, alerting, review, and journal workflow</td>
+            </tr>
+            <tr>
+              <th>pysystemtrade</th>
+              <td>Systematic futures trading research</td>
+              <td>Portfolio/system research and futures workflows</td>
+              <td>Focuses on equity scanner signals and operator review workflows</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="roadmap" class="section">
+      <p class="section-kicker">Next</p>
+      <h2>Roadmap</h2>
+      <div class="roadmap">
+        <div>Reproducible demo screenshots and GIFs</div>
+        <div>Stronger scanner scorecards and interval outcome analysis</div>
+        <div>Safer broker integration boundaries for paper execution</div>
+        <div>More import/export paths for journals and signal reviews</div>
+        <div>Public scanner design and operational playbooks</div>
+      </div>
+    </section>
+
+    <section id="safety" class="section safety">
+      <p class="section-kicker">Risk</p>
+      <h2>Safety and risk</h2>
+      <p>MarketHawk is research and workflow software. Trading involves substantial risk of loss. Sample data, fake outcomes, scanner scores, and demo records are illustrative only. Do not use demo settings for live trading.</p>
+    </section>
+  </main>
+
+  <footer class="footer">MarketHawk is research and workflow software, not financial advice.</footer>
+</body>
+</html>
