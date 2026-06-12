@@ -12,6 +12,9 @@ DIRECT_TO_PR_LABEL="${DIRECT_TO_PR_LABEL:-direct-to-pr}"
 SPEC_GRACE_MINUTES="${SPEC_GRACE_MINUTES:-30}"
 PLAN_GRACE_MINUTES="${PLAN_GRACE_MINUTES:-30}"
 CONFLICT_RESOLUTION_ENABLED="${CONFLICT_RESOLUTION_ENABLED:-true}"
+# Max concurrent factory containers, any run type (implement/refine/plan/deconflict/
+# close). Override in .archon/.env — takes effect on scheduler recreate, no rebuild.
+FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -113,6 +116,11 @@ is_issue_running() {
 
 count_factory_running() {
   docker ps --format '{{.Names}}' 2>/dev/null | grep -c 'markethawk-dark-factory-run-' || true
+}
+
+# True when the running factory-container count ($1) has reached FACTORY_WIP_LIMIT.
+factory_at_capacity() {
+  [ "$1" -ge "$FACTORY_WIP_LIMIT" ]
 }
 
 count_refine_running() {
@@ -629,7 +637,7 @@ trap '_sched_err_trap' ERR
 WIP_DATA=$(fetch_wip_limits)
 MAX_IN_PROGRESS=$(get_column_limit "$WIP_DATA" "$STATUS_IN_PROGRESS")
 MAX_IN_REVIEW=$(get_column_limit "$WIP_DATA" "$STATUS_IN_REVIEW")
-echo "WIP limits: in_progress=${MAX_IN_PROGRESS} in_review=${MAX_IN_REVIEW}"
+echo "WIP limits: in_progress=${MAX_IN_PROGRESS} in_review=${MAX_IN_REVIEW} factory=${FACTORY_WIP_LIMIT}"
 
 # --- Startup probe: verify factory image is available locally ---
 # `docker compose run` does not build inline by default, so a missing image causes every
@@ -716,19 +724,21 @@ ${FAIL_LIST}
     CI_BLOCKED="${CI_BLOCKED} ${ISSUE} "
   done < <(echo "$IN_REVIEW" | jq -c '.[]')
 
-  # Guard: only one factory container at a time (Claude Max rate limit). Everything
-  # below DISPATCHES factory work, so it waits for the current run; the CI gate above
-  # has already run regardless of factory activity.
+  # Guard: cap concurrent factory containers at FACTORY_WIP_LIMIT (Claude Max 5h-window
+  # burn scales with concurrency — default 1, override in .archon/.env). Everything
+  # below DISPATCHES factory work, so it waits for a free slot; the CI gate above has
+  # already run regardless of factory activity.
   FACTORY_RUNNING=$(count_factory_running)
-  if [ "$FACTORY_RUNNING" -gt 0 ]; then
-    echo "[$(date -u +%FT%TZ)] skip=factory_running count=${FACTORY_RUNNING}"
+  if factory_at_capacity "$FACTORY_RUNNING"; then
+    echo "[$(date -u +%FT%TZ)] skip=factory_at_capacity running=${FACTORY_RUNNING}/${FACTORY_WIP_LIMIT}"
     sleep "$POLL_INTERVAL"
     continue
   fi
 
   # --- Sweep: recover orphaned "In progress" items ---
-  # We only reach here when no factory container is running (FACTORY_RUNNING guard
-  # above), so any issue still in "In progress" was abandoned mid-run. The usual
+  # We reach here whenever a factory slot is free (capacity guard above). An issue in
+  # "In progress" whose container is alive is skipped by is_issue_running below; one
+  # with no container was abandoned mid-run. The usual
   # failure path (entrypoint on_failure -> Blocked) cannot fire for untrappable
   # deaths — host reboot, OOM/SIGKILL — so those issues would otherwise sit stuck
   # forever and silently consume a WIP slot. Route them into the Blocked retry path,
@@ -938,9 +948,9 @@ This issue was left in **In progress** with no running factory container — the
   # --- Log cycle summary ---
   BUDGET=$(gh api rate_limit --jq '.resources.graphql | "\(.used)/\(.limit)"' 2>/dev/null) || BUDGET="?"
   if [ -n "$DISPATCHED" ]; then
-    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} dispatched=\"${DISPATCHED}\" graphql=${BUDGET}"
+    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} factory_running=${FACTORY_RUNNING}/${FACTORY_WIP_LIMIT} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} dispatched=\"${DISPATCHED}\" graphql=${BUDGET}"
   else
-    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} skip=nothing_to_do graphql=${BUDGET}"
+    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} factory_running=${FACTORY_RUNNING}/${FACTORY_WIP_LIMIT} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} skip=nothing_to_do graphql=${BUDGET}"
   fi
 
   sleep "$POLL_INTERVAL"
