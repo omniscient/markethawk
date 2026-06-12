@@ -17,6 +17,7 @@ export interface ScannerEvent {
   closing_price?: number;
 
   signal_quality_score?: number | null;
+  regime?: string | null;
 
   indicators: Record<string, unknown>;
   criteria_met: Record<string, unknown>;
