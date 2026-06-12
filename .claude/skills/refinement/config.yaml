@@ -39,3 +39,9 @@ preview:
 conflict_resolution:
   enabled: true       # false = disable the P1.5 conflict scanner entirely (env CONFLICT_RESOLUTION_ENABLED overrides)
   ai_tier: true       # false = only Tier 1 (mechanical) resolution; never invoke Claude for conflict markers
+
+blast_radius:
+  enabled: true
+  hotspot_score_floor: 5.0      # files at or above this codeindex blast score trigger HUMAN_REQUIRED
+  size_budget_lines: 400        # total added+deleted lines threshold (0 = disabled)
+  size_budget_blocks: false     # true = size alone is blocking; false = advisory only
