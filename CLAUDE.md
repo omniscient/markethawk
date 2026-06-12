@@ -69,6 +69,20 @@ Three systems, all pre-configured. See [docs/ai-development.md](docs/ai-developm
 
 Work is tracked as [GitHub Issues](https://github.com/omniscient/markethawk/issues) with `priority:` (`must-have`/`should-have`) and `size:` (`S/M/L`) labels.
 
+### Replay Benchmark (harness regression gate)
+
+Before merging changes to factory prompts, DAG nodes, or gate thresholds, run the bench suite:
+
+```bash
+# Inside the factory container — one command, emits pass^k per size bucket
+bash dark-factory/bench/run_suite.sh
+
+# Dry run (plan only, no archon invocations)
+bash dark-factory/bench/run_suite.sh --dry-run
+```
+
+Results are written to `dark-factory/bench/results/`. See `dark-factory/bench/baseline.md` for the task manifest, scoring formula, and token cost guidance.
+
 ## Development Rules
 
 ### Validating Changes Before Committing
