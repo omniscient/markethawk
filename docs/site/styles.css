@@ -462,6 +462,19 @@ code {
   box-shadow: var(--glow);
 }
 
+.screenshot-frame {
+  margin: 0;
+}
+
+.screenshot-frame figcaption {
+  margin-top: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .table-wrap {
   margin-top: 24px;
   overflow-x: auto;
