@@ -33,7 +33,17 @@ npx() { echo "npx $*" >> "$STUB_LOG"; return "$TSC_FAIL"; }
 # shellcheck disable=SC2317
 python() {
   echo "python $*" >> "$STUB_LOG"
-  if echo "$*" | grep -q "import app"; then return "$PY_FAIL"; fi
+  if echo "$*" | grep -q "import app"; then
+    # Mimic import-time Settings() (#190/#365): app.main cannot even import
+    # unless the harness supplies the required env vars (JWT >= 32 chars) —
+    # regardless of whether the code itself is green.
+    local jwt="${JWT_SECRET_KEY:-}"
+    if [ -z "${DATABASE_URL:-}" ] || [ -z "${POLYGON_API_KEY:-}" ] || [ "${#jwt}" -lt 32 ]; then
+      echo "python_import_env_missing" >> "$STUB_LOG"
+      return 1
+    fi
+    return "$PY_FAIL"
+  fi
   return 0
 }
 # shellcheck disable=SC2317

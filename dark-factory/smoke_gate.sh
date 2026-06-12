@@ -17,8 +17,17 @@ _smoke_check_main() {
     return 1
   fi
   echo "[smoke_gate] Checking backend Python import graph..."
+  # Settings() is instantiated at import time and requires DATABASE_URL /
+  # POLYGON_API_KEY / JWT_SECRET_KEY (>=32 chars; preview env contract, #190).
+  # The gate verifies the import graph compiles, NOT that config is real —
+  # without throwaway values the check is red in every factory container, so
+  # every fix/continue/deconflict run false-latches the sentinel (#365). Same
+  # pattern as docker-compose.preview.yml and ci.yml.
   if ! (cd "${CLONE_DIR:-/workspace/markethawk}/backend" \
-        && python -c "import app.main" 2>&1); then
+        && DATABASE_URL="postgresql://smoke:smoke@localhost:5432/smoke" \
+           POLYGON_API_KEY="smoke-gate-only-not-a-real-key" \
+           JWT_SECRET_KEY="smoke-gate-only-not-secret-0123456789abcdef" \
+           python -c "import app.main" 2>&1); then
     echo "[smoke_gate] python import FAILED — main is red"
     return 1
   fi
