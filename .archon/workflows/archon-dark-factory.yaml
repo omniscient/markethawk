@@ -624,6 +624,17 @@ nodes:
         exit 0
       }
 
+      # Bench mode stub: skip Docker entirely, write canned preview_env.sh, exit 0.
+      # BENCH_MODE=stub: no preview stack (only push-and-pr is also stubbed).
+      # BENCH_MODE=full: preview runs normally; only push-and-pr is stubbed (no junk PRs).
+      if [ "${BENCH_MODE:-}" = "stub" ]; then
+        echo "BENCH_MODE=stub: preview stubbed for issue #${ISSUE}"
+        write_preview_env true false "bench mode stub — no preview stack" "" "" "" ""
+        echo "PREVIEW_SKIPPED=true"
+        echo "PREVIEW_SKIP_REASON=bench mode stub"
+        exit 0
+      fi
+
       # Skip ONLY on an explicit "false". Any other value (including garbled or errored
       # classifier output) falls through to building the preview — fail-safe direction.
       if [ "$NEEDS_PREVIEW" = "false" ]; then
@@ -817,6 +828,16 @@ nodes:
       PREVIEW_FAILED=false
       [ -f "$ARTIFACTS_DIR/preview_env.sh" ] && . "$ARTIFACTS_DIR/preview_env.sh"
       BRANCH=$(git branch --show-current)
+
+      # Bench mode stub: skip push and PR creation entirely.
+      # The implementation is already committed locally; downstream code-review reads git diff.
+      # BENCH_MODE=stub: no push, no PR. BENCH_MODE=full: no PR but push still happens.
+      if [ "${BENCH_MODE:-}" = "stub" ]; then
+        echo "BENCH_MODE=stub: skipping push and PR creation for issue #${ISSUE} (branch: ${BRANCH})"
+        echo "BENCH_MODE_STUB=true"
+        exit 0
+      fi
+
       echo "Pushing branch and creating/updating PR for issue #${ISSUE}..."
 
       # Archive spec/plan for this issue before pushing
