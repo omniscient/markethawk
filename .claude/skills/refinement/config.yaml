@@ -45,3 +45,13 @@ blast_radius:
   hotspot_score_floor: 5.0      # files at or above this codeindex blast score trigger HUMAN_REQUIRED
   size_budget_lines: 400        # total added+deleted lines threshold (0 = disabled)
   size_budget_blocks: false     # true = size alone is blocking; false = advisory only
+
+dispatch_ceiling:
+  enabled: true                # mirror of $DISPATCH_CEILING_ENABLED — kill-switch (set false in .archon/.env)
+  label: above-ceiling         # mirror of $ABOVE_CEILING_LABEL
+  keywords: "migration|migrate|performance|perf|architectur|refactor"  # mirror of $ABOVE_CEILING_KEYWORDS
+  # Doc-only mirror: the scheduler reads env-var defaults in scheduler.sh, not this file.
+  # L tickets (and M tickets with a keyword title match) park in Blocked for human pairing;
+  # M tickets lose the plan-pending-review grace-window auto-advance. S is unaffected.
+  # See docs/superpowers/specs/2026-06-12-size-type-aware-dispatch-ceiling-design.md
+  # Revisit: 2026-09-12
