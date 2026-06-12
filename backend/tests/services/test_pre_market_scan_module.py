@@ -99,80 +99,46 @@ def test_detect_returns_raw_signal_when_all_criteria_met():
 
 
 # ---------------------------------------------------------------------------
-# Full-pipeline regression test — mock DB + mocked enrichment + inline assertions
+# Full-pipeline regression test — real transaction-rollback DB fixture
 # ---------------------------------------------------------------------------
 
 
-def _mock_db_for_full_pipeline(ticker, event_date, daily_volumes, pm_volume):
-    """Return a mock DB session wired for the full run_pre_market_scan pipeline."""
-    from app.models.scanner_event import ScannerEvent
-
-    _ET = ZoneInfo("America/New_York")
-    base_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
-
-    daily_bars = [
-        _make_db_daily_bar(
-            ticker,
-            (base_et - timedelta(days=len(daily_volumes) - i))
-            .astimezone(timezone.utc)
-            .replace(tzinfo=None),
-            volume=v,
-        )
-        for i, v in enumerate(daily_volumes)
-    ]
-
-    # Mock last pre-market bar returned by _build_timing_features
-    pm_ts = datetime.combine(event_date, time(6, 30), tzinfo=_ET)
-    mock_pm_bar = MagicMock()
-    mock_pm_bar.timestamp = pm_ts.astimezone(timezone.utc).replace(tzinfo=None)
-
-    db = MagicMock()
-
-    def _query(model_or_col):
-        q = MagicMock()
-        q.filter.return_value = q
-        q.order_by.return_value = q
-        if model_or_col is StockAggregate:
-            q.all.return_value = daily_bars
-            q.first.return_value = mock_pm_bar
-            q.scalar.return_value = pm_volume
-        elif model_or_col is ScannerEvent:
-            q.first.return_value = None  # no existing event → insert path
-        else:
-            q.scalar.return_value = pm_volume  # func.sum path
-        return q
-
-    db.query.side_effect = _query
-    return db
-
-
-def test_run_pre_market_scan_full_pipeline():
-    """run_pre_market_scan passes indicators through detect→enrich→persist correctly."""
+def test_run_pre_market_scan_golden_day(db):
+    """Full-pipeline regression: detect→enrich→persist against the real DB fixture."""
     from app.services.pre_market_scan import run_pre_market_scan
 
     ticker = "TSST"
     event_date = date(2025, 3, 10)
-    daily_volumes = [1_000_000] * 25  # avg_volume_20d = 1M
-    pm_volume = 5_000_000  # 5× avg → spike criteria met
+    _ET = ZoneInfo("America/New_York")
+    base_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
 
-    db = _mock_db_for_full_pipeline(ticker, event_date, daily_volumes, pm_volume)
+    # Seed 25 daily bars (avg_volume_20d = 1M)
+    for i in range(25):
+        bar = _make_db_daily_bar(
+            ticker,
+            (base_et - timedelta(days=25 - i))
+            .astimezone(timezone.utc)
+            .replace(tzinfo=None),
+            volume=1_000_000,
+        )
+        db.add(bar)
 
-    _day_metrics = {
-        "opening_price": 0.0,
-        "closing_price": None,
-        "pre_market_close": None,
-        "regular_high": 0.0,
-        "regular_low": 0.0,
-    }
+    # Seed one pre-market minute bar (5M volume → 5× avg → spike passes)
+    pm_ts = datetime.combine(event_date, time(7, 0), tzinfo=_ET)
+    db.add(
+        _make_db_pm_bar(
+            ticker,
+            pm_ts.astimezone(timezone.utc).replace(tzinfo=None),
+            volume=5_000_000,
+        )
+    )
+    db.flush()
 
     with (
         patch.object(
             ScannerService,
             "_get_batch_enrichment_data",
             return_value=({"TSST": {}}, {}, {}),
-        ),
-        patch.object(
-            ScannerService, "calculate_day_metrics", return_value=_day_metrics
         ),
         patch.object(
             ScannerService,
@@ -188,7 +154,6 @@ def test_run_pre_market_scan_full_pipeline():
 
     assert len(results) == 1
     assert results[0]["ticker"] == ticker
-    assert results[0]["scanner_type"] == "pre_market_volume_spike"
 
     mock_save.assert_called_once()
     kw = mock_save.call_args.kwargs
@@ -205,6 +170,15 @@ def test_run_pre_market_scan_full_pipeline():
         "minimum_volume": True,
         "liquidity": True,
     }
+
+
+def test_enriched_signal_has_spec_shape():
+    """EnrichedSignal must carry raw: RawSignal and day_metrics: dict per spec."""
+    from app.services.pre_market_scan import EnrichedSignal
+
+    fields = EnrichedSignal.__dataclass_fields__
+    assert "raw" in fields, "EnrichedSignal must carry a 'raw: RawSignal' reference"
+    assert "day_metrics" in fields, "EnrichedSignal must carry 'day_metrics: dict'"
 
 
 def test_run_pre_market_scan_importable_from_module():

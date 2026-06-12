@@ -50,13 +50,10 @@ class RawSignal:
 
 @dataclass
 class EnrichedSignal:
-    ticker: str
+    raw: RawSignal
+    day_metrics: dict
     indicators: Dict[str, Any]
-    criteria_met: dict[str, bool]
     enrichment: Dict[str, Any]
-    previous_close: float
-    opening_price: float
-    closing_price: Optional[float]
 
 
 def _load_timesfm_config(db: Session) -> tuple:
@@ -234,6 +231,93 @@ def _build_catalyst_features(
     return result
 
 
+def _build_indicators(
+    raw: RawSignal,
+    day_metrics: dict,
+    enrichment: Dict[str, Any],
+    market_context_dict: Dict[str, Any],
+    sector_etf_pct_dict: Dict[str, float],
+    day_start_utc: datetime,
+    day_end_utc: datetime,
+    event_date: date,
+    db: Session,
+    _ET: Any,
+) -> Dict[str, Any]:
+    current_price = (
+        day_metrics["closing_price"]
+        or day_metrics["pre_market_close"]
+        or raw.previous_close
+    )
+    gap_pct = (
+        (day_metrics["opening_price"] - raw.previous_close) / raw.previous_close * 100
+        if day_metrics["opening_price"] > 0
+        else 0
+    )
+    fade_from_high_pct = (
+        (day_metrics["regular_high"] - current_price)
+        / day_metrics["regular_high"]
+        * 100
+        if day_metrics["regular_high"] > 0
+        else 0
+    )
+    day_range_pct = (
+        (day_metrics["regular_high"] - day_metrics["regular_low"])
+        / day_metrics["regular_low"]
+        * 100
+        if day_metrics["regular_low"] > 0
+        else 0
+    )
+    indicators: Dict[str, Any] = {
+        "pre_market_volume": raw.pre_market_volume,
+        "avg_volume_20d": int(raw.avg_volume_20d),
+        "avg_volume_50d": int(raw.avg_volume_50d) if raw.avg_volume_50d else None,
+        "relative_volume": round(raw.relative_volume, 2),
+        "volume_spike_ratio": round(raw.pre_market_volume / raw.avg_volume_20d, 2),
+        "gap_pct": round(gap_pct, 4),
+        "fade_from_high_pct": round(fade_from_high_pct, 4),
+        "day_range_pct": round(day_range_pct, 4),
+        "volume_anomaly_score": round(raw.anomaly_score, 4)
+        if raw.anomaly_score is not None
+        else None,
+        "predicted_volume_p50": round(raw.forecast["p50"]) if raw.forecast else None,
+        "predicted_volume_p90": round(raw.forecast["p90"]) if raw.forecast else None,
+        "volume_threshold_method": raw.threshold_method,
+    }
+    if enrichment.get("outstanding_shares"):
+        indicators["float_rotation_pct"] = round(
+            raw.pre_market_volume / enrichment["outstanding_shares"] * 100, 4
+        )
+    indicators["es_pct_from_prev_close"] = market_context_dict.get(
+        "es_pct_from_prev_close"
+    )
+    indicators["nq_pct_from_prev_close"] = market_context_dict.get(
+        "nq_pct_from_prev_close"
+    )
+    indicators["market_context"] = market_context_dict.get("market_context")
+    _sector = enrichment.get("sector")
+    _sector_etf = _SECTOR_ETF_MAP.get(_sector) if _sector else None
+    indicators["sector"] = _sector
+    indicators["sector_etf"] = _sector_etf
+    indicators["sector_etf_pct_change"] = (
+        sector_etf_pct_dict.get(_sector_etf) if _sector_etf else None
+    )
+    last_pre, timing = _build_timing_features(
+        raw.ticker, day_start_utc, day_end_utc, event_date, db, _ET
+    )
+    indicators.update(timing)
+    atr_rank, vol_regime = _compute_volatility_regime(raw.daily_bars)
+    indicators["atr_percentile_rank"] = atr_rank
+    indicators["volatility_regime"] = vol_regime
+    indicators.update(_build_catalyst_features(enrichment, last_pre))
+    indicators.update(
+        price_direction=None,
+        price_confidence=None,
+        price_forecast_4h=None,
+        price_forecast_1d=None,
+    )
+    return indicators
+
+
 def _enrich_one(
     raw: RawSignal,
     enrichment_batch: Dict[str, Dict[str, Any]],
@@ -245,112 +329,25 @@ def _enrich_one(
     db: Session,
     _ET: Any,
 ) -> EnrichedSignal:
-    from opentelemetry import context as _otel_context
-    from opentelemetry import trace as _otel_trace
-
     from app.services.scanner import ScannerService
 
-    _tracer = _otel_trace.get_tracer(__name__)
-    _span = _tracer.start_span("scanner.enrich_ticker")
-    _token = _otel_context.attach(_otel_trace.set_span_in_context(_span))
-    _span.set_attribute("ticker", raw.ticker)
-    try:
-        day_metrics = ScannerService.calculate_day_metrics(raw.ticker, event_date, db)
-        current_price = (
-            day_metrics["closing_price"]
-            or day_metrics["pre_market_close"]
-            or raw.previous_close
-        )
-        gap_pct = (
-            (day_metrics["opening_price"] - raw.previous_close)
-            / raw.previous_close
-            * 100
-            if day_metrics["opening_price"] > 0
-            else 0
-        )
-        fade_from_high_pct = (
-            (day_metrics["regular_high"] - current_price)
-            / day_metrics["regular_high"]
-            * 100
-            if day_metrics["regular_high"] > 0
-            else 0
-        )
-        day_range_pct = (
-            (day_metrics["regular_high"] - day_metrics["regular_low"])
-            / day_metrics["regular_low"]
-            * 100
-            if day_metrics["regular_low"] > 0
-            else 0
-        )
-
-        enrichment = enrichment_batch.get(raw.ticker.upper(), {})
-        indicators: Dict[str, Any] = {
-            "pre_market_volume": raw.pre_market_volume,
-            "avg_volume_20d": int(raw.avg_volume_20d),
-            "avg_volume_50d": int(raw.avg_volume_50d) if raw.avg_volume_50d else None,
-            "relative_volume": round(raw.relative_volume, 2),
-            "volume_spike_ratio": round(raw.pre_market_volume / raw.avg_volume_20d, 2),
-            "gap_pct": round(gap_pct, 4),
-            "fade_from_high_pct": round(fade_from_high_pct, 4),
-            "day_range_pct": round(day_range_pct, 4),
-            "volume_anomaly_score": round(raw.anomaly_score, 4)
-            if raw.anomaly_score is not None
-            else None,
-            "predicted_volume_p50": round(raw.forecast["p50"])
-            if raw.forecast
-            else None,
-            "predicted_volume_p90": round(raw.forecast["p90"])
-            if raw.forecast
-            else None,
-            "volume_threshold_method": raw.threshold_method,
-        }
-        if enrichment.get("outstanding_shares"):
-            indicators["float_rotation_pct"] = round(
-                raw.pre_market_volume / enrichment["outstanding_shares"] * 100, 4
-            )
-        indicators["es_pct_from_prev_close"] = market_context_dict.get(
-            "es_pct_from_prev_close"
-        )
-        indicators["nq_pct_from_prev_close"] = market_context_dict.get(
-            "nq_pct_from_prev_close"
-        )
-        indicators["market_context"] = market_context_dict.get("market_context")
-
-        _sector = enrichment.get("sector")
-        _sector_etf = _SECTOR_ETF_MAP.get(_sector) if _sector else None
-        indicators["sector"] = _sector
-        indicators["sector_etf"] = _sector_etf
-        indicators["sector_etf_pct_change"] = (
-            sector_etf_pct_dict.get(_sector_etf) if _sector_etf else None
-        )
-
-        last_pre, timing = _build_timing_features(
-            raw.ticker, day_start_utc, day_end_utc, event_date, db, _ET
-        )
-        indicators.update(timing)
-        atr_rank, vol_regime = _compute_volatility_regime(raw.daily_bars)
-        indicators["atr_percentile_rank"] = atr_rank
-        indicators["volatility_regime"] = vol_regime
-        indicators.update(_build_catalyst_features(enrichment, last_pre))
-        indicators.update(
-            price_direction=None,
-            price_confidence=None,
-            price_forecast_4h=None,
-            price_forecast_1d=None,
-        )
-
-        return EnrichedSignal(
-            ticker=raw.ticker,
-            indicators=indicators,
-            criteria_met=raw.criteria_met,
-            enrichment=enrichment,
-            previous_close=raw.previous_close,
-            opening_price=day_metrics["opening_price"],
-            closing_price=day_metrics["closing_price"],
-        )
-    finally:
-        _span.end()
-        _otel_context.detach(_token)
+    day_metrics = ScannerService.calculate_day_metrics(raw.ticker, event_date, db)
+    enrichment = enrichment_batch.get(raw.ticker.upper(), {})
+    indicators = _build_indicators(
+        raw,
+        day_metrics,
+        enrichment,
+        market_context_dict,
+        sector_etf_pct_dict,
+        day_start_utc,
+        day_end_utc,
+        event_date,
+        db,
+        _ET,
+    )
+    return EnrichedSignal(
+        raw=raw, day_metrics=day_metrics, indicators=indicators, enrichment=enrichment
+    )
 
 
 def _enrich(
@@ -413,15 +410,15 @@ def _persist(
     for signal in enriched:
         event_dict = ScannerService._save_event(
             db=db,
-            ticker=signal.ticker,
+            ticker=signal.raw.ticker,
             event_date=event_date,
             scanner_type="pre_market_volume_spike",
             indicators=signal.indicators,
-            criteria_met=signal.criteria_met,
+            criteria_met=signal.raw.criteria_met,
             enrichment=signal.enrichment,
-            previous_close=signal.previous_close,
-            opening_price=signal.opening_price,
-            closing_price=signal.closing_price,
+            previous_close=signal.raw.previous_close,
+            opening_price=signal.day_metrics.get("opening_price", 0.0),
+            closing_price=signal.day_metrics.get("closing_price"),
             ranker_config=ranker_config,
         )
         results.append(event_dict)
