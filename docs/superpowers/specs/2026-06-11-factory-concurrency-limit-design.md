@@ -41,10 +41,17 @@ refine, plan, deconflict, close).
      remains correct because it already checks `is_issue_running` per issue.
    - Add `factory_running=${FACTORY_RUNNING}/${FACTORY_WIP_LIMIT}` to the
      per-cycle summary log line for observability.
-2. `.archon/.env` (local only, not committed): `FACTORY_WIP_LIMIT=2`
+2. `dark-factory/entrypoint.sh` *(discovered during live validation)* — the
+   entrypoint has its own single-run mutex ("Another dark factory container is
+   already running") that vetoed scheduler dispatches into the second slot.
+   It now reads `FACTORY_WIP_LIMIT` (same default 1) and aborts only when the
+   count of *other* run containers is `>= limit`. The var reaches dispatched
+   containers via the service `env_file` (the scheduler's startup-provisioned
+   copy of `.archon/.env`).
+3. `.archon/.env` (local only, not committed): `FACTORY_WIP_LIMIT=2`
 
-No changes to `docker-compose.yml`, the dispatch path, retry/circuit-breaker
-state, or board WIP-limit parsing.
+No changes to `docker-compose.yml`, retry/circuit-breaker state, or board
+WIP-limit parsing.
 
 ## Behaviour under concurrency 2
 

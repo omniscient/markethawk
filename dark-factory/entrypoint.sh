@@ -51,15 +51,20 @@ ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1)
 INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict)' | head -1 | tr '[:upper:]' '[:lower:]')
 INTENT=${INTENT:-fix}
 
-# --- Concurrency guard: only one factory container at a time ---
+# --- Concurrency guard: cap factory containers at FACTORY_WIP_LIMIT ---
+# RUNNING counts OTHER run containers (self excluded), so at-capacity is
+# RUNNING >= limit. Must stay in sync with the scheduler's capacity guard —
+# the scheduler dispatches into free slots and this backstop must not veto
+# them (#347). The var arrives via the service env_file (.archon/.env).
+FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
 MY_ID=$(cat /proc/self/cgroup 2>/dev/null | grep -oP '[a-f0-9]{64}' | head -1 || hostname)
 RUNNING=$(docker ps --format '{{.ID}} {{.Names}}' 2>/dev/null \
   | grep 'markethawk-dark-factory-run-' \
   | grep -vc "${MY_ID:0:12}" || true)
 RUNNING=${RUNNING:-0}
-if [ "$RUNNING" -gt 0 ]; then
-  echo "ERROR: Another dark factory container is already running. Only one allowed at a time (Claude Max rate limit)." >&2
-  echo "       Use 'docker ps --filter name=dark-factory' to see it." >&2
+if [ "$RUNNING" -ge "$FACTORY_WIP_LIMIT" ]; then
+  echo "ERROR: ${RUNNING} other dark factory container(s) already running — at FACTORY_WIP_LIMIT=${FACTORY_WIP_LIMIT}." >&2
+  echo "       Use 'docker ps --filter name=dark-factory' to see them." >&2
   exit 1
 fi
 
