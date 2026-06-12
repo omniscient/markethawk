@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.trade import JournalEntry, Tag, Trade, TradeExecution
@@ -61,25 +62,29 @@ def update_trade(db: Session, trade_id: int, trade_update: TradeUpdate):
 
 
 def get_trade_stats(db: Session) -> TradeStats:
-    trades = db.query(Trade).all()
+    row = db.query(
+        func.count().label("total"),
+        func.count(case((Trade.net_pnl > 0, 1))).label("winners"),
+        func.count(case((Trade.net_pnl < 0, 1))).label("losers"),
+        func.coalesce(func.sum(Trade.net_pnl), 0).label("total_pnl"),
+        func.coalesce(func.sum(case((Trade.net_pnl > 0, Trade.net_pnl))), 0).label(
+            "gross_profit"
+        ),
+        func.coalesce(func.sum(case((Trade.net_pnl < 0, Trade.net_pnl))), 0).label(
+            "gross_loss"
+        ),
+    ).one()
 
-    total_trades = len(trades)
-    winning_trades = len([t for t in trades if t.net_pnl and t.net_pnl > 0])
-    losing_trades = len([t for t in trades if t.net_pnl and t.net_pnl < 0])
+    total_trades = row.total
+    winning_trades = row.winners
+    losing_trades = row.losers
+    total_pnl = Decimal(str(row.total_pnl))
+    gross_profit = Decimal(str(row.gross_profit)) or Decimal("1")
+    gross_loss = abs(Decimal(str(row.gross_loss))) or Decimal("1")
 
     win_rate = (winning_trades / total_trades) if total_trades > 0 else 0
-    total_pnl = sum([t.net_pnl for t in trades if t.net_pnl]) or Decimal("0")
     avg_profit = (total_pnl / total_trades) if total_trades > 0 else Decimal("0")
-
-    gross_profit = sum(
-        [t.net_pnl for t in trades if t.net_pnl and t.net_pnl > 0]
-    ) or Decimal("1")
-    gross_loss = abs(
-        sum([t.net_pnl for t in trades if t.net_pnl and t.net_pnl < 0])
-    ) or Decimal("1")
-    profit_factor = (
-        float(gross_profit / gross_loss) if gross_loss != 0 else float(gross_profit)
-    )
+    profit_factor = float(gross_profit / gross_loss)
 
     return TradeStats(
         total_trades=total_trades,
