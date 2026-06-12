@@ -619,7 +619,53 @@ export CLAUDE_BIN_PATH=/usr/bin/claude
 export IS_SANDBOX=1
 export ARCHON_SUPPRESS_NESTED_CLAUDE_WARNING=1
 echo "Starting dark factory: $ARGUMENTS"
-archon workflow run archon-dark-factory "$ARGUMENTS"
+while true; do
+  set +e
+  TMP_OUT=$(mktemp)
+  archon workflow run archon-dark-factory "$ARGUMENTS" 2>&1 | tee "$TMP_OUT"
+  EXIT_CODE=${PIPESTATUS[0]}
+  set -e
+
+  if [ "$EXIT_CODE" -ne 0 ]; then
+    if grep -qiE "usage limit|rate limit|429|credit balance|session limit" "$TMP_OUT"; then
+      # Attempt to parse specific reset time from: "You've hit your session limit · resets 11:10pm (America/Toronto)"
+      RESET_TIME=$(grep -ioP "resets\s+\K([0-9]{1,2}:[0-9]{2}[a-z]{2})" "$TMP_OUT" | head -1)
+      RESET_TZ=$(grep -ioP "resets\s+[0-9]{1,2}:[0-9]{2}[a-z]{2}\s*\(\K([^)]+)" "$TMP_OUT" | head -1)
+      
+      SLEEP_SECS=300 # default to 5 mins if parsing fails
+      if [ -n "$RESET_TIME" ]; then
+        if [ -n "$RESET_TZ" ]; then
+          TARGET_EPOCH=$(TZ="$RESET_TZ" date -d "$RESET_TIME" +%s 2>/dev/null || echo "")
+        else
+          TARGET_EPOCH=$(date -d "$RESET_TIME" +%s 2>/dev/null || echo "")
+        fi
+        
+        if [ -n "$TARGET_EPOCH" ]; then
+          NOW_EPOCH=$(date +%s)
+          if [ "$TARGET_EPOCH" -lt "$NOW_EPOCH" ]; then
+            TARGET_EPOCH=$((TARGET_EPOCH + 86400))
+          fi
+          SLEEP_SECS=$((TARGET_EPOCH - NOW_EPOCH + 60)) # Add 60s buffer to ensure it actually resets
+          
+          # Failsafe for absurd values (e.g., more than 24 hours or negative)
+          if [ "$SLEEP_SECS" -lt 0 ] || [ "$SLEEP_SECS" -gt 90000 ]; then
+            SLEEP_SECS=300
+          fi
+        fi
+      fi
+
+      echo "Claude Max subscription limit reached. Sleeping for ${SLEEP_SECS}s before retrying..."
+      rm -f "$TMP_OUT"
+      sleep "$SLEEP_SECS"
+      echo "Waking up and retrying..."
+      continue
+    fi
+    rm -f "$TMP_OUT"
+    exit "$EXIT_CODE"
+  fi
+  rm -f "$TMP_OUT"
+  break
+done
 
 # --- Post cost report to GitHub issue (success path) — non-fatal ---
 post_cost_report || true
