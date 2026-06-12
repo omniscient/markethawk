@@ -27,6 +27,7 @@ graph TD
         jaeger["jaeger :16686/:4317"]
         seqgelf["seq-gelf :12201/udp"]
         forecastworker["forecast-worker (profile: forecasting)"]
+        dbbackup["db-backup"]
     end
 
     subgraph factory["factory-network"]
@@ -79,6 +80,8 @@ graph TD
     seqgelf -->|"GELF → HTTP"| seq
     forecastworker --> postgres
     forecastworker --> redis
+    dbbackup -->|"pg_dump"| postgres
+    dbbackup -->|"failure events"| seq
 ```
 
 ## Scan Execution Flow
