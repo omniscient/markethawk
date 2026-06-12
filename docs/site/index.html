@@ -1,25 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MarketHawk Docs</title>
   <link rel="stylesheet" href="styles.css">
+  <script>
+    (function () {
+      var saved = localStorage.getItem('markethawk-docs-theme');
+      var theme = saved === 'light' || saved === 'dark' ? saved : 'dark';
+      document.documentElement.dataset.theme = theme;
+    }());
+  </script>
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="#top">MarketHawk</a>
+    <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true"></span>MarketHawk</a>
     <nav aria-label="Primary">
       <a href="#demo">Demo</a>
       <a href="#architecture">Architecture</a>
       <a href="#comparison">Compare</a>
       <a href="#safety">Safety</a>
     </nav>
+    <button class="theme-toggle" type="button" aria-label="Switch to light theme" aria-pressed="true">
+      <span class="theme-icon" aria-hidden="true"></span>
+      <span class="theme-label">Dark</span>
+    </button>
   </header>
 
   <main id="top">
     <section class="hero">
-      <p class="eyebrow">AI-First human-in-the-loop market scanning</p>
+      <p class="eyebrow"><span class="signal-dot" aria-hidden="true"></span>AI-First human-in-the-loop market scanning</p>
       <h1>MarketHawk</h1>
       <p class="lede">A market scanning cockpit for connecting market data, news, alerts, reviews, execution notes, journal entries, and outcomes.</p>
       <div class="hero-actions">
@@ -195,5 +206,25 @@
   </main>
 
   <footer class="footer">MarketHawk is research and workflow software, not financial advice.</footer>
+  <script>
+    (function () {
+      var button = document.querySelector('.theme-toggle');
+      var label = document.querySelector('.theme-label');
+
+      function applyTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+        localStorage.setItem('markethawk-docs-theme', theme);
+        var isDark = theme === 'dark';
+        button.setAttribute('aria-pressed', String(isDark));
+        button.setAttribute('aria-label', isDark ? 'Switch to light theme' : 'Switch to dark theme');
+        label.textContent = isDark ? 'Dark' : 'Light';
+      }
+
+      applyTheme(document.documentElement.dataset.theme || 'dark');
+      button.addEventListener('click', function () {
+        applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+      });
+    }());
+  </script>
 </body>
 </html>
