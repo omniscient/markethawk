@@ -72,6 +72,8 @@ assert_eq "gh issue edit adds needs-discussion" \
   "1" "$(grep -c 'issue edit 99.*needs-discussion' "$STUB_LOG" || echo 0)"
 assert_eq "gh issue comment posted" \
   "1" "$(grep -c 'issue comment 99' "$STUB_LOG" || echo 0)"
+assert_eq "gh issue edit adds factory-regression" \
+  "1" "$(grep -c 'issue edit 99.*factory-regression' "$STUB_LOG" || echo 0)"
 assert_eq ":plan counter reset after trip" \
   "0" "$(get_retry_count "99:plan")"
 
