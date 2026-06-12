@@ -260,6 +260,11 @@ plan_advance_check() {
     fi
     return 0
   fi
+  # Suppress timer-based advance for at/above-ceiling items: M and L require
+  # explicit human plan approval; the grace window applies only to S-size.
+  if [ "${DISPATCH_CEILING_ENABLED:-true}" = "true" ] && ! is_below_ceiling "$item"; then
+    return 0
+  fi
   if has_direct_to_pr_label "$item"; then
     local elapsed
     elapsed=$(elapsed_minutes_since_marker "$issue_num" "Posted by MarketHawk Refinement Pipeline")
