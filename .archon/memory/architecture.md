@@ -22,6 +22,14 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Endpoint Access Control
+
+- [PATTERN] For scrape endpoints consumed by internal Docker-network services (e.g. Prometheus scraping `/metrics` at `backend:8000`), protect via Caddyfile explicit deny rather than app-level auth — the Caddyfile already only forwards `/api/*` to the backend, so `/metrics` is unreachable from outside Caddy. An explicit `handle /metrics { respond 404 }` block in the Caddyfile makes this protection visible. Keep the endpoint in `EXEMPT_PREFIXES` so `AuthMiddleware` does not gate it (Prometheus cannot present a JWT cookie). <!-- issue:#369 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [AVOID] Do not add a static bearer-token auth mechanism to the `/metrics` route to "protect" it — long-lived static tokens are a security smell, there is no existing inbound bearer-token auth precedent in the codebase, and the Caddyfile reverse-proxy topology already provides the necessary isolation at the network layer. <!-- issue:#369 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [PATTERN] Gate feature-visibility toggles (Swagger/ReDoc/openapi.json) with a dedicated boolean Settings field (e.g. `DOCS_ENABLED: bool = False`) rather than deriving from `ENVIRONMENT`. Dedicated flags are independently overridable, default secure, and avoid coupling to the overloaded `ENVIRONMENT` string. Add the override to `docker-compose.override.yml` alongside `COOKIE_SECURE: "false"` so local dev requires no manual steps. <!-- issue:#369 date:2026-06-12 expires:2026-12-12 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
