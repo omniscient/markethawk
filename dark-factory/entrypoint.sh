@@ -682,5 +682,20 @@ while true; do
   break
 done
 
+# --- Capture archon cost data and assemble run record (non-fatal) ---
+ARCHON_COST_JSON=$(mktemp)
+archon workflow cost --last --json --quiet > "$ARCHON_COST_JSON" 2>/dev/null || true
+
+python3 "$CLONE_DIR/dark-factory/scripts/run_record.py" assemble \
+  --run-id "${RUN_ID:-unknown}" \
+  --issue "$ISSUE_NUM" \
+  --intent "$INTENT" \
+  --started-at "${RUN_STARTED_AT:-}" \
+  --artifacts-dir "$ARTIFACTS_DIR" \
+  --archon-cost-json "$ARCHON_COST_JSON" \
+  --out-file "$ARTIFACTS_DIR/run-record.json" || true
+
+rm -f "$ARCHON_COST_JSON"
+
 # --- Post cost report to GitHub issue (success path) — non-fatal ---
 post_cost_report || true
