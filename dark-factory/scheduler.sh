@@ -21,6 +21,15 @@ FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
 MAIN_RED_RECHECK_ENABLED="${MAIN_RED_RECHECK_ENABLED:-true}"
 MAIN_RED_RECHECK_MINUTES="${MAIN_RED_RECHECK_MINUTES:-20}"
 RECHECK_STAMP_FILE="${SCHEDULER_STATE_DIR}/main-red-last-recheck"
+# Dispatch ceiling policy (#339): L tickets — and M tickets whose title matches an
+# ABOVE_CEILING_KEYWORDS pattern — are never auto-dispatched to implement; they park in
+# Blocked under ABOVE_CEILING_LABEL for human-paired implementation. M tickets also lose
+# the plan-pending-review grace-window auto-advance (S keeps full autonomy).
+# Kill-switch and keyword list overridable in .archon/.env without a code change.
+# See docs/superpowers/specs/2026-06-12-size-type-aware-dispatch-ceiling-design.md; revisit 2026-09-12.
+DISPATCH_CEILING_ENABLED="${DISPATCH_CEILING_ENABLED:-true}"
+ABOVE_CEILING_LABEL="${ABOVE_CEILING_LABEL:-above-ceiling}"
+ABOVE_CEILING_KEYWORDS="${ABOVE_CEILING_KEYWORDS:-migration|migrate|performance|perf|architectur|refactor}"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -192,6 +201,38 @@ has_direct_to_pr_label() {
   echo "$item" | jq -r '.labels[]?' 2>/dev/null | grep -qi "$DIRECT_TO_PR_LABEL"
 }
 
+# --- Dispatch ceiling classification (#339) ---
+# Returns "S", "M", "L", or "" from the item's labels
+get_size_label() {
+  echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -oi 'size: [SML]' | awk '{print $2}' | head -1
+}
+
+# True (returns 0) if item is above the dispatch ceiling: size L always, or size M
+# when the title matches an ABOVE_CEILING_KEYWORDS pattern (escalation only — the
+# keyword heuristic never demotes).
+is_above_ceiling() {
+  local item="$1" title size
+  title=$(echo "$item" | jq -r '.content.title // ""' 2>/dev/null)
+  size=$(get_size_label "$item")
+  case "$size" in
+    L) return 0 ;;
+    M) echo "$title" | grep -qiE "${ABOVE_CEILING_KEYWORDS}" && return 0 || return 1 ;;
+    *) return 1 ;;
+  esac
+}
+
+# True if item already carries the above-ceiling label (board-fetch snapshot)
+has_above_ceiling_label() {
+  echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -qi "^${ABOVE_CEILING_LABEL}$"
+}
+
+# True if item is S-size or has no size label (unlabelled is treated as S per spec)
+is_below_ceiling() {
+  local size
+  size=$(get_size_label "$1")
+  case "$size" in S|"") return 0 ;; *) return 1 ;; esac
+}
+
 # Returns minutes elapsed since the last comment matching $marker_re on the given issue.
 # Returns "" if no matching comment exists or if the timestamp cannot be parsed.
 elapsed_minutes_since_marker() {
@@ -264,6 +305,11 @@ plan_advance_check() {
       DISPATCHED="Plan issue #${issue_num}"
       REFINE_RUNNING=$((REFINE_RUNNING + 1))
     fi
+    return 0
+  fi
+  # Dispatch ceiling (#339): timer-based advance applies only to S-size items. M and L
+  # require explicit human plan approval; the human-feedback path above is untouched.
+  if [ "${DISPATCH_CEILING_ENABLED:-true}" = "true" ] && ! is_below_ceiling "$item"; then
     return 0
   fi
   if has_direct_to_pr_label "$item"; then
@@ -898,6 +944,37 @@ This issue was left in **In progress** with no running factory container — the
       if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
       if is_issue_running "$ISSUE"; then continue; fi
 
+      # Dispatch ceiling (#339): park above-ceiling work for human pairing. The label
+      # check stops the comment/board-move from repeating every poll cycle — the label
+      # persists and comes back in the next fetch_board_items snapshot.
+      if [ "${DISPATCH_CEILING_ENABLED:-true}" = "true" ] && is_above_ceiling "$item"; then
+        if ! has_above_ceiling_label "$item"; then
+          echo "[$(date -u +%FT%TZ)] ceiling_gate issue=#${ISSUE} action=above_ceiling_blocked"
+          gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" \
+            --add-label "$ABOVE_CEILING_LABEL" 2>/dev/null || true
+          set_board_status "$ISSUE" "$STATUS_BLOCKED" || true
+          gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body \
+"## Scheduler — Above Dispatch Ceiling
+
+This ticket has been classified as **above the autonomous dispatch ceiling** \
+(size: L, or size: M with a perf/architectural/migration title keyword).
+
+Spec and plan are complete. **A human must pair on implementation.**
+
+To proceed:
+1. Remove the \`$ABOVE_CEILING_LABEL\` label.
+2. Dispatch manually:
+   \`\`\`bash
+   docker compose --profile factory run --rm dark-factory \"Fix issue #${ISSUE}\"
+   \`\`\`
+   Or implement directly in a local worktree.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+        fi
+        continue
+      fi
+
       if dispatch "Fix issue #${ISSUE}"; then
         DISPATCHED="Fix issue #${ISSUE}"
       fi
@@ -912,6 +989,9 @@ This issue was left in **In progress** with no running factory container — the
       [ -n "$DISPATCHED" ] && break
       ISSUE=$(get_issue_number "$item")
       if has_skip_label "$item"; then continue; fi
+      # Above-ceiling items in Blocked are parked by design (#339), not failed — the
+      # retry loop must not auto-dispatch them.
+      if has_above_ceiling_label "$item"; then continue; fi
       if is_issue_running "$ISSUE"; then continue; fi
 
       RETRIES=$(get_retry_count "$ISSUE")
