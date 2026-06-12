@@ -67,3 +67,9 @@ dark-factory/tmp/
 !.repowise/config.yaml
 .mcp.json
 .claude/CLAUDE.md
+
+# Codeindex generated artifacts — regenerate on demand (scripts/codeindex.sh or the
+# factory update-codeindex pass; ~6s). Committing them caused a merge conflict on every
+# PR (see #343). docs/codeindex-hotspots.md (small, human-readable) stays committed.
+codeindex.json
+symbolindex.json
