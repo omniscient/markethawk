@@ -37,6 +37,13 @@ jobs:
             # Pull dark-factory image (profile-gated — updated via pull, not auto-restarted)
             docker compose --profile factory pull dark-factory
 
+            # Run migrations before starting services so the backend never briefly serves
+            # traffic against a stale schema. Uses run --rm (not exec) so this works even
+            # when the backend is not yet running. Postgres must be up (service_healthy).
+            if [ "${{ inputs.run_migrations }}" = "true" ]; then
+              docker compose run --rm backend python -m alembic upgrade head
+            fi
+
             # Restart services with updated images
             docker compose up -d \
               backend celery-worker celery-beat live-scanner flower frontend
@@ -56,8 +63,3 @@ jobs:
 
             # Restart backlog-scheduler if deployed with the scheduler profile
             docker compose --profile scheduler up -d backlog-scheduler
-
-            # Optionally run migrations
-            if [ "${{ inputs.run_migrations }}" = "true" ]; then
-              docker compose exec -T backend python -m alembic upgrade head
-            fi
