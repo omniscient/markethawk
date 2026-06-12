@@ -9,6 +9,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Backend: API Routes
 
+- [AVOID] Never use `joinedload()` with paginated queries (`LIMIT/OFFSET`) on one-to-many relationships — it produces a JOIN that row-multiplies the parent before LIMIT is applied, so paginated pages return fewer rows than `limit` when children exist. Use `selectinload()` instead, which issues a separate `SELECT … WHERE id IN (…)` after the paginated parent query. See `routers/scanner.py` `joinedload(ScannerEvent.reviews)` → `selectinload` fix. <!-- issue:#291 date:2026-06-12 expires:2026-12-12 source:implement -->
+
 - [PATTERN] `AuthMiddleware` in `main.py` short-circuits for non-HTTP scopes — WebSocket routes are NOT covered. Protect WS endpoints by adding `_user: User = Depends(ws_get_current_user)` from `app.core.auth`; this raises `WebSocketException(code=1008)` before `accept()` if the cookie is absent or invalid. <!-- issue:#191 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 - [AVOID] Do not raise `HTTPException` inside a WebSocket dependency — FastAPI will not convert it to a WS close frame. Use `WebSocketException(code=1008, reason="...")` (importable from `fastapi`) instead, which FastAPI closes gracefully before `accept()` is called. <!-- issue:#191 date:2026-06-05 expires:2026-12-05 source:implement -->
@@ -54,6 +56,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [AVOID] Never use `except (pybreaker.CircuitBreakerError, Exception)` — `CircuitBreakerError` is an `Exception` subclass so the tuple is redundant, and the broad catch masks real defects as missing data. Use two separate handlers: `except pybreaker.CircuitBreakerError` → raise `ProviderError`, `except Exception` → log and return empty. <!-- issue:#205 date:2026-06-07 expires:2026-12-07 source:implement -->
 
 ## Backend: Utilities
+
+- [PATTERN] For aggregate stats functions (count/sum of a model column split by condition), use a single `db.query(func.count(), func.count(case((Model.col > 0, 1))), func.coalesce(func.sum(case((Model.col > 0, Model.col))), 0)).one()` query instead of a full-table `db.query(Model).all()`. Wrap numeric results in `Decimal(str(row.value))` to handle the psycopg2 Numeric bridge. See `journal_service.get_trade_stats()` for the reference implementation. <!-- issue:#291 date:2026-06-12 expires:2026-12-12 source:implement -->
 
 - [PATTERN] Use `from app.utils.time import utc_now, to_utc_naive` for any naive-UTC datetime need: `utc_now()` replaces `datetime.now(timezone.utc).replace(tzinfo=None)`, `to_utc_naive(dt)` replaces `.astimezone(timezone.utc).replace(tzinfo=None)`. Column defaults use the callable ref (`default=utc_now`), inline expressions call it (`utc_now()`). <!-- issue:#286 date:2026-06-11 expires:2026-12-11 source:implement -->
 
