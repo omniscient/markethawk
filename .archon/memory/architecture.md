@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Container Entrypoint / Migration Gate (issue #289)
+
+- [PATTERN] Use an `alembic check` drift gate in `backend/entrypoint.sh` (set as Dockerfile `ENTRYPOINT`, exec-ing `$@`) as a safety net — if schema drift is detected, exit non-zero with a clear log line before uvicorn or celery starts. The deploy workflow's explicit `alembic upgrade head` step (run before `docker compose up -d`) is the primary migration path; the entrypoint is the safety net that ensures a container never silently serves a stale schema. <!-- issue:#289 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [AVOID] Do not run `alembic upgrade head` automatically inside the container entrypoint. `backend`, `celery-worker`, `celery-beat`, `live-scanner`, and `flower` all use the same backend image and start concurrently on `docker compose up` — concurrent DDL from multiple containers is a race condition hazard on lock-sensitive migrations (column drops, type changes, index builds). The migration step must be a single-runner explicit operation in the deploy workflow, not an entrypoint side-effect. <!-- issue:#289 date:2026-06-12 expires:2026-12-12 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
