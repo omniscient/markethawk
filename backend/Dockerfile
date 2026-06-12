@@ -23,10 +23,16 @@ RUN addgroup --system --gid 1000 appuser \
 RUN mkdir -p /tmp/prometheus_multiproc \
  && chown appuser:appuser /tmp/prometheus_multiproc
 
+# Copy entrypoint outside /app so the ./backend:/app:ro local-dev bind-mount
+# in docker-compose.override.yml does not shadow it.
+COPY --chown=appuser:appuser entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 COPY --chown=appuser:appuser . .
 
 USER appuser
 
 EXPOSE 8000
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
