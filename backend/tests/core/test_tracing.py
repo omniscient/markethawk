@@ -3,9 +3,11 @@ import logging
 
 
 def test_otel_config_defaults():
-    from app.core.config import settings
-    assert settings.OTEL_EXPORTER_OTLP_ENDPOINT == ""
-    assert settings.OTEL_SERVICE_NAME == "markethawk"
+    import inspect
+    from app.core.config import Settings
+    fields = Settings.model_fields
+    assert fields["OTEL_EXPORTER_OTLP_ENDPOINT"].default == ""
+    assert fields["OTEL_SERVICE_NAME"].default == "markethawk"
 
 
 def test_otel_trace_id_filter_no_active_span():
@@ -50,6 +52,9 @@ def test_setup_otel_noop_when_endpoint_empty(monkeypatch):
     from opentelemetry import trace as otel_trace
 
     from app.core.tracing import setup_otel
+
+    # Reset any SDK provider set by app startup or a prior test run
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", None)
 
     setup_otel(endpoint="", service_name="test", engine=None)
     # The global tracer provider should remain the default (ProxyTracerProvider or NoOpTracerProvider)

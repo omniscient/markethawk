@@ -49,19 +49,22 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- Scanner config: Pocket Pivot (Evening)
+-- Mirrors the post-migration state (c7e2a9f4b1d3): active, criteria as JSON array.
+-- Guarded on scanner_type (not just id) so an environment that runs migrations before
+-- seeds doesn't get a second pocket_pivot row (decision recorded in issue #281).
 INSERT INTO scanner_configs (id, uuid, name, description, scanner_type, parameters, criteria, is_active, run_frequency, universe_id)
-VALUES (
+SELECT
   4,
   gen_random_uuid(),
   'Pocket Pivot (Evening)',
   'Detects up-days where session volume exceeds the highest down-day volume in the prior 10 trading days (classic Morales/Kacher pocket pivot).',
   'pocket_pivot',
   '{"lookback_days": 10, "min_lookback_days": 5, "price_floor": 5.00, "volume_floor": 100000}',
-  '{}',
-  false,
+  '[]',
+  true,
   'evening',
   1
-)
+WHERE NOT EXISTS (SELECT 1 FROM scanner_configs WHERE scanner_type = 'pocket_pivot')
 ON CONFLICT (id) DO NOTHING;
 
 -- System config defaults
