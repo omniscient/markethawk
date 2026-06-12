@@ -266,6 +266,7 @@ def create_app() -> FastAPI:
     EXEMPT_PREFIXES = (
         "/api/auth/",
         "/api/health",
+        "/api/ready",
         "/metrics",
         "/api/alerts/infrastructure",
         "/docs",
