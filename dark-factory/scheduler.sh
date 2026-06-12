@@ -757,12 +757,22 @@ This issue was left in **In progress** with no running factory container — the
 *Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
   done < <(echo "$IN_PROGRESS" | jq -c '.[]')
 
+  # --- Read main-is-red sentinel (written by smoke_gate.sh in dispatched containers) ---
+  # When present, skip Priority 1.5/2/3 (implementation dispatches); 1/4/5 continue.
+  MAIN_IS_RED=false
+  [ -f "${SCHEDULER_STATE_DIR}/main-is-red" ] && MAIN_IS_RED=true
+  if [ "$MAIN_IS_RED" = "true" ]; then
+    echo "[$(date -u +%FT%TZ)] main_red_gate=active action=skip_implement_dispatch"
+  fi
+
   # --- Priority 1.5: In Review items with merge conflicts (proactive auto-resolve) ---
   # Runs every cycle after the factory guard. Scans in-review PRs for GitHub's
   # CONFLICTING mergeability state and dispatches a deconflict run before any
   # human comments are processed. Honors SKIP_LABELS, CI_BLOCKED, and is_issue_running.
   # UNKNOWN is skipped — GitHub hasn't computed mergeability yet.
-  if [ "${CONFLICT_RESOLUTION_ENABLED:-true}" = "true" ]; then
+  if [ "$MAIN_IS_RED" = "true" ]; then
+    echo "[$(date -u +%FT%TZ)] main_red_gate=skip_deconflict"
+  elif [ "${CONFLICT_RESOLUTION_ENABLED:-true}" = "true" ]; then
     while IFS= read -r item; do
       [ -n "$DISPATCHED" ] && break
       ISSUE=$(get_issue_number "$item")
@@ -830,47 +840,55 @@ This issue was left in **In progress** with no running factory container — the
   done < <(echo "$IN_REVIEW" | jq -c '.[]')
 
   # --- Priority 2: Ready items (implement what's already refined+planned) ---
-  while IFS= read -r item; do
-    [ -n "$DISPATCHED" ] && break
-    ISSUE=$(get_issue_number "$item")
-    if has_skip_label "$item"; then continue; fi
-    if [ "$IN_PROGRESS_COUNT" -ge "$MAX_IN_PROGRESS" ]; then break; fi
-    if [ "$IN_REVIEW_COUNT" -ge "$MAX_IN_REVIEW" ]; then break; fi
-    if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
+  if [ "$MAIN_IS_RED" = "true" ]; then
+    echo "[$(date -u +%FT%TZ)] main_red_gate=skip_implement"
+  else
+    while IFS= read -r item; do
+      [ -n "$DISPATCHED" ] && break
+      ISSUE=$(get_issue_number "$item")
+      if has_skip_label "$item"; then continue; fi
+      if [ "$IN_PROGRESS_COUNT" -ge "$MAX_IN_PROGRESS" ]; then break; fi
+      if [ "$IN_REVIEW_COUNT" -ge "$MAX_IN_REVIEW" ]; then break; fi
+      if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
+      if is_issue_running "$ISSUE"; then continue; fi
 
-    if dispatch "Fix issue #${ISSUE}"; then
-      DISPATCHED="Fix issue #${ISSUE}"
-    fi
-  done < <(echo "$READY" | jq -c '.[]')
-
-  # --- Priority 3: Blocked items (retry stuck work) ---
-  while IFS= read -r item; do
-    [ -n "$DISPATCHED" ] && break
-    ISSUE=$(get_issue_number "$item")
-    if has_skip_label "$item"; then continue; fi
-    if is_issue_running "$ISSUE"; then continue; fi
-
-    RETRIES=$(get_retry_count "$ISSUE")
-    if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
-      trip_to_blocked "$ISSUE" "implement" "retry limit of ${MAX_RETRIES} reached"
-      continue
-    fi
-
-    increment_retry "$ISSUE"
-    # Branch-aware: a blocked item that already has a PR (e.g. red CI gated above, or a
-    # continue run that failed mid-way) must be CONTINUED to reuse the existing branch.
-    # Dispatching "Fix" would start a fresh branch that collides with the PR on push.
-    if [ -n "$(get_pr_for_issue "$ISSUE")" ]; then
-      if dispatch "Continue issue #${ISSUE}"; then
-        DISPATCHED="Continue issue #${ISSUE}"
-      fi
-    else
       if dispatch "Fix issue #${ISSUE}"; then
         DISPATCHED="Fix issue #${ISSUE}"
       fi
-    fi
-  done < <(echo "$BLOCKED" | jq -c '.[]')
+    done < <(echo "$READY" | jq -c '.[]')
+  fi
+
+  # --- Priority 3: Blocked items (retry stuck work) ---
+  if [ "$MAIN_IS_RED" = "true" ]; then
+    echo "[$(date -u +%FT%TZ)] main_red_gate=skip_blocked_retry"
+  else
+    while IFS= read -r item; do
+      [ -n "$DISPATCHED" ] && break
+      ISSUE=$(get_issue_number "$item")
+      if has_skip_label "$item"; then continue; fi
+      if is_issue_running "$ISSUE"; then continue; fi
+
+      RETRIES=$(get_retry_count "$ISSUE")
+      if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+        trip_to_blocked "$ISSUE" "implement" "retry limit of ${MAX_RETRIES} reached"
+        continue
+      fi
+
+      increment_retry "$ISSUE"
+      # Branch-aware: a blocked item that already has a PR (e.g. red CI gated above, or a
+      # continue run that failed mid-way) must be CONTINUED to reuse the existing branch.
+      # Dispatching "Fix" would start a fresh branch that collides with the PR on push.
+      if [ -n "$(get_pr_for_issue "$ISSUE")" ]; then
+        if dispatch "Continue issue #${ISSUE}"; then
+          DISPATCHED="Continue issue #${ISSUE}"
+        fi
+      else
+        if dispatch "Fix issue #${ISSUE}"; then
+          DISPATCHED="Fix issue #${ISSUE}"
+        fi
+      fi
+    done < <(echo "$BLOCKED" | jq -c '.[]')
+  fi
 
   # --- Priority 4: Refined items (plan generation — advance refined work before pulling new backlog) ---
   while IFS= read -r item; do
@@ -948,9 +966,9 @@ This issue was left in **In progress** with no running factory container — the
   # --- Log cycle summary ---
   BUDGET=$(gh api rate_limit --jq '.resources.graphql | "\(.used)/\(.limit)"' 2>/dev/null) || BUDGET="?"
   if [ -n "$DISPATCHED" ]; then
-    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} factory_running=${FACTORY_RUNNING}/${FACTORY_WIP_LIMIT} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} dispatched=\"${DISPATCHED}\" graphql=${BUDGET}"
+    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} factory_running=${FACTORY_RUNNING}/${FACTORY_WIP_LIMIT} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} dispatched=\"${DISPATCHED}\" main_red=${MAIN_IS_RED} graphql=${BUDGET}"
   else
-    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} factory_running=${FACTORY_RUNNING}/${FACTORY_WIP_LIMIT} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} skip=nothing_to_do graphql=${BUDGET}"
+    echo "[$(date -u +%FT%TZ)] backlog=${BACKLOG_COUNT} refined=${REFINED_COUNT} in_progress=${IN_PROGRESS_COUNT}/${MAX_IN_PROGRESS} in_review=${IN_REVIEW_COUNT}/${MAX_IN_REVIEW} factory_running=${FACTORY_RUNNING}/${FACTORY_WIP_LIMIT} refine_running=${REFINE_RUNNING}/${REFINE_WIP_LIMIT} skip=nothing_to_do main_red=${MAIN_IS_RED} graphql=${BUDGET}"
   fi
 
   sleep "$POLL_INTERVAL"

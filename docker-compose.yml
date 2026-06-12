@@ -464,6 +464,8 @@ services:
       options:
         gelf-address: "udp://host.docker.internal:12201"
         tag: "dark-factory"
+    volumes:
+      - scheduler_state:/var/lib/dark-factory
     profiles:
       - factory
 
