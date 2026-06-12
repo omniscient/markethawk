@@ -16,6 +16,11 @@ CONFLICT_RESOLUTION_ENABLED="${CONFLICT_RESOLUTION_ENABLED:-true}"
 # close). Override in .archon/.env — takes effect on scheduler recreate, no rebuild.
 FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
 
+# Dispatch ceiling policy (see docs/superpowers/specs/2026-06-12-size-type-aware-dispatch-ceiling-design.md; revisit 2026-09-12)
+DISPATCH_CEILING_ENABLED="${DISPATCH_CEILING_ENABLED:-true}"
+ABOVE_CEILING_LABEL="${ABOVE_CEILING_LABEL:-above-ceiling}"
+ABOVE_CEILING_KEYWORDS="${ABOVE_CEILING_KEYWORDS:-migration|migrate|performance|perf|architectur|refactor}"
+
 # Board constants
 PROJECT_NUMBER=1
 OWNER="omniscient"
@@ -150,6 +155,35 @@ has_opt_in_refine_label() {
 has_direct_to_pr_label() {
   local item="$1"
   echo "$item" | jq -r '.labels[]?' 2>/dev/null | grep -qi "$DIRECT_TO_PR_LABEL"
+}
+
+# Returns "S", "M", "L", or "" from the item's labels
+get_size_label() {
+  echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -oi 'size: [SML]' | awk '{print $2}' | head -1
+}
+
+# True (returns 0) if item is at or above the dispatch ceiling
+is_above_ceiling() {
+  local item="$1" title size
+  title=$(echo "$item" | jq -r '.content.title // ""' 2>/dev/null)
+  size=$(get_size_label "$item")
+  case "$size" in
+    L) return 0 ;;
+    M) echo "$title" | grep -qiE "${ABOVE_CEILING_KEYWORDS}" && return 0 || return 1 ;;
+    *) return 1 ;;
+  esac
+}
+
+# True if item carries the above-ceiling label (board-fetch snapshot)
+has_above_ceiling_label() {
+  echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -qi "^${ABOVE_CEILING_LABEL}$"
+}
+
+# True if item is S-size or has no size label (treated as S per spec)
+is_below_ceiling() {
+  local size
+  size=$(get_size_label "$1")
+  case "$size" in S|"") return 0 ;; *) return 1 ;; esac
 }
 
 # Returns minutes elapsed since the last comment matching $marker_re on the given issue.
