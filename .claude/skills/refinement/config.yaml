@@ -39,3 +39,12 @@ preview:
 conflict_resolution:
   enabled: true       # false = disable the P1.5 conflict scanner entirely (env CONFLICT_RESOLUTION_ENABLED overrides)
   ai_tier: true       # false = only Tier 1 (mechanical) resolution; never invoke Claude for conflict markers
+
+dispatch_ceiling:
+  enabled: true                # mirror of $DISPATCH_CEILING_ENABLED (set false in .archon/.env to disable)
+  label: above-ceiling         # mirror of $ABOVE_CEILING_LABEL
+  keywords: "migration|migrate|performance|perf|architectur|refactor"  # mirror of $ABOVE_CEILING_KEYWORDS
+  # Doc-only: the scheduler reads env-var defaults in scheduler.sh, not this file.
+  # To override without a code change, set these vars in .archon/.env.
+  # See docs/superpowers/specs/2026-06-12-size-type-aware-dispatch-ceiling-design.md for rationale.
+  # Revisit: 2026-09-12
