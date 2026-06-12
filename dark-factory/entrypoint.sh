@@ -244,6 +244,13 @@ ${RUN_ROWS}
 # --- Error handler: move ticket back to Ready and post comment ---
 on_failure() {
   local EXIT_CODE=$?
+  # Capture partial-failure record before any other action (non-fatal)
+  python3 "$CLONE_DIR/dark-factory/scripts/run_record.py" record \
+    --run-id "${RUN_ID:-unknown}" \
+    --issue "${ISSUE_NUM:-0}" \
+    --intent "${INTENT:-unknown}" \
+    --stage "failed" \
+    --verdict "failed" || true
   if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
     if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ] || [ "$INTENT" = "deconflict" ]; then
       # No board status change here — the scheduler's trip_to_blocked() handles the
