@@ -71,6 +71,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not mock API response shapes with ad-hoc field names — always derive mock objects from the actual TypeScript interface. Wrong mock shapes (`{ items, page }` vs `{ signals, limit, offset }`) silently pass because falsy checks short-circuit before the wrong field is accessed. <!-- issue:#250 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+## Frontend: Testing Hook Call Args
+
+- [AVOID] Do not write `vi.mock` hook factory wrappers that drop arguments — `useHook: () => mockFn()` captures no args, so `mockFn.mock.calls` is always `[[]]` and call-arg assertions silently pass or fail for the wrong reason. <!-- issue:#315 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [PATTERN] To assert what params a mocked hook received, forward args in the factory: `useHook: (...args) => mockFn(...args)`. Pair with `vi.setSystemTime(new Date('YYYY-MM-DD'))` inside `beforeEach` when the hook params include computed dates, so the assertion is deterministic. Use `vi.useRealTimers()` in `afterEach`. <!-- issue:#315 date:2026-06-12 expires:2026-12-12 source:refine -->
+
 ## Frontend: Coverage Thresholds
 
 - [PATTERN] Coverage threshold formula (issue #250 ratchet series): `floor(actual) - 3`, clamped to min 30 for statements/lines and 22 for branches/functions. Run `npx vitest run --coverage` to get actuals; update `frontend/vitest.config.ts` thresholds block. CI gate = threshold ≤ actual, so if clamped threshold exceeds actual, add more tests first. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:implement -->
