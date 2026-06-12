@@ -23,8 +23,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Seed SQL that INSERTs into `scanner_configs` must always include `universe_id` in the column list (value `1` for the default universe). The column is NOT NULL with no server default; omitting it causes a NOT NULL violation on fresh preview stacks. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
 
-- [AVOID] Do not embed data directly in Alembic migration files — migrations are schema-only. Feature-specific seed data goes in `dark-factory/seed/99_feature.sql` (idempotent, `ON CONFLICT DO NOTHING`). Data needed across multiple features goes in a new numbered baseline module. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
-
 ## Diff Computation
 
 - [PATTERN] When fetching base file content to compute a formatter delta for a `main...HEAD` three-dot diff, use `git merge-base main HEAD` for the base ref, then `git show "$MERGE_BASE:{filepath}"`. Using `git show "main:{filepath}"` references main's current tip — on branches where main later updated the file, the wrong base produces false positives (feature hunk mis-classified as formatter-only) or false negatives. path:dark-factory/scripts/fmt_hunk_filter.py <!-- issue:#276 date:2026-06-11 expires:2026-12-11 source:implement -->
@@ -56,12 +54,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] All host-facing port bindings in `docker-compose.yml` should use the `"127.0.0.1:HOST:CONTAINER"` format to prevent inadvertent exposure on public interfaces even without a reverse proxy — defense-in-depth independent of whether a TLS profile is active. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 - [PATTERN] Profile-gated infra services (Caddy, forecaster, scheduler) follow the same restart pattern in `deploy.yml`: `docker compose --profile <name> up -d <service>`. Guard the Caddy step with `[ -n "${DOMAIN:-}" ]` so a missing `DOMAIN` emits a clear message rather than starting Caddy with an empty hostname. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
-
-- [PATTERN] `caddy/Caddyfile` must use `{$DOMAIN}` (no `:default` fallback) — adding `{$DOMAIN:localhost}` causes Caddy to silently serve via a self-signed local-CA cert on real deploys where `DOMAIN` is unset, producing broken TLS without an obvious error. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
-
-## Environment and Credentials
-
-- [PATTERN] AI credentials (`CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`) and `GH_TOKEN` belong in `.archon/.env`, not in `.env`. The `.archon/.env` file is gitignored to keep secrets out of the repo. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 ## DAG Trigger Rules
 
@@ -106,3 +98,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PROVISIONAL] The `docker-socket-proxy` blocks `exec` operations (HTTP 403), so testcontainers healthchecks fail inside the factory container; use `TEST_DATABASE_URL=postgresql://postgres:<pw>@postgres:5432/test_markethawk` instead (create DB via SQLAlchemy AUTOCOMMIT before running pytest). <!-- evidence:curl-response issue:#287 date:2026-06-11 expires:2026-12-11 source:implement -->
 
 - [PROVISIONAL] When `.env` is absent, retrieve the running postgres password via `curl -s "http://docker-socket-proxy:2375/v1.54/containers/stockscanner-db/json" | python3 -c "import json,sys; [print(e) for e in json.load(sys.stdin)['Config']['Env'] if 'PASSWORD' in e]"`. <!-- evidence:curl-response issue:#287 date:2026-06-11 expires:2026-12-11 source:implement -->
+
+## Failure-Time Diagnostics
+
+- [PATTERN] Failure-time diagnostics (post-mortems, transcript analysis) must run inside the dark factory container (`entrypoint.sh`), not in the scheduler (`scheduler.sh`). The scheduler has no access to `$ARTIFACTS_DIR` (`implementation.md`, `conformance.md`, `review.md`) or the archon transcript (`$TMP_OUT`); it can only read GitHub comments. Failure analysis that needs run artefacts must be placed in the `if [ "$EXIT_CODE" -ne 0 ]` block before `rm -f "$TMP_OUT"`. <!-- issue:#336 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [PATTERN] The bot-comment filter in `has_new_comment_after_report` (`scheduler.sh:290`) already excludes all "Posted by MarketHawk Dark Factory" footer comments from human-feedback detection. New automated comments posted from `entrypoint.sh` with that footer are automatically filtered — no filter changes needed as long as the footer is used consistently. <!-- issue:#336 date:2026-06-12 expires:2026-12-12 source:refine -->
