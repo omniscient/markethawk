@@ -497,7 +497,9 @@ cp -r /opt/dark-factory/seed/ "$CLONE_DIR/dark-factory/seed/"
 
 # --- Install backend/frontend deps for local testing ---
 echo "Installing backend dependencies..."
-cd "$CLONE_DIR/backend" && pip install --quiet -r requirements.txt
+# --no-warn-script-location: pip installs as non-root into ~/.local/bin (off
+# PATH); harmless because all tools run via `python -m`, so mute the 20+ warnings.
+cd "$CLONE_DIR/backend" && pip install --quiet --no-warn-script-location -r requirements.txt
 echo "Installing frontend dependencies..."
 cd "$CLONE_DIR/frontend" && npm install --silent
 cd "$CLONE_DIR"

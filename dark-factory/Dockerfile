@@ -60,10 +60,16 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Archon CLI (from fork — includes workflow cost tracking)
+# Archon CLI (from fork — includes workflow cost tracking).
+# Deliberately NOT `bun link`: its shim lands in the invoking user's ~/.bun/bin
+# (root → /root/.bun/bin), which is off PATH and unreadable for the factory
+# user. Cached layers masked this for months; any --no-cache rebuild lost
+# `archon` (exit 127 in entrypoint). cli.ts carries a `#!/usr/bin/env bun`
+# shebang, so a plain symlink on PATH is all that's needed.
 RUN git clone -b feat/workflow-cost-tracking https://github.com/omniscient/Archon.git /opt/archon && \
     cd /opt/archon && bun install && \
-    cd /opt/archon/packages/cli && bun link
+    chmod +x /opt/archon/packages/cli/src/cli.ts && \
+    ln -sf /opt/archon/packages/cli/src/cli.ts /usr/local/bin/archon
 
 # Workspace directory
 RUN mkdir -p /workspace
@@ -93,9 +99,6 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
 # initializes factory-owned on first use instead of as a root-owned mountpoint.
 RUN mkdir -p /var/lib/dark-factory && \
     chown -R factory:factory /workspace /opt/dark-factory /var/lib/dark-factory
-
-# Re-link archon CLI so it remains accessible after user switch
-RUN cd /opt/archon/packages/cli && /opt/bun/bin/bun link
 
 USER factory
 WORKDIR /workspace
