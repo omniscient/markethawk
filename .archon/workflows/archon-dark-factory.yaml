@@ -525,6 +525,17 @@ nodes:
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 15000
 
+  # Bench mode probe: outputs 'stub' when BENCH_MODE=stub so classify-preview can gate on it.
+  # This prevents classify-preview from making a Haiku call during replay benchmark runs.
+  - id: bench-mode-probe
+    bash: |
+      if [ "${BENCH_MODE:-}" = "stub" ]; then
+        echo "stub"
+      fi
+    depends_on: [fetch-issue]
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
+    timeout: 5000
+
   - id: classify-preview
     prompt: |
       You are a classifier deciding whether a dark-factory preview stack (postgres, redis, backend,
@@ -562,8 +573,8 @@ nodes:
       The diff is authoritative — a documentation-labeled issue that touches backend/app/** still gets a preview.
     allowed_tools: [Read]
     model: haiku
-    depends_on: [preview-changeset, fetch-issue]
-    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
+    depends_on: [preview-changeset, fetch-issue, bench-mode-probe]
+    when: "($parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue') && $bench-mode-probe.output != 'stub'"
     output_format:
       type: object
       properties:

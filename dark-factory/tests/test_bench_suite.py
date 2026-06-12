@@ -181,6 +181,33 @@ class TestBenchModeWorkflow:
         assert "stub" in bash, "push-and-pr must handle BENCH_MODE=stub"
         assert "exit 0" in bash, "push-and-pr stub path must exit 0"
 
+    def test_classify_preview_skipped_in_bench_mode(self):
+        """classify-preview must not fire its LLM call when BENCH_MODE=stub.
+
+        The spec (Architecture §2) requires classify-preview to be gated so no
+        Haiku call fires during bench runs. Implemented via a bench-mode-probe
+        dependency whose output is checked in the when condition.
+        """
+        wf = self._load_workflow()
+        node = self._get_node(wf, "classify-preview")
+        when_cond = node.get("when", "")
+        deps = node.get("depends_on", [])
+        assert "bench-mode-probe" in when_cond, (
+            "classify-preview must gate on bench-mode-probe output to prevent "
+            "LLM calls during BENCH_MODE=stub replay runs"
+        )
+        assert "bench-mode-probe" in deps, (
+            "classify-preview must depend on bench-mode-probe"
+        )
+
+    def test_bench_mode_probe_node_exists(self):
+        """bench-mode-probe bash node must exist and output 'stub' when BENCH_MODE=stub."""
+        wf = self._load_workflow()
+        node = self._get_node(wf, "bench-mode-probe")
+        bash = node.get("bash", "")
+        assert "BENCH_MODE" in bash, "bench-mode-probe must check BENCH_MODE env var"
+        assert "stub" in bash, "bench-mode-probe must output 'stub' for BENCH_MODE=stub"
+
     def test_gate_nodes_unchanged(self):
         """validate, conformance, code-review, status-in-review, report must not have BENCH_MODE guards."""
         wf = self._load_workflow()
