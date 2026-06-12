@@ -454,6 +454,9 @@ services:
         required: true
     environment:
       DOCKER_HOST: tcp://docker-socket-proxy:2375
+      SEQ_URL: http://seq:5341
+    volumes:
+      - scheduler_state:/var/lib/dark-factory
     depends_on:
       - docker-socket-proxy
     networks:
