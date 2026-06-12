@@ -253,6 +253,24 @@ def test_update_regime_model_task_calls_train_and_persist():
     mock_train.assert_called_once()
 
 
+def test_tasks_package_exports_regime_tasks():
+    from app.tasks import backfill_regime_labels, update_regime_model
+
+    assert update_regime_model.name == "app.tasks.update_regime_model"
+    assert backfill_regime_labels.name == "app.tasks.backfill_regime_labels"
+
+
+def test_regime_beat_task_in_schedule():
+    from app.core.celery_app import celery_app
+
+    schedule = celery_app.conf.beat_schedule
+    assert "update-regime-model-nightly" in schedule
+    assert (
+        schedule["update-regime-model-nightly"]["task"]
+        == "app.tasks.update_regime_model"
+    )
+
+
 def test_save_event_regime_is_none_when_service_returns_none():
     """save_event must gracefully use None when RegimeService returns None."""
     from app.services.alert_service import save_event

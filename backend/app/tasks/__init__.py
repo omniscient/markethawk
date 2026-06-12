@@ -3,6 +3,7 @@ from app.tasks.quality import (
     analyze_universe_quality,
     normalize_universe_quality,
 )
+from app.tasks.regime import backfill_regime_labels, update_regime_model
 from app.tasks.scanning import (
     evaluate_scanner_alerts,
     run_liquidity_hunt_scheduled,
@@ -50,4 +51,7 @@ __all__ = [
     "analyze_universe_quality",
     "normalize_universe_quality",
     "analyze_signal_features",
+    # regime
+    "update_regime_model",
+    "backfill_regime_labels",
 ]

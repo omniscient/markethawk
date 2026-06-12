@@ -68,6 +68,11 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.analyze_signal_features",
         "schedule": crontab(minute="0", hour="11", day_of_week="1-5"),
     },
+    # HMM regime retraining: 21:00 UTC weekdays (17:00 ET / 16:00 EDT — post market-close)
+    "update-regime-model-nightly": {
+        "task": "app.tasks.update_regime_model",
+        "schedule": crontab(minute="0", hour="21", day_of_week="1-5"),
+    },
     # Tweet monitor: trigger every 45 seconds (expires in 40s to prevent pile-up)
     "trigger-tweet-monitor": {
         "task": "app.tasks.trigger_tweet_monitor",
