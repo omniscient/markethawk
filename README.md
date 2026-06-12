@@ -1,154 +1,136 @@
-# MarketHawk — Custom Stock Scanner System
+# MarketHawk
 
-A full-stack stock scanning platform that identifies pre-market volume spikes and unusual trading patterns. Built for active traders who need fast, configurable scans with a professional UI.
+MarketHawk is an AI-First human-in-the-loop market scanning cockpit for turning market data, news, scanner hits, alerts, reviews, execution notes, journal entries, and outcomes into a repeatable trader workflow.
 
-## Features
+> MarketHawk helps you understand scanner behavior. It does not provide financial advice, guarantee trading results, or replace broker-side risk controls.
 
-- **Pre-Market Volume Spike Detection** — Flags stocks with volume >4x the 20-day average between 4:00–9:30 AM ET
-- **Price Gap Analysis** — Detects gaps >1% from previous close with volume confirmation
-- **Low Volume Preceding Days** — Finds stocks with compressed volume before a spike
-- **Stock Universes** — Create and manage named groups of tickers for targeted scanning
-- **Futures Monitoring** — Track ES, NQ, and other futures contracts with rollover awareness
-- **News Catalyst Parsing** — Batch-analyzes recent headlines to surface catalysts alongside scan results
-- **Trade Journal** — Log and review trades with structured entry/exit data
-- **Edge Explorer** — Analyze historical scanner hit rates and outcome distributions
-- **WebSocket Live Data** — Real-time price and volume streaming
-- **Scheduled Scans** — Celery Beat runs scans automatically on market open
+## What MarketHawk Is
 
-## Scanner Criteria
+- An AI-First full-stack scanner workflow for active traders who want a repeatable review loop.
+- A local-first research and monitoring cockpit that connects data, scanners, alerts, reviews, journal notes, and outcomes.
+- A way to make scanner ideas observable: which signals fired, what reviewers decided, what happened after the signal, and what should be improved.
+- A practical bridge between discretionary review and systematic evidence.
 
-| Criterion | Threshold |
+## What MarketHawk Is Not
+
+- It is not a broker or broker replacement.
+- It is not a promise of profitable trading.
+- It is not a pure vectorized research engine like vectorbt.
+- It is not a full institutional backtesting engine like Lean or NautilusTrader.
+- It is not a substitute for risk controls, compliance, or human judgment.
+
+## Five-Minute Demo
+
+Run a complete demo without IBKR, Polygon, X, or live credentials:
+
+```bash
+make demo
+```
+
+Then open:
+
+| Surface | URL |
 |---|---|
-| Pre-market volume spike | > 4× 20-day average |
-| Price gap | > 1% from prior close |
-| Minimum pre-market volume | 100,000 shares |
-| Minimum average daily volume | 500,000 shares |
-| Low-volume preceding days | < 0.5× average (last 3 days) |
+| App | http://localhost:3333 |
+| API | http://localhost:8000 |
+| API docs | http://localhost:8000/docs |
 
-Session boundaries are computed in `America/New_York` and mapped to UTC for storage.
+Demo login:
 
-## Tech Stack
+| Username | Password |
+|---|---|
+| `demo` | `markethawk-demo` |
 
-**Backend**: FastAPI · SQLAlchemy 2.0 (sync, psycopg2) · PostgreSQL 15 · Redis 7 · Celery  
-**Frontend**: React 18 · TypeScript · Vite · Tailwind CSS · React Query · Recharts · Lightweight Charts  
-**Market Data**: Polygon.io (primary) · Interactive Brokers via IB Gateway (secondary)  
-**Logging**: Seq (structured, centralized)
+The demo resets only demo-owned Docker volumes. It does not touch normal development or live MarketHawk volumes.
+
+## Demo Walkthrough
+
+1. Open the app and log in with the demo account.
+2. Review seeded scanner events for NVDA, AMD, MSFT, TSLA, and AMZN.
+3. Open the active watchlist to see symbols promoted from scanner context.
+4. Inspect review cards with confirmed, rejected, and enhanced verdicts.
+5. Open outcome/scorecard views to see fake follow-through, MFE/MAE, and end-of-day results.
+6. Open the journal to see example execution notes and trade outcomes.
 
 ## Architecture
 
-```
-┌──────────────────────┐       ┌──────────────────────┐       ┌────────────────────┐
-│  React 18 Frontend   │◄─────►│  FastAPI Backend      │◄─────►│  PostgreSQL 15     │
-│  Vite · TypeScript   │  HTTP │  Python · Async       │       │  Redis 7           │
-└──────────────────────┘       └──────────────────────┘       └────────────────────┘
-                                          │
-                          ┌───────────────┼───────────────┐
-                          ▼               ▼               ▼
-                   ┌────────────┐  ┌────────────┐  ┌────────────┐
-                   │ Polygon.io │  │ IB Gateway │  │  Celery /  │
-                   │ Market Data│  │  (Docker)  │  │  Beat      │
-                   └────────────┘  └────────────┘  └────────────┘
+```mermaid
+flowchart LR
+    UI["React + Vite frontend"] --> API["FastAPI backend"]
+    API --> DB["PostgreSQL"]
+    API --> Redis["Redis"]
+    API --> Workers["Celery workers"]
+    Workers --> DB
+    Providers["Polygon / IBKR / demo seed data"] --> API
 ```
 
-### Backend (`backend/app/`)
+MarketHawk uses a React/Vite frontend, a FastAPI backend, PostgreSQL for durable workflow state, Redis/Celery for background work, and provider adapters for live or historical data. Demo mode swaps live providers for deterministic seed data so the product can be understood without credentials.
 
-```
-core/           — Config, DB session, Celery setup, error tracking
-models/         — SQLAlchemy ORM models (ScannerEvent, ScannerRun, ScannerConfig,
-                  StockUniverse, MonitoredStock, StockAggregate, FuturesAggregate,
-                  NewsArticle, Trade, TickerReference, UniverseQualityReport …)
-routers/        — FastAPI route handlers (scanner, universe, stocks, news,
-                  live_data, futures, journal, health, system)
-schemas/        — Pydantic request/response models
-services/       — Business logic (scanner, stock_data, discovery_service,
-                  futures_data, chart_indicators, catalyst_parser,
-                  journal_service, websocket_manager, data_quality …)
-providers/      — External data integrations (Polygon, IBKR, base interface, bulk ops)
-tasks/          — Celery task package (sync.py, scanning.py, trading.py, quality.py)
+## Data Flow
+
+```mermaid
+flowchart LR
+    Data["OHLCV + news + references"] --> Scanner["Scanner"]
+    Scanner --> Alert["Alert"]
+    Alert --> Review["Human review"]
+    Review --> Execution["Execution note / paper order"]
+    Execution --> Journal["Journal"]
+    Journal --> Outcome["Outcome + scorecard"]
+    Outcome --> Scanner
 ```
 
-### Frontend (`frontend/src/`)
+The core loop is evidence-driven: data produces scanner events, scanner events become alerts and review cards, reviewer decisions inform execution notes and journal entries, and outcomes feed back into scanner quality.
 
+## Local Install With Sample Data
+
+Use demo mode for the fastest sample-data setup:
+
+```bash
+make demo
 ```
-api/            — Axios HTTP client layer
-components/     — Reusable UI (UniverseFormModal, ScannerResults, …)
-pages/          — Dashboard, Scanner, Universes, PreMarketMovers,
-                  EdgeExplorer, Journal, Alerts, Settings, StockDetailPage
-hooks/          — Custom React hooks
-```
 
-## Quick Start
-
-### Prerequisites
-
-- Docker and Docker Compose
-- A [Polygon.io](https://polygon.io) API key
-- (Optional) Interactive Brokers credentials for live broker data
-
-### 1. Configure environment
+Use the full development stack when connecting real providers:
 
 ```bash
 cp .env.example .env
-# Edit .env — fill in POLYGON_API_KEY, POSTGRES_PASSWORD, SECRET_KEY,
-# PGADMIN_DEFAULT_EMAIL/PASSWORD, and SEQ_ADMIN_PASSWORD_HASH at minimum.
+docker compose up -d
 ```
 
-Generate the Seq password hash:
-```bash
-echo 'YourPassword' | docker run --rm -i datalust/seq config hash
-```
+The full stack can include PostgreSQL, Redis, FastAPI, React/Vite, Celery, IB Gateway, monitoring, alerting, and optional forecasting workers depending on enabled profiles and environment variables.
 
-### 2. Start all services
+## Screenshots and GIFs
 
-```bash
-docker-compose up -d
-```
+The static docs site includes placeholder assets in `docs/site/assets/`. Replace them with captured dashboard, scanner, review, and scorecard screenshots as the public demo stabilizes.
 
-IB Gateway takes ~60 seconds on first startup while IBC authenticates. The backend waits for it automatically.
+## Comparison
 
-### 3. Access the application
+| Tool | Primary Positioning | Best At | MarketHawk Difference |
+|---|---|---|---|
+| MarketHawk | AI-First human-in-the-loop scanner cockpit | Reviewing live-ish signals, watchlists, alerts, outcomes, and journal context together | Optimized for the scanner-review-outcome loop rather than pure backtesting |
+| Lean | Institutional-grade algorithmic trading platform | Multi-asset backtesting, live deployment, brokerage integrations | MarketHawk is lighter and focused on scanner operations and human review |
+| NautilusTrader | Production-grade Rust-native trading engine | Low-latency, event-driven strategy execution | MarketHawk prioritizes explainable scanner workflow over engine-level execution |
+| vectorbt | Test thousands of ideas quickly | Vectorized research and parameter sweeps | MarketHawk captures review decisions, alerts, and outcomes around operational scanner use |
+| backtrader | Ease-of-use Python backtesting | Scriptable local strategy backtests | MarketHawk is a full-stack scanner cockpit with UI, alerting, review, and journal surfaces |
+| pysystemtrade | Systematic futures trading research | Portfolio/system research and futures workflows | MarketHawk focuses on equity scanner signals and operator review workflows |
 
-| Service | URL |
-|---|---|
-| Frontend | http://localhost:3333 |
-| Backend API | http://localhost:8000 |
-| API Docs (Swagger) | http://localhost:8000/docs |
-| pgAdmin | http://localhost:5050 |
-| Flower (Celery) | http://localhost:5555 |
-| Seq (Logs) | http://localhost:5380 |
+## Roadmap
 
-### Manual Setup (without Docker)
+- Reproducible demo screenshots and GIFs.
+- Stronger scanner scorecards and interval outcome analysis.
+- Safer broker integration boundaries for paper execution.
+- More import/export paths for journals and signal reviews.
+- Public docs expansion for scanner design and operational playbooks.
 
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-python -m alembic upgrade head
-uvicorn app.main:app --reload
+## Safety and Risk
 
-# Frontend
-cd frontend
-npm install
-npm run dev
-```
-
-> For detailed setup, manual (non-Docker) configuration, database migrations, running tests, and troubleshooting, see [DEVELOPMENT.md](DEVELOPMENT.md).
-
-## Environment Variables
-
-See [ENV_VARIABLES.md](ENV_VARIABLES.md) for the complete environment variable reference with defaults and descriptions.
+MarketHawk is research and workflow software. Trading involves substantial risk of loss. Sample data, fake outcomes, scanner scores, and demo records are illustrative only. Do not use demo settings for live trading.
 
 ## Documentation
 
 | Document | Contents |
-|----------|---------|
-| [DEVELOPMENT.md](DEVELOPMENT.md) | Full local setup, Docker commands, service access, debugging, troubleshooting |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Service topology, scan execution flow, module map, database models, error tracking |
-| [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Annotated file tree of the entire repository |
-| [ENV_VARIABLES.md](ENV_VARIABLES.md) | Complete environment variable reference with defaults and usage |
-| [POLYGON_RATE_LIMITS.md](POLYGON_RATE_LIMITS.md) | Polygon.io plan tiers, rate limits, key endpoints, and sync strategy |
-| [deployment-guide.md](deployment-guide.md) | Production hardening checklist, backup, and upgrade procedure |
-
----
-
-**Disclaimer**: This tool is for research and personal use only. Not financial advice. Trading involves substantial risk of loss.
+|---|---|
+| [docs/site/index.html](docs/site/index.html) | Static public docs site |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Local setup and troubleshooting |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture details |
+| [ENV_VARIABLES.md](ENV_VARIABLES.md) | Environment variable reference |
+| [deployment-guide.md](deployment-guide.md) | Deployment and hardening notes |
