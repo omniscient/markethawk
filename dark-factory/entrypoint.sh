@@ -124,31 +124,22 @@ post_or_update_comment() {
 
 post_cost_report() {
   if [ -z "${ISSUE_NUM:-}" ]; then return; fi
-
-  # Get this run's cost data as JSON
-  # Archon's pino logger writes to stdout; use --quiet to suppress, fall back to jq filtering
-  local RAW_OUTPUT RUN_JSON
-  RAW_OUTPUT=$(archon workflow cost --last --json --quiet 2>/dev/null || true)
-  RUN_JSON=$(echo "$RAW_OUTPUT" | jq -s 'map(select((.run_id // .runId) != null)) | .[0] // empty' 2>/dev/null || true)
-  if [ -z "$RUN_JSON" ] || [ "$RUN_JSON" = "null" ]; then return; fi
+  local RUN_RECORD_FILE="${ARTIFACTS_DIR:-}/run-record.json"
+  if [ ! -f "$RUN_RECORD_FILE" ]; then return; fi
 
   echo "Posting cost report to issue #${ISSUE_NUM}..."
 
-  # Find existing cost report comment by marker
-  local COMMENT_ID
-  COMMENT_ID=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments" \
-    --jq "[.[] | select(.body | contains(\"$COST_MARKER\"))] | last | .id // empty" 2>/dev/null || true)
+  # Extract totals and status from run-record.json
+  local RUN_STATUS TOTAL_COST TOTAL_IN TOTAL_OUT
+  RUN_STATUS=$(jq -r '.status // "completed"' "$RUN_RECORD_FILE" 2>/dev/null || echo "unknown")
+  TOTAL_COST=$(jq -r '.totals.cost_usd // 0' "$RUN_RECORD_FILE" 2>/dev/null || echo "0")
+  TOTAL_IN=$(jq -r '.totals["gen_ai.usage.input_tokens"] // 0' "$RUN_RECORD_FILE" 2>/dev/null || echo "0")
+  TOTAL_OUT=$(jq -r '.totals["gen_ai.usage.output_tokens"] // 0' "$RUN_RECORD_FILE" 2>/dev/null || echo "0")
 
-  # Build the new run's markdown table rows
-  local RUN_ROWS TOTAL_COST TOTAL_IN TOTAL_OUT RUN_STATUS TIMESTAMP
+  # Build per-node table rows from nodes[] (OTel field names, model pre-stripped)
+  local RUN_ROWS TIMESTAMP
   TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-  RUN_STATUS=$(echo "$RUN_JSON" | jq -r '.status // "unknown"')
-  TOTAL_COST=$(echo "$RUN_JSON" | jq -r '.totals.cost_usd // .totals.costUsd // 0')
-  TOTAL_IN=$(echo "$RUN_JSON" | jq -r '.totals.input_tokens // .totals.inputTokens // 0')
-  TOTAL_OUT=$(echo "$RUN_JSON" | jq -r '.totals.output_tokens // .totals.outputTokens // 0')
-
-  # jq helper functions for human-readable formatting
-  RUN_ROWS=$(echo "$RUN_JSON" | jq -r '
+  RUN_ROWS=$(jq -r '
     def fmt_tokens: if . >= 1000000 then "\(. / 1000000 * 10 | round / 10)M"
                     elif . >= 1000 then "\(. / 1000 * 10 | round / 10)K"
                     else "\(.)" end;
@@ -156,13 +147,16 @@ post_cost_report() {
                  elif . < 60000 then "\(. / 100 | round / 10)s"
                  else "\(. / 60000 | floor)m \((. % 60000 / 1000) | round)s" end;
     def fmt_cost: "$\(. * 10000 | round / 10000)";
-    def fmt_model: (((.modelUsage // .model_usage) // {}) | keys[0] // "") |
-                   gsub("^claude-"; "") | gsub("-2025.*$"; "");
     (.nodes // [])[] |
-    "| \(.nodeId // .node_id) | \(fmt_model) | \((.inputTokens // .input_tokens // 0) | fmt_tokens) | \((.outputTokens // .output_tokens // 0) | fmt_tokens) | \((.costUsd // .cost_usd // 0) | fmt_cost) | \((.durationMs // .duration_ms // 0) | fmt_dur) |"
-  ' 2>/dev/null || true)
+    "| \(.node_id) | \(.model // "") | \((.["gen_ai.usage.input_tokens"] // 0) | fmt_tokens) | \((.["gen_ai.usage.output_tokens"] // 0) | fmt_tokens) | \((.cost_usd // 0) | fmt_cost) | \((.duration_ms // 0) | fmt_dur) |"
+  ' "$RUN_RECORD_FILE" 2>/dev/null || true)
 
   if [ -z "$RUN_ROWS" ]; then return; fi
+
+  # Find existing cost report comment by marker
+  local COMMENT_ID
+  COMMENT_ID=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments" \
+    --jq "[.[] | select(.body | contains(\"$COST_MARKER\"))] | last | .id // empty" 2>/dev/null || true)
 
   # If there's an existing comment, extract prior run sections and cumulative totals
   local PRIOR_RUNS="" PREV_COST="0" PREV_IN="0" PREV_OUT="0"
@@ -174,7 +168,6 @@ post_cost_report() {
     EXISTING_BODY=$(gh api "repos/omniscient/markethawk/issues/comments/${COMMENT_ID}" \
       --jq '.body' 2>/dev/null || true)
     PRIOR_RUNS=$(echo "$EXISTING_BODY" | sed -n '/^### Run:/,/^---$/p' | head -n -1 || true)
-    # Extract previous grand total from hidden data marker
     PREV_COST=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=\K[0-9.]+' || echo "0")
     PREV_IN=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=[0-9.]+ in=\K[0-9]+' || echo "0")
     PREV_OUT=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=[0-9.]+ in=[0-9]+ out=\K[0-9]+' || echo "0")
@@ -186,8 +179,6 @@ post_cost_report() {
   CUM_IN=$(( PREV_IN + TOTAL_IN ))
   CUM_OUT=$(( PREV_OUT + TOTAL_OUT ))
   local RUN_COUNT
-  # grep -c already prints the count (incl. "0"); the old `|| echo "0"` appended a
-  # SECOND "0" on no-match (grep exits 1), making RUN_COUNT="0\n0" → arithmetic syntax error.
   RUN_COUNT=$(echo "$PRIOR_RUNS" | grep -c '^### Run:' || true)
   RUN_COUNT=$(( ${RUN_COUNT:-0} + 1 ))
 
@@ -203,7 +194,7 @@ post_cost_report() {
     fi
   }
 
-  # Build the full comment body
+  # Build the full comment body (same format as before)
   local BODY
   BODY="${COST_MARKER}
 <!-- cumulative: cost=${CUM_COST} in=${CUM_IN} out=${CUM_OUT} -->
@@ -228,8 +219,6 @@ ${RUN_ROWS}
   echo "$BODY" > "$TMPFILE"
 
   if [ -n "$COMMENT_ID" ]; then
-    # Same canonical single-comment endpoint (no issue number). Let gh's stderr through
-    # on failure — swallowing it with 2>&1 is what hid the 404 path bug for so long.
     if ! gh api "repos/omniscient/markethawk/issues/comments/${COMMENT_ID}" \
         --method PATCH -F "body=@${TMPFILE}" >/dev/null; then
       echo "WARNING: Could not update cost report comment ${COMMENT_ID}"
