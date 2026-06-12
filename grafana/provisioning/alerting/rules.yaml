@@ -112,3 +112,31 @@ groups:
             model:
               type: math
               expression: $B > 5
+
+      - uid: tweet-monitor-auth-expired
+        title: Tweet-Monitor Auth Expired
+        condition: C
+        for: 2m
+        annotations:
+          summary: >
+            Tweet-monitor X.com cookie auth has been failing for 2+ minutes.
+            Rotate X_AUTH_TOKEN and X_CSRF_TOKEN in .env and restart tweet-monitor.
+        labels:
+          severity: warning
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: tweet_monitor_auth_ok
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B < 1

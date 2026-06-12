@@ -620,6 +620,35 @@ dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
 export -f gh get_pr_for_issue is_issue_running check_pr_mergeable dispatch
 
 # ==========================================
+# L: factory_at_capacity / FACTORY_WIP_LIMIT
+# ==========================================
+echo ""
+echo "--- L: factory_at_capacity ---"
+
+assert_eq "L0: FACTORY_WIP_LIMIT defaults to 1" "1" "${FACTORY_WIP_LIMIT:-}"
+
+FACTORY_WIP_LIMIT=1
+factory_at_capacity 0 \
+  && assert_eq "L1: 0 running, limit 1 → below capacity" "0" "1" \
+  || assert_eq "L1: 0 running, limit 1 → below capacity" "0" "0"
+factory_at_capacity 1 \
+  && assert_eq "L2: 1 running, limit 1 → at capacity" "0" "0" \
+  || assert_eq "L2: 1 running, limit 1 → at capacity" "0" "1"
+
+FACTORY_WIP_LIMIT=2
+factory_at_capacity 1 \
+  && assert_eq "L3: 1 running, limit 2 → below capacity" "0" "1" \
+  || assert_eq "L3: 1 running, limit 2 → below capacity" "0" "0"
+factory_at_capacity 2 \
+  && assert_eq "L4: 2 running, limit 2 → at capacity" "0" "0" \
+  || assert_eq "L4: 2 running, limit 2 → at capacity" "0" "1"
+factory_at_capacity 3 \
+  && assert_eq "L5: 3 running, limit 2 → at capacity" "0" "0" \
+  || assert_eq "L5: 3 running, limit 2 → at capacity" "0" "1"
+
+FACTORY_WIP_LIMIT=1
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"

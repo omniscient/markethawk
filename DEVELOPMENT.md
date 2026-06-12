@@ -382,6 +382,34 @@ docker-compose down
 docker-compose up -d
 ```
 
+### Tweet-Monitor: X.com Cookie Rotation
+
+`X_AUTH_TOKEN` and `X_CSRF_TOKEN` are X.com session cookies that expire roughly every 30 days. When they expire, the tweet-monitor detects the `/i/flow/login` redirect and raises `AuthExpiredError`, setting `tweet_monitor_auth_ok = 0`.
+
+**Alert signature:**
+- Grafana alert `Tweet-Monitor Auth Expired` fires in the `MarketHawk / Infrastructure` panel
+- Seq error log: `@<handle>: auth expired — X.com redirected to login for @<handle>`
+- `/health` endpoint returns `"auth_expired": true, "healthy": false`
+
+**To rotate cookies:**
+
+1. Log in to X.com in Chrome (use the account the scraper monitors)
+2. Open DevTools → Application → Cookies → `https://x.com`
+3. Copy the value of `auth_token` → this is `X_AUTH_TOKEN`
+4. Copy the value of `ct0` → this is `X_CSRF_TOKEN`
+5. Update `.env`:
+   ```
+   X_AUTH_TOKEN=<new_auth_token>
+   X_CSRF_TOKEN=<new_ct0_value>
+   ```
+6. Restart the tweet-monitor container:
+   ```bash
+   docker-compose restart tweet-monitor
+   ```
+7. Verify recovery: `curl http://localhost:8001/health` should return `"auth_expired": false, "healthy": true`
+
+The `tweet_monitor_auth_ok` gauge returns to `1` on the next poll cycle (within 45 seconds) after a successful restart.
+
 ## Codeindex (local visualization)
 
 The symbol index (`symbolindex.json`) and dependency graph (`codeindex.json`) are committed

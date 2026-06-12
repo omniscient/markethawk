@@ -186,6 +186,18 @@ nodes:
         exit 1
       fi
 
+      # Refuse auto-merge if a blast-radius block (or any other gate block) is still active
+      HAS_NEEDS_DISCUSSION=$(gh issue view "$ISSUE" \
+        --repo omniscient/markethawk \
+        --json labels --jq '.labels[].name' \
+        | grep -c 'needs-discussion' || true)
+      if [ "$HAS_NEEDS_DISCUSSION" -gt 0 ]; then
+        echo "close-preview: BLOCKED — needs-discussion label present on issue #$ISSUE"
+        echo "Remove the label after human review, then re-run:"
+        echo "  docker compose --profile factory run --rm dark-factory \"Close issue #$ISSUE\""
+        exit 1
+      fi
+
       # Mark ready (factory creates PRs as drafts) then merge to main
       gh pr ready "$PR_NUM" 2>/dev/null || true
       if ! gh pr merge "$PR_NUM" --merge --delete-branch; then
@@ -1026,6 +1038,26 @@ nodes:
         esac
       fi
 
+      BLAST_GATE_SECTION=""
+      if [ -f "$ARTIFACTS_DIR/blast.md" ]; then
+        BLAST_STATUS=$(grep '^STATUS:' "$ARTIFACTS_DIR/blast.md" | cut -d' ' -f2)
+        BLAST_TRIGGER=$(grep '^TRIGGER:' "$ARTIFACTS_DIR/blast.md" | cut -d' ' -f2-)
+        case "$BLAST_STATUS" in
+          PASS)
+            BLAST_GATE_SECTION=$(printf "### Blast-Radius Gate\n\n✅ Passed — no high-risk files detected.")
+            ;;
+          HUMAN_REQUIRED)
+            BLAST_GATE_SECTION=$(printf "### Blast-Radius Gate\n\n⛔ Blocked — trigger: %s. Human approval required; see issue comment for details." "${BLAST_TRIGGER:-unknown}")
+            ;;
+          SKIPPED)
+            BLAST_GATE_SECTION=$(printf "### Blast-Radius Gate\n\n_Blast-radius gate disabled (blast_radius.enabled=false)._")
+            ;;
+          *)
+            BLAST_GATE_SECTION=""
+            ;;
+        esac
+      fi
+
       CODE_REVIEW_SECTION=""
       if [ -f "$ARTIFACTS_DIR/review.md" ]; then
         CR_STATUS=$(grep '^STATUS:' "$ARTIFACTS_DIR/review.md" | cut -d' ' -f2)
@@ -1088,6 +1120,8 @@ nodes:
       ### Changes
 
       ${CHANGES:-_No implementation summary available._}
+
+      ${BLAST_GATE_SECTION}
 
       ${CONFORMANCE_SECTION}
       ${CODE_REVIEW_SECTION}

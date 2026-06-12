@@ -7,3 +7,8 @@ scrape_configs:
     static_configs:
       - targets: ["backend:8000"]
     metrics_path: /metrics
+
+  - job_name: tweet_monitor
+    static_configs:
+      - targets: ["tweet-monitor:8000"]
+    metrics_path: /metrics

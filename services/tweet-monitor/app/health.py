@@ -9,6 +9,7 @@ import logging
 import redis
 from sqlalchemy import create_engine, text
 
+import app.state as state
 from app.browser import browser_manager
 from app.config import settings
 
@@ -19,7 +20,7 @@ _engine = create_engine(settings.database_url, pool_pre_ping=True)
 
 async def check_health() -> dict:
     browser_ok = browser_manager.is_running
-    auth_expired = not settings.x_auth_token or not settings.x_csrf_token
+    auth_expired = not state.auth_ok
 
     db_ok = _check_db()
     redis_ok = _check_redis()

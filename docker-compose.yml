@@ -128,6 +128,12 @@ services:
         condition: service_healthy
       ib-gateway:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ready', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     volumes:
       - prometheus_multiproc:/tmp/prometheus_multiproc
     networks:
@@ -153,6 +159,9 @@ services:
     environment:
       REACT_APP_API_URL: http://localhost:8000
       VITE_API_TARGET: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
     networks:
       - stockscanner-network
     restart: unless-stopped
@@ -445,6 +454,9 @@ services:
         required: true
     environment:
       DOCKER_HOST: tcp://docker-socket-proxy:2375
+      SEQ_URL: http://seq:5341
+    volumes:
+      - scheduler_state:/var/lib/dark-factory
     depends_on:
       - docker-socket-proxy
     networks:
@@ -455,6 +467,8 @@ services:
       options:
         gelf-address: "udp://host.docker.internal:12201"
         tag: "dark-factory"
+    volumes:
+      - scheduler_state:/var/lib/dark-factory
     profiles:
       - factory
 

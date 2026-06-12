@@ -51,15 +51,28 @@ ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1)
 INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict)' | head -1 | tr '[:upper:]' '[:lower:]')
 INTENT=${INTENT:-fix}
 
-# --- Concurrency guard: only one factory container at a time ---
+# --- Canonical run identity and artifact directory ---
+# ARCHON_RUN_ID is not set by archon; always generate a UUID for correlation.
+RUN_ID=$(python3 -c 'import uuid; print(uuid.uuid4().hex)')
+RUN_STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+ARTIFACTS_DIR="${HOME}/.archon/workspaces/omniscient/markethawk/artifacts/runs/${RUN_ID}"
+export ARTIFACTS_DIR
+mkdir -p "$ARTIFACTS_DIR"
+
+# --- Concurrency guard: cap factory containers at FACTORY_WIP_LIMIT ---
+# RUNNING counts OTHER run containers (self excluded), so at-capacity is
+# RUNNING >= limit. Must stay in sync with the scheduler's capacity guard —
+# the scheduler dispatches into free slots and this backstop must not veto
+# them (#347). The var arrives via the service env_file (.archon/.env).
+FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
 MY_ID=$(cat /proc/self/cgroup 2>/dev/null | grep -oP '[a-f0-9]{64}' | head -1 || hostname)
 RUNNING=$(docker ps --format '{{.ID}} {{.Names}}' 2>/dev/null \
   | grep 'markethawk-dark-factory-run-' \
   | grep -vc "${MY_ID:0:12}" || true)
 RUNNING=${RUNNING:-0}
-if [ "$RUNNING" -gt 0 ]; then
-  echo "ERROR: Another dark factory container is already running. Only one allowed at a time (Claude Max rate limit)." >&2
-  echo "       Use 'docker ps --filter name=dark-factory' to see it." >&2
+if [ "$RUNNING" -ge "$FACTORY_WIP_LIMIT" ]; then
+  echo "ERROR: ${RUNNING} other dark factory container(s) already running — at FACTORY_WIP_LIMIT=${FACTORY_WIP_LIMIT}." >&2
+  echo "       Use 'docker ps --filter name=dark-factory' to see them." >&2
   exit 1
 fi
 
@@ -111,31 +124,22 @@ post_or_update_comment() {
 
 post_cost_report() {
   if [ -z "${ISSUE_NUM:-}" ]; then return; fi
-
-  # Get this run's cost data as JSON
-  # Archon's pino logger writes to stdout; use --quiet to suppress, fall back to jq filtering
-  local RAW_OUTPUT RUN_JSON
-  RAW_OUTPUT=$(archon workflow cost --last --json --quiet 2>/dev/null || true)
-  RUN_JSON=$(echo "$RAW_OUTPUT" | jq -s 'map(select((.run_id // .runId) != null)) | .[0] // empty' 2>/dev/null || true)
-  if [ -z "$RUN_JSON" ] || [ "$RUN_JSON" = "null" ]; then return; fi
+  local RUN_RECORD_FILE="${ARTIFACTS_DIR:-}/run-record.json"
+  if [ ! -f "$RUN_RECORD_FILE" ]; then return; fi
 
   echo "Posting cost report to issue #${ISSUE_NUM}..."
 
-  # Find existing cost report comment by marker
-  local COMMENT_ID
-  COMMENT_ID=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments" \
-    --jq "[.[] | select(.body | contains(\"$COST_MARKER\"))] | last | .id // empty" 2>/dev/null || true)
+  # Extract totals and status from run-record.json
+  local RUN_STATUS TOTAL_COST TOTAL_IN TOTAL_OUT
+  RUN_STATUS=$(jq -r '.status // "completed"' "$RUN_RECORD_FILE" 2>/dev/null || echo "unknown")
+  TOTAL_COST=$(jq -r '.totals.cost_usd // 0' "$RUN_RECORD_FILE" 2>/dev/null || echo "0")
+  TOTAL_IN=$(jq -r '.totals["gen_ai.usage.input_tokens"] // 0' "$RUN_RECORD_FILE" 2>/dev/null || echo "0")
+  TOTAL_OUT=$(jq -r '.totals["gen_ai.usage.output_tokens"] // 0' "$RUN_RECORD_FILE" 2>/dev/null || echo "0")
 
-  # Build the new run's markdown table rows
-  local RUN_ROWS TOTAL_COST TOTAL_IN TOTAL_OUT RUN_STATUS TIMESTAMP
+  # Build per-node table rows from nodes[] (OTel field names, model pre-stripped)
+  local RUN_ROWS TIMESTAMP
   TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-  RUN_STATUS=$(echo "$RUN_JSON" | jq -r '.status // "unknown"')
-  TOTAL_COST=$(echo "$RUN_JSON" | jq -r '.totals.cost_usd // .totals.costUsd // 0')
-  TOTAL_IN=$(echo "$RUN_JSON" | jq -r '.totals.input_tokens // .totals.inputTokens // 0')
-  TOTAL_OUT=$(echo "$RUN_JSON" | jq -r '.totals.output_tokens // .totals.outputTokens // 0')
-
-  # jq helper functions for human-readable formatting
-  RUN_ROWS=$(echo "$RUN_JSON" | jq -r '
+  RUN_ROWS=$(jq -r '
     def fmt_tokens: if . >= 1000000 then "\(. / 1000000 * 10 | round / 10)M"
                     elif . >= 1000 then "\(. / 1000 * 10 | round / 10)K"
                     else "\(.)" end;
@@ -143,13 +147,16 @@ post_cost_report() {
                  elif . < 60000 then "\(. / 100 | round / 10)s"
                  else "\(. / 60000 | floor)m \((. % 60000 / 1000) | round)s" end;
     def fmt_cost: "$\(. * 10000 | round / 10000)";
-    def fmt_model: (((.modelUsage // .model_usage) // {}) | keys[0] // "") |
-                   gsub("^claude-"; "") | gsub("-2025.*$"; "");
     (.nodes // [])[] |
-    "| \(.nodeId // .node_id) | \(fmt_model) | \((.inputTokens // .input_tokens // 0) | fmt_tokens) | \((.outputTokens // .output_tokens // 0) | fmt_tokens) | \((.costUsd // .cost_usd // 0) | fmt_cost) | \((.durationMs // .duration_ms // 0) | fmt_dur) |"
-  ' 2>/dev/null || true)
+    "| \(.node_id) | \(.model // "") | \((.["gen_ai.usage.input_tokens"] // 0) | fmt_tokens) | \((.["gen_ai.usage.output_tokens"] // 0) | fmt_tokens) | \((.cost_usd // 0) | fmt_cost) | \((.duration_ms // 0) | fmt_dur) |"
+  ' "$RUN_RECORD_FILE" 2>/dev/null || true)
 
   if [ -z "$RUN_ROWS" ]; then return; fi
+
+  # Find existing cost report comment by marker
+  local COMMENT_ID
+  COMMENT_ID=$(gh api "repos/omniscient/markethawk/issues/${ISSUE_NUM}/comments" \
+    --jq "[.[] | select(.body | contains(\"$COST_MARKER\"))] | last | .id // empty" 2>/dev/null || true)
 
   # If there's an existing comment, extract prior run sections and cumulative totals
   local PRIOR_RUNS="" PREV_COST="0" PREV_IN="0" PREV_OUT="0"
@@ -161,7 +168,6 @@ post_cost_report() {
     EXISTING_BODY=$(gh api "repos/omniscient/markethawk/issues/comments/${COMMENT_ID}" \
       --jq '.body' 2>/dev/null || true)
     PRIOR_RUNS=$(echo "$EXISTING_BODY" | sed -n '/^### Run:/,/^---$/p' | head -n -1 || true)
-    # Extract previous grand total from hidden data marker
     PREV_COST=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=\K[0-9.]+' || echo "0")
     PREV_IN=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=[0-9.]+ in=\K[0-9]+' || echo "0")
     PREV_OUT=$(echo "$EXISTING_BODY" | grep -oP '<!-- cumulative: cost=[0-9.]+ in=[0-9]+ out=\K[0-9]+' || echo "0")
@@ -173,8 +179,6 @@ post_cost_report() {
   CUM_IN=$(( PREV_IN + TOTAL_IN ))
   CUM_OUT=$(( PREV_OUT + TOTAL_OUT ))
   local RUN_COUNT
-  # grep -c already prints the count (incl. "0"); the old `|| echo "0"` appended a
-  # SECOND "0" on no-match (grep exits 1), making RUN_COUNT="0\n0" → arithmetic syntax error.
   RUN_COUNT=$(echo "$PRIOR_RUNS" | grep -c '^### Run:' || true)
   RUN_COUNT=$(( ${RUN_COUNT:-0} + 1 ))
 
@@ -190,7 +194,7 @@ post_cost_report() {
     fi
   }
 
-  # Build the full comment body
+  # Build the full comment body (same format as before)
   local BODY
   BODY="${COST_MARKER}
 <!-- cumulative: cost=${CUM_COST} in=${CUM_IN} out=${CUM_OUT} -->
@@ -215,8 +219,6 @@ ${RUN_ROWS}
   echo "$BODY" > "$TMPFILE"
 
   if [ -n "$COMMENT_ID" ]; then
-    # Same canonical single-comment endpoint (no issue number). Let gh's stderr through
-    # on failure — swallowing it with 2>&1 is what hid the 404 path bug for so long.
     if ! gh api "repos/omniscient/markethawk/issues/comments/${COMMENT_ID}" \
         --method PATCH -F "body=@${TMPFILE}" >/dev/null; then
       echo "WARNING: Could not update cost report comment ${COMMENT_ID}"
@@ -231,6 +233,13 @@ ${RUN_ROWS}
 # --- Error handler: move ticket back to Ready and post comment ---
 on_failure() {
   local EXIT_CODE=$?
+  # Capture partial-failure record before any other action (non-fatal)
+  python3 "$CLONE_DIR/dark-factory/scripts/run_record.py" record \
+    --run-id "${RUN_ID:-unknown}" \
+    --issue "${ISSUE_NUM:-0}" \
+    --intent "${INTENT:-unknown}" \
+    --stage "failed" \
+    --verdict "failed" || true
   if [ -n "${ISSUE_NUM:-}" ] && [ "$INTENT" != "close" ]; then
     if [ "$INTENT" = "refine" ] || [ "$INTENT" = "plan" ] || [ "$INTENT" = "deconflict" ]; then
       # No board status change here — the scheduler's trip_to_blocked() handles the
@@ -492,7 +501,9 @@ cp -r /opt/dark-factory/seed/ "$CLONE_DIR/dark-factory/seed/"
 
 # --- Install backend/frontend deps for local testing ---
 echo "Installing backend dependencies..."
-cd "$CLONE_DIR/backend" && pip install --quiet -r requirements.txt
+# --no-warn-script-location: pip installs as non-root into ~/.local/bin (off
+# PATH); harmless because all tools run via `python -m`, so mute the 20+ warnings.
+cd "$CLONE_DIR/backend" && pip install --quiet --no-warn-script-location -r requirements.txt
 echo "Installing frontend dependencies..."
 cd "$CLONE_DIR/frontend" && npm install --silent
 cd "$CLONE_DIR"
@@ -517,6 +528,15 @@ fi
 
 # --- Install pre-commit hooks so codeindex-blast warn hook fires in the run log ---
 pre-commit install --allow-missing-config 2>/dev/null || true
+
+# --- Smoke gate: verify origin/main is green before any per-ticket work ---
+# Applies to fix (new), continue, and deconflict (resolve) intents only.
+# On red main: exits 0 (no per-ticket failure), files a regression ticket, writes sentinel.
+# On green: cleans up any prior red state and proceeds.
+if [ "$INTENT" = "fix" ] || [ "$INTENT" = "continue" ] || [ "$INTENT" = "deconflict" ]; then
+  source /opt/dark-factory/smoke_gate.sh
+  run_smoke_gate
+fi
 
 # =============================================================================
 # --- Deconflict flow: resolve → validate → push → report → exit ---
@@ -582,9 +602,7 @@ if [ "$INTENT" = "deconflict" ]; then
   set_board_status "$STATUS_IN_REVIEW" 2>/dev/null || true
 
   # --- Write artifact ---
-  DECONFLICT_ARTIFACTS_DIR="${HOME}/.archon/workspaces/omniscient/markethawk/artifacts"
-  mkdir -p "$DECONFLICT_ARTIFACTS_DIR"
-  cat > "$DECONFLICT_ARTIFACTS_DIR/conflict_resolution.md" << EOF
+  cat > "$ARTIFACTS_DIR/conflict_resolution.md" << EOF
 # Conflict Resolution — Issue #${ISSUE_NUM}
 
 **Status:** RESOLVED
@@ -614,7 +632,68 @@ export CLAUDE_BIN_PATH=/usr/bin/claude
 export IS_SANDBOX=1
 export ARCHON_SUPPRESS_NESTED_CLAUDE_WARNING=1
 echo "Starting dark factory: $ARGUMENTS"
-archon workflow run archon-dark-factory "$ARGUMENTS"
+while true; do
+  set +e
+  TMP_OUT=$(mktemp)
+  archon workflow run archon-dark-factory "$ARGUMENTS" 2>&1 | tee "$TMP_OUT"
+  EXIT_CODE=${PIPESTATUS[0]}
+  set -e
+
+  if [ "$EXIT_CODE" -ne 0 ]; then
+    if grep -qiE "usage limit|rate limit|429|credit balance|session limit" "$TMP_OUT"; then
+      # Attempt to parse specific reset time from: "You've hit your session limit · resets 11:10pm (America/Toronto)"
+      RESET_TIME=$(grep -ioP "resets\s+\K([0-9]{1,2}:[0-9]{2}[a-z]{2})" "$TMP_OUT" | head -1)
+      RESET_TZ=$(grep -ioP "resets\s+[0-9]{1,2}:[0-9]{2}[a-z]{2}\s*\(\K([^)]+)" "$TMP_OUT" | head -1)
+      
+      SLEEP_SECS=300 # default to 5 mins if parsing fails
+      if [ -n "$RESET_TIME" ]; then
+        if [ -n "$RESET_TZ" ]; then
+          TARGET_EPOCH=$(TZ="$RESET_TZ" date -d "$RESET_TIME" +%s 2>/dev/null || echo "")
+        else
+          TARGET_EPOCH=$(date -d "$RESET_TIME" +%s 2>/dev/null || echo "")
+        fi
+        
+        if [ -n "$TARGET_EPOCH" ]; then
+          NOW_EPOCH=$(date +%s)
+          if [ "$TARGET_EPOCH" -lt "$NOW_EPOCH" ]; then
+            TARGET_EPOCH=$((TARGET_EPOCH + 86400))
+          fi
+          SLEEP_SECS=$((TARGET_EPOCH - NOW_EPOCH + 60)) # Add 60s buffer to ensure it actually resets
+          
+          # Failsafe for absurd values (e.g., more than 24 hours or negative)
+          if [ "$SLEEP_SECS" -lt 0 ] || [ "$SLEEP_SECS" -gt 90000 ]; then
+            SLEEP_SECS=300
+          fi
+        fi
+      fi
+
+      echo "Claude Max subscription limit reached. Sleeping for ${SLEEP_SECS}s before retrying..."
+      rm -f "$TMP_OUT"
+      sleep "$SLEEP_SECS"
+      echo "Waking up and retrying..."
+      continue
+    fi
+    rm -f "$TMP_OUT"
+    exit "$EXIT_CODE"
+  fi
+  rm -f "$TMP_OUT"
+  break
+done
+
+# --- Capture archon cost data and assemble run record (non-fatal) ---
+ARCHON_COST_JSON=$(mktemp)
+archon workflow cost --last --json --quiet > "$ARCHON_COST_JSON" 2>/dev/null || true
+
+python3 "$CLONE_DIR/dark-factory/scripts/run_record.py" assemble \
+  --run-id "${RUN_ID:-unknown}" \
+  --issue "$ISSUE_NUM" \
+  --intent "$INTENT" \
+  --started-at "${RUN_STARTED_AT:-}" \
+  --artifacts-dir "$ARTIFACTS_DIR" \
+  --archon-cost-json "$ARCHON_COST_JSON" \
+  --out-file "$ARTIFACTS_DIR/run-record.json" || true
+
+rm -f "$ARCHON_COST_JSON"
 
 # --- Post cost report to GitHub issue (success path) — non-fatal ---
 post_cost_report || true

@@ -153,10 +153,6 @@ class BrowserManager:
             logger.warning(f"Health check failed: {exc}")
             return False
 
-    def is_auth_expired(self) -> bool:
-        """Detect if X returned a login redirect (auth_expired)."""
-        return not settings.x_auth_token
-
     @property
     def age_seconds(self) -> float:
         if not self._started_at:

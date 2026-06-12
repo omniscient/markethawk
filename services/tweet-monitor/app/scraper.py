@@ -14,6 +14,10 @@ from playwright.async_api import Page
 
 from app.browser import browser_manager
 
+
+class AuthExpiredError(Exception):
+    """Raised when X.com redirects to the login flow (cookie expired)."""
+
 logger = logging.getLogger(__name__)
 
 # X DOM selectors (data-testid — more stable than class names)
@@ -39,8 +43,14 @@ class XProfileScraper:
             page = await browser_manager.new_page()
             url = _PROFILE_URL.format(handle=handle)
             await page.goto(url, timeout=_LOAD_TIMEOUT_MS, wait_until="domcontentloaded")
+
+            if "/i/flow/login" in page.url:
+                raise AuthExpiredError(f"X.com redirected to login for @{handle}")
+
             await page.wait_for_selector(_TWEET_ARTICLE, timeout=_LOAD_TIMEOUT_MS)
             raw = await self._extract_tweets(page)
+        except AuthExpiredError:
+            raise
         except Exception as exc:
             logger.error(f"Scrape failed for @{handle}: {exc}")
             return []

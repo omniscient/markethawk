@@ -8,6 +8,7 @@ Endpoints:
   GET  /accounts          — List monitored accounts
   POST /accounts          — Create/update a monitored account
   POST /poll/{account_id} — Manual single-account trigger (debugging)
+  GET  /metrics           — Prometheus metrics
 """
 import asyncio
 import logging
@@ -18,9 +19,11 @@ from typing import Any
 
 import redis as redis_lib
 from fastapi import FastAPI, HTTPException
+from prometheus_client import Gauge, make_asgi_app
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+import app.state as state
 from app.browser import browser_manager
 from app.classifier import TweetClassifier
 from app.config import settings
@@ -31,7 +34,7 @@ from app.pipeline import SignalPipeline
 from app.schemas import (
     AccountCreate, AccountStatus, HealthResponse, PollSummary, StatusResponse,
 )
-from app.scraper import XProfileScraper
+from app.scraper import AuthExpiredError, XProfileScraper
 
 logging.basicConfig(level=settings.log_level.upper())
 logger = logging.getLogger(__name__)
@@ -58,11 +61,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Tweet Monitor", lifespan=lifespan)
 
+TWEET_MONITOR_AUTH_OK = Gauge(
+    "tweet_monitor_auth_ok",
+    "1 = X.com cookie auth healthy, 0 = auth expired or login redirect detected",
+)
+TWEET_MONITOR_AUTH_OK.set(1)  # assume healthy at startup
+
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
 
 @app.post("/poll", response_model=PollSummary)
 async def poll_all():
     """Scrape all enabled accounts and process new tweets."""
     start = time.perf_counter()
+    state.auth_ok = True  # optimistic reset each cycle
     with _SessionLocal() as db:
         accounts = db.query(MonitoredAccount).filter(MonitoredAccount.enabled == True).all()
 
@@ -76,11 +89,17 @@ async def poll_all():
             promoted = await _poll_account(account, summary)
             summary.accounts_polled += 1
             summary.tweets_promoted += promoted
+        except AuthExpiredError as exc:
+            state.auth_ok = False
+            msg = f"@{account.handle}: auth expired — {exc}"
+            logger.error(msg)
+            errors.append(msg)
         except Exception as exc:
             msg = f"@{account.handle}: {exc}"
             logger.error(msg)
             errors.append(msg)
 
+    TWEET_MONITOR_AUTH_OK.set(1 if state.auth_ok else 0)
     summary.duration_ms = round((time.perf_counter() - start) * 1000, 1)
     summary.errors = errors
     return summary

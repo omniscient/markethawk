@@ -60,10 +60,16 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
 # Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Archon CLI (from fork — includes workflow cost tracking)
+# Archon CLI (from fork — includes workflow cost tracking).
+# Deliberately NOT `bun link`: its shim lands in the invoking user's ~/.bun/bin
+# (root → /root/.bun/bin), which is off PATH and unreadable for the factory
+# user. Cached layers masked this for months; any --no-cache rebuild lost
+# `archon` (exit 127 in entrypoint). cli.ts carries a `#!/usr/bin/env bun`
+# shebang, so a plain symlink on PATH is all that's needed.
 RUN git clone -b feat/workflow-cost-tracking https://github.com/omniscient/Archon.git /opt/archon && \
     cd /opt/archon && bun install && \
-    cd /opt/archon/packages/cli && bun link
+    chmod +x /opt/archon/packages/cli/src/cli.ts && \
+    ln -sf /opt/archon/packages/cli/src/cli.ts /usr/local/bin/archon
 
 # Workspace directory
 RUN mkdir -p /workspace
@@ -71,11 +77,12 @@ RUN mkdir -p /workspace
 # Copy entrypoint, scheduler, preview template, seed data, and base compose file
 COPY dark-factory/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY dark-factory/scheduler.sh /opt/dark-factory/scheduler.sh
+COPY dark-factory/smoke_gate.sh /opt/dark-factory/smoke_gate.sh
 COPY dark-factory/docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
 COPY dark-factory/seed/ /opt/dark-factory/seed/
 COPY docker-compose.yml /opt/dark-factory/docker-compose.yml
 COPY .claude/skills/refinement/ /opt/refinement-skills/
-RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh /opt/dark-factory/smoke_gate.sh
 
 # Non-root factory user — must be created AFTER all root-level installs.
 # ubuntu:24.04 ships a default 'ubuntu' user at UID/GID 1000; evict it first or
@@ -93,9 +100,6 @@ RUN userdel -r ubuntu 2>/dev/null || true && \
 # initializes factory-owned on first use instead of as a root-owned mountpoint.
 RUN mkdir -p /var/lib/dark-factory && \
     chown -R factory:factory /workspace /opt/dark-factory /var/lib/dark-factory
-
-# Re-link archon CLI so it remains accessible after user switch
-RUN cd /opt/archon/packages/cli && /opt/bun/bin/bun link
 
 USER factory
 WORKDIR /workspace
