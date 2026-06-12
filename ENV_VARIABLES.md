@@ -105,6 +105,16 @@ Set when using the `--profile tls` Caddy service. See [deployment-guide.md — S
 
 ---
 
+## Database Backup (`db-backup` service)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `BACKUP_DIR` | `/var/lib/markethawk/backups` | Host directory bind-mounted into the container at `/backups`; backup files are written here |
+| `BACKUP_RETENTION_DAYS` | `30` | Days to retain backup files; older files are deleted after each successful run |
+| `BACKUP_SCHEDULE` | `0 3 * * *` | Supercronic cron expression (UTC) controlling when `backup.sh` runs |
+
+---
+
 ## Monitoring
 
 | Variable | Default | Purpose |

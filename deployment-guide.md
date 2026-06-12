@@ -40,19 +40,54 @@ Before exposing this stack outside your local machine, address the following:
 
 ### Database Backup
 
-There is no automated backup configured. For production use, schedule regular PostgreSQL dumps:
+Automated backups run via the `db-backup` sidecar service, which starts automatically with `docker-compose up -d`.
+
+**Schedule and format**
+
+- Runs daily at 3 AM UTC by default (configurable via `BACKUP_SCHEDULE`).
+- Each backup is a gzip-compressed `pg_dump` file named `stockscanner_YYYYMMDD_HHMMSS.sql.gz`.
+- Files older than `BACKUP_RETENTION_DAYS` (default: 30) are deleted automatically after each run.
+- Dumps are written atomically — a `.tmp` file is used during the dump; only renamed to the final filename on success. A failed dump leaves no file behind.
+
+**Backup location**
+
+Backups are written to the directory specified by `BACKUP_DIR` (default: `/var/lib/markethawk/backups`) on the Docker host. This directory is bind-mounted into the container at `/backups`.
 
 ```bash
-# Dump to a file
-docker exec stockscanner-db pg_dump -U postgres stockscanner > backup_$(date +%Y%m%d_%H%M%S).sql
-
-# Restore from a dump
-docker exec -i stockscanner-db psql -U postgres stockscanner < backup_20260101_040000.sql
+# Verify the backup directory and latest file
+ls -lh ${BACKUP_DIR:-/var/lib/markethawk/backups}/
 ```
 
-A cron job example (runs at 3 AM daily):
+**Configuration (`.env`)**
+
+| Variable | Default | Description |
+|---|---|---|
+| `BACKUP_DIR` | `/var/lib/markethawk/backups` | Host path for backup files |
+| `BACKUP_RETENTION_DAYS` | `30` | Days to keep backup files |
+| `BACKUP_SCHEDULE` | `0 3 * * *` | Cron schedule (UTC, supercronic syntax) |
+
+**Trigger a manual backup**
+
+```bash
+docker compose run --rm db-backup /scripts/backup.sh
 ```
-0 3 * * * docker exec stockscanner-db pg_dump -U postgres stockscanner > /backups/stockscanner_$(date +\%Y\%m\%d).sql
+
+**Failure alerting**
+
+On failure, the script POSTs a structured CLEF event to Seq (`BackupStatus=failed`, `ErrorReason`). Set up a Seq alert rule on `@l = 'Error' and BackupStatus = 'failed'` to route notifications to your preferred channel (email, Slack, etc.).
+
+**Restore procedure**
+
+```bash
+# 1. Stop the backend and worker to prevent writes during restore
+docker compose stop backend celery-worker celery-beat
+
+# 2. Restore from a backup file
+gunzip -c ${BACKUP_DIR:-/var/lib/markethawk/backups}/stockscanner_YYYYMMDD_HHMMSS.sql.gz \
+  | docker exec -i stockscanner-db psql -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-stockscanner}
+
+# 3. Restart services
+docker compose start backend celery-worker celery-beat
 ```
 
 ### SSL / TLS
