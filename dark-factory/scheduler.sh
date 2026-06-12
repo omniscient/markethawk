@@ -873,6 +873,34 @@ This issue was left in **In progress** with no running factory container — the
     if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
     if is_issue_running "$ISSUE"; then continue; fi
 
+    if [ "${DISPATCH_CEILING_ENABLED:-true}" = "true" ] && is_above_ceiling "$item"; then
+      if ! has_above_ceiling_label "$item"; then
+        echo "[$(date -u +%FT%TZ)] ceiling_gate issue=#${ISSUE} action=above_ceiling_blocked"
+        gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" \
+          --add-label "$ABOVE_CEILING_LABEL" 2>/dev/null || true
+        set_board_status "$ISSUE" "$STATUS_BLOCKED" || true
+        gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body \
+"## Scheduler — Above Dispatch Ceiling
+
+This ticket has been classified as **above the autonomous dispatch ceiling** \
+(size: L, or size: M with a perf/architectural/migration title keyword).
+
+Spec and plan are complete. **A human must pair on implementation.**
+
+To proceed:
+1. Remove the \`$ABOVE_CEILING_LABEL\` label.
+2. Dispatch manually:
+   \`\`\`bash
+   docker compose --profile factory run --rm dark-factory \"Fix issue #${ISSUE}\"
+   \`\`\`
+   Or implement directly in a local worktree.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+      fi
+      continue
+    fi
+
     if dispatch "Fix issue #${ISSUE}"; then
       DISPATCHED="Fix issue #${ISSUE}"
     fi
