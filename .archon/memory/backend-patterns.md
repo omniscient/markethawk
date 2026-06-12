@@ -59,6 +59,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Use `from app.utils.db import get_or_404` to replace Shape A 404 boilerplate (`db.query(Model).filter(Model.id==id).first(); if not obj: raise HTTPException(404)`). Call without storing the result (`get_or_404(db, Model, id, "Name")`) when the result isn't used downstream. <!-- issue:#286 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+## Backend: Scanner Pipeline Decomposition
+
+- [PATTERN] Decompose monolithic scanner functions into three private stages: `_detect(ticker, prefetched_bars, ...) -> RawSignal | None` (pure, no DB), `_enrich(raw_signals, ..., db) -> list[EnrichedSignal]` (batch over passing signals), `_persist(enriched, failed, db, ...) -> list[dict]` (all DB writes + single `db.commit()`). Use `@dataclass(frozen=True) RawSignal` and `@dataclass EnrichedSignal` as stage boundaries. See `backend/app/services/pre_market_scan.py` for the reference implementation; `oversold_bounce_scan.py` follows the same pattern. <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:implement -->
+
+- [AVOID] Do not use `SQLite in-memory` (`create_engine("sqlite:///:memory:")`) for full-pipeline tests in this codebase — `Base.metadata.create_all` fails because several models use `JSONB` columns (e.g. `monitored_accounts.classification_config`) that SQLite's compiler cannot render. Use a mock DB (`MagicMock` with a `query.side_effect` dispatcher) instead, patching `ScannerService._save_event` to capture indicator assertions from `call_args.kwargs`. <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:implement -->
+
 ## Backend: Middleware
 
 - [PATTERN] Pure-ASGI middleware classes (like `CSRFMiddleware`) should be defined at module level in `main.py`, not inside `create_app()` — module-level placement makes them importable by the test suite without triggering the full app factory. The `AuthMiddleware` is an exception because it closes over `EXEMPT_PREFIXES`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
