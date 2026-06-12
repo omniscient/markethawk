@@ -334,8 +334,10 @@ nodes:
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     idle_timeout: 600000
 
-  # Post-implement codeindex regeneration — commits codeindex.json / symbolindex.json / hotspots so the
-  # artifact in the PR matches the final code.  Non-fatal: if codeindex is unavailable the run continues.
+  # Post-implement codeindex regeneration — refreshes the local index so the in-run MCP tools
+  # (lookup_symbol / get_impact) see the final code. codeindex.json / symbolindex.json are
+  # gitignored (regenerated on demand, see #343); only docs/codeindex-hotspots.md is committed.
+  # Non-fatal: if codeindex is unavailable the run continues.
   - id: regen-codeindex
     bash: |
       if ! command -v codeindex &>/dev/null; then
@@ -347,12 +349,13 @@ nodes:
       codeindex symbols . --inline 2>/dev/null || echo "WARNING: codeindex symbols failed"
       mkdir -p docs
       codeindex high-blast 2>/dev/null > docs/codeindex-hotspots.md || true
-      git add codeindex.json symbolindex.json docs/codeindex-hotspots.md 2>/dev/null || true
+      # Commit only the small human-readable hotspots doc; the JSON indexes are gitignored.
+      git add docs/codeindex-hotspots.md 2>/dev/null || true
       if ! git diff --staged --quiet 2>/dev/null; then
-        git commit -m "chore: update codeindex artifacts (post-implement)"
-        echo "codeindex artifacts committed"
+        git commit -m "chore: update codeindex hotspots (post-implement)"
+        echo "codeindex hotspots committed"
       else
-        echo "codeindex artifacts unchanged — no commit needed"
+        echo "codeindex hotspots unchanged — no commit needed"
       fi
     depends_on: [implement]
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
