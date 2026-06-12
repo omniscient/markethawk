@@ -9,6 +9,91 @@ argument-hint: (no arguments - reads from workflow context)
 
 ---
 
+## Phase 0: BLAST-RADIUS HARD GATE
+
+Read `blast_radius.enabled` from `.claude/skills/refinement/config.yaml` (default: true).
+
+```bash
+BLAST_ENABLED=$(python3 -c "
+import yaml, sys
+d = yaml.safe_load(open('.claude/skills/refinement/config.yaml'))
+print(str(d.get('blast_radius', {}).get('enabled', True)).lower())
+" 2>/dev/null || echo "true")
+```
+
+Derive the issue number from the artifacts dir:
+
+```bash
+ISSUE_NUM=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
+```
+
+If `BLAST_ENABLED=false`, write `STATUS: SKIPPED` to `$ARTIFACTS_DIR/blast.md` and skip the rest of Phase 0:
+
+```bash
+if [ "$BLAST_ENABLED" = "false" ]; then
+  printf "STATUS: SKIPPED\nGATE_TYPE: blast\nFINDINGS_COUNT: 0\nSEVERITY: none\n---\nTRIGGER: none\n" \
+    > "$ARTIFACTS_DIR/blast.md"
+  BLAST_ENABLED=skip
+fi
+
+if [ "$BLAST_ENABLED" != "skip" ]; then
+
+  # 1. Get changed files and real line count
+  CHANGED=$(git diff main...HEAD --name-only 2>/dev/null || echo "")
+  ADDED=$(git diff main...HEAD --shortstat 2>/dev/null | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+  DELETED=$(git diff main...HEAD --shortstat 2>/dev/null | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)
+  LINES=$((ADDED + DELETED))
+
+  # 2. Run the blast-radius checker — pass real line count via --lines-changed
+  echo "$CHANGED" | python3 dark-factory/scripts/gate_blast_radius.py \
+    --changed-files-stdin \
+    --lines-changed "$LINES" \
+    --hotspots docs/codeindex-hotspots.md \
+    --config .claude/skills/refinement/config.yaml \
+    > "$ARTIFACTS_DIR/blast.md"
+
+  # 3. Read verdict — guard with || true so grep's exit-1-on-no-match doesn't abort under set -e
+  BLAST_STATUS=$(grep '^STATUS:' "$ARTIFACTS_DIR/blast.md" | cut -d' ' -f2 || true)
+  BLAST_TRIGGER=$(grep '^TRIGGER:' "$ARTIFACTS_DIR/blast.md" | cut -d' ' -f2- || true)
+  BLAST_FILES=$(grep '^\s*-' "$ARTIFACTS_DIR/blast.md" | head -10 || true)
+
+  # 4. Block on HUMAN_REQUIRED
+  if [ "$BLAST_STATUS" = "HUMAN_REQUIRED" ]; then
+    gh issue comment "$ISSUE_NUM" --body "$(cat <<EOF
+## Blast-Radius Gate — BLOCKED
+
+The blast-radius gate has flagged this change as requiring human review before it can auto-merge.
+
+**Trigger:** $BLAST_TRIGGER
+
+**Triggered files:**
+$BLAST_FILES
+
+Remove the \`needs-discussion\` label after reviewing and approving the risk, then re-run validate:
+\`\`\`
+docker compose --profile factory run --rm dark-factory "Validate issue #$ISSUE_NUM"
+\`\`\`
+---
+*Posted by MarketHawk Dark Factory*
+EOF
+)"
+    gh issue edit "$ISSUE_NUM" --add-label needs-discussion
+    # Move to Blocked on the project board
+    ITEM_ID=$(gh project item-list 1 --owner omniscient --format json --limit 200 \
+      | jq -r ".items[] | select(.content.number == $ISSUE_NUM and .content.type == \"Issue\") | .id")
+    if [ -n "$ITEM_ID" ]; then
+      gh project item-edit \
+        --project-id PVT_kwHOAAFds84BWh4w \
+        --id "$ITEM_ID" \
+        --field-id PVTSSF_lAHOAAFds84BWh4wzhR1VaA \
+        --single-select-option-id 93d87b2f
+    fi
+    exit 1
+  fi
+
+fi
+```
+
 ## Phase 1: LOAD
 
 Read the implementation context:
