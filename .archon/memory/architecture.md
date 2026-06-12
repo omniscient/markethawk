@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Redis Authentication (issue #370)
+
+- [PATTERN] For size-M Redis authentication tickets, implement `requirepass` with a single shared password (`REDIS_PASSWORD`) validated in pydantic-settings (≥16 chars); use a `model_validator(mode='after')` in `Settings` to inject the password into `REDIS_URL` so no consumer changes are needed. The `REDISCLI_AUTH` env var on the Redis container keeps the healthcheck clean. <!-- issue:#370 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [AVOID] Do not implement full Redis 6 ACLs (one user per service with least-privilege commands) in a size-M security ticket — it requires a `redis.conf` file, per-service usernames in every URL, and a command-set audit; that is realistically an L. Ship `requirepass` first, file ACLs as a separate `should-have` follow-up. <!-- issue:#370 date:2026-06-12 expires:2026-12-12 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
