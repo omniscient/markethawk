@@ -1,0 +1,98 @@
+name: markethawk_demo
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: stockscanner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: demo_password
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stockscanner"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - demo
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - demo
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL: postgresql://postgres:demo_password@postgres:5432/stockscanner
+      POSTGRES_DB: stockscanner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: demo_password
+      POLYGON_API_KEY: demo_no_live_key
+      REDIS_URL: redis://redis:6379/0
+      ENVIRONMENT: development
+      COOKIE_SECURE: "false"
+      RATE_LIMITING_ENABLED: "false"
+      SEQ_URL: disabled
+      JWT_SECRET_KEY: markethawk_demo_jwt_secret_key_32_chars_minimum
+      CORS_ORIGINS: '["http://localhost:3333"]'
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./backend:/app:ro
+      - ./demo:/demo:ro
+      - prometheus_multiproc:/tmp/prometheus_multiproc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - demo
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    command: npm run dev -- --host 0.0.0.0 --port 3333
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+      VITE_API_TARGET: http://backend:8000
+    ports:
+      - "127.0.0.1:3333:3333"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - demo
+
+volumes:
+  postgres_data:
+    name: markethawk_demo_postgres_data
+  redis_data:
+    name: markethawk_demo_redis_data
+  prometheus_multiproc:
+    name: markethawk_demo_prometheus_multiproc
+
+networks:
+  demo:
+    name: markethawk_demo_network
