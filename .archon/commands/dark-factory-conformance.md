@@ -11,6 +11,11 @@ argument-hint: (no arguments - reads issue context from workflow)
 
 ## Phase 1: LOAD
 
+```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
+source "${REPO_ROOT}/dark-factory/scripts/gate_lib.sh"
+```
+
 1. Read `.claude/skills/refinement/config.yaml` and extract the `conformance` block.
 2. If `conformance.enabled` is `false`:
    - Write `$ARTIFACTS_DIR/conformance.md` with content: `STATUS: SKIPPED\nREASON: conformance.enabled=false`
@@ -265,17 +270,14 @@ Store `SPILLOVER_TICKETS` so the `report` node can include it.
 
 Write the attestation to `$ARTIFACTS_DIR/conformance.md`:
 
-```
-STATUS: PASS
-VERDICT: <CONFORMS | MINOR | ADVISORY>
-CYCLES: $CONFORMANCE_CYCLE
-NO_SPEC: <true|false>
-OOS_EXCISED: <count of successfully excised out-of-scope changes, or 0>
-OOS_TICKETS: <space-separated spillover ticket numbers, e.g. "207 208", or empty>
-
----
-
-$CONFORMANCE_DIALOGUE
+```bash
+{
+  emit_verdict "conformance" "PASS" "${MATERIAL_COUNT:-0}" "none"
+  printf "VERDICT: %s\nCYCLES: %s\nNO_SPEC: %s\nOOS_EXCISED: %s\nOOS_TICKETS: %s\n" \
+    "${CONFORMANCE_VERDICT:-UNKNOWN}" "${CONFORMANCE_CYCLE:-0}" "${NO_SPEC:-false}" \
+    "${OOS_EXCISED:-0}" "${OOS_TICKETS:-}"
+  printf "\n---\n\n%s\n" "${CONFORMANCE_DIALOGUE}"
+} > "$ARTIFACTS_DIR/conformance.md"
 ```
 
 If `CONFORMANCE_CYCLE > 0` (MATERIAL violations were found and resolved in this run), extract
@@ -283,56 +285,8 @@ violation data from `$CONFORMANCE_DIALOGUE` and write memory entries:
 
 ```bash
 # Memory write: only when MATERIAL violations were found and resolved (CONFORMANCE_CYCLE > 0)
+# (route_memory_file and write_memory_entry are sourced from gate_lib.sh at Phase 1 LOAD)
 if [ "${CONFORMANCE_CYCLE:-0}" -gt 0 ]; then
-
-  route_memory_file() {
-    local FILE="$1"
-    case "$FILE" in
-      backend/app/*)            echo ".archon/memory/backend-patterns.md" ;;
-      frontend/src/*)           echo ".archon/memory/frontend-patterns.md" ;;
-      .archon/*|dark-factory/*) echo ".archon/memory/dark-factory-ops.md" ;;
-      ARCHITECTURE.md)          echo ".archon/memory/architecture.md" ;;
-      *)                        echo ".archon/memory/codebase-patterns.md" ;;
-    esac
-  }
-
-  write_memory_entry() {
-    # Usage: write_memory_entry TARGET PATH_PREFIX VIOLATION_TEXT SOURCE ISSUE_NUM
-    local TARGET="$1" PATH_PREFIX="$2" TEXT="$3" SOURCE="$4" ISSUE="$5"
-
-    # Dedup: skip if core sentence already present
-    if grep -qF "$TEXT" "$TARGET" 2>/dev/null; then
-      echo "memory-write: duplicate entry skipped — already in $TARGET"
-      return 0
-    fi
-
-    # Expiry cleanup (mawk-compatible two-argument match form)
-    TODAY=$(date +%Y-%m-%d)
-    awk -v today="$TODAY" '
-      /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
-        found=match($0, /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/)
-        if (found) { expiry_date=substr($0, RSTART+8, 10); if (expiry_date < today) next }
-      }
-      { print }
-    ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
-
-    # Cap check (30 authoritative entries per file)
-    COUNT=$(grep -c '^\- \[PATTERN\]\|^\- \[AVOID\]\|^\- \[FIX\]' "$TARGET" 2>/dev/null || echo 0)
-    if [ "$COUNT" -ge 30 ]; then
-      echo "memory-write: cap reached ($COUNT entries) in $TARGET — skipping write"
-      return 0
-    fi
-
-    EXPIRES=$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d)
-    ENTRY="- [AVOID] $TEXT <!-- issue:#$ISSUE date:$(date +%Y-%m-%d) expires:$EXPIRES source:$SOURCE path:$PATH_PREFIX -->"
-
-    # Insert before the PROVISIONAL section delimiter (or append if no delimiter)
-    if grep -q '^---$' "$TARGET" 2>/dev/null; then
-      sed -i "/^---$/i $ENTRY" "$TARGET"
-    else
-      echo "$ENTRY" >> "$TARGET"
-    fi
-  }
 
   # Extract (VIOLATION_FILE, VIOLATION_TEXT) pairs from $CONFORMANCE_DIALOGUE.
   # $CONFORMANCE_DIALOGUE is the free-form output of the conformance reviewer subagent.
@@ -418,14 +372,12 @@ This phase is only reached if reconcile failed after `MAX_CYCLES`.
    ```
 
 4. Write blocked status to `$ARTIFACTS_DIR/conformance.md`:
-   ```
-   STATUS: BLOCKED
-   VERDICT: MATERIAL
-   CYCLES: $CONFORMANCE_CYCLE
-
-   ---
-
-   $CONFORMANCE_DIALOGUE
+   ```bash
+   {
+     emit_verdict "conformance" "BLOCKED" "${MATERIAL_COUNT:-0}" "critical"
+     printf "VERDICT: MATERIAL\nCYCLES: %s\n" "${CONFORMANCE_CYCLE:-0}"
+     printf "\n---\n\n%s\n" "${CONFORMANCE_DIALOGUE}"
+   } > "$ARTIFACTS_DIR/conformance.md"
    ```
 
 5. Exit non-zero (`exit 1`) — this prevents `push-and-pr` and `status-in-review` from running.
