@@ -51,6 +51,14 @@ ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1)
 INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict)' | head -1 | tr '[:upper:]' '[:lower:]')
 INTENT=${INTENT:-fix}
 
+# --- Canonical run identity and artifact directory ---
+# ARCHON_RUN_ID is not set by archon; always generate a UUID for correlation.
+RUN_ID=$(python3 -c 'import uuid; print(uuid.uuid4().hex)')
+RUN_STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+ARTIFACTS_DIR="${HOME}/.archon/workspaces/omniscient/markethawk/artifacts/runs/${RUN_ID}"
+export ARTIFACTS_DIR
+mkdir -p "$ARTIFACTS_DIR"
+
 # --- Concurrency guard: cap factory containers at FACTORY_WIP_LIMIT ---
 # RUNNING counts OTHER run containers (self excluded), so at-capacity is
 # RUNNING >= limit. Must stay in sync with the scheduler's capacity guard —
@@ -589,9 +597,7 @@ if [ "$INTENT" = "deconflict" ]; then
   set_board_status "$STATUS_IN_REVIEW" 2>/dev/null || true
 
   # --- Write artifact ---
-  DECONFLICT_ARTIFACTS_DIR="${HOME}/.archon/workspaces/omniscient/markethawk/artifacts"
-  mkdir -p "$DECONFLICT_ARTIFACTS_DIR"
-  cat > "$DECONFLICT_ARTIFACTS_DIR/conflict_resolution.md" << EOF
+  cat > "$ARTIFACTS_DIR/conflict_resolution.md" << EOF
 # Conflict Resolution — Issue #${ISSUE_NUM}
 
 **Status:** RESOLVED
