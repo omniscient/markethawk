@@ -27,6 +27,35 @@ services:
         limits:
           memory: 2G
 
+  # Database backup sidecar — runs pg_dump on a schedule via supercronic
+  db-backup:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backup
+    container_name: markethawk-db-backup
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-stockscanner}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      SEQ_URL: http://seq:5341
+      BACKUP_DIR: ${BACKUP_DIR:-/backups}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 3 * * *}
+    volumes:
+      - ${BACKUP_DIR:-/var/lib/markethawk/backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - stockscanner-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
   # Redis for caching and Celery broker
   redis:
     image: redis:7-alpine
