@@ -362,6 +362,7 @@ def save_event(
         compute_event_severity,
         generate_event_summary,
     )
+    from app.services.regime_service import RegimeService
     from app.services.signal_ranker import compute_signal_quality_score
 
     summary = generate_event_summary(scanner_type, indicators)
@@ -370,6 +371,16 @@ def save_event(
     score = None
     if ranker_config and ranker_config.get("enabled") and ranker_config.get("weights"):
         score = compute_signal_quality_score(indicators, ranker_config["weights"])
+
+    regime = None
+    try:
+        regime = RegimeService.get_regime_at_date(db, event_date)
+    except Exception:
+        logger.debug(
+            "save_event: regime lookup failed for %s %s — falling back to None",
+            ticker,
+            event_date,
+        )
 
     event_dict = {
         "ticker": ticker,
@@ -384,6 +395,7 @@ def save_event(
         "criteria_met": criteria_met,
         "metadata": enrichment,
         "signal_quality_score": score,
+        "regime": regime,
     }
 
     existing = (

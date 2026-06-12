@@ -199,3 +199,64 @@ def test_get_regime_at_date_handles_exception_gracefully():
     with patch.object(RegimeService, "_get_redis_cache", return_value=None):
         result = RegimeService.get_regime_at_date(mock_db, date(2024, 1, 15))
     assert result is None
+
+
+# ── T10: save_event regime injection ─────────────────────────────────────────
+
+
+def test_save_event_populates_regime_field():
+    """save_event must include regime in the returned event_dict."""
+    from app.services.alert_service import save_event
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = None
+
+    new_event = MagicMock()
+    new_event.id = 99
+    db.flush.return_value = None
+
+    # ScannerEvent constructor returns our mock
+    with (
+        patch("app.services.alert_service.ScannerEvent", return_value=new_event),
+        patch("app.services.alert_service.trigger_scanner_alert"),
+        patch.object(RegimeService, "get_regime_at_date", return_value="risk_on"),
+    ):
+        result = save_event(
+            db=db,
+            ticker="AAPL",
+            event_date=date(2024, 1, 15),
+            scanner_type="pre_market_volume_spike",
+            indicators={"volume_ratio": 5.0},
+            criteria_met={"volume_spike": True},
+            enrichment={},
+        )
+
+    assert result.get("regime") == "risk_on"
+
+
+def test_save_event_regime_is_none_when_service_returns_none():
+    """save_event must gracefully use None when RegimeService returns None."""
+    from app.services.alert_service import save_event
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = None
+
+    new_event = MagicMock()
+    new_event.id = 100
+
+    with (
+        patch("app.services.alert_service.ScannerEvent", return_value=new_event),
+        patch("app.services.alert_service.trigger_scanner_alert"),
+        patch.object(RegimeService, "get_regime_at_date", return_value=None),
+    ):
+        result = save_event(
+            db=db,
+            ticker="TSLA",
+            event_date=date(2024, 1, 15),
+            scanner_type="pre_market_volume_spike",
+            indicators={},
+            criteria_met={},
+            enrichment={},
+        )
+
+    assert result.get("regime") is None
