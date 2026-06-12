@@ -69,6 +69,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not use `SQLite in-memory` (`create_engine("sqlite:///:memory:")`) for full-pipeline tests in this codebase — `Base.metadata.create_all` fails because several models use `JSONB` columns (e.g. `monitored_accounts.classification_config`) that SQLite's compiler cannot render. Use a mock DB (`MagicMock` with a `query.side_effect` dispatcher) instead, patching `ScannerService._save_event` to capture indicator assertions from `call_args.kwargs`. <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:implement -->
 
+## Backend: Test Directory Layout
+
+- [PATTERN] `backend/tests/fixtures/` is reserved for domain seed/mock helpers (inserts rows, mocks providers, patches HTTP calls). Infrastructure helpers that are not domain-specific (e.g., postgres discovery, DB URL resolution) belong in `backend/tests/utils/` — create `utils/__init__.py` alongside. A future agent that places infrastructure code in `fixtures/` will find it semantically misclassified. <!-- issue:#360 date:2026-06-12 expires:2026-12-12 source:refine -->
+
 ## Backend: Middleware
 
 - [PATTERN] Pure-ASGI middleware classes (like `CSRFMiddleware`) should be defined at module level in `main.py`, not inside `create_app()` — module-level placement makes them importable by the test suite without triggering the full app factory. The `AuthMiddleware` is an exception because it closes over `EXEMPT_PREFIXES`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
