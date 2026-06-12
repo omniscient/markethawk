@@ -243,6 +243,53 @@ def test_find_eligible_importable():
     assert hasattr(find_eligible, "compute_pass_k" if hasattr(find_eligible, "compute_pass_k") else "verify_fail_pass")
 
 
+# ---------------------------------------------------------------------------
+# --baseline Haiku prose generation
+# ---------------------------------------------------------------------------
+
+class TestBaseline:
+    _RUN_SUITE = _BENCH_DIR / "run_suite.sh"
+
+    def _non_comment_lines(self) -> list[str]:
+        """Return non-comment, non-empty lines from run_suite.sh."""
+        lines = []
+        for line in self._RUN_SUITE.read_text().splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):
+                lines.append(stripped)
+        return lines
+
+    def test_baseline_flag_triggers_prose_generation(self):
+        """--baseline must invoke Haiku to generate per-task prose, not just parse the flag."""
+        code_lines = self._non_comment_lines()
+        code = '\n'.join(code_lines)
+        # There must be executable code (not just comments) that branches on BASELINE
+        assert '[ "$BASELINE"' in code or '[ "${BASELINE' in code or '"$BASELINE" = "true"' in code or "$BASELINE" in code.replace('BASELINE=true', '').replace('BASELINE=false', ''), (
+            "run_suite.sh must use BASELINE variable in executable code"
+        )
+        # The script must contain actual LLM invocation code (not just comments mentioning it)
+        has_claude_invocation = (
+            'claude -p' in code or
+            'claude --print' in code or
+            'anthropic.ai' in code or
+            'ANTHROPIC_API_KEY' in code.replace('ANTHROPIC_API_KEY   Required', '')  # not just usage comment
+        )
+        assert has_claude_invocation, (
+            "--baseline must contain executable Haiku invocation (claude -p or Anthropic API call), "
+            "not just a comment. The $BASELINE=true code path must actually call the model."
+        )
+
+    def test_baseline_writes_to_baseline_md(self):
+        """--baseline prose must be written/appended to baseline.md in executable code."""
+        code_lines = self._non_comment_lines()
+        code = '\n'.join(code_lines)
+        # Must write to baseline.md in non-comment code
+        assert 'baseline.md' in code, (
+            "--baseline must write per-task prose to dark-factory/bench/baseline.md "
+            "in executable code (not just a comment)"
+        )
+
+
 def test_find_eligible_has_required_functions():
     bench_dir = Path(__file__).resolve().parents[1] / "bench"
     if str(bench_dir) not in sys.path:

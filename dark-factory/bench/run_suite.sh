@@ -330,3 +330,112 @@ PYEOF
 
 echo ""
 echo "Results file: $RESULTS_FILE"
+
+# ---- Baseline prose generation (--baseline only) ----
+if [ "$BASELINE" = "true" ]; then
+  log "=== Generating Haiku prose summaries for baseline.md ==="
+  BASELINE_MD="$BENCH_DIR/baseline.md"
+
+  # Verify ANTHROPIC_API_KEY is available
+  if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+    log "WARNING: ANTHROPIC_API_KEY not set — skipping Haiku prose summaries"
+    log "Re-run with ANTHROPIC_API_KEY set to generate baseline prose."
+  else
+    # Append a timestamp header for this baseline run
+    {
+      echo ""
+      echo "## Baseline Run — $(date -u +%Y-%m-%d)"
+      echo ""
+    } >> "$BASELINE_MD"
+
+    # For each task in the results file, call Haiku inline to generate prose
+    python3 - "$RESULTS_FILE" "$REPO_ROOT" "$BASELINE_MD" << 'BASELINE_PY'
+import json, subprocess, sys, os
+from pathlib import Path
+
+results_file = sys.argv[1]
+repo_root = sys.argv[2]
+baseline_md = sys.argv[3]
+
+data = json.load(open(results_file))
+tasks = data.get("tasks", [])
+
+suite = json.load(open(Path(repo_root) / "dark-factory/bench/suite.json"))
+suite_by_issue = {t["issue"]: t for t in suite["tasks"]}
+
+for task in tasks:
+    issue = task["issue"]
+    title = task["title"]
+    golden_pr = suite_by_issue.get(issue, {}).get("golden_pr", "unknown")
+    passes = task["passes"]
+    n = task["n"]
+    pass_k = task["pass_k"]
+
+    # Get golden PR diff
+    golden_diff = ""
+    rc = subprocess.run(
+        ["gh", "pr", "diff", str(golden_pr), "--repo", "omniscient/markethawk"],
+        capture_output=True, text=True, cwd=repo_root
+    )
+    if rc.returncode == 0:
+        golden_diff = rc.stdout[:4000]  # truncate to avoid prompt overflow
+
+    # Get the last replay run's diff (most recent result branch)
+    replay_diff = ""
+    result_branches = subprocess.run(
+        ["git", "branch", "--list", f"feat/issue-{issue}-*"],
+        capture_output=True, text=True, cwd=repo_root
+    ).stdout.strip().splitlines()
+    if result_branches:
+        last_branch = result_branches[-1].strip()
+        rc = subprocess.run(
+            ["git", "diff", f"main...{last_branch}", "--stat", "--diff-filter=AM"],
+            capture_output=True, text=True, cwd=repo_root
+        )
+        if rc.returncode == 0:
+            replay_diff = rc.stdout[:2000]
+
+    # Build Haiku prompt
+    prompt = f"""You are a code reviewer evaluating a replay benchmark run. Summarize in 3-5 sentences:
+1. Whether the replay implementation appears correct and complete relative to the golden PR
+2. Any notable divergences from the golden solution
+3. Confidence in the oracle test result ({passes}/{n} runs passed, pass^k={pass_k})
+
+Issue: #{issue} — {title}
+Golden PR: #{golden_pr} ({passes}/{n} runs passed, pass^k={pass_k})
+
+Golden PR changed files:
+{golden_diff[:2000] if golden_diff else '(unavailable)'}
+
+Replay diff summary:
+{replay_diff if replay_diff else '(unavailable — no result branch found)'}
+
+Write only the prose summary, no headers or bullet points."""
+
+    print(f"[bench] Generating Haiku summary for issue #{issue}...", file=sys.stderr)
+    rc = subprocess.run(
+        ["claude", "-p", prompt, "--model", "claude-haiku-4-5-20251001", "--max-tokens", "500"],
+        capture_output=True, text=True, cwd=repo_root,
+        env={**os.environ, "ANTHROPIC_API_KEY": os.environ["ANTHROPIC_API_KEY"]}
+    )
+    if rc.returncode != 0:
+        # Fallback: note that generation failed
+        prose = f"(Haiku summary generation failed: {rc.stderr[:200]})"
+        print(f"[bench] WARNING: Haiku call failed for #{issue}", file=sys.stderr)
+    else:
+        prose = rc.stdout.strip()
+
+    # Append to baseline.md
+    with open(baseline_md, "a") as f:
+        f.write(f"### Issue #{issue} — {title}\n")
+        f.write(f"**Oracle result**: {passes}/{n} runs passed (pass^k={pass_k})\n\n")
+        f.write(prose + "\n\n")
+    print(f"[bench] Written prose for #{issue}", file=sys.stderr)
+
+print(f"[bench] Baseline prose written to {baseline_md}", file=sys.stderr)
+BASELINE_PY
+
+    log "Baseline prose generation complete: $BASELINE_MD"
+    echo "Baseline: $BASELINE_MD"
+  fi
+fi
