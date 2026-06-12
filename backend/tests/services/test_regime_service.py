@@ -234,6 +234,25 @@ def test_save_event_populates_regime_field():
     assert result.get("regime") == "risk_on"
 
 
+# ── T11: Celery tasks ─────────────────────────────────────────────────────────
+
+
+def test_regime_tasks_are_importable():
+    from app.tasks.regime import backfill_regime_labels, update_regime_model
+
+    assert callable(update_regime_model)
+    assert callable(backfill_regime_labels)
+
+
+def test_update_regime_model_task_calls_train_and_persist():
+    from app.tasks.regime import update_regime_model
+
+    with patch.object(RegimeService, "train_and_persist") as mock_train:
+        mock_train.return_value = MagicMock(n_states=3, version=1)
+        update_regime_model.apply()
+    mock_train.assert_called_once()
+
+
 def test_save_event_regime_is_none_when_service_returns_none():
     """save_event must gracefully use None when RegimeService returns None."""
     from app.services.alert_service import save_event
