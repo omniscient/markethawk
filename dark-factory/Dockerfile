@@ -77,11 +77,12 @@ RUN mkdir -p /workspace
 # Copy entrypoint, scheduler, preview template, seed data, and base compose file
 COPY dark-factory/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY dark-factory/scheduler.sh /opt/dark-factory/scheduler.sh
+COPY dark-factory/smoke_gate.sh /opt/dark-factory/smoke_gate.sh
 COPY dark-factory/docker-compose.preview.yml /opt/dark-factory/docker-compose.preview.yml
 COPY dark-factory/seed/ /opt/dark-factory/seed/
 COPY docker-compose.yml /opt/dark-factory/docker-compose.yml
 COPY .claude/skills/refinement/ /opt/refinement-skills/
-RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /opt/dark-factory/scheduler.sh /opt/dark-factory/smoke_gate.sh
 
 # Non-root factory user — must be created AFTER all root-level installs.
 # ubuntu:24.04 ships a default 'ubuntu' user at UID/GID 1000; evict it first or

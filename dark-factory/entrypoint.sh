@@ -525,6 +525,15 @@ fi
 # --- Install pre-commit hooks so codeindex-blast warn hook fires in the run log ---
 pre-commit install --allow-missing-config 2>/dev/null || true
 
+# --- Smoke gate: verify origin/main is green before any per-ticket work ---
+# Applies to fix (new), continue, and deconflict (resolve) intents only.
+# On red main: exits 0 (no per-ticket failure), files a regression ticket, writes sentinel.
+# On green: cleans up any prior red state and proceeds.
+if [ "$INTENT" = "fix" ] || [ "$INTENT" = "continue" ] || [ "$INTENT" = "deconflict" ]; then
+  source /opt/dark-factory/smoke_gate.sh
+  run_smoke_gate
+fi
+
 # =============================================================================
 # --- Deconflict flow: resolve → validate → push → report → exit ---
 # 'continue' sync is handled by the archon workflow's de-conflict node.
