@@ -397,6 +397,38 @@ pip install "git+https://github.com/scheidydude/codeindex.git"
 bash scripts/codeindex.sh
 ```
 
+## Dark Factory Eval Flywheel
+
+When the factory circuit-breaker trips (after `MAX_RETRIES` failed runs), it:
+1. Moves the issue to **Blocked** and labels it `needs-discussion`
+2. Applies the `factory-regression` label — marks this failure for the replay benchmark suite
+3. Generates a post-mortem comment (`<!-- df-post-mortem -->`) via a haiku agent explaining the probable root cause
+4. Appends one line to `dark-factory/evals/factory-failures.jsonl` and commits it to the feature branch
+
+### Querying the failure corpus
+
+```bash
+# List all promoted failures
+cat dark-factory/evals/factory-failures.jsonl | jq .
+
+# Failures by phase
+cat dark-factory/evals/factory-failures.jsonl | jq 'select(.phase == "fix")'
+
+# GitHub label query (requires gh CLI)
+gh issue list --repo omniscient/markethawk --label factory-regression
+```
+
+### Reading post-mortems
+
+Post-mortem comments are posted directly on the issue and are included automatically in the next dispatch (via the existing `gh issue view --json comments` fetch). No retry-context changes are needed.
+
+### Replay harness (C3 — future work)
+
+The `dark-factory/evals/factory-failures.jsonl` corpus is designed for a future replay harness (architecture review candidate C3) that will re-run failed issues against new factory versions to measure regression rates. The JSONL schema is:
+```json
+{"issue": 123, "title": "...", "phase": "fix", "exit_code": 1, "postmortem": "...", "promoted_at": "2026-06-12T09:00:00Z"}
+```
+
 ## Security Notes
 
 - Credentials in `.env` are for local development. Never commit `.env` to version control (it is in `.gitignore`).
