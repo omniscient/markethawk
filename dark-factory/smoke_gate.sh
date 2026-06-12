@@ -30,6 +30,9 @@ _smoke_on_red() {
   echo "[smoke_gate] main is RED — halting factory run cleanly (exit 0, no per-ticket failure)"
   mkdir -p "${SMOKE_STATE_DIR}"
   touch "${SMOKE_STATE_DIR}/main-is-red"
+  # Stamp the recheck throttle: red was just confirmed, so the scheduler's first
+  # "Recheck main" dispatch (#365) should wait a full MAIN_RED_RECHECK_MINUTES.
+  touch "${SMOKE_STATE_DIR}/main-red-last-recheck"
 
   local ISSUE_FILE="${SMOKE_STATE_DIR}/main-is-red-issue"
   if [ -f "$ISSUE_FILE" ]; then
@@ -67,7 +70,7 @@ _smoke_on_green() {
     return 0
   fi
   echo "[smoke_gate] main is GREEN — removing red sentinel and closing regression ticket"
-  rm -f "${SMOKE_STATE_DIR}/main-is-red"
+  rm -f "${SMOKE_STATE_DIR}/main-is-red" "${SMOKE_STATE_DIR}/main-red-last-recheck"
 
   local ISSUE_FILE="${SMOKE_STATE_DIR}/main-is-red-issue"
   if [ -f "$ISSUE_FILE" ]; then

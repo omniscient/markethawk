@@ -43,12 +43,15 @@ if [ -z "$ARGUMENTS" ]; then
   echo "       docker compose --profile factory run --rm dark-factory \"Close issue #3\""
   echo "       docker compose --profile factory run --rm dark-factory \"Refine issue #3\""
   echo "       docker compose --profile factory run --rm dark-factory \"Plan issue #3\""
+  echo "       docker compose --profile factory run --rm dark-factory \"Recheck main\""
   exit 1
 fi
 
 # --- Extract issue number and intent immediately (no AI needed) ---
-ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1)
-INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict)' | head -1 | tr '[:upper:]' '[:lower:]')
+# "Recheck main" carries no "#N" — the || true keeps the no-match grep (exit 1)
+# from killing the script under set -euo pipefail.
+ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1 || true)
+INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict|recheck)' | head -1 | tr '[:upper:]' '[:lower:]')
 INTENT=${INTENT:-fix}
 
 # --- Canonical run identity and artifact directory ---
@@ -530,12 +533,21 @@ fi
 pre-commit install --allow-missing-config 2>/dev/null || true
 
 # --- Smoke gate: verify origin/main is green before any per-ticket work ---
-# Applies to fix (new), continue, and deconflict (resolve) intents only.
+# Applies to fix (new), continue, deconflict (resolve), and recheck intents.
 # On red main: exits 0 (no per-ticket failure), files a regression ticket, writes sentinel.
 # On green: cleans up any prior red state and proceeds.
-if [ "$INTENT" = "fix" ] || [ "$INTENT" = "continue" ] || [ "$INTENT" = "deconflict" ]; then
+if [ "$INTENT" = "fix" ] || [ "$INTENT" = "continue" ] || [ "$INTENT" = "deconflict" ] || [ "$INTENT" = "recheck" ]; then
   source /opt/dark-factory/smoke_gate.sh
   run_smoke_gate
+fi
+
+# --- Recheck flow: the run exists solely to re-evaluate the gate (#365) ---
+# Reaching this line means the gate passed (on red, run_smoke_gate exits 0 inside
+# _smoke_on_red). _smoke_on_green has already cleared the sentinel and closed the
+# regression ticket — there is no per-ticket work to do.
+if [ "$INTENT" = "recheck" ]; then
+  echo "[recheck] main is green — sentinel cleared; done."
+  exit 0
 fi
 
 # =============================================================================

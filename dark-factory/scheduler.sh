@@ -15,6 +15,12 @@ CONFLICT_RESOLUTION_ENABLED="${CONFLICT_RESOLUTION_ENABLED:-true}"
 # Max concurrent factory containers, any run type (implement/refine/plan/deconflict/
 # close). Override in .archon/.env — takes effect on scheduler recreate, no rebuild.
 FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
+# While main-is-red is latched, dispatch a "Recheck main" run (clone + smoke gate
+# only) at most this often, so a green main clears the sentinel without waiting for
+# a human comment on an in-review PR (#365).
+MAIN_RED_RECHECK_ENABLED="${MAIN_RED_RECHECK_ENABLED:-true}"
+MAIN_RED_RECHECK_MINUTES="${MAIN_RED_RECHECK_MINUTES:-20}"
+RECHECK_STAMP_FILE="${SCHEDULER_STATE_DIR}/main-red-last-recheck"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -121,6 +127,40 @@ count_factory_running() {
 # True when the running factory-container count ($1) has reached FACTORY_WIP_LIMIT.
 factory_at_capacity() {
   [ "$1" -ge "$FACTORY_WIP_LIMIT" ]
+}
+
+# True when a "Recheck main" container is already running (dedupe — recheck runs
+# carry no "#N", so is_issue_running cannot see them).
+is_recheck_running() {
+  docker ps --no-trunc --format '{{.Command}}' 2>/dev/null | grep -q 'Recheck main' && return 0
+  return 1
+}
+
+# True when the recheck throttle window has elapsed (or no recheck happened yet).
+# Throttled via the stamp file's mtime — survives scheduler restarts on the state volume.
+recheck_due() {
+  [ -f "$RECHECK_STAMP_FILE" ] || return 0
+  local last now
+  last=$(stat -c %Y "$RECHECK_STAMP_FILE" 2>/dev/null || echo 0)
+  now=$(date +%s)
+  [ $(( now - last )) -ge $(( MAIN_RED_RECHECK_MINUTES * 60 )) ]
+}
+
+# --- Main-red self-clear: throttled "Recheck main" dispatch (#365) ---
+# The main-is-red sentinel pauses implementation dispatches, but the only code that
+# CLEARS it is _smoke_on_green() inside a dispatched container — and those dispatches
+# are exactly what the sentinel blocks. Without this, the latch is one-way: main goes
+# green and the factory stays paused until a human comments on an in-review PR.
+# Callers guarantee a free factory slot (runs after the capacity guard).
+main_red_recheck_check() {
+  [ "$MAIN_RED_RECHECK_ENABLED" = "true" ] || return 0
+  is_recheck_running && return 0
+  recheck_due || return 0
+  if dispatch "Recheck main"; then
+    DISPATCHED="Recheck main"
+    touch "$RECHECK_STAMP_FILE"
+    echo "[$(date -u +%FT%TZ)] main_red_recheck=dispatched interval=${MAIN_RED_RECHECK_MINUTES}m"
+  fi
 }
 
 count_refine_running() {
@@ -758,11 +798,13 @@ This issue was left in **In progress** with no running factory container — the
   done < <(echo "$IN_PROGRESS" | jq -c '.[]')
 
   # --- Read main-is-red sentinel (written by smoke_gate.sh in dispatched containers) ---
-  # When present, skip Priority 1.5/2/3 (implementation dispatches); 1/4/5 continue.
+  # When present, skip Priority 1.5/2/3 (implementation dispatches); 1/4/5 continue,
+  # and a throttled "Recheck main" run gives the gate a chance to self-clear (#365).
   MAIN_IS_RED=false
   [ -f "${SCHEDULER_STATE_DIR}/main-is-red" ] && MAIN_IS_RED=true
   if [ "$MAIN_IS_RED" = "true" ]; then
     echo "[$(date -u +%FT%TZ)] main_red_gate=active action=skip_implement_dispatch"
+    main_red_recheck_check
   fi
 
   # --- Priority 1.5: In Review items with merge conflicts (proactive auto-resolve) ---
