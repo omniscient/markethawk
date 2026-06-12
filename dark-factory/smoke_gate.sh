@@ -17,8 +17,17 @@ _smoke_check_main() {
     return 1
   fi
   echo "[smoke_gate] Checking backend Python import graph..."
+  # Settings() is instantiated at import time and requires DATABASE_URL /
+  # POLYGON_API_KEY / JWT_SECRET_KEY (>=32 chars; preview env contract, #190).
+  # The gate verifies the import graph compiles, NOT that config is real —
+  # without throwaway values the check is red in every factory container, so
+  # every fix/continue/deconflict run false-latches the sentinel (#365). Same
+  # pattern as docker-compose.preview.yml and ci.yml.
   if ! (cd "${CLONE_DIR:-/workspace/markethawk}/backend" \
-        && python -c "import app.main" 2>&1); then
+        && DATABASE_URL="postgresql://smoke:smoke@localhost:5432/smoke" \
+           POLYGON_API_KEY="smoke-gate-only-not-a-real-key" \
+           JWT_SECRET_KEY="smoke-gate-only-not-secret-0123456789abcdef" \
+           python -c "import app.main" 2>&1); then
     echo "[smoke_gate] python import FAILED — main is red"
     return 1
   fi
@@ -30,6 +39,9 @@ _smoke_on_red() {
   echo "[smoke_gate] main is RED — halting factory run cleanly (exit 0, no per-ticket failure)"
   mkdir -p "${SMOKE_STATE_DIR}"
   touch "${SMOKE_STATE_DIR}/main-is-red"
+  # Stamp the recheck throttle: red was just confirmed, so the scheduler's first
+  # "Recheck main" dispatch (#365) should wait a full MAIN_RED_RECHECK_MINUTES.
+  touch "${SMOKE_STATE_DIR}/main-red-last-recheck"
 
   local ISSUE_FILE="${SMOKE_STATE_DIR}/main-is-red-issue"
   if [ -f "$ISSUE_FILE" ]; then
@@ -67,7 +79,7 @@ _smoke_on_green() {
     return 0
   fi
   echo "[smoke_gate] main is GREEN — removing red sentinel and closing regression ticket"
-  rm -f "${SMOKE_STATE_DIR}/main-is-red"
+  rm -f "${SMOKE_STATE_DIR}/main-is-red" "${SMOKE_STATE_DIR}/main-red-last-recheck"
 
   local ISSUE_FILE="${SMOKE_STATE_DIR}/main-is-red-issue"
   if [ -f "$ISSUE_FILE" ]; then

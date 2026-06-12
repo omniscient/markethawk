@@ -14,6 +14,11 @@ set_board_status() { echo "set_board_status $*" >> "$STUB_LOG"; return 0; }
 export -f gh docker set_board_status
 
 # ---- Source scheduler helpers only ----
+# Point the state dir at a temp dir BEFORE sourcing: scheduler.sh derives STATE_FILE
+# and RECHECK_STAMP_FILE from it (and mkdir-s it), so tests must not touch the real
+# /var/lib/dark-factory.
+SCHEDULER_STATE_DIR=$(mktemp -d /tmp/sched-test-statedir-XXXXXX)
+export SCHEDULER_STATE_DIR
 STATE_FILE=$(mktemp /tmp/sched-test-state-XXXXXX.json)
 echo '{}' > "$STATE_FILE"
 export STATE_FILE
@@ -649,9 +654,80 @@ factory_at_capacity 3 \
 FACTORY_WIP_LIMIT=1
 
 # ==========================================
+# M: Main-red recheck self-clear (#365)
+# ==========================================
+echo ""
+echo "--- M: main-red recheck self-clear ---"
+> "$STUB_LOG"
+DISPATCHED=""
+
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+is_recheck_running() { return 1; }
+export -f dispatch is_recheck_running
+
+# M1: no stamp → due
+rm -f "$RECHECK_STAMP_FILE"
+recheck_due \
+  && assert_eq "M1: no stamp → due" "0" "0" \
+  || assert_eq "M1: no stamp → due" "0" "1"
+
+# M2: fresh stamp → throttled
+touch "$RECHECK_STAMP_FILE"
+recheck_due \
+  && assert_eq "M2: fresh stamp → throttled" "0" "1" \
+  || assert_eq "M2: fresh stamp → throttled" "0" "0"
+
+# M3: stale stamp (older than MAIN_RED_RECHECK_MINUTES=20) → due
+touch -d "25 minutes ago" "$RECHECK_STAMP_FILE"
+recheck_due \
+  && assert_eq "M3: stale stamp → due" "0" "0" \
+  || assert_eq "M3: stale stamp → due" "0" "1"
+
+# M4: due → dispatches "Recheck main", sets DISPATCHED, refreshes the stamp
+rm -f "$RECHECK_STAMP_FILE"; DISPATCHED=""
+main_red_recheck_check
+assert_eq "M4: Recheck main dispatched" \
+  "1" "$(grep -c 'dispatch Recheck main' "$STUB_LOG" || echo 0)"
+assert_eq "M4: DISPATCHED set" "Recheck main" "$DISPATCHED"
+[ -f "$RECHECK_STAMP_FILE" ] \
+  && assert_eq "M4: stamp refreshed" "0" "0" \
+  || assert_eq "M4: stamp refreshed" "0" "1"
+
+# M5: stamp fresh from M4 → throttled, no dispatch
+> "$STUB_LOG"; DISPATCHED=""
+main_red_recheck_check
+assert_eq "M5: throttled → no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+# M6: recheck container already running → no dispatch even when due
+> "$STUB_LOG"; DISPATCHED=""
+rm -f "$RECHECK_STAMP_FILE"
+is_recheck_running() { return 0; }
+export -f is_recheck_running
+main_red_recheck_check
+assert_eq "M6: running recheck → no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+
+# M7: kill switch off → no dispatch even when due
+> "$STUB_LOG"; DISPATCHED=""
+is_recheck_running() { return 1; }
+export -f is_recheck_running
+MAIN_RED_RECHECK_ENABLED=false
+main_red_recheck_check
+assert_eq "M7: kill switch → no dispatch" \
+  "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
+MAIN_RED_RECHECK_ENABLED=true
+
+# Restore stubs
+is_recheck_running() { return 1; }
+dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
+export -f is_recheck_running dispatch
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"
+rm -rf "$SCHEDULER_STATE_DIR"
 echo ""
 echo "Results: ${PASSED} passed, ${FAILED} failed"
 [ "$FAILED" -eq 0 ]
