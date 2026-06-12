@@ -59,7 +59,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## DAG Trigger Rules
 
-- [AVOID] Do not substitute the sync tripwire (count of trigger_rule-bearing nodes == len(REQUIRED_OR_JOIN_NODES)) in check_workflow_dag.py with structural `when:`-based detection — the spec requires the count mechanism explicitly; the substitution was flagged as a material conformance violation. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:conformance path:dark-factory/scripts/ -->
 - [AVOID] Do not add structural OR-join detection (checking whether all upstreams carry a `when:` condition) to a ticket where the spec listed it as Non-Goal (v1) — it changes what gets built and will be caught as a material conformance deviation even when the intent is to improve coverage. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:conformance path:dark-factory/scripts/ -->
 - [PATTERN] Every OR-join node in `archon-dark-factory.yaml` — a node whose `depends_on` list contains mutually-exclusive upstream branches (one is always skipped per intent) — must declare `trigger_rule: none_failed_min_one_success` (or `one_success`). The default `all_success` treats a skipped upstream as non-success and silently skips the join and all its descendants. The four known OR-join nodes (`validate`, `de-conflict`, `status-in-review`, `report`) are enumerated in `REQUIRED_OR_JOIN_NODES` in `dark-factory/scripts/check_workflow_dag.py`; when adding a new OR-join, add its ID there too. A sync tripwire (count of trigger_rule-bearing nodes must equal `len(REQUIRED_OR_JOIN_NODES)`) fires with an "update REQUIRED_OR_JOIN_NODES" prompt if the count drifts. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:conformance -->
 
@@ -83,11 +82,15 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] The `docker-socket-proxy` service must have no `profiles:` key so it is a lifecycle superset of both `factory` and `scheduler` profiles. Consumers (`dark-factory`, `backlog-scheduler`) drop their raw `/var/run/docker.sock` volumes and instead set `DOCKER_HOST: tcp://docker-socket-proxy:2375` with `depends_on: [docker-socket-proxy]`. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+## Gate Shared Library
+
+- [PATTERN] Gate commands (conformance, code-review, validate) that need `route_memory_file()`, `write_memory_entry()`, or `emit_verdict()` must source `dark-factory/scripts/gate_lib.sh` at Phase 1 LOAD: `REPO_ROOT=$(git rev-parse --show-toplevel); source "${REPO_ROOT}/dark-factory/scripts/gate_lib.sh"`. Do NOT add `set -euo pipefail` in gate_lib.sh — it is sourced, not executed, and strictness in the library would abort the caller on any non-zero grep/awk. <!-- issue:#334 date:2026-06-12 expires:2026-12-12 source:implement path:.archon/commands/ -->
+
 ## Path-Tag Memory Filtering
 
 - [PATTERN] Path-tag filtering in Phase 1 LOAD extracts the `path:` prefix with `sed 's/.*path:\([^ >]*\).*/\1/'` (POSIX-compatible; not `grep -oP`) and matches via `echo "$AFFECTED" | grep -q "^${PATH_TAG}"` against the affected file list; empty `AFFECTED` means "include all" — correct fallback for new branches. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
 
-- [PATTERN] Gate commands (conformance, code-review) that need to write `[AVOID]` memory entries should define `route_memory_file()` and `write_memory_entry()` as inline shell functions using: dedup via `grep -qF`, 30-entry cap check, mawk-compatible two-arg awk expiry cleanup, and `sed -i "/^---$/i ENTRY"` to insert before the PROVISIONAL section delimiter. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
+- [INVALID: functions moved to dark-factory/scripts/gate_lib.sh — source instead of inline-define] Gate commands (conformance, code-review) that need to write `[AVOID]` memory entries should define `route_memory_file()` and `write_memory_entry()` as inline shell functions using: dedup via `grep -qF`, 30-entry cap check, mawk-compatible two-arg awk expiry cleanup, and `sed -i "/^---$/i ENTRY"` to insert before the PROVISIONAL section delimiter. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
 
 - [AVOID] Never use a simple hex-sequence like `a1b2c3d4e5f6` as an Alembic revision ID — the existing migration set contains files with IDs following this pattern and conflicts will produce a `CycleDetected` error. Use `python -m alembic revision -m "..."` to generate a unique ID, or pick a random 12-char alphanumeric string that doesn't appear in `ls backend/app/alembic/versions/` output. <!-- issue:#299 date:2026-06-11 expires:2026-12-11 source:implement -->
 

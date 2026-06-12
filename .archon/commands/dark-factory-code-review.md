@@ -11,6 +11,11 @@ argument-hint: (no arguments - reads issue/PR context from the workflow)
 
 ## Phase 1: LOAD
 
+```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
+source "${REPO_ROOT}/dark-factory/scripts/gate_lib.sh"
+```
+
 1. Read the `code_review` block from `.claude/skills/refinement/config.yaml`.
 2. If `code_review.enabled` is `false`:
    - Write `$ARTIFACTS_DIR/review.md` with content: `STATUS: SKIPPED\nREASON: code_review.enabled=false`
@@ -99,15 +104,14 @@ A failed POST is non-fatal — the gate decision below still applies.
 ### If `STATUS` is `PASS` (no blockers)
 
 Write to `$ARTIFACTS_DIR/review.md`:
-```
-STATUS: PASS
-BLOCKERS: 0
-ADVISORY: <ADVISORY>
-THRESHOLD: <BLOCK_THRESHOLD>
-
----
-
-<contents of $ARTIFACTS_DIR/review_findings.md>
+```bash
+{
+  emit_verdict "code-review" "PASS" "0" "none"
+  printf "BLOCKERS: 0\nADVISORY: %s\nTHRESHOLD: %s\n" \
+    "${ADVISORY:-0}" "${BLOCK_THRESHOLD:-high}"
+  printf "\n---\n\n"
+  cat "$ARTIFACTS_DIR/review_findings.md"
+} > "$ARTIFACTS_DIR/review.md"
 ```
 Exit `0`. `status-in-review` and `report` proceed.
 
@@ -144,68 +148,20 @@ Exit `0`. `status-in-review` and `report` proceed.
    gh issue edit "$ISSUE_NUM" --repo omniscient/markethawk --add-label needs-discussion
    ```
 4. Write to `$ARTIFACTS_DIR/review.md`:
-   ```
-   STATUS: BLOCKED
-   BLOCKERS: <BLOCKERS>
-   ADVISORY: <ADVISORY>
-   THRESHOLD: <BLOCK_THRESHOLD>
-
-   ---
-
-   <contents of $ARTIFACTS_DIR/review_findings.md>
+   ```bash
+   {
+     emit_verdict "code-review" "BLOCKED" "${BLOCKER_COUNT:-0}" "high"
+     printf "BLOCKERS: %s\nADVISORY: %s\nTHRESHOLD: %s\n" \
+       "${BLOCKER_COUNT:-0}" "${ADVISORY_COUNT:-0}" "${BLOCK_THRESHOLD:-high}"
+     printf "\n---\n\n"
+     cat "$ARTIFACTS_DIR/review_findings.md"
+   } > "$ARTIFACTS_DIR/review.md"
    ```
 5. Write blocking findings back to memory so future runs learn from this gate failure:
 
 ```bash
 # Memory write: only when STATUS=BLOCKED (blocking findings confirmed)
-route_memory_file() {
-  local FILE="$1"
-  case "$FILE" in
-    backend/app/*)            echo ".archon/memory/backend-patterns.md" ;;
-    frontend/src/*)           echo ".archon/memory/frontend-patterns.md" ;;
-    .archon/*|dark-factory/*) echo ".archon/memory/dark-factory-ops.md" ;;
-    ARCHITECTURE.md)          echo ".archon/memory/architecture.md" ;;
-    *)                        echo ".archon/memory/codebase-patterns.md" ;;
-  esac
-}
-
-write_memory_entry() {
-  # Usage: write_memory_entry TARGET PATH_PREFIX VIOLATION_TEXT SOURCE ISSUE_NUM
-  local TARGET="$1" PATH_PREFIX="$2" TEXT="$3" SOURCE="$4" ISSUE="$5"
-
-  # Dedup: skip if core sentence already present
-  if grep -qF "$TEXT" "$TARGET" 2>/dev/null; then
-    echo "memory-write: duplicate entry skipped — already in $TARGET"
-    return 0
-  fi
-
-  # Expiry cleanup (mawk-compatible two-argument match form)
-  TODAY=$(date +%Y-%m-%d)
-  awk -v today="$TODAY" '
-    /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
-      found=match($0, /expires:[0-9]{4}-[0-9]{2}-[0-9]{2}/)
-      if (found) { expiry_date=substr($0, RSTART+8, 10); if (expiry_date < today) next }
-    }
-    { print }
-  ' "$TARGET" > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"
-
-  # Cap check (30 authoritative entries per file)
-  COUNT=$(grep -c '^\- \[PATTERN\]\|^\- \[AVOID\]\|^\- \[FIX\]' "$TARGET" 2>/dev/null || echo 0)
-  if [ "$COUNT" -ge 30 ]; then
-    echo "memory-write: cap reached ($COUNT entries) in $TARGET — skipping write"
-    return 0
-  fi
-
-  EXPIRES=$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d)
-  ENTRY="- [AVOID] $TEXT <!-- issue:#$ISSUE date:$(date +%Y-%m-%d) expires:$EXPIRES source:$SOURCE path:$PATH_PREFIX -->"
-
-  # Insert before the PROVISIONAL section delimiter (or append if no delimiter)
-  if grep -q '^---$' "$TARGET" 2>/dev/null; then
-    sed -i "/^---$/i $ENTRY" "$TARGET"
-  else
-    echo "$ENTRY" >> "$TARGET"
-  fi
-}
+# (route_memory_file and write_memory_entry are sourced from gate_lib.sh at Phase 1 LOAD)
 
 # Extract blocker file paths from review_result.json
 BLOCKER_FILES=$(jq -r '.blockers[].path // empty' "$ARTIFACTS_DIR/review_result.json" 2>/dev/null | sort -u)

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Unit test for route_memory_file() — the path routing table for gate-stage memory writes.
-# This test is self-contained: it defines and tests the function in isolation.
+# Unit test for route_memory_file() — sourced from gate_lib.sh.
 set -euo pipefail
+
+source "$(git rev-parse --show-toplevel)/dark-factory/scripts/gate_lib.sh"
 
 PASS=0; FAIL=0
 
@@ -12,17 +13,6 @@ assert() {
   else
     echo "FAIL: $desc"; FAIL=$((FAIL+1))
   fi
-}
-
-route_memory_file() {
-  local FILE="$1"
-  case "$FILE" in
-    backend/app/*)            echo ".archon/memory/backend-patterns.md" ;;
-    frontend/src/*)           echo ".archon/memory/frontend-patterns.md" ;;
-    .archon/*|dark-factory/*) echo ".archon/memory/dark-factory-ops.md" ;;
-    ARCHITECTURE.md)          echo ".archon/memory/architecture.md" ;;
-    *)                        echo ".archon/memory/codebase-patterns.md" ;;
-  esac
 }
 
 assert "backend/ routes to backend-patterns.md" \
