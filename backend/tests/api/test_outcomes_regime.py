@@ -57,3 +57,32 @@ def test_get_regime_breakdown_empty_db_has_no_breakdown(db):
     result = StatsService.get_regime_breakdown(db, "pre_market_volume_spike")
     assert result["total_events"] == 0
     assert result["breakdown"] == {}
+
+
+# ── T15: Outcomes router endpoints ────────────────────────────────────────────
+
+
+def test_scorecard_endpoint_accepts_regime_param(db):
+    resp = client.get(
+        "/api/v1/outcomes/scorecard/pre_market_volume_spike?regime=risk_on"
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["scanner_type"] == "pre_market_volume_spike"
+
+
+def test_regime_breakdown_endpoint_shape(db):
+    resp = client.get("/api/v1/outcomes/regime-breakdown/pre_market_volume_spike")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["scanner_type"] == "pre_market_volume_spike"
+    assert "total_events" in data
+    assert "breakdown" in data
+
+
+def test_regime_breakdown_empty_returns_empty_breakdown(db):
+    resp = client.get("/api/v1/outcomes/regime-breakdown/pre_market_volume_spike")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_events"] == 0
+    assert data["breakdown"] == {}

@@ -29,6 +29,7 @@ from app.schemas.outcome import (
     ReadinessResponse,
     SignalListResponse,
 )
+from app.schemas.regime import RegimeBreakdownResponse
 from app.services.data_readiness import DataReadinessService
 from app.services.outcome_service import OutcomeService
 from app.services.stats import StatsService
@@ -43,11 +44,14 @@ def get_scorecard(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     severity: Optional[str] = None,
+    regime: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     if not scanner_type:
         raise HTTPException(status_code=400, detail="scanner_type is required")
-    return StatsService.get_scorecard(db, scanner_type, start_date, end_date, severity)
+    return StatsService.get_scorecard(
+        db, scanner_type, start_date, end_date, severity, regime
+    )
 
 
 @router.get("/scorecard/{scanner_type}")
@@ -56,9 +60,23 @@ def get_scorecard_by_type(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     severity: Optional[str] = None,
+    regime: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    return StatsService.get_scorecard(db, scanner_type, start_date, end_date, severity)
+    return StatsService.get_scorecard(
+        db, scanner_type, start_date, end_date, severity, regime
+    )
+
+
+@router.get("/regime-breakdown/{scanner_type}", response_model=RegimeBreakdownResponse)
+def get_regime_breakdown(
+    scanner_type: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+):
+    result = StatsService.get_regime_breakdown(db, scanner_type, start_date, end_date)
+    return RegimeBreakdownResponse(**result)
 
 
 @router.get("/intervals/{scanner_type}")
