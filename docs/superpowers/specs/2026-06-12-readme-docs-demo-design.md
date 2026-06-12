@@ -14,7 +14,7 @@ This approach rewrites the README around clear positioning, adds a static docs s
 
 ## Positioning
 
-MarketHawk is a human-in-the-loop market scanning cockpit for turning market data, news, scanner hits, alerting, review, execution notes, and outcomes into a repeatable trader workflow.
+MarketHawk is an AI-First human-in-the-loop market scanning cockpit for turning market data, news, scanner hits, alerting, review, execution notes, and outcomes into a repeatable trader workflow.
 
 MarketHawk is not:
 
