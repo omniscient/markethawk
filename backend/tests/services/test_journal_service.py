@@ -117,6 +117,64 @@ def test_trade_stats_win_rate(db: Session):
     assert pytest.approx(stats.win_rate, rel=1e-3) == 0.5
 
 
+def test_trade_stats_aggregates_pnl_and_profit_factor(db: Session):
+    """get_trade_stats must compute total_pnl and profit_factor via SQL aggregates."""
+    from app.models.trade import Trade
+
+    db.add_all(
+        [
+            Trade(symbol="A", status="closed", net_pnl=Decimal("200")),
+            Trade(symbol="B", status="closed", net_pnl=Decimal("100")),
+            Trade(symbol="C", status="closed", net_pnl=Decimal("-50")),
+        ]
+    )
+    db.flush()
+    stats = get_trade_stats(db)
+    assert stats.total_trades == 3
+    assert stats.winning_trades == 2
+    assert stats.losing_trades == 1
+    assert stats.total_pnl == Decimal("250")
+    assert pytest.approx(float(stats.avg_profit), rel=1e-3) == pytest.approx(
+        250 / 3, rel=1e-3
+    )
+    # gross_profit=300, gross_loss=50 → profit_factor=6.0
+    assert pytest.approx(stats.profit_factor, rel=1e-3) == 6.0
+
+
+def test_trade_stats_profit_factor_all_winners(db: Session):
+    """profit_factor falls back to gross_profit/1 when gross_loss is zero."""
+    from app.models.trade import Trade
+
+    db.add_all(
+        [
+            Trade(symbol="W1", status="closed", net_pnl=Decimal("100")),
+            Trade(symbol="W2", status="closed", net_pnl=Decimal("200")),
+        ]
+    )
+    db.flush()
+    stats = get_trade_stats(db)
+    assert stats.losing_trades == 0
+    # gross_loss=0 → fallback to Decimal("1"), profit_factor = 300/1 = 300.0
+    assert pytest.approx(stats.profit_factor, rel=1e-3) == 300.0
+
+
+def test_trade_stats_ignores_null_pnl(db: Session):
+    """Trades with NULL net_pnl must not count as winners or losers."""
+    from app.models.trade import Trade
+
+    db.add_all(
+        [
+            Trade(symbol="OPEN", status="open"),  # net_pnl=None
+            Trade(symbol="WIN", status="closed", net_pnl=Decimal("50")),
+        ]
+    )
+    db.flush()
+    stats = get_trade_stats(db)
+    assert stats.total_trades == 2
+    assert stats.winning_trades == 1
+    assert stats.losing_trades == 0
+
+
 # ── journal entries ────────────────────────────────────────────────────────
 
 
