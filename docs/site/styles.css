@@ -228,6 +228,12 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.port-note {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
 .diagram {
   margin-top: 28px;
   padding: 22px;

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
+from pathlib import Path
+import sys
 
 
 DEMO_USERNAME = "demo"
@@ -390,6 +392,10 @@ def _decimal(value: str | None) -> Decimal | None:
 
 
 def seed_database() -> None:
+    for candidate in (Path("/app"), Path(__file__).resolve().parents[2] / "backend"):
+        if (candidate / "app").exists() and str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+
     from app.core.auth import hash_password
     from app.core.database import SessionLocal
     from app.models import (
@@ -503,6 +509,7 @@ def seed_database() -> None:
                     data_source=DEMO_SOURCE,
                 )
             )
+        db.flush()
 
         for config in dataset["configs"]:
             db.add(

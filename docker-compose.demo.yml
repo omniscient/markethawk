@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: stockscanner
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: demo_password
-    ports:
-      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,8 +19,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -44,6 +40,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: demo_password
       POLYGON_API_KEY: demo_no_live_key
+      LIVE_WEBSOCKET_ENABLED: "false"
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       COOKIE_SECURE: "false"
@@ -54,7 +51,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: ""
       PYTHONDONTWRITEBYTECODE: "1"
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${DEMO_BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app:ro
       - ./demo:/demo:ro
@@ -76,7 +73,7 @@ services:
       REACT_APP_API_URL: http://localhost:8000
       VITE_API_TARGET: http://backend:8000
     ports:
-      - "127.0.0.1:3333:3333"
+      - "127.0.0.1:${DEMO_FRONTEND_PORT:-3333}:3333"
     volumes:
       - ./frontend:/app
       - /app/node_modules

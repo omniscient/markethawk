@@ -43,6 +43,12 @@ Demo login:
 
 The demo resets only demo-owned Docker volumes. It does not touch normal development or live MarketHawk volumes.
 
+If your normal development stack is already using those ports, keep the same demo data path and choose alternate host ports:
+
+```bash
+DEMO_BACKEND_PORT=8010 DEMO_FRONTEND_PORT=3340 make demo
+```
+
 ## Demo Walkthrough
 
 1. Open the app and log in with the demo account.
