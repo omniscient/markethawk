@@ -22,6 +22,16 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Backtest / Replay Engine (issue #301)
+
+- [PATTERN] Backtest-generated historical signals stay in-memory and are never written to `scanner_events`. The service calls `scan_orchestrator.run()` in read-only mode (skips `_persist`), stores any needed signal context in `backtest_trades.signal_indicators` JSONB, and optionally records a nullable `source_event_id` FK when a real `ScannerEvent` already exists for that `(ticker, date, scanner_type)`. <!-- issue:#301 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [AVOID] Do not INSERT backtest-generated signals into `scanner_events`. The `UniqueConstraint(ticker, event_date, scanner_type)` causes IntegrityErrors on overlapping real events. Synthetic rows also pollute live operational history consumed by alerts, outcome snapshots, and clustering. <!-- issue:#301 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [PATTERN] Backtest-only exit/hold parameters (e.g. `max_hold_sessions`) belong on the per-run request body and are stored on `BacktestRun`, not on `TradingStrategy`. `TradingStrategy` is a live-trading model; its columns must map to behavior the live executor actually implements. <!-- issue:#301 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [AVOID] Do not add backtest-only columns to `TradingStrategy`. The live executor (`auto_trade_service.py`, `tasks/trading.py`) would silently ignore them, creating a latent footgun where users expect live trades to honor a config they set only for backtesting. <!-- issue:#301 date:2026-06-12 expires:2026-12-12 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
