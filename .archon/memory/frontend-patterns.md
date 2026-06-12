@@ -71,6 +71,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not mock API response shapes with ad-hoc field names — always derive mock objects from the actual TypeScript interface. Wrong mock shapes (`{ items, page }` vs `{ signals, limit, offset }`) silently pass because falsy checks short-circuit before the wrong field is accessed. <!-- issue:#250 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+## Frontend: Testing Page Orchestration Components
+
+- [PATTERN] For page-level orchestration components (pages that wire hooks + sub-components), test the conditional render branches the page directly owns and derived state transforms (e.g. displayName from URL param, active period styling) — not the rendered values inside child components, which each have their own dedicated test files. Use module-scope `vi.fn()` spies so each test can set its own state via `mockReturnValueOnce`. <!-- issue:#309 date:2026-06-12 expires:2026-12-12 source:refine -->
+
+- [AVOID] Do not use a static `vi.mock` factory (every hook returning the same fixed value) for page-level tests — it limits all tests to a single render state and signals the file was written for a coverage gate rather than intentional coverage. Use module-scope `vi.fn()` with `beforeEach` defaults instead. <!-- issue:#309 date:2026-06-12 expires:2026-12-12 source:refine -->
+
 ## Frontend: Coverage Thresholds
 
 - [PATTERN] Coverage threshold formula (issue #250 ratchet series): `floor(actual) - 3`, clamped to min 30 for statements/lines and 22 for branches/functions. Run `npx vitest run --coverage` to get actuals; update `frontend/vitest.config.ts` thresholds block. CI gate = threshold ≤ actual, so if clamped threshold exceeds actual, add more tests first. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:implement -->
