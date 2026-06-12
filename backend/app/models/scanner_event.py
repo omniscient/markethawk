@@ -57,6 +57,7 @@ class ScannerEvent(Base):
     )
 
     signal_quality_score = Column(Float, nullable=True)
+    regime = Column(String(30), nullable=True, index=True)
 
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(
