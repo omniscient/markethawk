@@ -81,6 +81,15 @@ graph TD
     forecastworker --> redis
 ```
 
+### Container Users
+
+All containers run as a non-root user except `forecast-worker`:
+
+| Image | User | Note |
+|-------|------|------|
+| `backend`, `celery-worker`, `celery-beat`, `live-scanner` | `appuser` (UID 1000) | Standard policy |
+| `forecast-worker` | `root` | HuggingFace/TimesFM weights (~800 MB) are cached at `/root/.cache/huggingface` via the `timesfm_cache` named volume; converting to non-root requires relocating the cache path and is tracked as a separate follow-up |
+
 ## Scan Execution Flow
 
 A full pre-market scan proceeds as follows:
