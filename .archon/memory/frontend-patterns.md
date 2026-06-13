@@ -69,6 +69,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] For per-test mock overrides with `vi.mock`, create the factory function as a `vi.fn()` spy at module scope (e.g. `const mockUseWatchlist = vi.fn(() => defaultReturn)`), reference it in the `vi.mock` factory (`useWatchlist: () => mockUseWatchlist()`), then use `mockUseWatchlist.mockReturnValueOnce(...)` in individual tests — same pattern as ScorecardOverview.test.tsx and ActiveWatchlist.test.tsx. <!-- issue:#250 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+- [PATTERN] When the test needs to assert call args on a hook mock, forward arguments in the factory: `useScorecard: (...args: unknown[]) => mockUseScorecard(...args)` — the `() => mockFn()` form drops all args so `mockFn.mock.calls` is always `[[]]`, making call-arg assertions always pass vacuously. <!-- issue:#315 date:2026-06-13 expires:2026-12-13 source:implement -->
+
 - [AVOID] Do not mock API response shapes with ad-hoc field names — always derive mock objects from the actual TypeScript interface. Wrong mock shapes (`{ items, page }` vs `{ signals, limit, offset }`) silently pass because falsy checks short-circuit before the wrong field is accessed. <!-- issue:#250 date:2026-06-11 expires:2026-12-11 source:implement -->
 
 ## Frontend: Coverage Thresholds
@@ -82,3 +84,5 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+- [PROVISIONAL] For date-sensitive Vitest tests, isolate fake timers in a sibling `describe` block: call `vi.useFakeTimers()` + `vi.setSystemTime(new Date('YYYY-MM-DDT00:00:00.000Z'))` in `beforeEach`, and `vi.useRealTimers()` in `afterEach` — this prevents timer state from leaking into adjacent tests that use real dates. <!-- evidence:test-output issue:#315 date:2026-06-13 expires:2026-12-13 source:implement -->
