@@ -1,3 +1,4 @@
+from app.tasks.backtest import run_backtest
 from app.tasks.quality import (
     analyze_signal_features,
     analyze_universe_quality,
@@ -27,6 +28,8 @@ from app.tasks.trading import (
 )
 
 __all__ = [
+    # backtest
+    "run_backtest",
     # sync
     "sync_tickers_batch",
     "sync_ticker_details",

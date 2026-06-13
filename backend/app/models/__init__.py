@@ -6,6 +6,8 @@ from app.models.active_watchlist import ActiveWatchlist
 from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.auto_trade_order import AutoTradeOrder
+from app.models.backtest_run import BacktestRun
+from app.models.backtest_trade import BacktestTrade
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.futures_contract import FuturesContract
 from app.models.futures_rollover import FuturesRollover
@@ -37,6 +39,8 @@ from app.models.universe_quality_report import UniverseQualityReport
 from app.models.user import User
 
 __all__ = [
+    "BacktestRun",
+    "BacktestTrade",
     "StockUniverse",
     "MonitoredStock",
     "ScannerEvent",
