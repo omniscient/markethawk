@@ -4,7 +4,7 @@ from datetime import datetime
 import redis
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,41 @@ from app.core.rate_limits import AUTH_LIMIT, limiter
 from app.models.user import User
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+_COMMON_PASSWORDS: frozenset = frozenset(
+    {
+        "password123456",
+        "123456789012",
+        "qwerty123456",
+        "passwordpassword",
+        "letmein123456",
+        "monkey123456",
+        "iloveyou1234",
+        "admin123456789",
+        "welcome123456",
+        "login123456789",
+        "passw0rd12345",
+        "starwars12345",
+        "master123456789",
+        "hello123456789",
+        "shadow123456789",
+        "sunshine123456",
+        "princess123456",
+        "dragon123456789",
+        "baseball123456",
+        "football123456",
+        "superman123456",
+        "batman12345678",
+        "trustno112345",
+        "mustang123456",
+        "access123456789",
+        "michael123456",
+        "jessica123456",
+        "andrew123456789",
+        "joshua12345678",
+        "hunter12345678",
+    }
+)
 
 
 def _get_redis():
@@ -54,7 +89,14 @@ def _set_auth_cookies(
 
 class RegisterRequest(BaseModel):
     username: str
-    password: str
+    password: str = Field(min_length=12)
+
+    @field_validator("password")
+    @classmethod
+    def password_not_common(cls, v: str) -> str:
+        if v.lower() in _COMMON_PASSWORDS:
+            raise ValueError("Password is too common")
+        return v
 
 
 class LoginRequest(BaseModel):

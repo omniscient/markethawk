@@ -22,7 +22,7 @@ def test_auth_status_returns_bootstrapped_false_when_no_users(db):
 def test_register_creates_first_user(db):
     response = client.post(
         "/api/auth/register",
-        json={"username": "admin", "password": "hunter2"},
+        json={"username": "admin", "password": "ValidPassword1!"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -31,26 +31,32 @@ def test_register_creates_first_user(db):
 
 
 def test_register_blocked_when_user_exists(db):
-    client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
+    client.post(
+        "/api/auth/register", json={"username": "admin", "password": "ValidPassword1!"}
+    )
     response = client.post(
         "/api/auth/register",
-        json={"username": "admin2", "password": "hunter2"},
+        json={"username": "admin2", "password": "ValidPassword1!"},
     )
     assert response.status_code == 403
 
 
 def test_login_sets_cookies(db):
-    client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
+    client.post(
+        "/api/auth/register", json={"username": "admin", "password": "ValidPassword1!"}
+    )
     response = client.post(
         "/api/auth/login",
-        json={"username": "admin", "password": "hunter2"},
+        json={"username": "admin", "password": "ValidPassword1!"},
     )
     assert response.status_code == 200
     assert "access_token" in response.cookies
 
 
 def test_login_wrong_password_returns_401(db):
-    client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
+    client.post(
+        "/api/auth/register", json={"username": "admin", "password": "ValidPassword1!"}
+    )
     response = client.post(
         "/api/auth/login",
         json={"username": "admin", "password": "wrongpassword"},
@@ -63,7 +69,7 @@ def test_me_returns_current_user(db):
 
     # Register and get the real user ID to create an authenticated token
     reg = client.post(
-        "/api/auth/register", json={"username": "admin", "password": "hunter2"}
+        "/api/auth/register", json={"username": "admin", "password": "ValidPassword1!"}
     )
     user_id = reg.json()["id"]
     token = create_access_token(user_id)
@@ -78,7 +84,7 @@ def test_logout_clears_cookies(db):
 
     # Register and set a valid token for the registered user
     reg = client.post(
-        "/api/auth/register", json={"username": "admin", "password": "hunter2"}
+        "/api/auth/register", json={"username": "admin", "password": "ValidPassword1!"}
     )
     user_id = reg.json()["id"]
     token = create_access_token(user_id)
@@ -99,10 +105,12 @@ def test_cookie_secure_defaults_to_true():
 
 
 def test_login_cookies_have_correct_flags(db):
-    client.post("/api/auth/register", json={"username": "admin", "password": "hunter2"})
+    client.post(
+        "/api/auth/register", json={"username": "admin", "password": "ValidPassword1!"}
+    )
     response = client.post(
         "/api/auth/login",
-        json={"username": "admin", "password": "hunter2"},
+        json={"username": "admin", "password": "ValidPassword1!"},
     )
     assert response.status_code == 200
     set_cookie_headers = [
@@ -116,3 +124,19 @@ def test_login_cookies_have_correct_flags(db):
     # Secure flag must appear on both cookies (COOKIE_SECURE defaults True)
     assert "secure" in access_cookie.lower()
     assert "secure" in refresh_cookie.lower()
+
+
+def test_register_rejects_short_password(db):
+    response = client.post(
+        "/api/auth/register",
+        json={"username": "admin", "password": "short123"},
+    )
+    assert response.status_code == 422
+
+
+def test_register_rejects_common_password(db):
+    response = client.post(
+        "/api/auth/register",
+        json={"username": "admin", "password": "password123456"},
+    )
+    assert response.status_code == 422
