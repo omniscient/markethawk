@@ -386,3 +386,29 @@ def test_update_rule_accepts_valid_channel_config(db: Session):
     assert (
         response.json()["channel_config"]["webhook_url"] == "https://example.com/hook"
     )
+
+
+def test_create_rule_rejects_invalid_email_format(db: Session):
+    payload = {
+        "name": "Invalid Email Rule",
+        "channels": ["email"],
+        "channel_config": {"email": "not-an-email-address"},
+    }
+
+    response = client.post("/api/v1/alerts/rules", json=payload)
+
+    assert response.status_code == 422
+    assert "channel_config" in response.json()["detail"]
+
+
+def test_create_rule_rejects_non_url_webhook(db: Session):
+    payload = {
+        "name": "Invalid Webhook Rule",
+        "channels": ["webhook"],
+        "channel_config": {"webhook_url": "not-a-valid-url"},
+    }
+
+    response = client.post("/api/v1/alerts/rules", json=payload)
+
+    assert response.status_code == 422
+    assert "channel_config" in response.json()["detail"]

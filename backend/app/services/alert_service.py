@@ -15,7 +15,7 @@ import ssl
 from datetime import date, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, get_args
 
 import httpx
 from sqlalchemy.orm import Session
@@ -25,9 +25,12 @@ from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
+from app.schemas.event import SeverityLiteral
 from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
+
+_VALID_SEVERITIES: frozenset = frozenset(get_args(SeverityLiteral))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -378,14 +381,9 @@ def save_event(
     summary = generate_event_summary(scanner_type, indicators)
     severity = compute_event_severity(scanner_type, indicators)
 
-    import typing
-
-    from app.schemas.event import SeverityLiteral
-
-    valid_severities = typing.get_args(SeverityLiteral)
-    if severity not in valid_severities:
+    if severity not in _VALID_SEVERITIES:
         raise ValueError(
-            f"Invalid severity '{severity}': must be one of {valid_severities}"
+            f"Invalid severity '{severity}': must be one of {_VALID_SEVERITIES}"
         )
 
     _validate_jsonb_dict(indicators, "indicators")

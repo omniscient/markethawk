@@ -28,6 +28,7 @@ def _parse_channel_config(payload: Dict[str, Any]) -> None:
     """Validate channel_config against ChannelConfig schema; raise HTTP 422 on invalid input."""
     raw = payload.get("channel_config")
     if raw is None:
+        # Absent/null channel_config is stored as {} by the rule constructor; skip validation.
         return
     try:
         ChannelConfig.model_validate(raw)
