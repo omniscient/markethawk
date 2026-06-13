@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## CI Security Scanning
+
+- [PATTERN] Use two Trivy steps per matrix image: one `format: table` step with `exit-code: "1"`, `severity: HIGH,CRITICAL`, and `ignore-unfixed: true` to gate the job; one `format: sarif` step with `exit-code: "0"` and `if: always()` to feed the GitHub Security tab. A single step with `format: sarif` + `exit-code: "1"` does not reliably block in `aquasecurity/trivy-action@0.28.0` — the SARIF formatter and exit-code gate are separate code paths. <!-- issue:#293 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not set `continue-on-error: true` on the `scan` job — it swallows step failures and makes the Trivy gate appear to pass even when the table step exits 1. Remove it (or set it to `false`) whenever Trivy is intended to block the publish. <!-- issue:#293 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
