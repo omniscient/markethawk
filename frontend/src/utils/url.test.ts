@@ -59,4 +59,13 @@ describe('safeExternalUrl', () => {
   it('rejects http: even when host is in allowedHosts', () => {
     expect(safeExternalUrl('http://twitter.com/foo', { allowedHosts: TWEET_HOSTS })).toBeNull();
   });
+
+  it('accepts a subdomain of an allowedHost', () => {
+    const url = 'https://mobile.twitter.com/user/status/123';
+    expect(safeExternalUrl(url, { allowedHosts: TWEET_HOSTS })).toBe(url);
+  });
+
+  it('rejects a host that only ends with an allowedHost string but is not a subdomain', () => {
+    expect(safeExternalUrl('https://eviltwitter.com/foo', { allowedHosts: TWEET_HOSTS })).toBeNull();
+  });
 });
