@@ -41,6 +41,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Scheduler Architecture
 
+- [PATTERN] When `dependencies_met()` in `scheduler.sh` cannot find a dep on the board (`dep_status` is empty), fall back to `gh issue view $dep_num --json state -q '.state'` and treat CLOSED as met. This handles deps that are archived off the board or beyond the 50-item fetch window. gh failure (empty state) → treat as unmet (safe direction). <!-- issue:#389 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not solve archived-dependency stranding by expanding the board `items(first: N)` fetch window. It burns GraphQL rate-limit budget on every poll cycle and still does not handle the archival case (archived items are absent regardless of fetch window size). The correct fix is the off-board fallback to `gh issue view`. <!-- issue:#389 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 - [PATTERN] All `dispatch()` call sites in `scheduler.sh` must use `if dispatch ...; then ... fi` guards. A bare `dispatch "..."` under `set -e` exits the daemon on non-zero return, which triggers `restart: unless-stopped` and wipes the retry counter — the root cause of the #159 loop. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
 
 ## Codeindex / MCP Integration
@@ -63,16 +67,11 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## DAG Trigger Rules
 
-- [AVOID] Do not add structural OR-join detection (checking whether all upstreams carry a `when:` condition) to a ticket where the spec listed it as Non-Goal (v1) — it changes what gets built and will be caught as a material conformance deviation even when the intent is to improve coverage. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:conformance path:dark-factory/scripts/ -->
 - [PATTERN] Every OR-join node in `archon-dark-factory.yaml` — a node whose `depends_on` list contains mutually-exclusive upstream branches (one is always skipped per intent) — must declare `trigger_rule: none_failed_min_one_success` (or `one_success`). The default `all_success` treats a skipped upstream as non-success and silently skips the join and all its descendants. The four known OR-join nodes (`validate`, `de-conflict`, `status-in-review`, `report`) are enumerated in `REQUIRED_OR_JOIN_NODES` in `dark-factory/scripts/check_workflow_dag.py`; when adding a new OR-join, add its ID there too. A sync tripwire (count of trigger_rule-bearing nodes must equal `len(REQUIRED_OR_JOIN_NODES)`) fires with an "update REQUIRED_OR_JOIN_NODES" prompt if the count drifts. <!-- issue:#224 date:2026-06-11 expires:2026-12-11 source:conformance -->
 
 ## Refine-Branch Pre-Implementation
 
 - [PATTERN] When the architect subagent implements plan tasks during validation (indicated by "Verdict: Approved (implemented directly...)" in the issue comment), cherry-pick those commits from `origin/refine/issue-NNN-...` onto the feat branch rather than reimplementing from scratch: `git log --oneline main..origin/refine/<branch>` to find the commits, then `git cherry-pick <hashes>` in chronological order. <!-- issue:#173 date:2026-06-04 expires:2026-12-04 source:implement -->
-
-## Plan Drift
-
-- [PATTERN] When a refinement plan specifies exact line numbers or file counts for reference fixes, always re-grep the actual files rather than trusting the plan's enumeration — commits landing between plan creation and implementation can shift line numbers and add/remove references. <!-- issue:#171 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 ## Conflict Resolution
 
@@ -97,8 +96,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] Path-tag filtering in Phase 1 LOAD extracts the `path:` prefix with `sed 's/.*path:\([^ >]*\).*/\1/'` (POSIX-compatible; not `grep -oP`) and matches via `echo "$AFFECTED" | grep -q "^${PATH_TAG}"` against the affected file list; empty `AFFECTED` means "include all" — correct fallback for new branches. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
 
 - [INVALID: functions moved to dark-factory/scripts/gate_lib.sh — source instead of inline-define] Gate commands (conformance, code-review) that need to write `[AVOID]` memory entries should define `route_memory_file()` and `write_memory_entry()` as inline shell functions using: dedup via `grep -qF`, 30-entry cap check, mawk-compatible two-arg awk expiry cleanup, and `sed -i "/^---$/i ENTRY"` to insert before the PROVISIONAL section delimiter. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
-
-- [AVOID] Never use a simple hex-sequence like `a1b2c3d4e5f6` as an Alembic revision ID — the existing migration set contains files with IDs following this pattern and conflicts will produce a `CycleDetected` error. Use `python -m alembic revision -m "..."` to generate a unique ID, or pick a random 12-char alphanumeric string that doesn't appear in `ls backend/app/alembic/versions/` output. <!-- issue:#299 date:2026-06-11 expires:2026-12-11 source:implement -->
 
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
