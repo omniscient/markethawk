@@ -5,8 +5,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Frontend: Data Fetching
 
-- [PATTERN] Use React Query (`useQuery` / `useMutation`) for all server state — never `useState` + `useEffect` + `fetch`. The existing query client is configured in `frontend/src/main.tsx`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
-
 - [PATTERN] Query keys follow the format `['resource', id?]` — e.g. `['scanner-results']`, `['stock', ticker]`. Keep keys consistent across the file so React Query can cache and invalidate correctly. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 ## Frontend: TypeScript
@@ -38,10 +36,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Frontend: Security Headers
 
 - [PATTERN] Both `apiClient` and `unversionedClient` in `frontend/src/api/client.ts` must carry any security headers (e.g. `X-Requested-With: XMLHttpRequest`) as static defaults in the `headers` block — never add them only to one client, as auth endpoints use `unversionedClient` and API endpoints use `apiClient`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
-
-## Frontend: Routing
-
-- [PATTERN] New routes are registered in `frontend/src/App.tsx` using React Router `<Route>` elements. Match the existing pattern of lazy-loaded page components (`React.lazy` + `Suspense`). <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 ## Frontend: Testing Selectors
 
@@ -100,3 +94,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [AVOID] `allowedHosts` matching in `safeExternalUrl` must use exact-host-or-subdomain logic (`host === h || host.endsWith('.' + h)`), not `Array.includes(hostname)`, which is exact-match only and silently drops subdomain support the spec requires (e.g. `mobile.twitter.com` would be rejected despite `twitter.com` being in the allowlist). <!-- issue:#381 date:2026-06-13 expires:2026-12-13 source:conformance path:frontend/src/utils/ -->
  
 - [PROVISIONAL] The `react-hooks/set-state-in-effect` ESLint rule fires only on the FIRST setState call in a useEffect body (complex values like `new Set()` or conditional `true`/`false` trigger it; simple literal resets like `null`, `'all'`, `0` do not); add `// eslint-disable-next-line react-hooks/set-state-in-effect` before that first call to silence the entire effect — one comment suffices. <!-- evidence:pre-commit-hook-output issue:#294 date:2026-06-13 expires:2026-12-13 source:implement -->
+## Frontend: ARIA vs data-testid for test assertions
+
+- [PATTERN] Prefer ARIA semantic attributes (`aria-pressed`, `role="status"`, `aria-label`) over `data-testid` when adding source hooks to make components testable. ARIA attributes carry real accessibility semantics (screen reader announcements, WCAG compliance), survive cosmetic CSS refactors, and are queried via RTL's `getByRole`/`getByLabelText` — same as any semantic HTML element. `data-testid` is test-only scaffolding with no semantic value. <!-- issue:#396 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not test interactive UI state (active toggle button, severity indicator color, count-at-limit color) via `className.toContain('tailwind-class')`. These assertions couple tests to CSS implementation details and break on visual refactors. Add `aria-pressed` to toggle buttons and `aria-label` to color-coded indicators so RTL can query them semantically. <!-- issue:#396 date:2026-06-13 expires:2026-12-13 source:refine -->
