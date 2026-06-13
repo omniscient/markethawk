@@ -75,3 +75,12 @@ def test_redis_url_not_double_injected():
     s1 = Settings(REDIS_PASSWORD="a" * 16)
     s2 = Settings(REDIS_PASSWORD="a" * 16, REDIS_URL=s1.REDIS_URL)
     assert s2.REDIS_URL == s1.REDIS_URL
+
+
+def test_redis_url_password_special_chars_are_encoded():
+    """Passwords with URL-special characters must be percent-encoded in REDIS_URL."""
+    # '@' in password would break URL parsing if not encoded
+    password = "a" * 14 + "@:"
+    s = Settings(REDIS_PASSWORD=password)
+    assert "%40%3A" in s.REDIS_URL
+    assert f":{password}@" not in s.REDIS_URL

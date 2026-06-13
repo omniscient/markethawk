@@ -3,6 +3,7 @@ Application configuration using pydantic-settings.
 """
 
 from functools import lru_cache
+from urllib.parse import quote
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -151,10 +152,13 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _build_redis_url(self) -> "Settings":
         if self.REDIS_PASSWORD:
+            if "://" not in self.REDIS_URL:
+                raise ValueError("REDIS_URL must include a scheme (e.g. redis://...)")
             scheme, rest = self.REDIS_URL.split("://", 1)
             if "@" in rest:
                 rest = rest.split("@", 1)[1]
-            self.REDIS_URL = f"{scheme}://:{self.REDIS_PASSWORD}@{rest}"
+            encoded = quote(self.REDIS_PASSWORD, safe="")
+            self.REDIS_URL = f"{scheme}://:{encoded}@{rest}"
         return self
 
     @field_validator("JWT_SECRET_KEY")
