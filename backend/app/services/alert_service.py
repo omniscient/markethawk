@@ -337,6 +337,17 @@ class NotificationDispatcher:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def _validate_jsonb_dict(value: Any, field_name: str) -> None:
+    if not isinstance(value, dict):
+        raise ValueError(f"{field_name} must be a dict, got {type(value).__name__}")
+    try:
+        json.dumps(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{field_name} contains non-JSON-serializable value: {exc}"
+        ) from exc
+
+
 def trigger_scanner_alert(event_id: int) -> None:
     """Enqueue alert evaluation for a newly persisted ScannerEvent."""
     from app.tasks import evaluate_scanner_alerts
@@ -366,6 +377,20 @@ def save_event(
 
     summary = generate_event_summary(scanner_type, indicators)
     severity = compute_event_severity(scanner_type, indicators)
+
+    import typing
+
+    from app.schemas.event import SeverityLiteral
+
+    valid_severities = typing.get_args(SeverityLiteral)
+    if severity not in valid_severities:
+        raise ValueError(
+            f"Invalid severity '{severity}': must be one of {valid_severities}"
+        )
+
+    _validate_jsonb_dict(indicators, "indicators")
+    _validate_jsonb_dict(criteria_met, "criteria_met")
+    _validate_jsonb_dict(enrichment, "enrichment")
 
     score = None
     if ranker_config and ranker_config.get("enabled") and ranker_config.get("weights"):

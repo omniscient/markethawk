@@ -189,7 +189,9 @@ def test_update_rule_toggle_active(db: Session):
     rules = seed_alert_rules(db)
     rule_id = rules[0].id  # starts active
 
-    response = client.patch(f"/api/v1/alerts/rules/{rule_id}", json={"is_active": False})
+    response = client.patch(
+        f"/api/v1/alerts/rules/{rule_id}", json={"is_active": False}
+    )
 
     assert response.status_code == 200
     assert response.json()["is_active"] is False
@@ -323,3 +325,64 @@ def test_list_logs_includes_failed_entries(db: Session):
     statuses = {log["status"] for log in response.json()}
     assert "sent" in statuses
     assert "failed" in statuses
+
+
+# ---------------------------------------------------------------------------
+# channel_config validation — POST and PATCH
+# ---------------------------------------------------------------------------
+
+
+def test_create_rule_rejects_unknown_channel_config_key(db: Session):
+    payload = {
+        "name": "Bad Config Rule",
+        "channels": ["email"],
+        "channel_config": {"gmail": "user@example.com"},
+    }
+
+    response = client.post("/api/v1/alerts/rules", json=payload)
+
+    assert response.status_code == 422
+    data = response.json()
+    assert "channel_config" in data["detail"]
+
+
+def test_create_rule_accepts_valid_channel_config(db: Session):
+    payload = {
+        "name": "Good Config Rule",
+        "channels": ["email"],
+        "channel_config": {"email": "user@example.com"},
+    }
+
+    response = client.post("/api/v1/alerts/rules", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["channel_config"]["email"] == "user@example.com"
+
+
+def test_update_rule_rejects_invalid_channel_config(db: Session):
+    rules = seed_alert_rules(db)
+    rule_id = rules[0].id
+
+    response = client.patch(
+        f"/api/v1/alerts/rules/{rule_id}",
+        json={"channel_config": {"slack_webhook": "https://hooks.slack.com/bad"}},
+    )
+
+    assert response.status_code == 422
+    data = response.json()
+    assert "channel_config" in data["detail"]
+
+
+def test_update_rule_accepts_valid_channel_config(db: Session):
+    rules = seed_alert_rules(db)
+    rule_id = rules[0].id
+
+    response = client.patch(
+        f"/api/v1/alerts/rules/{rule_id}",
+        json={"channel_config": {"webhook_url": "https://example.com/hook"}},
+    )
+
+    assert response.status_code == 200
+    assert (
+        response.json()["channel_config"]["webhook_url"] == "https://example.com/hook"
+    )

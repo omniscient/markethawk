@@ -7,6 +7,7 @@ import logging
 from datetime import date, datetime
 from typing import Any, Dict, List
 
+import pydantic
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
@@ -15,11 +16,26 @@ from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
+from app.schemas.alerts import ChannelConfig
 from app.utils.db import get_or_404
 from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 logger = logging.getLogger(__name__)
+
+
+def _parse_channel_config(payload: Dict[str, Any]) -> None:
+    """Validate channel_config against ChannelConfig schema; raise HTTP 422 on invalid input."""
+    raw = payload.get("channel_config")
+    if raw is None:
+        return
+    try:
+        ChannelConfig.model_validate(raw)
+    except pydantic.ValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"channel_config": exc.errors()},
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -98,6 +114,7 @@ def create_rule(
     payload: Dict[str, Any], db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Create a new alert rule."""
+    _parse_channel_config(payload)
     rule = AlertRule(
         name=payload.get("name", "Untitled Rule"),
         is_active=payload.get("is_active", True),
@@ -121,6 +138,7 @@ def update_rule(
     rule_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """Update an alert rule (full or partial). Used for toggles too."""
+    _parse_channel_config(payload)
     rule = get_or_404(db, AlertRule, rule_id, "AlertRule")
 
     updatable = {

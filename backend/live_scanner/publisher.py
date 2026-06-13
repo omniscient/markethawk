@@ -13,6 +13,7 @@ Alerts flow to:
 import asyncio
 import json
 import logging
+import typing
 import uuid as uuid_module
 from datetime import datetime, timezone
 
@@ -132,6 +133,16 @@ class LivePublisher:
 
         summary = generate_event_summary(condition.scanner_type, condition.indicators)
         severity = compute_event_severity(condition.scanner_type, condition.indicators)
+
+        from app.schemas.event import SeverityLiteral
+
+        valid_severities = typing.get_args(SeverityLiteral)
+        if severity not in valid_severities:
+            logger.error(
+                f"LivePublisher: invalid severity '{severity}' for "
+                f"{bar.symbol} {condition.scanner_type} — skipping DB write"
+            )
+            return
 
         # Write to DB in a background thread (sync SQLAlchemy)
         event_id: int | None = None
