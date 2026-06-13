@@ -295,6 +295,7 @@ Each page is a co-located directory (`pages/PageName/index.tsx` + panel files). 
 | `StockDetailPage` | `/stock/:ticker` | `StockDetailPage/` (index, ChartPanel, MetadataPanel, ScannerHistoryPanel) | Per-ticker chart, metrics, and news. Supports `?date=YYYY-MM-DD` |
 | `AutoTrading` | `/trading` | `AutoTrading/` (index, StrategyPanel, OrdersPanel, AccountPanel, ConfigPanel, components) | Strategy management, order approval, IBKR account |
 | `Login` | `/login` | `Login/index.tsx` | Bootstrap-aware login and first-user registration. On first launch shows "Create account" form; on subsequent launches shows login form. Redirects to `/` on success. |
+| `ScorecardOverview` | `/scorecard` | `ScorecardOverview.tsx` | Signal quality scorecards across all active scanner configs |
 | `Settings` | `/settings` | `Settings.tsx` | System configuration |
 
 ### Charting Libraries
