@@ -2,7 +2,7 @@ import { vi, describe, it, expect } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { renderWithQuery } from '../test-utils/renderWithQuery';
 import QualityReportModal from './QualityReportModal';
-import type { StockUniverse } from '../api/scanner';
+import type { StockUniverse } from '../api/universe';
 
 const mockFetchReport = vi.fn().mockResolvedValue({
   universe_id: 1,
@@ -27,7 +27,7 @@ const mockFetchReport = vi.fn().mockResolvedValue({
   normalization_data: null,
 });
 
-vi.mock('../api/scanner', () => ({
+vi.mock('../api/universe', () => ({
   fetchQualityReport: () => mockFetchReport(),
   triggerQualityAnalysis: vi.fn().mockResolvedValue({}),
   triggerNormalization: vi.fn().mockResolvedValue({}),

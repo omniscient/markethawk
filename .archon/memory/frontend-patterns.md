@@ -98,3 +98,5 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Frontend: URL Validation
 
 - [AVOID] `allowedHosts` matching in `safeExternalUrl` must use exact-host-or-subdomain logic (`host === h || host.endsWith('.' + h)`), not `Array.includes(hostname)`, which is exact-match only and silently drops subdomain support the spec requires (e.g. `mobile.twitter.com` would be rejected despite `twitter.com` being in the allowlist). <!-- issue:#381 date:2026-06-13 expires:2026-12-13 source:conformance path:frontend/src/utils/ -->
+ 
+- [PROVISIONAL] The `react-hooks/set-state-in-effect` ESLint rule fires only on the FIRST setState call in a useEffect body (complex values like `new Set()` or conditional `true`/`false` trigger it; simple literal resets like `null`, `'all'`, `0` do not); add `// eslint-disable-next-line react-hooks/set-state-in-effect` before that first call to silence the entire effect — one comment suffices. <!-- evidence:pre-commit-hook-output issue:#294 date:2026-06-13 expires:2026-12-13 source:implement -->

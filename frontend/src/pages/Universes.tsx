@@ -23,10 +23,7 @@ import UniverseDetailsModal from '../components/UniverseDetailsModal';
 import SyncUniverseModal from '../components/SyncUniverseModal';
 import ExportUniverseModal from '../components/ExportUniverseModal';
 import QualityReportModal from '../components/QualityReportModal';
-import { StockUniverse, QualityReport, fetchQualityReport } from '../api/scanner';
-
-// API functions
-import { fetchStockUniverses, deleteStockUniverse, fetchUniverseSyncStatus, syncMissingAggregates, refreshUniverseStats } from '../api/scanner';
+import { StockUniverse, QualityReport, fetchQualityReport, fetchStockUniverses, deleteStockUniverse, fetchUniverseSyncStatus, syncMissingAggregates, refreshUniverseStats } from '../api/universe';
 
 const Universes: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');

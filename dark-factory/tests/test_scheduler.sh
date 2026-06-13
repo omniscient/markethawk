@@ -25,6 +25,22 @@ export STATE_FILE
 # Stub credentials to satisfy the validation block (which runs before SCHEDULER_SOURCE_ONLY guard)
 export GH_TOKEN="${GH_TOKEN:-stub-token}"
 export CLAUDE_CODE_OAUTH_TOKEN="${CLAUDE_CODE_OAUTH_TOKEN:-stub-token}"
+# Set all config-driven vars explicitly: read_config runs after SCHEDULER_SOURCE_ONLY guard
+# so these values won't be populated by config.yaml during test sourcing.
+export POLL_INTERVAL=60
+export MAX_RETRIES=3
+export RATE_LIMIT_FLOOR=200
+export FACTORY_WIP_LIMIT=1
+export MAIN_RED_RECHECK_ENABLED=true
+export MAIN_RED_RECHECK_MINUTES=20
+export REFINE_WIP_LIMIT=2
+export DIRECT_TO_PR_LABEL=direct-to-pr
+export SPEC_GRACE_MINUTES=30
+export PLAN_GRACE_MINUTES=30
+export CONFLICT_RESOLUTION_ENABLED=true
+export DISPATCH_CEILING_ENABLED=true
+export ABOVE_CEILING_LABEL=above-ceiling
+export ABOVE_CEILING_KEYWORDS="migration|migrate|performance|perf|architectur|refactor"
 SCHEDULER_SOURCE_ONLY=1 source "$SCHED"
 
 # Re-stub set_board_status — scheduler.sh defines its own, overriding the export above
@@ -632,7 +648,7 @@ export -f gh get_pr_for_issue is_issue_running check_pr_mergeable dispatch
 echo ""
 echo "--- L: factory_at_capacity ---"
 
-assert_eq "L0: FACTORY_WIP_LIMIT defaults to 1" "1" "${FACTORY_WIP_LIMIT:-}"
+assert_eq "L0: FACTORY_WIP_LIMIT=1 (test-provided)" "1" "${FACTORY_WIP_LIMIT:-}"
 
 FACTORY_WIP_LIMIT=1
 factory_at_capacity 0 \
