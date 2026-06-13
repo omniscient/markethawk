@@ -33,7 +33,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Scope Enforcement
 
-- [PATTERN] When an out-of-scope defect is noticed during implementation, write it to `$ARTIFACTS_DIR/out-of-scope.md` with `- <file>: <one-sentence description>` and leave the defect unfixed. The conformance gate calls `dark-factory/scripts/dedupe_oos.py` which classifies each entry as `create` (new ticket), `comment:<n>` (cross-run dup — post comment on existing `scope-spillover` issue), or `suppress` (within-run dup or ruff-reformat); only `create` entries open new issues. New issues embed `<!-- dedup-key: file|finding-type -->` for future cross-run matching. <!-- issue:#206 date:2026-06-04 updated-by:#384 date:2026-06-13 expires:2026-12-13 source:implement -->
+- [PATTERN] When an out-of-scope defect is noticed during implementation, write it to `$ARTIFACTS_DIR/out-of-scope.md` with `- <file>: <one-sentence description>` and leave the defect unfixed. The conformance gate reads this file and converts each entry into a `scope-spillover`-labelled backlog ticket automatically. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 ## Scheduler Architecture
 
