@@ -3,10 +3,6 @@
 This file is maintained automatically by the dark factory implement agent. Do not edit manually.
 Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, follow those documents.
 
-## Backend: Models
-
-- [INVALID: app uses synchronous SQLAlchemy (Session/psycopg2), not AsyncSession — ADR-0004] Never use synchronous SQLAlchemy patterns (`session.query()`, sync `relationship()` lazy loads) — the app uses `AsyncSession` throughout. All queries use `select()` + `await session.execute()`. Sync lazy-loading raises `MissingGreenlet` in asyncpg. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
-
 ## Backend: API Routes
 
 - [AVOID] Never use `joinedload()` with paginated queries (`LIMIT/OFFSET`) on one-to-many relationships — it produces a JOIN that row-multiplies the parent before LIMIT is applied, so paginated pages return fewer rows than `limit` when children exist. Use `selectinload()` instead, which issues a separate `SELECT … WHERE id IN (…)` after the paginated parent query. See `routers/scanner.py` `joinedload(ScannerEvent.reviews)` → `selectinload` fix. <!-- issue:#291 date:2026-06-12 expires:2026-12-12 source:implement -->
@@ -34,8 +30,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Backend: Config / Settings
 
 - [PATTERN] When adding a `field_validator` to `Settings` in `config.py`, add a matching `os.environ.setdefault("FIELD_NAME", valid_value)` at the top of `backend/tests/conftest.py` (before app imports) — otherwise bare `Settings()` calls in existing tests will hit the new validator with the default value and fail. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
-
-- [PATTERN] Test a pydantic-settings validator by passing the invalid value as an init kwarg — `Settings(JWT_SECRET_KEY="")` — since init kwargs override env vars. This gives a clean, deterministic test without manipulating environment state. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 ## Backend: Migrations
 
@@ -79,6 +73,14 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] EnrichedSignal must carry raw:RawSignal and day_metrics:dict stage-boundary fields per spec; omitting them severs the seam contract and blocks recovery of the original signal from enriched output <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:conformance path:backend/app/services/ -->
 - [AVOID] Stage functions (especially _enrich_one / per-ticker helpers) must stay under ~80 lines; when a helper grows large, extract the indicator-building body into a named _build_indicators() sub-helper rather than leaving it inline <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:conformance path:backend/app/services/ -->
+## Backend: Logging
+
+- [PATTERN] When adding a logging filter that must apply to both the FastAPI backend and Celery workers, install it via two paths: (1) call `logging.getLogger().addFilter(...)` inside `create_app()` in `main.py` for the backend process, and (2) connect to `celery.signals.after_setup_logger` + `after_setup_task_logger` in `celery_app.py` for the worker/beat processes — Celery resets the root logger after import, so `create_app()` is never called in worker processes. Factor the filter into a shared helper (e.g. `core/log_filters.py`) and call it from both sites. <!-- issue:#382 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not install a logging filter only in `create_app()` expecting it to apply to Celery workers — the `celery-worker` and `celery-beat` containers launch via `celery ... worker|beat` and never execute `create_app()`. Celery's own logging setup (which runs after import) overwrites any root-logger configuration done at module load time in `celery_app.py`; use the `after_setup_logger` signal hook instead. <!-- issue:#382 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [PATTERN] Sensitive `Settings` fields (API keys, passwords, connection strings) must carry `Field(repr=False)` in `backend/app/core/config.py` to prevent Pydantic's default `__repr__` from rendering their values. A regex-based logging filter defends against secrets interpolated from other sources; `repr=False` defends against `logger.info(f"config: {settings}")` calls where the secret is already embedded in the string before the filter can act. Both layers are needed. <!-- issue:#382 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
