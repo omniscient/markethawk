@@ -100,6 +100,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          no-cache: true  # force clean rebuild to exercise ubuntu-eviction layer (issue #261)
 
   scan:
     runs-on: ubuntu-latest
