@@ -5,7 +5,7 @@ from app.core.database import engine
 
 
 def test_engine_echo_matches_environment():
-    assert engine.echo == (settings.ENVIRONMENT == "development")
+    assert engine.echo == (settings.LOG_LEVEL == "DEBUG")
 
 
 def test_engine_pool_size_matches_settings():
