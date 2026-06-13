@@ -182,7 +182,7 @@ Expected: `AttributeError: 'Settings' object has no attribute 'SCAN_DURATION_SLO
 
 - [ ] **Step 3: Add fields to `backend/app/core/config.py`**
 
-In the `Settings` class, after the last existing scanner/promotion-related field (e.g. `PROMOTION_THRESHOLD`), add:
+In the `Settings` class, after the last existing field (`VAPID_CLAIMS_EMAIL`, line 114) and before the first `@field_validator`, add:
 
 ```python
     # Scanner SLO thresholds — documented in ENV_VARIABLES.md
@@ -739,7 +739,7 @@ Expected: `OK`.
 
 - [ ] **Step 2: Append three rules inside the `markethawk-infrastructure` group's `rules:` list**
 
-After the last existing rule in `grafana/provisioning/alerting/rules.yaml` (currently the `db-pool-overflow` rule block, which ends with `expression: $B > 0`), and still inside the `rules:` list of the `markethawk-infrastructure` group, append:
+After the last existing rule in `grafana/provisioning/alerting/rules.yaml` (currently the `tweet-monitor-auth-expired` rule block, which ends with `expression: $B < 1`), and still inside the `rules:` list of the `markethawk-infrastructure` group, append:
 
 ```yaml
       - uid: scan-missed-slot-pre-market
