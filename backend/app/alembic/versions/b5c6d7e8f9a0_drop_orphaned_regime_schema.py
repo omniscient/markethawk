@@ -24,13 +24,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.drop_index("ix_scanner_events_regime", table_name="scanner_events")
-    op.drop_column("scanner_events", "regime")
+    op.execute("DROP INDEX IF EXISTS ix_scanner_events_regime")
+    op.execute("ALTER TABLE scanner_events DROP COLUMN IF EXISTS regime")
 
-    op.drop_index(op.f("ix_regime_models_id"), table_name="regime_models")
-    op.drop_index("ix_regime_models_status_version", table_name="regime_models")
-    op.drop_index(op.f("ix_regime_models_version"), table_name="regime_models")
-    op.drop_table("regime_models")
+    op.execute("DROP INDEX IF EXISTS ix_regime_models_id")
+    op.execute("DROP INDEX IF EXISTS ix_regime_models_status_version")
+    op.execute("DROP INDEX IF EXISTS ix_regime_models_version")
+    op.execute("DROP TABLE IF EXISTS regime_models")
 
 
 def downgrade() -> None:

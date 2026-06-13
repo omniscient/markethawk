@@ -98,7 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="flex h-screen bg-financial-dark">
       {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 bg-financial-gray border-r border-gray-700 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
+      <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-64 2xl:w-72 bg-financial-gray border-r border-gray-700 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-700">
           <div className="flex items-center space-x-3">
             <TrendingUp className="h-8 w-8 text-financial-blue" />
@@ -134,9 +134,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top bar */}
-        <div className="flex items-center justify-between h-16 bg-financial-gray border-b border-gray-700 px-6">
+        <div className="flex items-center justify-between h-16 bg-financial-gray border-b border-gray-700 px-4 sm:px-6 2xl:px-8">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden text-gray-400 hover:text-white"
@@ -173,8 +173,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-financial-dark">
-          <div className="p-6">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-financial-dark">
+          <div className="app-content-shell">
             {children}
           </div>
         </main>

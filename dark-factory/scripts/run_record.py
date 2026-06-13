@@ -111,6 +111,34 @@ def cmd_record(args) -> None:
     _post_seq(record)
 
 
+def _iter_json_documents(text: str):
+    """Yield each top-level JSON value in text (mirrors `jq -s`).
+
+    `archon workflow cost --json` emits the run as a single PRETTY-PRINTED
+    (multi-line, indent=2) object; `--quiet` suppresses its pino log lines.
+    Parsing line-by-line breaks on the indented object — every fragment is
+    invalid JSON — so decode the stream value-by-value with raw_decode and
+    resync to the next line on any non-JSON noise (e.g. a leaked pino line).
+    """
+    decoder = json.JSONDecoder()
+    i, n = 0, len(text)
+    while i < n:
+        while i < n and text[i] in " \t\r\n":
+            i += 1
+        if i >= n:
+            break
+        try:
+            obj, end = decoder.raw_decode(text, i)
+        except json.JSONDecodeError:
+            nl = text.find("\n", i)
+            if nl == -1:
+                break
+            i = nl + 1
+            continue
+        yield obj
+        i = end
+
+
 def _parse_archon_cost(path: pathlib.Path) -> list:
     """Map archon workflow cost JSON nodes to OTel field names."""
     if path is None or not path.exists():
@@ -120,17 +148,14 @@ def _parse_archon_cost(path: pathlib.Path) -> list:
         if not content:
             return []
         run_obj = None
-        for line in content.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-                if isinstance(obj, dict) and (obj.get("run_id") or obj.get("runId")):
-                    run_obj = obj
+        for obj in _iter_json_documents(content):
+            candidates = obj if isinstance(obj, list) else [obj]
+            for cand in candidates:
+                if isinstance(cand, dict) and (cand.get("run_id") or cand.get("runId")):
+                    run_obj = cand
                     break
-            except json.JSONDecodeError:
-                continue
+            if run_obj is not None:
+                break
         if run_obj is None:
             return []
 
