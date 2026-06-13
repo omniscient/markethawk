@@ -466,6 +466,19 @@ code {
   margin: 0;
 }
 
+.screenshot-gallery {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 24px;
+}
+
+.screenshot-gallery .screenshot {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  object-position: top left;
+}
+
 .screenshot-frame figcaption {
   margin-top: 12px;
   color: var(--muted);
