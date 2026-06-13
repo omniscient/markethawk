@@ -48,7 +48,7 @@ from app.services.websocket_manager import websocket_manager
 # CSRF header check — module-level so it is importable by the test suite without
 # triggering the full create_app() factory. Pure ASGI (not BaseHTTPMiddleware) to
 # avoid the chunked-gzip termination bug described at the AuthMiddleware comment below.
-CSRF_EXEMPT_PREFIXES = ("/api/auth/",)
+CSRF_EXEMPT_PREFIXES = ("/api/auth/", "/api/v1/alerts/infrastructure")
 CSRF_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
@@ -275,7 +275,7 @@ def create_app() -> FastAPI:
         "/api/health",
         "/api/ready",
         "/metrics",
-        "/api/alerts/infrastructure",
+        "/api/v1/alerts/infrastructure",
     )
     _doc_prefixes = ("/docs", "/redoc", "/openapi.json")
     EXEMPT_PREFIXES = _base_exempt + (_doc_prefixes if settings.DOCS_ENABLED else ())
