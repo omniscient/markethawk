@@ -94,6 +94,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Never use a simple hex-sequence like `a1b2c3d4e5f6` as an Alembic revision ID — the existing migration set contains files with IDs following this pattern and conflicts will produce a `CycleDetected` error. Use `python -m alembic revision -m "..."` to generate a unique ID, or pick a random 12-char alphanumeric string that doesn't appear in `ls backend/app/alembic/versions/` output. <!-- issue:#299 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+## Supply-Chain Hardening
+
+- [AVOID] Never add `curl | bash` or `wget | bash` tool installations to `dark-factory/Dockerfile` — the factory container has docker-socket-proxy BUILD/POST access, so build-time code execution is high blast radius. For apt-based tools, use the vendor's GPG keyring + `signed-by=` apt source (matching the existing GitHub CLI and Docker CLI blocks). For binary releases, download the release artifact + verification checksum file separately and run `sha256sum -c` before extracting. For git clones from moving branches, pin to a commit SHA via `git checkout <SHA>` immediately after `clone`. <!-- issue:#375 date:2026-06-13 expires:2026-12-13 source:refine path:dark-factory/Dockerfile -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
