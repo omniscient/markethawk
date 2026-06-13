@@ -59,6 +59,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When fixing `eslint.config.js` to enforce warning-level rules that produce many pre-existing warnings, update the pre-commit hook in `.pre-commit-config.yaml` to use `npx eslint . --report-unused-disable-directives-severity error` (errors only) rather than `npm run lint` — otherwise the hook blocks all commits until every warning is cleaned up. <!-- issue:#197 date:2026-06-05 expires:2026-12-05 source:implement -->
 
+## Frontend: Security
+
+- [PATTERN] External URLs from API responses must be validated with `safeExternalUrl(url, { allowedHosts? })` in `frontend/src/utils/url.ts` before binding to `href`/`src`; use scheme-only for unknown sources (news feeds) and scheme+allowlist for known sources (tweet URLs: `['twitter.com', 'x.com', 't.co']`); null return = render as plain text, no link/thumbnail. <!-- issue:#381 date:2026-06-13 expires:2026-12-13 source:implement -->
+
+- [PATTERN] The CSP `style-src` directive in `caddy/Caddyfile` must include `'unsafe-inline'` — Tailwind v4 (`@tailwindcss/vite`) and Recharts inject runtime inline styles that cannot be nonce'd; removing it breaks all chart rendering. <!-- issue:#381 date:2026-06-13 expires:2026-12-13 source:implement -->
+
 ## Frontend: Testing Route Params
 
 - [PATTERN] Components using `useParams` from react-router-dom need `vi.mock('react-router-dom', async (importOriginal) => ({ ...await importOriginal(), useParams: () => ({ paramName: value }) }))` in tests — `renderWithQuery` uses `MemoryRouter` without param-aware route patterns, so `useParams` returns `{}` by default. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:implement -->
@@ -89,4 +95,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PROVISIONAL] When asserting absence of a CSS class (e.g. `text-positive`) in a `WatchlistRow` test, choose a live-data fixture whose other cells (`SessionCell` for `regular` also uses `text-positive`) do not share that class — or scope the query: `container.querySelector('td:nth-child(2) span.text-positive')`. <!-- evidence:test-output issue:#312 date:2026-06-13 expires:2026-12-13 source:implement -->
 
+## Frontend: URL Validation
+
+- [AVOID] `allowedHosts` matching in `safeExternalUrl` must use exact-host-or-subdomain logic (`host === h || host.endsWith('.' + h)`), not `Array.includes(hostname)`, which is exact-match only and silently drops subdomain support the spec requires (e.g. `mobile.twitter.com` would be rejected despite `twitter.com` being in the allowlist). <!-- issue:#381 date:2026-06-13 expires:2026-12-13 source:conformance path:frontend/src/utils/ -->
+ 
 - [PROVISIONAL] The `react-hooks/set-state-in-effect` ESLint rule fires only on the FIRST setState call in a useEffect body (complex values like `new Set()` or conditional `true`/`false` trigger it; simple literal resets like `null`, `'all'`, `0` do not); add `// eslint-disable-next-line react-hooks/set-state-in-effect` before that first call to silence the entire effect — one comment suffices. <!-- evidence:pre-commit-hook-output issue:#294 date:2026-06-13 expires:2026-12-13 source:implement -->

@@ -4,6 +4,7 @@ import { Newspaper, ExternalLink, Clock, RefreshCw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fetchRecentNews, NewsArticle, triggerNewsRefresh } from '../api/news';
 import { wsUrl } from '../api/client';
+import { safeExternalUrl } from '../utils/url';
 
 // Normalize a published_utc string to ensure consistent UTC parsing.
 // The REST API may return "2026-03-23T15:30:00" (no Z) while WebSocket
@@ -127,55 +128,71 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ ticker, limit = 50 }) => {
         .slice()
         .sort((a, b) => parsePublishedUtc(b.published_utc) - parsePublishedUtc(a.published_utc));
 
-    const renderArticle = (article: NewsArticle) => (
-        <div
-            key={article.id}
-            className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors animate-fade-in"
-        >
-            <div className="flex justify-between items-start mb-2">
-                <div className="flex flex-wrap gap-1 mb-1">
-                    {article.tickers?.slice(0, 3).map(t => (
-                        <span key={t} className="text-xs font-mono bg-financial-blue/20 text-financial-blue px-1.5 rounded">
-                            {t}
-                        </span>
-                    ))}
-                    {article.tickers && article.tickers.length > 3 && (
-                        <span className="text-xs font-mono bg-gray-700 text-gray-300 px-1.5 rounded">
-                            +{article.tickers.length - 3}
-                        </span>
-                    )}
-                </div>
-                <div className="text-xs text-gray-400 flex items-center whitespace-nowrap ml-2">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {formatDistanceToNow(parsePublishedUtc(article.published_utc), { addSuffix: true })}
-                </div>
-            </div>
+    const renderArticle = (article: NewsArticle) => {
+        const safeArticleUrl = safeExternalUrl(article.article_url);
+        const safeImageUrl = safeExternalUrl(article.image_url);
 
-            <a
-                href={article.article_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-financial-light hover:text-white transition-colors group flex items-start"
+        return (
+            <div
+                key={article.id}
+                className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors animate-fade-in"
             >
-                <div className="flex-1">
-                    <h4 className="leading-snug line-clamp-2">{article.title}</h4>
-                    <p className="text-xs text-gray-400 mt-2 flex items-center">
-                        <span className="truncate max-w-[150px] inline-block">{article.provider || article.author || 'Unknown source'}</span>
-                        <ExternalLink className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </p>
+                <div className="flex justify-between items-start mb-2">
+                    <div className="flex flex-wrap gap-1 mb-1">
+                        {article.tickers?.slice(0, 3).map(t => (
+                            <span key={t} className="text-xs font-mono bg-financial-blue/20 text-financial-blue px-1.5 rounded">
+                                {t}
+                            </span>
+                        ))}
+                        {article.tickers && article.tickers.length > 3 && (
+                            <span className="text-xs font-mono bg-gray-700 text-gray-300 px-1.5 rounded">
+                                +{article.tickers.length - 3}
+                            </span>
+                        )}
+                    </div>
+                    <div className="text-xs text-gray-400 flex items-center whitespace-nowrap ml-2">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {formatDistanceToNow(parsePublishedUtc(article.published_utc), { addSuffix: true })}
+                    </div>
                 </div>
-                {article.image_url && (
-                    <div className="ml-3 shrink-0">
-                        <img
-                            src={article.image_url}
-                            alt=""
-                            className="w-16 h-12 object-cover rounded shadow-sm border border-gray-700"
-                        />
+
+                {safeArticleUrl ? (
+                    <a
+                        href={safeArticleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-financial-light hover:text-white transition-colors group flex items-start"
+                    >
+                        <div className="flex-1">
+                            <h4 className="leading-snug line-clamp-2">{article.title}</h4>
+                            <p className="text-xs text-gray-400 mt-2 flex items-center">
+                                <span className="truncate max-w-[150px] inline-block">{article.provider || article.author || 'Unknown source'}</span>
+                                <ExternalLink className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </p>
+                        </div>
+                        {safeImageUrl && (
+                            <div className="ml-3 shrink-0">
+                                <img
+                                    src={safeImageUrl}
+                                    alt=""
+                                    className="w-16 h-12 object-cover rounded shadow-sm border border-gray-700"
+                                />
+                            </div>
+                        )}
+                    </a>
+                ) : (
+                    <div className="font-medium text-financial-light flex items-start">
+                        <div className="flex-1">
+                            <h4 className="leading-snug line-clamp-2">{article.title}</h4>
+                            <p className="text-xs text-gray-400 mt-2">
+                                <span className="truncate max-w-[150px] inline-block">{article.provider || article.author || 'Unknown source'}</span>
+                            </p>
+                        </div>
                     </div>
                 )}
-            </a>
-        </div>
-    );
+            </div>
+        );
+    };
 
     return (
         <div className="space-y-4">
