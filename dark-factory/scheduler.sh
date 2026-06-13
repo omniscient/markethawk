@@ -1,35 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- Configuration ---
-POLL_INTERVAL="${POLL_INTERVAL:-60}"
+# --- Configuration (non-policy infrastructure) ---
 SKIP_LABELS="needs-discussion,epic"
-MAX_RETRIES="${MAX_RETRIES:-3}"
 SCHEDULER_STATE_DIR="${SCHEDULER_STATE_DIR:-/var/lib/dark-factory}"
 STATE_FILE="${SCHEDULER_STATE_DIR}/scheduler-state.json"
-RATE_LIMIT_FLOOR="${RATE_LIMIT_FLOOR:-200}"
-DIRECT_TO_PR_LABEL="${DIRECT_TO_PR_LABEL:-direct-to-pr}"
-SPEC_GRACE_MINUTES="${SPEC_GRACE_MINUTES:-30}"
-PLAN_GRACE_MINUTES="${PLAN_GRACE_MINUTES:-30}"
-CONFLICT_RESOLUTION_ENABLED="${CONFLICT_RESOLUTION_ENABLED:-true}"
-# Max concurrent factory containers, any run type (implement/refine/plan/deconflict/
-# close). Override in .archon/.env — takes effect on scheduler recreate, no rebuild.
-FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
-# While main-is-red is latched, dispatch a "Recheck main" run (clone + smoke gate
-# only) at most this often, so a green main clears the sentinel without waiting for
-# a human comment on an in-review PR (#365).
-MAIN_RED_RECHECK_ENABLED="${MAIN_RED_RECHECK_ENABLED:-true}"
-MAIN_RED_RECHECK_MINUTES="${MAIN_RED_RECHECK_MINUTES:-20}"
 RECHECK_STAMP_FILE="${SCHEDULER_STATE_DIR}/main-red-last-recheck"
-# Dispatch ceiling policy (#339): L tickets — and M tickets whose title matches an
-# ABOVE_CEILING_KEYWORDS pattern — are never auto-dispatched to implement; they park in
-# Blocked under ABOVE_CEILING_LABEL for human-paired implementation. M tickets also lose
-# the plan-pending-review grace-window auto-advance (S keeps full autonomy).
-# Kill-switch and keyword list overridable in .archon/.env without a code change.
-# See docs/superpowers/specs/2026-06-12-size-type-aware-dispatch-ceiling-design.md; revisit 2026-09-12.
-DISPATCH_CEILING_ENABLED="${DISPATCH_CEILING_ENABLED:-true}"
-ABOVE_CEILING_LABEL="${ABOVE_CEILING_LABEL:-above-ceiling}"
-ABOVE_CEILING_KEYWORDS="${ABOVE_CEILING_KEYWORDS:-migration|migrate|performance|perf|architectur|refactor}"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -44,10 +20,67 @@ STATUS_DONE="98236657"
 STATUS_BACKLOG="f75ad846"
 STATUS_REFINED="0c79ebe5"
 
-# Refinement pipeline configuration
-REFINE_WIP_LIMIT="${REFINE_WIP_LIMIT:-2}"
+# Refinement pipeline (env-only: REFINE_MAX_RETRIES is not in config.yaml by design)
 REFINE_SKIP_LABELS="needs-discussion,epic,spec-pending-review,plan-pending-review"
 REFINE_MAX_RETRIES="${REFINE_MAX_RETRIES:-3}"
+
+# --- Config YAML resolution ---
+# Ordered search: bind-mounted repo (local dev / deletion test) → baked image (production).
+CONFIG_YAML_PATHS=(
+  "/workspace/project/.claude/skills/refinement/config.yaml"
+  "/opt/refinement-skills/config.yaml"
+)
+
+resolve_config_yaml() {
+  local p
+  for p in "${CONFIG_YAML_PATHS[@]}"; do
+    [ -f "$p" ] && echo "$p" && return 0
+  done
+  echo "ERROR: config.yaml not found — searched: ${CONFIG_YAML_PATHS[*]}" >&2
+  return 1
+}
+
+# Read all policy knobs from config.yaml; log when an env var overrides the config value.
+# Must be called in the main exec path (after SCHEDULER_SOURCE_ONLY guard) — not at source
+# time — so test sourcing never triggers config resolution.
+read_config() {
+  local cfg
+  cfg=$(resolve_config_yaml) || { echo "FATAL: cannot read config.yaml" >&2; exit 1; }
+
+  _set_cfg() {
+    local var="$1" yq_expr="$2"
+    local cfg_val
+    cfg_val=$(yq "$yq_expr" "$cfg" 2>/dev/null || true)
+    [ "${cfg_val:-null}" = "null" ] && cfg_val=""
+    # ${!var+x} expands to "x" if var is set (even empty), empty if unset — safe under set -u
+    if [ -n "${!var+x}" ]; then
+      local env_val="${!var}"
+      if [ "$env_val" != "$cfg_val" ]; then
+        echo "[config] ${var}=${env_val} (env override; config has '${cfg_val}')" >&2
+      fi
+      # Keep existing env value
+    else
+      export "${var}=${cfg_val}"
+    fi
+  }
+
+  _set_cfg POLL_INTERVAL              '.scheduler.poll_interval'
+  _set_cfg MAX_RETRIES                '.scheduler.max_retries'
+  _set_cfg RATE_LIMIT_FLOOR           '.scheduler.rate_limit_floor'
+  _set_cfg FACTORY_WIP_LIMIT          '.scheduler.factory_wip_limit'
+  _set_cfg MAIN_RED_RECHECK_ENABLED   '.scheduler.main_red_recheck_enabled'
+  _set_cfg MAIN_RED_RECHECK_MINUTES   '.scheduler.main_red_recheck_minutes'
+  _set_cfg REFINE_WIP_LIMIT           '.refine.wip_limit'
+  _set_cfg DIRECT_TO_PR_LABEL         '.direct_to_pr.label'
+  _set_cfg SPEC_GRACE_MINUTES         '.direct_to_pr.spec_grace_minutes'
+  _set_cfg PLAN_GRACE_MINUTES         '.direct_to_pr.plan_grace_minutes'
+  _set_cfg CONFLICT_RESOLUTION_ENABLED '.conflict_resolution.enabled'
+  _set_cfg DISPATCH_CEILING_ENABLED   '.dispatch_ceiling.enabled'
+  _set_cfg ABOVE_CEILING_LABEL        '.dispatch_ceiling.label'
+  _set_cfg ABOVE_CEILING_KEYWORDS     '.dispatch_ceiling.keywords'
+
+  echo "[config] loaded from ${cfg}"
+}
 
 # --- Validate required environment ---
 if [ -z "${GH_TOKEN:-}" ]; then
@@ -711,6 +744,9 @@ ${comment_text}"
 if [ "${SCHEDULER_SOURCE_ONLY:-0}" = "1" ]; then
   return 0
 fi
+
+# --- Load policy knobs from config.yaml (env overrides logged when active) ---
+read_config
 
 # --- ERR trap: log unhandled exits for post-mortem diagnosis ---
 # dispatch() callers are all guarded with `if dispatch ...; then`; this backstop

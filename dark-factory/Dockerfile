@@ -49,6 +49,11 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     apt-get update && apt-get install -y gh && \
     rm -rf /var/lib/apt/lists/*
 
+# yq — YAML processor used by entrypoint.sh and scheduler.sh to read config.yaml
+RUN YQ_ARCH=$(dpkg --print-architecture) && \
+    curl -fsSL "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_${YQ_ARCH}" -o /usr/local/bin/yq && \
+    chmod +x /usr/local/bin/yq
+
 # Docker CLI (client only — no daemon)
 RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \

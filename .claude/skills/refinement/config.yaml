@@ -1,6 +1,14 @@
 # .claude/skills/refinement/config.yaml
+scheduler:
+  poll_interval: 60              # seconds between polls; env: POLL_INTERVAL overrides
+  max_retries: 3                 # per-issue retry limit before trip_to_blocked; env: MAX_RETRIES overrides
+  rate_limit_floor: 200          # pause polling when GraphQL remaining < this; env: RATE_LIMIT_FLOOR overrides
+  factory_wip_limit: 1           # max concurrent factory containers; env: FACTORY_WIP_LIMIT overrides
+  main_red_recheck_enabled: true # periodically recheck a red main to self-clear (#365); env: MAIN_RED_RECHECK_ENABLED overrides
+  main_red_recheck_minutes: 20   # interval between red-main recheck dispatches; env: MAIN_RED_RECHECK_MINUTES overrides
+
 refine:
-  wip_limit: 2
+  wip_limit: 2                   # env: REFINE_WIP_LIMIT overrides
   skip_labels:
     - needs-discussion
     - epic
@@ -14,9 +22,9 @@ plan:
     - plan-pending-review
 
 direct_to_pr:
-  label: direct-to-pr          # mirror of $DIRECT_TO_PR_LABEL (set in .archon/.env to override)
-  spec_grace_minutes: 30       # mirror of $SPEC_GRACE_MINUTES — 0 = advance on next poll
-  plan_grace_minutes: 30       # mirror of $PLAN_GRACE_MINUTES — 0 = advance on next poll
+  label: direct-to-pr          # env: DIRECT_TO_PR_LABEL overrides
+  spec_grace_minutes: 30        # env: SPEC_GRACE_MINUTES overrides — 0 = advance on next poll
+  plan_grace_minutes: 30        # env: PLAN_GRACE_MINUTES overrides — 0 = advance on next poll
 
 conformance:
   enabled: true
@@ -31,14 +39,19 @@ code_review:
   block_threshold: high     # findings at this severity or above block (critical|high|medium|low)
   fail_open: true           # reviewer error / unparseable output → advisory, never block
   max_findings: 50          # cap inline comments to avoid spam (log if exceeded)
+  severity_order:           # ascending rank — lowest to highest; sourced by code_review_payload.py
+    - low
+    - medium
+    - high
+    - critical
 
 preview:
   enabled: true   # false = always build the preview (pre-differentiator behavior) — kill-switch
   model: haiku
 
 conflict_resolution:
-  enabled: true       # false = disable the P1.5 conflict scanner entirely (env CONFLICT_RESOLUTION_ENABLED overrides)
-  ai_tier: true       # false = only Tier 1 (mechanical) resolution; never invoke Claude for conflict markers
+  enabled: true       # env: CONFLICT_RESOLUTION_ENABLED overrides — false = disable P1.5 conflict scanner
+  ai_tier: true       # env: CONFLICT_RESOLUTION_AI_TIER overrides — false = only Tier 1 (mechanical) resolution
 
 blast_radius:
   enabled: true
@@ -47,10 +60,9 @@ blast_radius:
   size_budget_blocks: false     # true = size alone is blocking; false = advisory only
 
 dispatch_ceiling:
-  enabled: true                # mirror of $DISPATCH_CEILING_ENABLED — kill-switch (set false in .archon/.env)
-  label: above-ceiling         # mirror of $ABOVE_CEILING_LABEL
-  keywords: "migration|migrate|performance|perf|architectur|refactor"  # mirror of $ABOVE_CEILING_KEYWORDS
-  # Doc-only mirror: the scheduler reads env-var defaults in scheduler.sh, not this file.
+  enabled: true                # env: DISPATCH_CEILING_ENABLED overrides — kill-switch
+  label: above-ceiling         # env: ABOVE_CEILING_LABEL overrides
+  keywords: "migration|migrate|performance|perf|architectur|refactor"  # env: ABOVE_CEILING_KEYWORDS overrides
   # L tickets (and M tickets with a keyword title match) park in Blocked for human pairing;
   # M tickets lose the plan-pending-review grace-window auto-advance. S is unaffected.
   # See docs/superpowers/specs/2026-06-12-size-type-aware-dispatch-ceiling-design.md

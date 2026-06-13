@@ -35,6 +35,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When an out-of-scope defect is noticed during implementation, write it to `$ARTIFACTS_DIR/out-of-scope.md` with `- <file>: <one-sentence description>` and leave the defect unfixed. The conformance gate reads this file and converts each entry into a `scope-spillover`-labelled backlog ticket automatically. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
 
+## Scheduler Config Pattern
+
+- [PATTERN] When scheduler.sh defers `read_config()` until after the `SCHEDULER_SOURCE_ONLY` guard, every bash test file that sources scheduler.sh (`SCHEDULER_SOURCE_ONLY=1 source "$SCHED"`) must explicitly `export VAR=value` for all config-driven policy vars before sourcing — otherwise helper functions that reference those vars fail with `set -u` unbound-variable errors. The canonical list is in `test_scheduler.sh`'s pre-source export block. <!-- issue:#338 date:2026-06-13 expires:2026-12-13 source:implement -->
+
 ## Scheduler Architecture
 
 - [PATTERN] All `dispatch()` call sites in `scheduler.sh` must use `if dispatch ...; then ... fi` guards. A bare `dispatch "..."` under `set -e` exits the daemon on non-zero return, which triggers `restart: unless-stopped` and wipes the retry counter — the root cause of the #159 loop. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->

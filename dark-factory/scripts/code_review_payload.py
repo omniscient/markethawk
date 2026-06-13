@@ -20,8 +20,6 @@ import sys
 from dataclasses import dataclass
 from typing import Optional
 
-SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-
 _FINDING_RE = re.compile(r"\s*-\s*\[(critical|high|medium|low)\]\s*(.+)$", re.IGNORECASE)
 _LOC_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+)\s*$")
 
@@ -143,18 +141,22 @@ def _review_body(header, blockers, advisory, offdiff, dropped_count):
     return "\n".join(lines)
 
 
+_DEFAULT_SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+
 def build_review(findings, changed, block_threshold="high", max_findings=50,
-                 header="🏭 Dark Factory Code Review"):
-    thr = SEVERITY_ORDER[block_threshold.lower()]
-    blockers = [f for f in findings if SEVERITY_ORDER[f.severity] >= thr]
-    advisory = [f for f in findings if SEVERITY_ORDER[f.severity] < thr]
+                 header="🏭 Dark Factory Code Review", severity_rank=None):
+    rank = severity_rank if severity_rank is not None else _DEFAULT_SEVERITY_RANK
+    thr = rank[block_threshold.lower()]
+    blockers = [f for f in findings if rank[f.severity] >= thr]
+    advisory = [f for f in findings if rank[f.severity] < thr]
 
     def anchorable(f):
         return f.path is not None and f.line is not None and f.line in changed.get(f.path, set())
 
     anchored = sorted(
         (f for f in findings if anchorable(f)),
-        key=lambda f: (-SEVERITY_ORDER[f.severity], f.path, f.line),
+        key=lambda f: (-rank[f.severity], f.path, f.line),
     )
     offdiff = [f for f in findings if not anchorable(f)]
     kept = anchored[:max_findings]
@@ -185,12 +187,19 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Build a GitHub PR review payload from reviewer findings.")
     ap.add_argument("--review", required=True, help="path to the reviewer subagent's markdown output")
     ap.add_argument("--diff", required=True, help="path to the unified diff that was reviewed")
-    ap.add_argument("--block-threshold", default="high", choices=list(SEVERITY_ORDER))
+    ap.add_argument("--block-threshold", default="high")
+    ap.add_argument("--severity-order", required=True,
+                    help="comma-separated severity levels in ascending rank order (e.g. low,medium,high,critical)")
     ap.add_argument("--max-findings", type=int, default=50)
     args = ap.parse_args(argv)
+    severity_list = [s.strip().lower() for s in args.severity_order.split(",") if s.strip()]
+    severity_rank = {s: i for i, s in enumerate(severity_list)}
+    if args.block_threshold.lower() not in severity_rank:
+        ap.error(f"--block-threshold '{args.block_threshold}' is not in --severity-order '{args.severity_order}'")
     findings = parse_findings(_read(args.review))
     changed = changed_lines(_read(args.diff))
-    result = build_review(findings, changed, args.block_threshold, args.max_findings)
+    result = build_review(findings, changed, args.block_threshold, args.max_findings,
+                          severity_rank=severity_rank)
     print(json.dumps(result))
     return 0
 
