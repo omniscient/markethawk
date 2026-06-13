@@ -16,6 +16,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not introduce a vector database, embedding model, or semantic search service for memory retrieval. At the scale of this codebase (< 200 memory entries) flat file reading is faster and more predictable than a retrieval pipeline. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Docker Socket Proxy Architecture (issue #379)
+
+- [PATTERN] When two consumers of the docker-socket-proxy have materially different privilege needs (e.g., scheduler only needs CONTAINERS/IMAGES/POST while the factory also needs BUILD/EXEC/NETWORKS/VOLUMES), run separate proxy service instances — one per privilege tier — rather than granting the lower-privilege consumer the higher required permission set. The scheduler is always-on and restart: unless-stopped, making it the highest-value foothold target; it must never hold BUILD or EXEC. <!-- issue:#379 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not share a single docker-socket-proxy between the dark-factory and backlog-scheduler if their verb requirements differ. The scheduler never builds images or execs into containers; granting it BUILD=1 purely because the factory needs it violates least-privilege and was flagged in the 2026-06-12 security audit as the concrete risk vector. <!-- issue:#379 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ## Agent Memory Design (issue #149)
 
 - [PATTERN] Agent memory is stored as plain markdown files in `.archon/memory/`, committed to the repo. Files are read at Phase 1 load time and updated post-run. This keeps memory human-readable, version-controlled, and accessible to all agents without any extra tooling. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->

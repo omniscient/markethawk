@@ -11,6 +11,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Preview ports follow the formula `1{ISSUE_NUM_PADDED}XX` where `ISSUE_NUM_PADDED` is zero-padded to two digits and XX is the service suffix (33=frontend, 80=backend, 54=postgres, 63=redis). Example: issue #3 → frontend `:10333`, backend `:10380`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
+- [AVOID] Do not rely solely on env var fallback (`${VAR:-weak_default}`) as the guard against preview hardcoded credentials appearing in production compose files. The silent-default failure mode (host without the env var set → weak credentials silently applied) is the exact risk. Always pair with a static grep-based CI/pre-commit check that allowlists only `dark-factory/docker-compose.preview.yml` and blocks the literal strings `preview_password` and `preview-only-not-secret` everywhere else. <!-- issue:#379 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ## Container Root and Mounts
 
 - [PATTERN] Copy shared entrypoint scripts to `/entrypoint.sh` (outside `/app`) in `backend/Dockerfile` — not to `./entrypoint.sh` or `/app/entrypoint.sh`. The `docker-compose.override.yml` local-dev bind-mount `./backend:/app:ro` shadows the entire `/app` directory, so any file placed inside `/app` is invisible at runtime in dev; files outside `/app` are unaffected. <!-- issue:#289 date:2026-06-12 expires:2026-12-12 source:implement -->
