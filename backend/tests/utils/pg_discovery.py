@@ -6,6 +6,9 @@ exec is blocked (e.g. docker-socket-proxy with EXEC:0).
 
 import os
 
+import psycopg2
+import requests
+
 
 def probe_running_postgres() -> str | None:
     """Return a postgres URL if a running instance is reachable, else None.
@@ -18,9 +21,6 @@ def probe_running_postgres() -> str | None:
     For each candidate host the function tries common_creds in order and
     returns on the first successful psycopg2.connect().
     """
-    import psycopg2
-    import requests
-
     explicit = os.environ.get("TEST_DATABASE_URL")
     if explicit:
         return explicit
