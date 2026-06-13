@@ -179,7 +179,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install test deps
-        run: pip install pytest pytest-mock
+        run: pip install pytest pytest-mock pyyaml
 
       - name: Run factory_core tests
         run: python -m pytest dark-factory/tests/ -v
