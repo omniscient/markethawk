@@ -16,6 +16,14 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not introduce a vector database, embedding model, or semantic search service for memory retrieval. At the scale of this codebase (< 200 memory entries) flat file reading is faster and more predictable than a retrieval pipeline. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Observability / Alerting
+
+- [PATTERN] All alert rules live in `grafana/provisioning/alerting/rules.yaml` as Grafana-managed alerts (Grafana's native alerting engine). `monitoring/prometheus/prometheus.yml` has NO `rule_files:` or `alerting:` block — do not add them for individual features. Every rule follows the two-refId pattern: one Prometheus datasource refId for the metric query, one `-- Grafana --` math expression refId for the threshold condition. <!-- issue:#391 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not add Prometheus recording rules or `rule_files:` infrastructure for new alert rules — this would introduce a parallel alerting path and break the single-source-of-truth in `grafana/provisioning/alerting/rules.yaml`. All thresholds and alert routing belong in the Grafana provisioning layer. <!-- issue:#391 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [PATTERN] Prometheus metrics in `backend/app/core/metrics.py` use no application prefix (e.g. `scan_duration_seconds`, not `markethawk_scan_duration_seconds`). Follow this convention for all new metrics. The `markethawk_` prefix appears in issue bodies as illustrative naming only — it is not an established convention. <!-- issue:#391 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ## Agent Memory Design (issue #149)
 
 - [PATTERN] Agent memory is stored as plain markdown files in `.archon/memory/`, committed to the repo. Files are read at Phase 1 load time and updated post-run. This keeps memory human-readable, version-controlled, and accessible to all agents without any extra tooling. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
