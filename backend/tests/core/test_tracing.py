@@ -3,7 +3,6 @@ import logging
 
 
 def test_otel_config_defaults():
-    import inspect
     from app.core.config import Settings
     fields = Settings.model_fields
     assert fields["OTEL_EXPORTER_OTLP_ENDPOINT"].default == ""
