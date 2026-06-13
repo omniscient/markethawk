@@ -63,6 +63,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Use `from app.utils.db import get_or_404` to replace Shape A 404 boilerplate (`db.query(Model).filter(Model.id==id).first(); if not obj: raise HTTPException(404)`). Call without storing the result (`get_or_404(db, Model, id, "Name")`) when the result isn't used downstream. <!-- issue:#286 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+## Backend: JSONB / Schema Validation
+
+- [PATTERN] Validate JSONB dict fields before persisting with a coarse `json.dumps()` probe (`_validate_jsonb_dict` in `alert_service.py`) — catches `datetime`, `Decimal`, callables at write time rather than serialization time. Prefer this over per-scanner-type Pydantic schemas when the key set varies by scanner type; use a concrete Pydantic model with `extra="forbid"` only when the shape is fixed (e.g. `ChannelConfig` in `schemas/alerts.py`). <!-- issue:#292 date:2026-06-13 expires:2026-12-13 source:implement -->
+
 ## Backend: Scanner Pipeline Decomposition
 
 - [PATTERN] Decompose monolithic scanner functions into three private stages: `_detect(ticker, prefetched_bars, ...) -> RawSignal | None` (pure, no DB), `_enrich(raw_signals, ..., db) -> tuple[list[EnrichedSignal], list[dict]]` (batch with per-ticker try/except — bad ticker logs + appends to failed list, returns both enriched and newly-failed), `_persist(enriched, failed, db, ...) -> list[dict]` (all DB writes + `try: db.commit() except: db.rollback(); raise`). Use `@dataclass(frozen=True) RawSignal` and `@dataclass EnrichedSignal` as stage boundaries; parameterize all list/dict fields (e.g. `list[StockAggregate]`, `dict[str, bool]`). Orchestrator unpacks `_enrich` result: `enriched, enrich_failed = _enrich(...); failed.extend(enrich_failed)`. See `backend/app/services/pre_market_scan.py` for the reference implementation. <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:implement -->
