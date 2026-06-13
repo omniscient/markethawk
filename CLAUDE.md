@@ -49,7 +49,7 @@ tasks/        — Celery background/scheduled tasks (sync.py, scanning.py, tradi
 ### Frontend (`frontend/src/`)
 
 ```
-api/          — Axios HTTP client layer (client.ts, scanner.ts, stocks.ts, news.ts, system.ts)
+api/          — Axios HTTP client layer (client.ts, scanner/ (facade + sub-modules), universe.ts, stocks.ts, news.ts, system.ts)
 components/   — Reusable UI components (UniverseFormModal, UniverseDetailsModal, ScannerResults, etc.)
 pages/        — Route-level views (Dashboard, Scanner, Universes, Journal, Alerts, Settings, etc.)
 hooks/        — Custom React hooks
