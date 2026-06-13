@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # Polygon.io API - REQUIRED
     POLYGON_API_KEY: str
     POLYGON_DELAYED: bool = True
+    LIVE_WEBSOCKET_ENABLED: bool = True
 
     # Redis / Celery
     REDIS_URL: str = "redis://redis:6379/0"

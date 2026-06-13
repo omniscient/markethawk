@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   TrendingUp,
@@ -26,6 +26,20 @@ import { fetchScannerResults, fetchMarketStats } from '../api/scanner';
 const Dashboard: React.FC = () => {
   const [sortBy, setSortBy] = useState<string>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [isWideViewport, setIsWideViewport] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1800px)').matches
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(min-width: 1800px)');
+    const handleChange = () => setIsWideViewport(mediaQuery.matches);
+
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   // Fetch recent scanner results
   const { data: scannerResults, isLoading: loadingResults } = useQuery({
@@ -76,9 +90,9 @@ const Dashboard: React.FC = () => {
     : 'Never';
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="dashboard-page animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="dashboard-page-header">
         <div>
           <h1 className="text-3xl font-bold text-financial-light">Dashboard</h1>
           <p className="text-gray-400 mt-1">Real-time stock scanner insights and alerts</p>
@@ -92,7 +106,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="dashboard-metrics-grid">
         <MetricCard
           title="Today's Events"
           value={todayEvents}
@@ -124,22 +138,22 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Charts and Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="dashboard-primary-grid">
         {/* Volume Spike Chart */}
-        <div className="lg:col-span-2">
+        <div className="min-w-0">
           <Card title="Volume Spike Trends" icon={TrendingUp}>
             <Chart
               data={scannerResults || []}
               type="area"
               xKey="event_date"
               yKey="relative_volume"
-              height={300}
+              height={isWideViewport ? 420 : 300}
             />
           </Card>
         </div>
 
         {/* Recent Alerts */}
-        <div>
+        <div className="min-w-0">
           <Card title="Recent Alerts" icon={Bell}>
             <AlertList alerts={recentAlerts} />
           </Card>
@@ -147,7 +161,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Recent Events Table */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="dashboard-secondary-grid">
         <Card title="Recent Volume Events" icon={Activity}>
           <RecentEvents
             events={recentEvents}
@@ -188,17 +202,17 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* News Feed Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className="dashboard-primary-grid">
+        <div className="min-w-0">
           <NewsFeed />
         </div>
-        <div>
+        <div className="min-w-0">
           <NewsSettings />
         </div>
       </div>
 
       {/* Tweet Signals feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="dashboard-secondary-grid">
         <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 min-h-64">
           <TweetFeed limit={30} />
         </div>
