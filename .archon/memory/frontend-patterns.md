@@ -82,3 +82,5 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+- [PROVISIONAL] When asserting absence of a CSS class (e.g. `text-positive`) in a `WatchlistRow` test, choose a live-data fixture whose other cells (`SessionCell` for `regular` also uses `text-positive`) do not share that class — or scope the query: `container.querySelector('td:nth-child(2) span.text-positive')`. <!-- evidence:test-output issue:#312 date:2026-06-13 expires:2026-12-13 source:implement -->
