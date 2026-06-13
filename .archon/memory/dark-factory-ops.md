@@ -49,6 +49,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Write `codeindex high-blast` output to a temp file then atomically rename: `codeindex high-blast > "$TARGET.tmp" && mv "$TARGET.tmp" "$TARGET"` — direct `>` truncates the file before writing, so a crash mid-run leaves a zero-byte artifact; the temp+mv pattern ensures the file is either fully written or unchanged. <!-- issue:#264 date:2026-06-10 expires:2026-12-10 source:implement -->
 
+## Third-Party Service Credential Validation
+
+- [PATTERN] To gate startup on credential validation for third-party Docker images (pgAdmin, Seq, Grafana) that cannot have their entrypoints modified without wrapper Dockerfiles, add a dedicated `admin-env-check` service using `alpine:3` that runs a shell credential check and exits 0 on success. Add `depends_on: admin-env-check: condition: service_completed_successfully` to each gated service. This is the idiomatic extension of the existing `condition: service_healthy` pattern already used for postgres/redis. <!-- issue:#371 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ## Docker Port Hardening
 
 - [PATTERN] All host-facing port bindings in `docker-compose.yml` should use the `"127.0.0.1:HOST:CONTAINER"` format to prevent inadvertent exposure on public interfaces even without a reverse proxy — defense-in-depth independent of whether a TLS profile is active. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
