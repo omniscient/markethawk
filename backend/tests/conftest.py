@@ -32,10 +32,13 @@ POSTGRES_IMAGE = "postgres:15-alpine"
 def _testcontainers_url():
     # When testcontainers' exec endpoint is blocked (e.g. docker-socket-proxy
     # with EXEC:0), fall back to a running postgres discovered via DNS probe.
-    probe = probe_running_postgres()
-    if probe:
-        yield probe
-        return
+    # Requires POSTGRES_DISCOVERY_ENABLED=true to prevent probe from matching
+    # a dev database and having drop_all() destroy its tables on teardown.
+    if os.environ.get("POSTGRES_DISCOVERY_ENABLED") == "true":
+        probe = probe_running_postgres()
+        if probe:
+            yield probe
+            return
     with PostgresContainer(POSTGRES_IMAGE) as container:
         yield container.get_connection_url()
 
