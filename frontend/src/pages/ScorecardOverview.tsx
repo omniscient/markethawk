@@ -4,7 +4,7 @@ import ScannerSummaryCard from '../components/scorecard/ScannerSummaryCard';
 
 type Period = '7d' | '30d' | '90d' | 'all';
 
-const periodToDates = (period: Period): { start_date?: string; end_date?: string } => {
+export const periodToDates = (period: Period): { start_date?: string; end_date?: string } => {
   if (period === 'all') return {};
   const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
   const end = new Date();
