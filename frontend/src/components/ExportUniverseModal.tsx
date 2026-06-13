@@ -8,7 +8,7 @@ import {
   fetchUniverseStocks,
   exportUniverseAggregates,
   ExportAggregatesOptions,
-} from '../api/scanner';
+} from '../api/universe';
 
 interface ExportUniverseModalProps {
   isOpen: boolean;
