@@ -107,7 +107,7 @@ def test_ws_settings_have_correct_defaults():
 #### Step 1.2 — Verify test fails
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/core/test_config.py::test_ws_settings_have_correct_defaults -x 2>&1 | tail -10
+docker-compose exec -T backend python -m pytest backend/tests/core/test_config.py::test_ws_settings_have_correct_defaults -x --no-cov 2>&1 | tail -10
 ```
 
 Expected: `AttributeError: 'Settings' object has no attribute 'WS_MAX_CONNECTIONS_PER_USER'`
@@ -142,7 +142,7 @@ os.environ.setdefault("WS_MAX_LIFETIME_SECONDS", "28800")
 #### Step 1.5 — Verify test passes
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/core/test_config.py::test_ws_settings_have_correct_defaults -x 2>&1 | tail -5
+docker-compose exec -T backend python -m pytest backend/tests/core/test_config.py::test_ws_settings_have_correct_defaults -x --no-cov 2>&1 | tail -5
 ```
 
 Expected: `1 passed`
@@ -257,7 +257,7 @@ async def test_multiple_users_independent():
 #### Step 2.2 — Verify tests fail
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/core/test_ws_limits.py -x 2>&1 | tail -5
+docker-compose exec -T backend python -m pytest backend/tests/core/test_ws_limits.py -x --no-cov 2>&1 | tail -5
 ```
 
 Expected: `ModuleNotFoundError: No module named 'app.core.ws_limits'`
@@ -319,7 +319,7 @@ async def ws_connection_slot(user_id: uuid.UUID):
 #### Step 2.4 — Verify tests pass
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/core/test_ws_limits.py -v 2>&1 | tail -15
+docker-compose exec -T backend python -m pytest backend/tests/core/test_ws_limits.py -v --no-cov 2>&1 | tail -15
 ```
 
 Expected: `5 passed`
@@ -477,7 +477,7 @@ def test_disallowed_origin_rejects_with_1008(db):
 #### Step 3.2 — Verify unit tests fail
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_guards.py::test_missing_origin_is_allowed -x 2>&1 | tail -5
+docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_guards.py::test_missing_origin_is_allowed -x --no-cov 2>&1 | tail -5
 ```
 
 Expected: `ImportError: cannot import name 'verify_ws_origin' from 'app.core.auth'`
@@ -506,23 +506,15 @@ async def verify_ws_origin(websocket: WebSocket) -> None:
         raise WebSocketException(code=1008, reason="Origin not allowed")
 ```
 
-#### Step 3.4 — Verify all guard tests pass
+#### Step 3.4 — Verify origin unit tests pass
+
+At this step only the 3 origin unit tests are expected to pass. The 2 cap integration
+tests (`test_global_cap_rejects_with_1008`, `test_per_user_cap_rejects_with_1008`)
+require handler updates from Tasks 5–8 to succeed; they will be verified again in
+Task 7 Step 7.3.
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_guards.py -v 2>&1 | tail -20
-```
-
-Expected: `6 passed` (3 unit + 3 integration; integration cap/origin tests may show
-skips if Redis is unavailable — that's acceptable, the unit tests cover the logic)
-
-Note: Integration tests `test_global_cap_rejects_with_1008` and
-`test_per_user_cap_rejects_with_1008` will fail if the handlers have not yet been
-updated in Tasks 5–8. These tests can be run again after those tasks complete.
-The unit tests (`test_missing_origin_is_allowed`, `test_matching_origin_is_allowed`,
-`test_mismatched_origin_is_rejected`) must pass at this step.
-
-```bash
-docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_guards.py -k "origin" -v 2>&1 | tail -10
+docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_guards.py -k "origin" -v --no-cov 2>&1 | tail -10
 ```
 
 Expected: `3 passed`
@@ -685,7 +677,7 @@ async def test_fan_out_delivers_message_to_all_queues():
 #### Step 4.2 — Verify tests fail
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/services/test_websocket_manager.py -x 2>&1 | tail -10
+docker-compose exec -T backend python -m pytest backend/tests/services/test_websocket_manager.py -x --no-cov 2>&1 | tail -10
 ```
 
 Expected: `AttributeError: 'StockWebSocketManager' object has no attribute '_channel_queues'`
@@ -765,7 +757,7 @@ from typing import Any, Dict, Optional, Set
 #### Step 4.4 — Verify tests pass
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/services/test_websocket_manager.py -v 2>&1 | tail -15
+docker-compose exec -T backend python -m pytest backend/tests/services/test_websocket_manager.py -v --no-cov 2>&1 | tail -15
 ```
 
 Expected: `4 passed`
@@ -791,7 +783,7 @@ aioredis/pubsub to the shared fan-out registry. All five guards are applied:
 #### Step 5.1 — Verify existing auth tests still pass (baseline)
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_auth.py -v 2>&1 | tail -10
+docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_auth.py -v --no-cov 2>&1 | tail -10
 ```
 
 Expected: all existing tests pass (they send no Origin and use no-user tokens →
@@ -928,7 +920,7 @@ async def watchlist_live_websocket(
 #### Step 5.5 — Run regression tests
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_auth.py -v 2>&1 | tail -15
+docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_auth.py -v --no-cov 2>&1 | tail -15
 ```
 
 Expected: all existing tests pass.
@@ -1011,7 +1003,7 @@ async def scan_task_websocket(
 #### Step 6.2 — Run regression tests
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_auth.py -v 2>&1 | tail -10
+docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_auth.py -v --no-cov 2>&1 | tail -10
 ```
 
 Expected: all existing tests pass.
@@ -1097,7 +1089,7 @@ async def news_websocket(
 #### Step 7.3 — Run regression + guard tests
 
 ```bash
-docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_auth.py backend/tests/api/test_ws_guards.py -v 2>&1 | tail -20
+docker-compose exec -T backend python -m pytest backend/tests/api/test_ws_auth.py backend/tests/api/test_ws_guards.py -v --no-cov 2>&1 | tail -20
 ```
 
 Expected: all pass. The `test_per_user_cap_rejects_with_1008` integration test (which
