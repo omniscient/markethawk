@@ -79,6 +79,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not rely on spec line-count yield estimates to predict which priority files will be sufficient for a coverage ratchet — with `all: true` and a large untested denominator, actual coverage yield per file can be 30–40% lower than estimated; always run `npx vitest run --coverage` after each batch and continue past the spec's priority list per D1 until the gate clears. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:conformance path:frontend/src/ -->
 
+## Frontend: Security — External URL Validation
+
+- [PATTERN] For external URLs bound to `href`/`src`, use a `safeExternalUrl(url, { allowedHosts? })` utility (`frontend/src/utils/url.ts`) that calls `new URL()` in a try/catch and rejects anything whose protocol is not `'https:'`. For data sources with a fixed, known domain set (e.g. tweet-monitor → `twitter.com`/`x.com`/`t.co`), also pass `allowedHosts` for open-redirect prevention. For data sources with unbounded publisher domains (e.g. Polygon.io news → hundreds of CDNs), use scheme-only validation — a strict domain allowlist is unmaintainable and silently breaks the feed when new publishers are added. <!-- issue:#381 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not set `style-src 'self'` (without `'unsafe-inline'`) in the Content Security Policy when the project uses Tailwind v4 (via `@tailwindcss/vite`) or Recharts — both inject runtime inline styles, so a strict `style-src` breaks chart rendering. Allow `'unsafe-inline'` for styles; restrict `script-src 'self'` (no `'unsafe-inline'`) which is safe because Vite emits no inline scripts in `index.html`. <!-- issue:#381 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
