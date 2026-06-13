@@ -94,6 +94,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Never use a simple hex-sequence like `a1b2c3d4e5f6` as an Alembic revision ID — the existing migration set contains files with IDs following this pattern and conflicts will produce a `CycleDetected` error. Use `python -m alembic revision -m "..."` to generate a unique ID, or pick a random 12-char alphanumeric string that doesn't appear in `ls backend/app/alembic/versions/` output. <!-- issue:#299 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+- [PATTERN] Scope-spillover issues created by the conformance gate must embed `<!-- dedup-key: <file/area>|<finding-type> -->` in the issue body so future runs can exact-match against the key rather than parsing LLM-generated titles; keyless legacy issues fall back to best-effort `**File/area:**` field matching (advisory, may miss). The dedup classifier lives in `dark-factory/scripts/dedupe_oos.py` (same fail-open shell-invocation pattern as `fmt_hunk_filter.py`). <!-- issue:#384 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
