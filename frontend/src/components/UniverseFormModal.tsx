@@ -2,7 +2,8 @@ import React, { useState, useEffect, startTransition } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
-import { createStockUniverse, updateStockUniverse, StockUniverse, fetchProviders } from '../api/scanner';
+import { createStockUniverse, updateStockUniverse, StockUniverse } from '../api/universe';
+import { fetchProviders } from '../api/scanner';
 
 interface UniverseFormModalProps {
     isOpen: boolean;
