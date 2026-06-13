@@ -94,3 +94,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PROVISIONAL] For date-sensitive Vitest tests, isolate fake timers in a sibling `describe` block: call `vi.useFakeTimers()` + `vi.setSystemTime(new Date('YYYY-MM-DDT00:00:00.000Z'))` in `beforeEach`, and `vi.useRealTimers()` in `afterEach` — this prevents timer state from leaking into adjacent tests that use real dates. <!-- evidence:test-output issue:#315 date:2026-06-13 expires:2026-12-13 source:implement -->
 
 - [PROVISIONAL] When asserting absence of a CSS class (e.g. `text-positive`) in a `WatchlistRow` test, choose a live-data fixture whose other cells (`SessionCell` for `regular` also uses `text-positive`) do not share that class — or scope the query: `container.querySelector('td:nth-child(2) span.text-positive')`. <!-- evidence:test-output issue:#312 date:2026-06-13 expires:2026-12-13 source:implement -->
+
+## Frontend: URL Validation
+
+- [AVOID] `allowedHosts` matching in `safeExternalUrl` must use exact-host-or-subdomain logic (`host === h || host.endsWith('.' + h)`), not `Array.includes(hostname)`, which is exact-match only and silently drops subdomain support the spec requires (e.g. `mobile.twitter.com` would be rejected despite `twitter.com` being in the allowlist). <!-- issue:#381 date:2026-06-13 expires:2026-12-13 source:conformance path:frontend/src/utils/ -->
