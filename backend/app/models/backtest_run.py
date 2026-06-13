@@ -43,6 +43,8 @@ class BacktestRun(Base):
     max_hold_sessions = Column(Integer, nullable=False, default=10)
     # Optional scanner config parameters (JSONB; passed to scanner if re-generating signals)
     scanner_config_params = Column(JSONB, nullable=True)
+    # Snapshot of strategy fields at run time for determinism (spec req #9, #11)
+    strategy_snapshot = Column(JSONB, nullable=True)
 
     # ── Execution state ───────────────────────────────────────────────────────
     # queued → running → completed | failed

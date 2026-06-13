@@ -69,6 +69,7 @@ class BacktestResult:
     trades_exited_on_data_end: int = 0
     universe_as_of: Optional[str] = None
     bars_source: Optional[str] = None
+    strategy_snapshot: Optional[dict] = None
     trades: list = field(default_factory=list)
 
 
@@ -122,6 +123,7 @@ def _simulate_trade(
     entry_type: str,
     limit_offset_pct: float,
     max_hold_sessions: int,
+    signal_previous_close: Optional[float] = None,
 ) -> tuple[
     Optional[Decimal],
     Optional[Decimal],
@@ -136,16 +138,21 @@ def _simulate_trade(
     Returns: (entry_price, exit_price, exit_reason, hold_sessions, stop_price, target_price)
 
     Conservative intrabar rule: if bar.low <= stop AND bar.high >= target → stop wins.
+    Time stop: exits at NEXT session open after max_hold_sessions (spec req #6).
+    Limit entry: uses signal_previous_close for limit_price computation (spec §Entry price).
     """
-    # Compute entry price from the next session open (entry_bar is the first session bar)
     open_price = Decimal(str(entry_bar.open))
     if entry_type == "limit":
-        # Limit order: entry at open * (1 + offset/100); if offset < 0, we wait for a lower price
-        entry_price = open_price * (1 + Decimal(str(limit_offset_pct)) / 100)
-        # If limit entry price > open (chasing), fill at open; if < open (pull-back), skip
-        # Conservative: if open > entry_price (gap-down below limit), we don't fill
-        if limit_offset_pct < 0 and open_price > entry_price:
+        # Limit price = signal_previous_close * (1 + offset/100); fill at open if open <= limit_price
+        if signal_previous_close is not None:
+            prev_close = Decimal(str(signal_previous_close))
+            limit_price = prev_close * (1 + Decimal(str(limit_offset_pct)) / 100)
+        else:
+            # Fallback when previous_close unavailable: use open as base
+            limit_price = open_price * (1 + Decimal(str(limit_offset_pct)) / 100)
+        if open_price > limit_price:
             return None, None, EXIT_NO_ENTRY, 0, None, None
+        entry_price = open_price  # filled at open (at or better than limit)
     else:
         entry_price = open_price
 
@@ -157,7 +164,7 @@ def _simulate_trade(
         return entry_price, entry_price, EXIT_DELISTED, 0, stop_price, target_price
 
     hold = 0
-    for bar in subsequent_bars:
+    for i, bar in enumerate(subsequent_bars):
         hold += 1
         low = Decimal(str(bar.low))
         high = Decimal(str(bar.high))
@@ -182,7 +189,19 @@ def _simulate_trade(
             )
 
         if hold >= max_hold_sessions:
-            return entry_price, close, EXIT_TIME_STOP, hold, stop_price, target_price
+            # Exit at next session open; fall back to close if no next bar
+            if i + 1 < len(subsequent_bars):
+                next_open = Decimal(str(subsequent_bars[i + 1].open))
+            else:
+                next_open = close
+            return (
+                entry_price,
+                next_open,
+                EXIT_TIME_STOP,
+                hold,
+                stop_price,
+                target_price,
+            )
 
     # Bars ran out while position is open — delisting or data end
     last_close = Decimal(str(subsequent_bars[-1].close))
@@ -323,6 +342,16 @@ def run_backtest_logic(
     if strategy is None:
         raise ValueError(f"TradingStrategy id={strategy_id} not found")
 
+    # Snapshot strategy fields at run time for determinism (spec req #9, #11)
+    strategy_snapshot_data = {
+        "entry_type": strategy.entry_type,
+        "stop_pct": str(strategy.stop_pct),
+        "risk_reward_ratio": str(strategy.risk_reward_ratio),
+        "limit_offset_pct": str(strategy.limit_offset_pct)
+        if strategy.limit_offset_pct is not None
+        else None,
+    }
+
     # Resolve universe tickers — NOT filtered by current tradability (survivorship-bias rule)
     universe_tickers_rows = (
         db.query(StockUniverseTicker.ticker)
@@ -360,6 +389,7 @@ def run_backtest_logic(
         run_uuid=str(_uuid.uuid4()),
         universe_as_of=str(date_type.today()),
         bars_source="polygon_adjusted",
+        strategy_snapshot=strategy_snapshot_data,
     )
 
     stop_pct = float(strategy.stop_pct)
@@ -404,6 +434,8 @@ def run_backtest_logic(
             entry_bar = entry_bars[0]
             subsequent_bars = entry_bars[1:]
 
+            previous_close = indicators.get("previous_close")
+
             (
                 entry_price,
                 exit_price,
@@ -419,6 +451,9 @@ def run_backtest_logic(
                 entry_type=entry_type,
                 limit_offset_pct=limit_offset_pct,
                 max_hold_sessions=max_hold_sessions,
+                signal_previous_close=float(previous_close)
+                if previous_close is not None
+                else None,
             )
 
             if exit_reason == EXIT_NO_ENTRY:
@@ -433,8 +468,35 @@ def run_backtest_logic(
                 entry_bar.timestamp.day,
             )
 
+            # Compute exit_date from bars and hold_sessions
+            if hold_sessions == 0:
+                exit_date_val = (
+                    entry_date_val  # delisted immediately (no subsequent bars)
+                )
+            elif exit_reason == EXIT_TIME_STOP:
+                # Time stop: exit at NEXT bar's open; that bar is subsequent_bars[hold_sessions]
+                next_idx = hold_sessions
+                next_bar = (
+                    subsequent_bars[next_idx]
+                    if next_idx < len(subsequent_bars)
+                    else subsequent_bars[-1]
+                )
+                exit_date_val = date(
+                    next_bar.timestamp.year,
+                    next_bar.timestamp.month,
+                    next_bar.timestamp.day,
+                )
+            else:
+                exit_bar = subsequent_bars[hold_sessions - 1]
+                exit_date_val = date(
+                    exit_bar.timestamp.year,
+                    exit_bar.timestamp.month,
+                    exit_bar.timestamp.day,
+                )
+
             trade.entry_date = entry_date_val
             trade.entry_price = entry_price
+            trade.exit_date = exit_date_val
             trade.exit_reason = exit_reason
             trade.hold_sessions = hold_sessions
             trade.stop_price = stop_price

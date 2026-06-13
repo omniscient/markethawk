@@ -111,6 +111,7 @@ def run_backtest(
         run.trades_exited_on_data_end = result.trades_exited_on_data_end
         run.universe_as_of = result.universe_as_of
         run.bars_source = result.bars_source
+        run.strategy_snapshot = result.strategy_snapshot
         run.status = "completed"
         run.completed_at = utc_now()
         db.flush()

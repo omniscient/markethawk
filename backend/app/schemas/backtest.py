@@ -50,6 +50,7 @@ class BacktestRunResponse(BaseModel):
     end_date: date
     max_hold_sessions: int
     scanner_config_params: Optional[Dict[str, Any]] = None
+    strategy_snapshot: Optional[Dict[str, Any]] = None
     status: str
     celery_task_id: Optional[str] = None
     error_message: Optional[str] = None

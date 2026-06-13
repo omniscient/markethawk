@@ -130,20 +130,21 @@ def test_intrabar_only_low_hits():
 # ---------------------------------------------------------------------------
 
 
-def test_time_stop_exits_at_close():
-    """Position held for max_hold_sessions without hitting stop or target → time_stop at close."""
+def test_time_stop_exits_at_next_open():
+    """Position held for max_hold_sessions without hitting stop/target → time_stop at NEXT session open."""
     entry = _bar(open_=100, high=100, low=100, close=100)
-    # 3 neutral bars (stop=98, target=104, bars stay in range)
+    # 3 neutral bars + 4th bar providing the time-stop exit open
     bars = [
         _bar(open_=100, high=102, low=99, close=101),
         _bar(open_=101, high=103, low=100, close=102),
-        _bar(open_=102, high=103, low=100, close=101),
+        _bar(open_=102, high=103, low=100, close=101),  # hold=3 triggers time_stop
+        _bar(open_=103, high=104, low=102, close=103),  # exit at open=103
     ]
     entry_price, exit_price, exit_reason, hold, _, _ = _run(
         entry, bars, max_hold_sessions=3
     )
     assert exit_reason == "time_stop"
-    assert exit_price == Decimal("101")  # last bar close
+    assert exit_price == Decimal("103")  # next session open, NOT last bar close
     assert hold == 3
 
 
@@ -206,13 +207,13 @@ def test_no_subsequent_bars_is_delisted():
 
 def test_limit_entry_no_fill_when_gap_down():
     """
-    Limit entry with negative offset (wait for pull-back): if open > entry limit price,
-    position is not entered (no_entry_bar).
+    Limit entry: limit_price = previous_close * (1 + offset/100).
+    If open > limit_price, no fill (no_entry_bar).
     """
     from app.services.backtest_service import _simulate_trade
 
-    # limit_offset_pct = -2%: entry limit = 100 * 0.98 = 98
-    # But open = 100 (gap-UP — open above limit → no fill for a pull-back limit)
+    # signal_previous_close=100, limit_offset_pct=-2%: limit_price = 100 * 0.98 = 98
+    # open = 100 > limit_price = 98 → no fill
     entry = _bar(open_=100, high=102, low=99, close=101)
     result = _simulate_trade(
         entry_bar=entry,
@@ -220,8 +221,9 @@ def test_limit_entry_no_fill_when_gap_down():
         stop_pct=2.0,
         risk_reward_ratio=2.0,
         entry_type="limit",
-        limit_offset_pct=-2.0,  # buy limit 2% below trigger
+        limit_offset_pct=-2.0,
         max_hold_sessions=10,
+        signal_previous_close=100.0,
     )
     entry_price, exit_price, exit_reason, hold, _, _ = result
     assert exit_reason == "no_entry_bar"

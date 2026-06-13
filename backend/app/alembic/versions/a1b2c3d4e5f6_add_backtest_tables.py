@@ -35,6 +35,11 @@ def upgrade() -> None:
             postgresql.JSONB(astext_type=sa.Text()),
             nullable=True,
         ),
+        sa.Column(
+            "strategy_snapshot",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=True,
+        ),
         sa.Column("status", sa.String(length=20), nullable=False),
         sa.Column("celery_task_id", sa.String(length=64), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
