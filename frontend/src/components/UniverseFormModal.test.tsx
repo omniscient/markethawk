@@ -13,9 +13,12 @@ const mockCreate = vi.fn().mockResolvedValue({
   created_at: '2026-01-01T00:00:00Z',
 });
 
-vi.mock('../api/scanner', () => ({
+vi.mock('../api/universe', () => ({
   createStockUniverse: () => mockCreate(),
   updateStockUniverse: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('../api/scanner', () => ({
   fetchProviders: vi.fn().mockResolvedValue({ available: [] }),
 }));
 

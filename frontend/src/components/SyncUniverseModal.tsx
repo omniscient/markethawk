@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import { DownloadCloud } from 'lucide-react';
-import { StockUniverse, syncUniverseAggregates, SyncAggregatesOptions } from '../api/scanner';
+import { StockUniverse, syncUniverseAggregates, SyncAggregatesOptions } from '../api/universe';
 
 interface SyncUniverseModalProps {
     isOpen: boolean;

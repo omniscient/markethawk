@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
-import { createStockUniverse } from '../api/scanner';
+import { createStockUniverse } from '../api/universe';
 
 interface CreateUniverseModalProps {
     isOpen: boolean;
