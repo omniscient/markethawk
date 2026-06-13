@@ -83,6 +83,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Backend: Test Infrastructure
 
 - [PATTERN] Place reusable test infrastructure code (postgres discovery, environment probing, connection helpers) in `backend/tests/utils/` with module-level imports so patch targets resolve as `tests.utils.<module>.<name>`; reserve `backend/tests/fixtures/` for domain seed/mock helpers only. <!-- issue:#360 date:2026-06-13 expires:2026-12-13 source:implement -->
+
+- [AVOID] Never call a postgres discovery probe unconditionally from `_testcontainers_url()` in `conftest.py` — if the probe finds a dev database (e.g. `stockscanner-db`), `db_engine`'s `drop_all(bind=engine)` teardown destroys its tables. Gate probe calls behind an explicit opt-in flag: `if os.environ.get("POSTGRES_DISCOVERY_ENABLED") == "true":`. The factory environment sets this flag; normal CI does not. <!-- issue:#360 date:2026-06-13 expires:2026-12-13 source:implement -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
