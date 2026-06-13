@@ -22,6 +22,8 @@ MarketHawk/
 │   │   │   ├── cache.py
 │   │   │   └── tracing.py
 │   │   ├── models/
+│   │   │   ├── backtest_run.py
+│   │   │   ├── backtest_trade.py
 │   │   │   ├── active_watchlist.py
 │   │   │   ├── scanner_run.py
 │   │   │   ├── scanner_event.py
@@ -49,6 +51,7 @@ MarketHawk/
 │   │   │   ├── user.py
 │   │   │   └── __init__.py
 │   │   ├── routers/
+│   │   │   ├── backtest.py
 │   │   │   ├── auth.py
 │   │   │   ├── scanner.py
 │   │   │   ├── universe.py
@@ -67,6 +70,7 @@ MarketHawk/
 │   │   │   ├── active_watchlist.py
 │   │   │   └── stock.py
 │   │   ├── services/
+│   │   │   ├── backtest_service.py (daily-bar replay engine — _simulate_trade, run_backtest_logic)
 │   │   │   ├── stock_data.py
 │   │   │   ├── universe_stats.py
 │   │   │   ├── scan_orchestrator.py
