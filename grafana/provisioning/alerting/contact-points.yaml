@@ -7,5 +7,5 @@ contactPoints:
       - uid: markethawk-infra-webhook
         type: webhook
         settings:
-          url: http://backend:8000/api/alerts/infrastructure
+          url: http://backend:8000/api/v1/alerts/infrastructure
           httpMethod: POST

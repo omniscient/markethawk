@@ -48,3 +48,87 @@
     @apply bg-financial-dark text-white font-sans;
   }
 }
+
+@layer components {
+  .app-content-shell {
+    width: 100%;
+    max-width: 2400px;
+    margin-inline: auto;
+    padding: clamp(1.25rem, 1vw + 1rem, 2.5rem);
+  }
+
+  .dashboard-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+
+  .dashboard-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .dashboard-metrics-grid,
+  .dashboard-primary-grid,
+  .dashboard-secondary-grid {
+    display: grid;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+
+  .dashboard-metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  }
+
+  .dashboard-primary-grid,
+  .dashboard-secondary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (min-width: 1024px) {
+    .dashboard-metrics-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .dashboard-primary-grid {
+      grid-template-columns: minmax(0, 2fr) minmax(300px, 0.9fr);
+    }
+
+    .dashboard-secondary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .dashboard-page,
+    .dashboard-metrics-grid,
+    .dashboard-primary-grid,
+    .dashboard-secondary-grid {
+      gap: 2rem;
+    }
+
+    .dashboard-primary-grid {
+      grid-template-columns: minmax(0, 2.35fr) minmax(360px, 0.8fr);
+    }
+
+    .dashboard-secondary-grid {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+    }
+  }
+
+  @media (min-width: 2200px) {
+    .dashboard-primary-grid {
+      grid-template-columns: minmax(0, 2.6fr) minmax(420px, 0.75fr);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .dashboard-page-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+}

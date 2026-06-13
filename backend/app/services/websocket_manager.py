@@ -98,6 +98,10 @@ class StockWebSocketManager:
             logger.warning("POLYGON_API_KEY not set. WebSocket manager will not start.")
             return
 
+        if not settings.LIVE_WEBSOCKET_ENABLED:
+            logger.info("Live WebSocket manager disabled by configuration.")
+            return
+
         self._loop = asyncio.get_event_loop()
 
         def run_client():

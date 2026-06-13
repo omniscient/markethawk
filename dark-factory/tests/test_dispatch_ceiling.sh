@@ -22,6 +22,13 @@ echo '{}' > "$STATE_FILE"
 export STATE_FILE
 export GH_TOKEN="${GH_TOKEN:-stub-token}"
 export CLAUDE_CODE_OAUTH_TOKEN="${CLAUDE_CODE_OAUTH_TOKEN:-stub-token}"
+# Set all config-driven vars explicitly: read_config runs after SCHEDULER_SOURCE_ONLY guard
+export POLL_INTERVAL=60 MAX_RETRIES=3 RATE_LIMIT_FLOOR=200 FACTORY_WIP_LIMIT=1
+export MAIN_RED_RECHECK_ENABLED=true MAIN_RED_RECHECK_MINUTES=20 REFINE_WIP_LIMIT=2
+export DIRECT_TO_PR_LABEL=direct-to-pr SPEC_GRACE_MINUTES=30 PLAN_GRACE_MINUTES=30
+export CONFLICT_RESOLUTION_ENABLED=true DISPATCH_CEILING_ENABLED=true
+export ABOVE_CEILING_LABEL=above-ceiling
+export ABOVE_CEILING_KEYWORDS="migration|migrate|performance|perf|architectur|refactor"
 SCHEDULER_SOURCE_ONLY=1 source "$SCHED"
 
 # Re-stub set_board_status — scheduler.sh defines its own, overriding the export above
