@@ -79,6 +79,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] EnrichedSignal must carry raw:RawSignal and day_metrics:dict stage-boundary fields per spec; omitting them severs the seam contract and blocks recovery of the original signal from enriched output <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:conformance path:backend/app/services/ -->
 - [AVOID] Stage functions (especially _enrich_one / per-ticker helpers) must stay under ~80 lines; when a helper grows large, extract the indicator-building body into a named _build_indicators() sub-helper rather than leaving it inline <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:conformance path:backend/app/services/ -->
+
+## Backend: Backtest / Simulation
+
+- [AVOID] Never write generated backtest signals to `scanner_events` — the `UniqueConstraint(ticker, event_date, scanner_type)` causes IntegrityErrors on any overlap with real events, and `scanner_events` is operational history consumed by alerts/clusters/reviews. Keep replay signals in-memory only; store a nullable `source_event_id` FK for signals that already exist in DB. See `backtest_service.py`. <!-- issue:#301 date:2026-06-13 expires:2026-12-13 source:implement -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
