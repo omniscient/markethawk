@@ -7,8 +7,13 @@ vi.mock('../api/scanner', () => ({
   syncFundamentals: vi.fn().mockResolvedValue({}),
   syncMetrics: vi.fn().mockResolvedValue({}),
   syncTickerDetails: vi.fn().mockResolvedValue({}),
-  stopSync: vi.fn().mockResolvedValue({}),
-  fetchStorageStats: vi.fn().mockResolvedValue({ total_rows: 1000, db_size_mb: 50 }),
+  stopSync: vi.fn().mockResolvedValue({ message: 'Sync stopped' }),
+  fetchStorageStats: vi.fn().mockResolvedValue({
+    scanner: { bytes: 1024, formatted: '1.0 KB' },
+    historical: { bytes: 2048, formatted: '2.0 KB' },
+    settings: { bytes: 512, formatted: '0.5 KB' },
+    total: { bytes: 3584, formatted: '3.5 KB' },
+  }),
 }));
 
 vi.mock('../api/system', () => ({
@@ -42,5 +47,10 @@ describe('Settings page', () => {
   it('shows Global API Speed selector in Data tab', () => {
     renderWithQuery(<Settings />);
     expect(screen.getByText(/Global API Speed/i)).toBeInTheDocument();
+  });
+
+  it('displays storage stats total after loading', async () => {
+    renderWithQuery(<Settings />);
+    expect(await screen.findByText('3.5 KB')).toBeInTheDocument();
   });
 });
