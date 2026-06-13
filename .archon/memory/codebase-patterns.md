@@ -17,6 +17,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] When spec coverage priority files yield less than the target threshold, do not silently add out-of-list files — document the deviation explicitly in the config comment block (why the assumption failed, which files were needed) so the deviation is classified as MINOR (documented/justified) rather than MATERIAL (silent scope expansion). <!-- issue:#250 date:2026-06-11 expires:2026-12-11 source:conformance path:frontend/ -->
 - [AVOID] Full-pipeline regression tests must use the transaction-rollback db fixture from conftest.py (not MagicMock DB), which ensures SQLAlchemy queries actually execute against a real schema and triggers the SAVEPOINT-based isolation <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:conformance path:backend/tests/services/ -->
+- [AVOID] Gating probe_running_postgres() behind an env-var (e.g. POSTGRES_DISCOVERY_ENABLED==true) in _testcontainers_url() is a fixture behaviour change that violates spec requirement #2; if a safety concern requires a gate, the spec must be updated to include it — do not add opt-in gates silently in the implementation <!-- issue:#360 date:2026-06-13 expires:2026-12-13 source:conformance path:backend/tests/ -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
