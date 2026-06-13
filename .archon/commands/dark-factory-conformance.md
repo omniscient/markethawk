@@ -204,27 +204,100 @@ After excision:
 
 ### 3.6.2 — Create backlog ticket
 
-For each `[OOS]` entry (whether excision succeeded or not), create one GitHub issue:
+Before filing tickets, deduplicate OOS entries against each other and against the
+existing `scope-spillover` backlog.
+
+**Populate `OOS_ENTRIES` array from `$CONFORMANCE_DIALOGUE`** (the accumulated reviewer output
+set in Phase 3.1 step 5 and appended on each reconcile cycle):
 
 ```bash
-SPILLOVER_TITLE="<short title derived from the OOS description>"
-SPILLOVER_BODY="## Scope spillover from #${ISSUE_NUM}
+OOS_ENTRIES=()
+while IFS= read -r line; do
+  stripped="${line#- }"
+  [[ "$stripped" == \[OOS\]* ]] && OOS_ENTRIES+=("$stripped")
+done <<< "$CONFORMANCE_DIALOGUE"
+```
+
+Skip to 3.6.3 if `${#OOS_ENTRIES[@]} -eq 0`.
+
+**Step A — Fetch existing open spillover issues:**
+
+```bash
+SPILLOVER_JSON=$(gh issue list \
+  --repo omniscient/markethawk \
+  --label "$BACKLOG_LABEL" \
+  --state open \
+  --json number,title,body \
+  --limit 200 2>/dev/null || echo "[]")
+```
+
+**Step B — Build OOS JSON array and call `dedupe_oos.py` (fail-open):**
+
+```bash
+OOS_ENTRIES_JSON=$(python3 -c \
+  "import json,sys; entries=sys.argv[1:]; print(json.dumps(entries))" \
+  "${OOS_ENTRIES[@]}")
+
+DEDUPE_OUT=$(python3 dark-factory/scripts/dedupe_oos.py \
+  --oos "$OOS_ENTRIES_JSON" --spillovers "$SPILLOVER_JSON" 2>/tmp/dedupe_err.txt) \
+  && ACTION_LIST="$DEDUPE_OUT" \
+  || {
+    echo "dedupe_oos.py failed ($(cat /tmp/dedupe_err.txt)) — falling back to create-per-finding"
+    ACTION_LIST=$(echo "$OOS_ENTRIES_JSON" | python3 -c \
+      "import json,sys; print(json.dumps([{'entry':e,'action':'create','key':''} for e in json.load(sys.stdin)]))")
+  }
+```
+
+**Step C — Process actions (whether excision succeeded or not):**
+
+Use process substitution so `SPILLOVER_TICKETS` mutations survive outside the loop:
+
+```bash
+SPILLOVER_TICKETS=""
+
+while IFS='|' read -r ACTION ENTRY KEY; do
+  case "$ACTION" in
+    create)
+      SPILLOVER_TITLE="<short title derived from ENTRY>"
+      DEDUP_KEY_COMMENT="<!-- dedup-key: ${KEY} -->"
+      SPILLOVER_BODY="## Scope spillover from #${ISSUE_NUM}
 
 The dark factory noticed this pre-existing defect while implementing issue #${ISSUE_NUM} but did not fix it inline (scope enforcement).
 
-**File/area:** <file>
-**Defect:** <description from OOS entry>
+**File/area:** <file from ENTRY>
+**Defect:** <description from ENTRY>
+
+${DEDUP_KEY_COMMENT}
 
 ---
 *Automatically triaged by MarketHawk Dark Factory scope enforcement.*"
 
-SPILLOVER_NUM=$(gh issue create \
-  --repo omniscient/markethawk \
-  --title "$SPILLOVER_TITLE" \
-  --body "$SPILLOVER_BODY" \
-  --label "needs-triage,${BACKLOG_LABEL}" \
-  --json number --jq '.number')
-echo "Created spillover ticket #${SPILLOVER_NUM}"
+      SPILLOVER_URL=$(gh issue create \
+        --repo omniscient/markethawk \
+        --title "$SPILLOVER_TITLE" \
+        --body "$SPILLOVER_BODY" \
+        --label "needs-triage,${BACKLOG_LABEL}")
+      SPILLOVER_NUM=$(basename "$SPILLOVER_URL")
+      SPILLOVER_TICKETS="$SPILLOVER_TICKETS $SPILLOVER_NUM"
+      echo "scope-enforcement: created new spillover #${SPILLOVER_NUM} (key: $KEY)"
+      ;;
+    comment:*)
+      EXISTING_NUM="${ACTION#comment:}"
+      gh issue comment "$EXISTING_NUM" \
+        --repo omniscient/markethawk \
+        --body "**Scope enforcement (re-observed):** This finding was re-surfaced while implementing issue #${ISSUE_NUM}.
+
+**Entry:** ${ENTRY}
+
+No new ticket created — deduped against this issue."
+      echo "scope-enforcement: commented on existing spillover #${EXISTING_NUM} (key: $KEY)"
+      ;;
+    suppress)
+      echo "scope-enforcement: suppressed non-actionable finding (key: $KEY): $ENTRY"
+      ;;
+  esac
+done < <(echo "$ACTION_LIST" | python3 -c \
+  "import json,sys; [print(r['action']+'|'+r['entry']+'|'+r.get('key','')) for r in json.load(sys.stdin)]")
 ```
 
 Collect all created ticket numbers into `SPILLOVER_TICKETS` (space-separated list).
