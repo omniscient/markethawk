@@ -14,6 +14,9 @@ Open the `.html` files in a browser — they are self-contained (Tailwind/Mermai
 | 2 | [`2026-06-03-architecture-quality-report-v2.html`](2026-06-03-architecture-quality-report-v2.html) | 2026-06-03 | **v2** — re-assessment after those tickets shipped, using the identical rubric. Overall **83/100**, architecture **3.9/5**, scorecard **3.75/5**. Includes a refreshed risk register and a ticket→outcome traceability matrix. |
 | 3 | [`2026-06-03-architecture-quality-comparison-v1-vs-v2.html`](2026-06-03-architecture-quality-comparison-v1-vs-v2.html) | 2026-06-03 | **Comparison** — visual v1→v2 side-by-side: a diverging delta chart across all 16 dimensions, "dramatically improved" vs "cold spots & regressions", and the new defects the remediation introduced. |
 | 4 | [`2026-06-09-architecture-quality-report-v3.html`](2026-06-09-architecture-quality-report-v3.html) | 2026-06-09 | **v3** — re-assessment after round-2 tickets #190–#205. Overall **90/100**, architecture **4.3/5**, scorecard **4.06/5**. First report with the Code Health Deep-Dive, DORA-proxy, and Score Trend sections. Caught one ticket (#195 backups) closed with no implementation. |
+| — | [`2026-06-12-security-review.html`](2026-06-12-security-review.html) | 2026-06-12 | **Security Review** (not a quality vN) — comprehensive read-only application-security assessment. Mean posture **2.6/5** on a security-specific 12-category scorecard (independent of the 16-dimension quality rubric). 0 Critical / 4 High / 8 Medium / 2 Low. Confirmed the system can place **live** IBKR bracket orders. Follow-ups labeled `security-audit-2026-06-12`, grouped under an epic. |
+
+> **Note:** the security review reuses the visual shell for consistency but is a **distinct artifact** — it is scored on its own security rubric and does **not** renumber the comparable v1→v2→v3 quality series.
 
 ## Headline movement
 

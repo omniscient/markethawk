@@ -11,6 +11,9 @@ import Card from './ui/Card';
 import Ticker from './Ticker';
 import ReviewControls from './ReviewControls';
 import { ScannerEvent, ScannerDiagnostics } from '../api/scanner';
+import { safeExternalUrl } from '../utils/url';
+
+const TWEET_HOSTS = ['twitter.com', 'x.com', 't.co'];
 
 interface ScannerResultsProps {
   results: {
@@ -237,17 +240,23 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                       <span className="text-[10px] font-bold text-gray-500 uppercase border border-gray-700 px-1.5 py-0.5 rounded-md bg-gray-900/50">
                         {event.scanner_type.replace(/_/g, ' ')}
                       </span>
-                      {event.scanner_type === 'social_callout' && Boolean(event.metadata?.tweet_url) && (
-                        <a
-                          href={event.metadata.tweet_url as string}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-financial-blue hover:underline truncate max-w-[120px]"
-                          title={`@${(event.metadata?.source_account as string) ?? ''}`}
-                        >
-                          @{(event.metadata?.source_account as string) ?? 'unknown'}
-                        </a>
-                      )}
+                      {event.scanner_type === 'social_callout' && Boolean(event.metadata?.tweet_url) && (() => {
+                        const safeTweetUrl = safeExternalUrl(event.metadata.tweet_url as string, { allowedHosts: TWEET_HOSTS });
+                        const label = `@${(event.metadata?.source_account as string) ?? 'unknown'}`;
+                        return safeTweetUrl ? (
+                          <a
+                            href={safeTweetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-financial-blue hover:underline truncate max-w-[120px]"
+                            title={label}
+                          >
+                            {label}
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{label}</span>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td className="py-4 px-4 bg-gray-800 max-w-xs">
