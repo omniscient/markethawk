@@ -249,11 +249,18 @@ def create_app() -> FastAPI:
 
         logging.info("Advanced SQL Logging enabled (Copy-Paste friendly)")
 
+    _docs_url = "/docs" if settings.DOCS_ENABLED else None
+    _redoc_url = "/redoc" if settings.DOCS_ENABLED else None
+    _openapi_url = "/openapi.json" if settings.DOCS_ENABLED else None
+
     app = FastAPI(
         title=settings.APP_NAME,
         description="Professional stock scanning and alert system",
         version=settings.APP_VERSION,
         lifespan=lifespan,
+        docs_url=_docs_url,
+        redoc_url=_redoc_url,
+        openapi_url=_openapi_url,
     )
 
     setup_otel(
@@ -263,16 +270,15 @@ def create_app() -> FastAPI:
     )
     instrument_fastapi(app)
 
-    EXEMPT_PREFIXES = (
+    _base_exempt = (
         "/api/auth/",
         "/api/health",
         "/api/ready",
         "/metrics",
         "/api/alerts/infrastructure",
-        "/docs",
-        "/redoc",
-        "/openapi.json",
     )
+    _doc_prefixes = ("/docs", "/redoc", "/openapi.json")
+    EXEMPT_PREFIXES = _base_exempt + (_doc_prefixes if settings.DOCS_ENABLED else ())
 
     # Pure ASGI auth middleware (deliberately NOT BaseHTTPMiddleware). BaseHTTPMiddleware
     # re-emits every response as a stream, which forces GZipMiddleware into chunked mode;
