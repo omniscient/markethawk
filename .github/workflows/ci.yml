@@ -167,3 +167,21 @@ jobs:
           POLYGON_API_KEY: dummy-key-for-ci
           JWT_SECRET_KEY: ci-test-only-not-secret-0123456789abcdef
         run: python -m alembic check
+
+  factory-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test deps
+        run: pip install pytest pytest-mock
+
+      - name: Run factory_core tests
+        run: python -m pytest dark-factory/tests/ -v
+        env:
+          PYTHONPATH: dark-factory/scripts

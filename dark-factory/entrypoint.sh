@@ -362,7 +362,7 @@ ${RUN_ROWS}
 on_failure() {
   local EXIT_CODE=$?
   # Capture partial-failure record before any other action (non-fatal)
-  python3 "$CLONE_DIR/dark-factory/scripts/run_record.py" record \
+  python3 "$CLONE_DIR/dark-factory/scripts/factory_core/cli.py" run-record record \
     --run-id "${RUN_ID:-unknown}" \
     --issue "${ISSUE_NUM:-0}" \
     --intent "${INTENT:-unknown}" \
@@ -416,203 +416,14 @@ docker compose --profile factory run --rm dark-factory \"$ARGUMENTS\"
 trap on_failure ERR
 
 # =============================================================================
-# --- Conflict resolution helpers (tiered: mechanical → AI → escalate) ---
+# --- Conflict resolution: thin adapter -> factory_core CLI ---
 # =============================================================================
 
-# Tier 1: mechanical, no-AI resolution for one file.
-# Returns 0 if the file is in the allowlist and was resolved; 1 otherwise.
-_conflict_tier1() {
-  local f="$1"
-  case "$f" in
-    codeindex.json|symbolindex.json|docs/codeindex-hotspots.md)
-      git checkout --theirs "$f" 2>/dev/null && git add "$f" || return 1
-      ;;
-    frontend/package-lock.json)
-      cd "$CLONE_DIR/frontend" && npm install --silent 2>/dev/null && cd "$CLONE_DIR" || return 1
-      git add frontend/package-lock.json || return 1
-      ;;
-    backend/app/models/__init__.py)
-      python3 - "$f" << '_PYEOF' || return 1
-import sys
-path = sys.argv[1]
-with open(path) as fh:
-    content = fh.read()
-lines = content.split('\n')
-result = []
-for line in lines:
-    if line.startswith('<<<<<<<') or line.startswith('=======') or line.startswith('>>>>>>>'):
-        continue
-    result.append(line)
-seen = set()
-final = []
-for line in result:
-    stripped = line.strip()
-    if stripped and (stripped.startswith('from ') or stripped.startswith('import ')):
-        if stripped not in seen:
-            seen.add(stripped)
-            final.append(line)
-    else:
-        final.append(line)
-with open(path, 'w') as fh:
-    fh.write('\n'.join(final))
-_PYEOF
-      git add "$f" || return 1
-      ;;
-    backend/alembic/versions/*.py)
-      git checkout --theirs "$f" 2>/dev/null && git add "$f" || return 1
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-# Tier 2: AI resolution via claude -p for one conflicted file.
-# Returns 0 if resolved cleanly; 1 if uncertain or Claude unavailable.
-_conflict_tier2() {
-  local f="$1"
-  [ -f "$f" ] || return 1
-
-  local issue_body git_log conflict_content tmpfile resolved
-  issue_body=$(gh issue view "$ISSUE_NUM" --repo "${OWNER}/markethawk" --json body --jq '.body' 2>/dev/null || echo "")
-  git_log=$(git log --oneline -15 HEAD 2>/dev/null || echo "")
-  conflict_content=$(cat "$f" 2>/dev/null) || return 1
-
-  tmpfile=$(mktemp /tmp/conflict-prompt-XXXXXX.txt)
-  printf 'Resolve the git merge conflict markers in this file, preserving both intents (what the feature branch added AND what main added).\n\nReturn the COMPLETE resolved file content between two marker lines, EXACTLY like this and nothing else:\n===BEGIN_RESOLVED_FILE===\n<complete resolved file content>\n===END_RESOLVED_FILE===\n\nNo explanation, commentary, or markdown code fences — inside or outside the markers.\n\nFile: %s\n\nIssue context:\n%s\n\nRecent git log:\n%s\n\nFile content with conflict markers:\n%s\n' \
-    "$f" "$issue_body" "$git_log" "$conflict_content" > "$tmpfile"
-
-  local raw
-  raw=$(claude -p --model sonnet < "$tmpfile" 2>/dev/null)
-  local exit_code=$?
-  rm -f "$tmpfile"
-  [ "$exit_code" -ne 0 ] && return 1
-
-  # Extract ONLY the content between the sentinel markers. Claude often ignores
-  # "output only file content" and prepends prose ("The resolved content is ready,
-  # here's what I chose…"); writing that raw output silently corrupts the file and only
-  # surfaces later as a CI failure (#207: prose overwrote 01_scanner_configs.sql). If the
-  # markers are missing the response was malformed — treat as uncertain and escalate
-  # (return 1) rather than writing anything.
-  if ! printf '%s' "$raw" | grep -q '^===BEGIN_RESOLVED_FILE===$' \
-     || ! printf '%s' "$raw" | grep -q '^===END_RESOLVED_FILE===$'; then
-    return 1
-  fi
-  resolved=$(printf '%s\n' "$raw" | sed -n '/^===BEGIN_RESOLVED_FILE===$/,/^===END_RESOLVED_FILE===$/p' | sed '1d;$d')
-  if [ -z "$resolved" ] || printf '%s' "$resolved" | grep -qE '^(<<<<<<<|>>>>>>>)'; then
-    return 1
-  fi
-  printf '%s\n' "$resolved" > "$f"
-  git add "$f"
-}
-
-# Tier 3: move issue to Blocked and post an explanatory comment.
-# Does NOT exit — caller decides whether to exit after this.
-_conflict_escalate() {
-  local reason="$1"
-  echo "[deconflict] Tier 3 escalation: ${reason}"
-  set_board_status "$STATUS_BLOCKED" 2>/dev/null || true
-  gh issue comment "$ISSUE_NUM" --repo "${OWNER}/markethawk" --body \
-"## Dark Factory — Conflict Resolution Escalated
-
-The factory attempted automatic merge conflict resolution but could not complete it.
-
-**Reason:** ${reason}
-
-**To fix manually:**
-\`\`\`bash
-git checkout feat/issue-${ISSUE_NUM}-*
-git fetch origin main
-git merge origin/main
-# Resolve conflicts manually, then push
-\`\`\`
-
----
-*Posted by MarketHawk Dark Factory*" 2>/dev/null || true
-}
-
-# Main resolver: merge origin/main into HEAD, apply Tier 1 → Tier 2 → Tier 3.
-# Returns 0 on clean merge or successful resolution.
-# Returns 1 after escalation (Tier 3); the caller must then exit.
+# Merge origin/main into HEAD using the tiered factory_core resolver.
+# Returns 0 on clean merge or successful resolution, 1 after Tier-3 escalation.
 _resolve_merge_conflicts() {
-  echo "[deconflict] Fetching origin/main..."
-  git fetch origin main 2>&1 || true
-
-  local merge_exit=0
-  git merge origin/main --no-edit --no-ff 2>&1 || merge_exit=$?
-
-  if [ "$merge_exit" -eq 0 ]; then
-    echo "[deconflict] Clean merge — no conflicts."
-    return 0
-  fi
-
-  local conflicted
-  conflicted=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
-  if [ -z "$conflicted" ]; then
-    git merge --abort 2>/dev/null || true
-    _conflict_escalate "Merge failed with no resolvable conflict markers (possibly a binary file or submodule conflict)."
-    return 1
-  fi
-
-  echo "[deconflict] Conflicted files: $(echo "$conflicted" | tr '\n' ' ')"
-
-  # --- Tier 1: mechanical resolution ---
-  local tier2_needed=""
-  while IFS= read -r f; do
-    [ -z "$f" ] && continue
-    if _conflict_tier1 "$f"; then
-      echo "[deconflict] Tier1 resolved: $f"
-    else
-      tier2_needed="$tier2_needed $f"
-    fi
-  done <<< "$conflicted"
-
-  # Alembic multi-head merge (run after Tier 1 migration file resolution)
-  local heads_count=0
-  heads_count=$(cd "$CLONE_DIR/backend" && python -m alembic heads 2>/dev/null | grep -c '^[a-f0-9]' || echo "0")
-  if [ "${heads_count:-0}" -gt 1 ]; then
-    echo "[deconflict] Multiple alembic heads (${heads_count}) — creating merge migration..."
-    (cd "$CLONE_DIR/backend" && python -m alembic merge heads -m "merge_branches_issue_${ISSUE_NUM}" 2>/dev/null) || true
-    git add backend/alembic/versions/ 2>/dev/null || true
-  fi
-
-  # --- Tier 2: AI resolution ---
-  local ai_uncertain=""
-  if [ -n "$tier2_needed" ]; then
-    if [ "${CONFLICT_RESOLUTION_AI_TIER:-true}" = "true" ]; then
-      for f in $tier2_needed; do
-        if _conflict_tier2 "$f"; then
-          echo "[deconflict] Tier2 resolved: $f"
-        else
-          ai_uncertain="$ai_uncertain $f"
-        fi
-      done
-    else
-      ai_uncertain="$tier2_needed"
-      echo "[deconflict] AI tier disabled; escalating: ${tier2_needed}"
-    fi
-  fi
-
-  # --- Hard grep: surviving conflict markers (safety net) ---
-  local survivors
-  survivors=$(find . -not -path './.git/*' -type f \
-    \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' \
-       -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' \
-       -o -name '*.md' -o -name '*.sh' -o -name '*.sql' \) \
-    -exec grep -l '^<<<<<<' {} \; 2>/dev/null | head -20 || true)
-
-  if [ -n "$ai_uncertain" ] || [ -n "$survivors" ]; then
-    local reason=""
-    [ -n "$ai_uncertain" ] && reason="AI could not resolve:${ai_uncertain}."
-    [ -n "$survivors" ] && reason="${reason} Surviving markers in: $(echo "$survivors" | tr '\n' ' ')."
-    git merge --abort 2>/dev/null || true
-    _conflict_escalate "${reason}"
-    return 1
-  fi
-
-  # Commit the resolution
-  git commit -m "chore: merge origin/main, resolve conflicts [#${ISSUE_NUM}]" 2>/dev/null || true
-  echo "[deconflict] Merge resolution committed."
+  python3 "$CLONE_DIR/dark-factory/scripts/factory_core/cli.py" \
+    deconflict --issue "$ISSUE_NUM" || return $?
 }
 
 # --- Clone the repo ---
@@ -826,7 +637,7 @@ done
 ARCHON_COST_JSON=$(mktemp)
 archon workflow cost --last --json --quiet > "$ARCHON_COST_JSON" 2>/dev/null || true
 
-python3 "$CLONE_DIR/dark-factory/scripts/run_record.py" assemble \
+python3 "$CLONE_DIR/dark-factory/scripts/factory_core/cli.py" run-record assemble \
   --run-id "${RUN_ID:-unknown}" \
   --issue "$ISSUE_NUM" \
   --intent "$INTENT" \
