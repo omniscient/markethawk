@@ -202,7 +202,8 @@ def test_save_event_rejects_non_serializable_indicators(db: Session):
         )
 
 
-def test_save_event_accepts_valid_payload(db: Session):
+@patch("app.services.alert_service.trigger_scanner_alert")
+def test_save_event_accepts_valid_payload(mock_trigger, db: Session):
     result = save_event(
         db,
         ticker="AAPL",
@@ -214,3 +215,4 @@ def test_save_event_accepts_valid_payload(db: Session):
     )
     assert "id" in result
     assert result["ticker"] == "AAPL"
+    mock_trigger.assert_called_once_with(result["id"])
