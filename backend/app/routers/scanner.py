@@ -16,7 +16,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.auth import ws_get_current_user
 from app.core.cache import cache_response, get_cached
@@ -374,7 +374,7 @@ def get_scanner_results(
     db: Session = Depends(get_db),
 ):
     """Get scanner results with filtering."""
-    query = db.query(ScannerEvent).options(joinedload(ScannerEvent.reviews))
+    query = db.query(ScannerEvent).options(selectinload(ScannerEvent.reviews))
 
     if ticker:
         query = query.filter(ScannerEvent.ticker == ticker.upper())

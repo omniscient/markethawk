@@ -33,7 +33,17 @@ npx() { echo "npx $*" >> "$STUB_LOG"; return "$TSC_FAIL"; }
 # shellcheck disable=SC2317
 python() {
   echo "python $*" >> "$STUB_LOG"
-  if echo "$*" | grep -q "import app"; then return "$PY_FAIL"; fi
+  if echo "$*" | grep -q "import app"; then
+    # Mimic import-time Settings() (#190/#365): app.main cannot even import
+    # unless the harness supplies the required env vars (JWT >= 32 chars) —
+    # regardless of whether the code itself is green.
+    local jwt="${JWT_SECRET_KEY:-}"
+    if [ -z "${DATABASE_URL:-}" ] || [ -z "${POLYGON_API_KEY:-}" ] || [ "${#jwt}" -lt 32 ]; then
+      echo "python_import_env_missing" >> "$STUB_LOG"
+      return 1
+    fi
+    return "$PY_FAIL"
+  fi
   return 0
 }
 # shellcheck disable=SC2317
@@ -86,6 +96,7 @@ rm -f "${SMOKE_STATE_DIR}/main-is-red" "${SMOKE_STATE_DIR}/main-is-red-issue"
 
 assert_file_exists "sentinel file created" "${SMOKE_STATE_DIR}/main-is-red"
 assert_file_exists "issue number file created" "${SMOKE_STATE_DIR}/main-is-red-issue"
+assert_file_exists "recheck throttle stamp created on red (#365)" "${SMOKE_STATE_DIR}/main-red-last-recheck"
 GH_CREATES=$(grep -c "gh.*issue create" "$STUB_LOG" 2>/dev/null || true)
 assert_eq "gh issue create called once on first red" "1" "$GH_CREATES"
 
@@ -113,6 +124,7 @@ GATE_RC=0
 assert_eq "gate exits/returns 0 on green" "0" "$GATE_RC"
 assert_file_absent "sentinel removed on green" "${SMOKE_STATE_DIR}/main-is-red"
 assert_file_absent "issue number file removed on green" "${SMOKE_STATE_DIR}/main-is-red-issue"
+assert_file_absent "recheck throttle stamp removed on green (#365)" "${SMOKE_STATE_DIR}/main-red-last-recheck"
 GH_CLOSES=$(grep -c "gh.*issue close" "$STUB_LOG" 2>/dev/null || true)
 assert_eq "gh issue close called once" "1" "$GH_CLOSES"
 
@@ -123,10 +135,10 @@ TSC_FAIL=1; export TSC_FAIL
 > "$STUB_LOG"
 rm -f "${SMOKE_STATE_DIR}/main-is-red" "${SMOKE_STATE_DIR}/main-is-red-issue"
 
-# Mirror the entrypoint.sh intent guard: only fix/continue/deconflict trigger the gate
+# Mirror the entrypoint.sh intent guard: only fix/continue/deconflict/recheck trigger the gate
 for INTENT in refine plan close; do
   export INTENT
-  if [ "$INTENT" = "fix" ] || [ "$INTENT" = "continue" ] || [ "$INTENT" = "deconflict" ]; then
+  if [ "$INTENT" = "fix" ] || [ "$INTENT" = "continue" ] || [ "$INTENT" = "deconflict" ] || [ "$INTENT" = "recheck" ]; then
     (run_smoke_gate) || true
   fi
 done
@@ -134,6 +146,26 @@ done
 TSC_CALLS=$(grep -cE "npx|tsc" "$STUB_LOG" 2>/dev/null || true)
 assert_eq "no tsc calls for refine/plan/close" "0" "$TSC_CALLS"
 assert_file_absent "no sentinel created for skip intents" "${SMOKE_STATE_DIR}/main-is-red"
+
+# ---- Phase 4: Recheck intent (#365) — runs the gate and clears red state on green ----
+echo ""
+echo "--- Phase 4: Recheck intent clears latched red state on green ---"
+TSC_FAIL=0; PY_FAIL=0; export TSC_FAIL PY_FAIL
+> "$STUB_LOG"
+touch "${SMOKE_STATE_DIR}/main-is-red" "${SMOKE_STATE_DIR}/main-red-last-recheck"
+echo "999" > "${SMOKE_STATE_DIR}/main-is-red-issue"
+
+INTENT=recheck; export INTENT
+if [ "$INTENT" = "fix" ] || [ "$INTENT" = "continue" ] || [ "$INTENT" = "deconflict" ] || [ "$INTENT" = "recheck" ]; then
+  (run_smoke_gate) || true
+fi
+
+TSC_CALLS4=$(grep -c "npx" "$STUB_LOG" 2>/dev/null || true)
+assert_eq "recheck intent runs the gate (tsc called)" "1" "$TSC_CALLS4"
+assert_file_absent "sentinel removed by green recheck" "${SMOKE_STATE_DIR}/main-is-red"
+assert_file_absent "throttle stamp removed by green recheck" "${SMOKE_STATE_DIR}/main-red-last-recheck"
+GH_CLOSES4=$(grep -c "gh.*issue close" "$STUB_LOG" 2>/dev/null || true)
+assert_eq "regression ticket closed by green recheck" "1" "$GH_CLOSES4"
 
 # ---- Summary ----
 echo ""

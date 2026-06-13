@@ -35,6 +35,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When an out-of-scope defect is noticed during implementation, write it to `$ARTIFACTS_DIR/out-of-scope.md` with `- <file>: <one-sentence description>` and leave the defect unfixed. The conformance gate reads this file and converts each entry into a `scope-spillover`-labelled backlog ticket automatically. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
 
+## Scheduler Config Pattern
+
+- [PATTERN] When scheduler.sh defers `read_config()` until after the `SCHEDULER_SOURCE_ONLY` guard, every bash test file that sources scheduler.sh (`SCHEDULER_SOURCE_ONLY=1 source "$SCHED"`) must explicitly `export VAR=value` for all config-driven policy vars before sourcing — otherwise helper functions that reference those vars fail with `set -u` unbound-variable errors. The canonical list is in `test_scheduler.sh`'s pre-source export block. <!-- issue:#338 date:2026-06-13 expires:2026-12-13 source:implement -->
+
 ## Scheduler Architecture
 
 - [PATTERN] All `dispatch()` call sites in `scheduler.sh` must use `if dispatch ...; then ... fi` guards. A bare `dispatch "..."` under `set -e` exits the daemon on non-zero return, which triggers `restart: unless-stopped` and wipes the retry counter — the root cause of the #159 loop. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
@@ -103,3 +107,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PROVISIONAL] The `docker-socket-proxy` blocks `exec` operations (HTTP 403), so testcontainers healthchecks fail inside the factory container; use `TEST_DATABASE_URL=postgresql://postgres:<pw>@postgres:5432/test_markethawk` instead (create DB via SQLAlchemy AUTOCOMMIT before running pytest). <!-- evidence:curl-response issue:#287 date:2026-06-11 expires:2026-12-11 source:implement -->
 
 - [PROVISIONAL] When `.env` is absent, retrieve the running postgres password via `curl -s "http://docker-socket-proxy:2375/v1.54/containers/stockscanner-db/json" | python3 -c "import json,sys; [print(e) for e in json.load(sys.stdin)['Config']['Env'] if 'PASSWORD' in e]"`. <!-- evidence:curl-response issue:#287 date:2026-06-11 expires:2026-12-11 source:implement -->
+
+- [PROVISIONAL] For standalone sidecar services (not reusing the backend image), place the Dockerfile at `docker/Dockerfile.<service>` and set `build: context: .` in `docker-compose.yml` so `COPY scripts/<file>` can reach files from the repo root; use a separate named `docker/` directory rather than placing service Dockerfiles at the project root. <!-- evidence:docker-compose-yml issue:#90 date:2026-06-12 expires:2026-12-12 source:implement -->
+
+- [PROVISIONAL] When a `dark-factory/Dockerfile` layer change (e.g. user/group creation) risks being silently skipped by GitHub CI's Docker layer cache, temporarily add `no-cache: true` to the `build-push-action@v6` `with:` block in `.github/workflows/ci-publish.yml`'s `build-dark-factory` job, then revert after smoke tests confirm the layer executed (`whoami` returns `factory` not `root`). <!-- evidence:ci-publish-yml issue:#261 date:2026-06-13 expires:2026-12-13 source:implement -->

@@ -40,19 +40,54 @@ Before exposing this stack outside your local machine, address the following:
 
 ### Database Backup
 
-There is no automated backup configured. For production use, schedule regular PostgreSQL dumps:
+Automated backups run via the `db-backup` sidecar service, which starts automatically with `docker-compose up -d`.
+
+**Schedule and format**
+
+- Runs daily at 3 AM UTC by default (configurable via `BACKUP_SCHEDULE`).
+- Each backup is a gzip-compressed `pg_dump` file named `stockscanner_YYYYMMDD_HHMMSS.sql.gz`.
+- Files older than `BACKUP_RETENTION_DAYS` (default: 30) are deleted automatically after each run.
+- Dumps are written atomically — a `.tmp` file is used during the dump; only renamed to the final filename on success. A failed dump leaves no file behind.
+
+**Backup location**
+
+Backups are written to the directory specified by `BACKUP_DIR` (default: `/var/lib/markethawk/backups`) on the Docker host. This directory is bind-mounted into the container at `/backups`.
 
 ```bash
-# Dump to a file
-docker exec stockscanner-db pg_dump -U postgres stockscanner > backup_$(date +%Y%m%d_%H%M%S).sql
-
-# Restore from a dump
-docker exec -i stockscanner-db psql -U postgres stockscanner < backup_20260101_040000.sql
+# Verify the backup directory and latest file
+ls -lh ${BACKUP_DIR:-/var/lib/markethawk/backups}/
 ```
 
-A cron job example (runs at 3 AM daily):
+**Configuration (`.env`)**
+
+| Variable | Default | Description |
+|---|---|---|
+| `BACKUP_DIR` | `/var/lib/markethawk/backups` | Host path for backup files |
+| `BACKUP_RETENTION_DAYS` | `30` | Days to keep backup files |
+| `BACKUP_SCHEDULE` | `0 3 * * *` | Cron schedule (UTC, supercronic syntax) |
+
+**Trigger a manual backup**
+
+```bash
+docker compose run --rm db-backup /scripts/backup.sh
 ```
-0 3 * * * docker exec stockscanner-db pg_dump -U postgres stockscanner > /backups/stockscanner_$(date +\%Y\%m\%d).sql
+
+**Failure alerting**
+
+On failure, the script POSTs a structured CLEF event to Seq (`BackupStatus=failed`, `ErrorReason`). Set up a Seq alert rule on `@l = 'Error' and BackupStatus = 'failed'` to route notifications to your preferred channel (email, Slack, etc.).
+
+**Restore procedure**
+
+```bash
+# 1. Stop the backend and worker to prevent writes during restore
+docker compose stop backend celery-worker celery-beat
+
+# 2. Restore from a backup file
+gunzip -c ${BACKUP_DIR:-/var/lib/markethawk/backups}/stockscanner_YYYYMMDD_HHMMSS.sql.gz \
+  | docker exec -i stockscanner-db psql -U ${POSTGRES_USER:-postgres} ${POSTGRES_DB:-stockscanner}
+
+# 3. Restart services
+docker compose start backend celery-worker celery-beat
 ```
 
 ### SSL / TLS
@@ -81,6 +116,18 @@ A Caddy reverse proxy service is included in `docker-compose.yml`, gated behind 
 
 `COOKIE_SECURE` defaults to `true`. Local dev overrides this automatically via `docker-compose.override.yml` so cookies work over plain HTTP. In production the cookies require HTTPS; enabling the Caddy profile satisfies this.
 
+**API docs in production**
+
+`DOCS_ENABLED` defaults to `false` — Swagger UI, ReDoc, and `/openapi.json` are not served in production and return 401/404. This prevents the full API schema from being used as a reconnaissance map by unauthenticated callers.
+
+Local dev overrides this automatically via `docker-compose.override.yml` (`DOCS_ENABLED: "true"`), so developers have full access to `/docs` and `/openapi.json` without any manual steps.
+
+> **Note:** If you need docs access on a staging environment, add `DOCS_ENABLED=true` to that environment's `.env`. Never set this in production.
+
+**Prometheus `/metrics` isolation**
+
+`/metrics` is accessible on the internal Docker network only (Prometheus scrapes `backend:8000/metrics` directly). The Caddyfile blocks external requests to `/metrics` with a `404` response before they reach the backend — backend port 8000 must **not** be published to the host in production (`ports:` mapping removed or bound to `127.0.0.1`). If port 8000 is externally reachable, the Caddyfile deny is insufficient and the port mapping must be removed.
+
 **HTTP→HTTPS and HSTS**
 
 The Caddyfile redirects all HTTP (`:80`) requests to HTTPS and sets `Strict-Transport-Security` so browsers enforce HTTPS for all subsequent visits. Port 80 remains published only for Let's Encrypt HTTP-01 challenges and the redirect — no content is served over plain HTTP.
@@ -89,6 +136,7 @@ The Caddyfile redirects all HTTP (`:80`) requests to HTTPS and sets `Strict-Tran
 
 | Path pattern | Upstream |
 |---|---|
+| `/metrics` | 404 (Caddy deny — internal Docker network only) |
 | `/api/*` | `backend:8000` |
 | `/*` | `frontend:3333` |
 

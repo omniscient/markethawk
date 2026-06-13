@@ -537,6 +537,24 @@ nodes:
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 15000
 
+  # Bench mode probe: outputs 'stub' when BENCH_MODE=stub, 'live' otherwise, so
+  # classify-preview can gate on it (prevents a Haiku call during replay benchmark runs).
+  # Unconditional and always emits a value: classify-preview's `when:` references this
+  # output, and Archon's when-parser supports only simple/single-operator expressions —
+  # NO parentheses. The parenthesized intent+probe compound (b675ecd) was unparseable,
+  # so classify-preview skipped fail-closed and the all_success trigger-rule cascade
+  # skipped validate/push-and-pr/report: every implement run exited 0 while silently
+  # discarding its work (#397).
+  - id: bench-mode-probe
+    bash: |
+      if [ "${BENCH_MODE:-}" = "stub" ]; then
+        echo "stub"
+      else
+        echo "live"
+      fi
+    depends_on: [fetch-issue]
+    timeout: 5000
+
   - id: classify-preview
     prompt: |
       You are a classifier deciding whether a dark-factory preview stack (postgres, redis, backend,
@@ -574,8 +592,11 @@ nodes:
       The diff is authoritative — a documentation-labeled issue that touches backend/app/** still gets a preview.
     allowed_tools: [Read]
     model: haiku
-    depends_on: [preview-changeset, fetch-issue]
-    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
+    depends_on: [preview-changeset, fetch-issue, bench-mode-probe]
+    # Intent gating (new/continue) is enforced structurally: preview-changeset only runs
+    # for those intents, and its skip cascades here via the default all_success trigger
+    # rule. Keep this `when:` in the parser-supported simple form (#397).
+    when: "$bench-mode-probe.output == 'live'"
     output_format:
       type: object
       properties:
@@ -635,6 +656,17 @@ nodes:
         echo "PREVIEW_SKIP_REASON=preview failed: ${REASON}"
         exit 0
       }
+
+      # Bench mode stub: skip Docker entirely, write canned preview_env.sh, exit 0.
+      # BENCH_MODE=stub: no preview stack (only push-and-pr is also stubbed).
+      # BENCH_MODE=full: preview runs normally; only push-and-pr is stubbed (no junk PRs).
+      if [ "${BENCH_MODE:-}" = "stub" ]; then
+        echo "BENCH_MODE=stub: preview stubbed for issue #${ISSUE}"
+        write_preview_env true false "bench mode stub — no preview stack" "" "" "" ""
+        echo "PREVIEW_SKIPPED=true"
+        echo "PREVIEW_SKIP_REASON=bench mode stub"
+        exit 0
+      fi
 
       # Skip ONLY on an explicit "false". Any other value (including garbled or errored
       # classifier output) falls through to building the preview — fail-safe direction.
@@ -829,6 +861,16 @@ nodes:
       PREVIEW_FAILED=false
       [ -f "$ARTIFACTS_DIR/preview_env.sh" ] && . "$ARTIFACTS_DIR/preview_env.sh"
       BRANCH=$(git branch --show-current)
+
+      # Bench mode stub: skip push and PR creation entirely.
+      # The implementation is already committed locally; downstream code-review reads git diff.
+      # BENCH_MODE=stub: no push, no PR. BENCH_MODE=full: no PR but push still happens.
+      if [ "${BENCH_MODE:-}" = "stub" ]; then
+        echo "BENCH_MODE=stub: skipping push and PR creation for issue #${ISSUE} (branch: ${BRANCH})"
+        echo "BENCH_MODE_STUB=true"
+        exit 0
+      fi
+
       echo "Pushing branch and creating/updating PR for issue #${ISSUE}..."
 
       # Archive spec/plan for this issue before pushing

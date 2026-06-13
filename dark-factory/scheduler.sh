@@ -1,20 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- Configuration ---
-POLL_INTERVAL="${POLL_INTERVAL:-60}"
+# --- Configuration (non-policy infrastructure) ---
 SKIP_LABELS="needs-discussion,epic"
-MAX_RETRIES="${MAX_RETRIES:-3}"
 SCHEDULER_STATE_DIR="${SCHEDULER_STATE_DIR:-/var/lib/dark-factory}"
 STATE_FILE="${SCHEDULER_STATE_DIR}/scheduler-state.json"
-RATE_LIMIT_FLOOR="${RATE_LIMIT_FLOOR:-200}"
-DIRECT_TO_PR_LABEL="${DIRECT_TO_PR_LABEL:-direct-to-pr}"
-SPEC_GRACE_MINUTES="${SPEC_GRACE_MINUTES:-30}"
-PLAN_GRACE_MINUTES="${PLAN_GRACE_MINUTES:-30}"
-CONFLICT_RESOLUTION_ENABLED="${CONFLICT_RESOLUTION_ENABLED:-true}"
-# Max concurrent factory containers, any run type (implement/refine/plan/deconflict/
-# close). Override in .archon/.env — takes effect on scheduler recreate, no rebuild.
-FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
+RECHECK_STAMP_FILE="${SCHEDULER_STATE_DIR}/main-red-last-recheck"
 
 # Board constants
 PROJECT_NUMBER=1
@@ -29,10 +20,67 @@ STATUS_DONE="98236657"
 STATUS_BACKLOG="f75ad846"
 STATUS_REFINED="0c79ebe5"
 
-# Refinement pipeline configuration
-REFINE_WIP_LIMIT="${REFINE_WIP_LIMIT:-2}"
+# Refinement pipeline (env-only: REFINE_MAX_RETRIES is not in config.yaml by design)
 REFINE_SKIP_LABELS="needs-discussion,epic,spec-pending-review,plan-pending-review"
 REFINE_MAX_RETRIES="${REFINE_MAX_RETRIES:-3}"
+
+# --- Config YAML resolution ---
+# Ordered search: bind-mounted repo (local dev / deletion test) → baked image (production).
+CONFIG_YAML_PATHS=(
+  "/workspace/project/.claude/skills/refinement/config.yaml"
+  "/opt/refinement-skills/config.yaml"
+)
+
+resolve_config_yaml() {
+  local p
+  for p in "${CONFIG_YAML_PATHS[@]}"; do
+    [ -f "$p" ] && echo "$p" && return 0
+  done
+  echo "ERROR: config.yaml not found — searched: ${CONFIG_YAML_PATHS[*]}" >&2
+  return 1
+}
+
+# Read all policy knobs from config.yaml; log when an env var overrides the config value.
+# Must be called in the main exec path (after SCHEDULER_SOURCE_ONLY guard) — not at source
+# time — so test sourcing never triggers config resolution.
+read_config() {
+  local cfg
+  cfg=$(resolve_config_yaml) || { echo "FATAL: cannot read config.yaml" >&2; exit 1; }
+
+  _set_cfg() {
+    local var="$1" yq_expr="$2"
+    local cfg_val
+    cfg_val=$(yq "$yq_expr" "$cfg" 2>/dev/null || true)
+    [ "${cfg_val:-null}" = "null" ] && cfg_val=""
+    # ${!var+x} expands to "x" if var is set (even empty), empty if unset — safe under set -u
+    if [ -n "${!var+x}" ]; then
+      local env_val="${!var}"
+      if [ "$env_val" != "$cfg_val" ]; then
+        echo "[config] ${var}=${env_val} (env override; config has '${cfg_val}')" >&2
+      fi
+      # Keep existing env value
+    else
+      export "${var}=${cfg_val}"
+    fi
+  }
+
+  _set_cfg POLL_INTERVAL              '.scheduler.poll_interval'
+  _set_cfg MAX_RETRIES                '.scheduler.max_retries'
+  _set_cfg RATE_LIMIT_FLOOR           '.scheduler.rate_limit_floor'
+  _set_cfg FACTORY_WIP_LIMIT          '.scheduler.factory_wip_limit'
+  _set_cfg MAIN_RED_RECHECK_ENABLED   '.scheduler.main_red_recheck_enabled'
+  _set_cfg MAIN_RED_RECHECK_MINUTES   '.scheduler.main_red_recheck_minutes'
+  _set_cfg REFINE_WIP_LIMIT           '.refine.wip_limit'
+  _set_cfg DIRECT_TO_PR_LABEL         '.direct_to_pr.label'
+  _set_cfg SPEC_GRACE_MINUTES         '.direct_to_pr.spec_grace_minutes'
+  _set_cfg PLAN_GRACE_MINUTES         '.direct_to_pr.plan_grace_minutes'
+  _set_cfg CONFLICT_RESOLUTION_ENABLED '.conflict_resolution.enabled'
+  _set_cfg DISPATCH_CEILING_ENABLED   '.dispatch_ceiling.enabled'
+  _set_cfg ABOVE_CEILING_LABEL        '.dispatch_ceiling.label'
+  _set_cfg ABOVE_CEILING_KEYWORDS     '.dispatch_ceiling.keywords'
+
+  echo "[config] loaded from ${cfg}"
+}
 
 # --- Validate required environment ---
 if [ -z "${GH_TOKEN:-}" ]; then
@@ -123,6 +171,40 @@ factory_at_capacity() {
   [ "$1" -ge "$FACTORY_WIP_LIMIT" ]
 }
 
+# True when a "Recheck main" container is already running (dedupe — recheck runs
+# carry no "#N", so is_issue_running cannot see them).
+is_recheck_running() {
+  docker ps --no-trunc --format '{{.Command}}' 2>/dev/null | grep -q 'Recheck main' && return 0
+  return 1
+}
+
+# True when the recheck throttle window has elapsed (or no recheck happened yet).
+# Throttled via the stamp file's mtime — survives scheduler restarts on the state volume.
+recheck_due() {
+  [ -f "$RECHECK_STAMP_FILE" ] || return 0
+  local last now
+  last=$(stat -c %Y "$RECHECK_STAMP_FILE" 2>/dev/null || echo 0)
+  now=$(date +%s)
+  [ $(( now - last )) -ge $(( MAIN_RED_RECHECK_MINUTES * 60 )) ]
+}
+
+# --- Main-red self-clear: throttled "Recheck main" dispatch (#365) ---
+# The main-is-red sentinel pauses implementation dispatches, but the only code that
+# CLEARS it is _smoke_on_green() inside a dispatched container — and those dispatches
+# are exactly what the sentinel blocks. Without this, the latch is one-way: main goes
+# green and the factory stays paused until a human comments on an in-review PR.
+# Callers guarantee a free factory slot (runs after the capacity guard).
+main_red_recheck_check() {
+  [ "$MAIN_RED_RECHECK_ENABLED" = "true" ] || return 0
+  is_recheck_running && return 0
+  recheck_due || return 0
+  if dispatch "Recheck main"; then
+    DISPATCHED="Recheck main"
+    touch "$RECHECK_STAMP_FILE"
+    echo "[$(date -u +%FT%TZ)] main_red_recheck=dispatched interval=${MAIN_RED_RECHECK_MINUTES}m"
+  fi
+}
+
 count_refine_running() {
   docker ps --no-trunc --format '{{.Command}}' 2>/dev/null | grep -cE 'Refine issue|Plan issue' || true
 }
@@ -150,6 +232,38 @@ has_opt_in_refine_label() {
 has_direct_to_pr_label() {
   local item="$1"
   echo "$item" | jq -r '.labels[]?' 2>/dev/null | grep -qi "$DIRECT_TO_PR_LABEL"
+}
+
+# --- Dispatch ceiling classification (#339) ---
+# Returns "S", "M", "L", or "" from the item's labels
+get_size_label() {
+  echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -oi 'size: [SML]' | awk '{print $2}' | head -1
+}
+
+# True (returns 0) if item is above the dispatch ceiling: size L always, or size M
+# when the title matches an ABOVE_CEILING_KEYWORDS pattern (escalation only — the
+# keyword heuristic never demotes).
+is_above_ceiling() {
+  local item="$1" title size
+  title=$(echo "$item" | jq -r '.content.title // ""' 2>/dev/null)
+  size=$(get_size_label "$item")
+  case "$size" in
+    L) return 0 ;;
+    M) echo "$title" | grep -qiE "${ABOVE_CEILING_KEYWORDS}" && return 0 || return 1 ;;
+    *) return 1 ;;
+  esac
+}
+
+# True if item already carries the above-ceiling label (board-fetch snapshot)
+has_above_ceiling_label() {
+  echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -qi "^${ABOVE_CEILING_LABEL}$"
+}
+
+# True if item is S-size or has no size label (unlabelled is treated as S per spec)
+is_below_ceiling() {
+  local size
+  size=$(get_size_label "$1")
+  case "$size" in S|"") return 0 ;; *) return 1 ;; esac
 }
 
 # Returns minutes elapsed since the last comment matching $marker_re on the given issue.
@@ -224,6 +338,11 @@ plan_advance_check() {
       DISPATCHED="Plan issue #${issue_num}"
       REFINE_RUNNING=$((REFINE_RUNNING + 1))
     fi
+    return 0
+  fi
+  # Dispatch ceiling (#339): timer-based advance applies only to S-size items. M and L
+  # require explicit human plan approval; the human-feedback path above is untouched.
+  if [ "${DISPATCH_CEILING_ENABLED:-true}" = "true" ] && ! is_below_ceiling "$item"; then
     return 0
   fi
   if has_direct_to_pr_label "$item"; then
@@ -357,6 +476,10 @@ trip_to_blocked() {
   # 2. needs-discussion is in SKIP_LABELS — filters this issue from every dispatch loop
   gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
     --add-label needs-discussion 2>/dev/null || true
+
+  # Promote to eval flywheel: factory-regression label marks this failure for replay benchmark
+  gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
+    --add-label factory-regression 2>/dev/null || true
 
   # 3. Manual retry command varies by phase
   local retry_cmd
@@ -622,6 +745,9 @@ if [ "${SCHEDULER_SOURCE_ONLY:-0}" = "1" ]; then
   return 0
 fi
 
+# --- Load policy knobs from config.yaml (env overrides logged when active) ---
+read_config
+
 # --- ERR trap: log unhandled exits for post-mortem diagnosis ---
 # dispatch() callers are all guarded with `if dispatch ...; then`; this backstop
 # identifies any command that slips through. The scheduler exits on unhandled ERR
@@ -758,11 +884,13 @@ This issue was left in **In progress** with no running factory container — the
   done < <(echo "$IN_PROGRESS" | jq -c '.[]')
 
   # --- Read main-is-red sentinel (written by smoke_gate.sh in dispatched containers) ---
-  # When present, skip Priority 1.5/2/3 (implementation dispatches); 1/4/5 continue.
+  # When present, skip Priority 1.5/2/3 (implementation dispatches); 1/4/5 continue,
+  # and a throttled "Recheck main" run gives the gate a chance to self-clear (#365).
   MAIN_IS_RED=false
   [ -f "${SCHEDULER_STATE_DIR}/main-is-red" ] && MAIN_IS_RED=true
   if [ "$MAIN_IS_RED" = "true" ]; then
     echo "[$(date -u +%FT%TZ)] main_red_gate=active action=skip_implement_dispatch"
+    main_red_recheck_check
   fi
 
   # --- Priority 1.5: In Review items with merge conflicts (proactive auto-resolve) ---
@@ -852,6 +980,37 @@ This issue was left in **In progress** with no running factory container — the
       if ! dependencies_met "$ISSUE" "$BOARD_ITEMS"; then continue; fi
       if is_issue_running "$ISSUE"; then continue; fi
 
+      # Dispatch ceiling (#339): park above-ceiling work for human pairing. The label
+      # check stops the comment/board-move from repeating every poll cycle — the label
+      # persists and comes back in the next fetch_board_items snapshot.
+      if [ "${DISPATCH_CEILING_ENABLED:-true}" = "true" ] && is_above_ceiling "$item"; then
+        if ! has_above_ceiling_label "$item"; then
+          echo "[$(date -u +%FT%TZ)] ceiling_gate issue=#${ISSUE} action=above_ceiling_blocked"
+          gh issue edit "$ISSUE" --repo "${OWNER}/markethawk" \
+            --add-label "$ABOVE_CEILING_LABEL" 2>/dev/null || true
+          set_board_status "$ISSUE" "$STATUS_BLOCKED" || true
+          gh issue comment "$ISSUE" --repo "${OWNER}/markethawk" --body \
+"## Scheduler — Above Dispatch Ceiling
+
+This ticket has been classified as **above the autonomous dispatch ceiling** \
+(size: L, or size: M with a perf/architectural/migration title keyword).
+
+Spec and plan are complete. **A human must pair on implementation.**
+
+To proceed:
+1. Remove the \`$ABOVE_CEILING_LABEL\` label.
+2. Dispatch manually:
+   \`\`\`bash
+   docker compose --profile factory run --rm dark-factory \"Fix issue #${ISSUE}\"
+   \`\`\`
+   Or implement directly in a local worktree.
+
+---
+*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
+        fi
+        continue
+      fi
+
       if dispatch "Fix issue #${ISSUE}"; then
         DISPATCHED="Fix issue #${ISSUE}"
       fi
@@ -866,6 +1025,9 @@ This issue was left in **In progress** with no running factory container — the
       [ -n "$DISPATCHED" ] && break
       ISSUE=$(get_issue_number "$item")
       if has_skip_label "$item"; then continue; fi
+      # Above-ceiling items in Blocked are parked by design (#339), not failed — the
+      # retry loop must not auto-dispatch them.
+      if has_above_ceiling_label "$item"; then continue; fi
       if is_issue_running "$ISSUE"; then continue; fi
 
       RETRIES=$(get_retry_count "$ISSUE")

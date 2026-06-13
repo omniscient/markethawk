@@ -2,6 +2,12 @@
     # HSTS: instruct browsers to use HTTPS for this domain for 1 year
     header Strict-Transport-Security "max-age=31536000; includeSubDomains" always
 
+    # Block external access to the Prometheus metrics endpoint.
+    # /metrics is accessible on the internal Docker network only (Prometheus scrapes backend:8000/metrics).
+    handle /metrics {
+        respond "Not found" 404
+    }
+
     # WebSocket and REST API — backend
     handle /api/* {
         reverse_proxy backend:8000

@@ -1,0 +1,5 @@
+# Trivy ignore file — list CVE IDs or paths to suppress from the blocking gate.
+# Format: one entry per line. CVE IDs (e.g. CVE-2023-12345) suppress that finding
+# across all images; path patterns suppress findings in specific layers.
+# Entries here are still reported in the SARIF Security-tab upload.
+# Document WHY each entry is accepted before adding it.

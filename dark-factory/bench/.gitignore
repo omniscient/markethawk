@@ -1,0 +1,5 @@
+# Per-run result JSONs are not committed (only baseline.md is committed)
+results/*.json
+# Python cache
+__pycache__/
+*.pyc

@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     # Secure cookies — default True; set to false in docker-compose.override.yml for local HTTP dev
     COOKIE_SECURE: bool = True
+    # API docs (Swagger/ReDoc/openapi.json) — default False (secure-by-default).
+    # Set to true in docker-compose.override.yml for local dev. Never enable in production.
+    DOCS_ENABLED: bool = False
 
     # Connection pool
     DB_POOL_SIZE: int = 20

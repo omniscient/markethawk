@@ -27,6 +27,7 @@ graph TD
         jaeger["jaeger :16686/:4317"]
         seqgelf["seq-gelf :12201/udp"]
         forecastworker["forecast-worker (profile: forecasting)"]
+        dbbackup["db-backup"]
     end
 
     subgraph factory["factory-network"]
@@ -79,6 +80,8 @@ graph TD
     seqgelf -->|"GELF → HTTP"| seq
     forecastworker --> postgres
     forecastworker --> redis
+    dbbackup -->|"pg_dump"| postgres
+    dbbackup -->|"failure events"| seq
 ```
 
 ## Scan Execution Flow
@@ -222,7 +225,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `futures.py` | `/api/v1/futures/*` — `GET /history/{symbol}`, `GET /contracts/{symbol}`, `GET /rollovers/{symbol}`, `POST /download/{symbol}` (catalog refresh), `GET /providers` |
 | `journal.py` | `/api/v1/journal/*` — trade journal entries |
 | `watchlist.py` | `/api/v1/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |
-| `health.py` | `GET /api/health` — liveness probe; `GET /api/ready` — readiness probe (DB `SELECT 1` + Redis `PING`, HTTP 200/503 with per-probe latency; used by compose healthcheck and frontend `depends_on`) |
+| `health.py` | `GET /api/health` — liveness probe; `GET /api/ready` — readiness probe (DB `SELECT 1` + Redis `PING`, HTTP 200/503 with per-probe latency; auth and rate-limit exempt; used by compose healthcheck and frontend `depends_on`) |
 | `system.py` | `/api/v1/system/*` — configuration, status |
 | `outcomes.py` | `/api/v1/outcomes/*` — scorecard, intervals, distribution, edge decay, signals, event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
 | `tweets.py` | `GET /api/v1/tweets/recent` — recent TweetSignals (filter by classification/promoted); `WS /api/v1/tweets/feed` — live WebSocket stream of all new tweet signals from Redis `tweet_signals:all` channel |
@@ -292,6 +295,7 @@ Each page is a co-located directory (`pages/PageName/index.tsx` + panel files). 
 | `StockDetailPage` | `/stock/:ticker` | `StockDetailPage/` (index, ChartPanel, MetadataPanel, ScannerHistoryPanel) | Per-ticker chart, metrics, and news. Supports `?date=YYYY-MM-DD` |
 | `AutoTrading` | `/trading` | `AutoTrading/` (index, StrategyPanel, OrdersPanel, AccountPanel, ConfigPanel, components) | Strategy management, order approval, IBKR account |
 | `Login` | `/login` | `Login/index.tsx` | Bootstrap-aware login and first-user registration. On first launch shows "Create account" form; on subsequent launches shows login form. Redirects to `/` on success. |
+| `ScorecardOverview` | `/scorecard` | `ScorecardOverview.tsx` | Signal quality scorecards across all active scanner configs |
 | `Settings` | `/settings` | `Settings.tsx` | System configuration |
 
 ### Charting Libraries
