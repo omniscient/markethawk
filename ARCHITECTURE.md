@@ -202,6 +202,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `auto_trade_service.py` | `AutoTradeExecutor` — full auto-trade lifecycle (guard checks, sizing, IBKR submission). `approve_order(order, strategy, db)` handles paper vs. live approval. `cancel_order(order, db)` cancels via IBKR or marks paper cancelled. `get_account()` fetches IBKR account summary with graceful fallback. `get_stats(db, days)` computes P&L, win rate, and status breakdown. |
 | `stats.py` | Aggregate statistics helpers for dashboard metrics. |
 | `event_helpers.py` | Utility functions for `ScannerEvent` construction and querying. |
+| `backtest_service.py` | Daily-bar replay engine. `_simulate_trade()` — pure function; simulates one position with conservative intrabar rule (both stop and target hit on same bar → stop wins), market/limit entry, stop/target/time-stop/delisting exits. `run_backtest_logic()` — orchestrates signal sourcing (existing ScannerEvents first, in-memory scanner fallback), bar-presence-based ticker eligibility (survivorship-bias avoidance), `_compute_stats()` for aggregate metrics. |
 | `statistical_discovery.py` | Pure-Python statistical analysis service: `build_feature_matrix`, `compute_correlations` (Pearson + Spearman), `compute_shap_weights` (LightGBM + SHAP), `run_kmeans`, `compute_conditional_stats`, `generate_label`. No DB dependencies; accepts DataFrames, returns typed dicts. |
 
 ### Providers (`app/providers/`)
@@ -231,6 +232,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `tweets.py` | `GET /api/v1/tweets/recent` — recent TweetSignals (filter by classification/promoted); `WS /api/v1/tweets/feed` — live WebSocket stream of all new tweet signals from Redis `tweet_signals:all` channel |
 | `alerts.py` | `GET /api/v1/alerts/stats` (dashboard header cards), `GET/POST /api/v1/alerts/rules` (list / create), `PATCH/DELETE /api/v1/alerts/rules/{id}`, `POST /api/v1/alerts/rules/{id}/test` (dry-run match against recent events), `GET /api/v1/alerts/logs` (delivery audit trail), `GET/POST /api/v1/alerts/push/vapid-key`, `GET /api/v1/alerts/push/generate-keys`, `POST /api/v1/alerts/push/subscribe`, `DELETE /api/v1/alerts/push/unsubscribe`, `POST /api/v1/alerts/infrastructure` (Grafana alerting webhook) |
 | `auto_trading.py` | `GET/POST /api/v1/trading/strategies` (list / create), `GET/PATCH/DELETE /api/v1/trading/strategies/{id}`, `GET /api/v1/trading/orders` (list with status filter), `GET /api/v1/trading/orders/{id}`, `POST /api/v1/trading/orders/{id}/approve`, `POST /api/v1/trading/orders/{id}/reject`, `POST /api/v1/trading/orders/{id}/cancel`, `GET /api/v1/trading/account` (IBKR account summary), `GET /api/v1/trading/stats` (P&L, win rate, status breakdown), `GET/PATCH /api/v1/trading/config` |
+| `backtest.py` | `POST /api/v1/backtest/runs` (enqueue a new backtest run, HTTP 202), `GET /api/v1/backtest/runs` (list runs; filterable by scanner_type, strategy_id), `GET /api/v1/backtest/runs/{uuid}` (poll status + full trade list) |
 
 ### Database Models (`app/models/`)
 
@@ -269,6 +271,8 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `ScannerOutcomeSnapshot` | `scanner_outcome_snapshots` | Captures price action at a specific time offset (`interval_key`) from a scanner signal. FK → `scanner_events.id`. Unique on `(scanner_event_id, interval_key)`. |
 | `ScannerOutcomeSummary` | `scanner_outcome_summaries` | Derived signal-quality metrics (MFE %, MAE %, MFE/MAE ratio, time-to-MFE/MAE) computed from a signal's snapshots. One-to-one FK → `scanner_events.id`. |
 | `SystemConfig` | `system_config` | Key/value store for system-wide runtime settings (e.g. signal ranker weights, feature flags). `key` is the PK; `value` is a string. Updated without redeploy. |
+| `BacktestRun` | `backtest_runs` | Anchor table for one backtest execution. Stores inputs (scanner_type, strategy_id, universe_id, date range, max_hold_sessions), execution state (status, celery_task_id), summary stats (win_rate, profit_factor, expectancy_r, max_drawdown_r), and anti-bias metadata (signals_skipped_no_data, trades_exited_on_data_end, universe_as_of, bars_source). |
+| `BacktestTrade` | `backtest_trades` | One simulated trade per BacktestRun. Records signal context (ticker, signal_date, optional source_event_id FK, signal_indicators JSONB), entry/exit prices and dates, exit_reason (stop/target/time_stop/delisted_or_data_end/no_entry_bar), hold_sessions, and result_r (R-multiples P&L). CASCADE DELETE from BacktestRun. |
 
 ## Frontend Architecture
 
@@ -431,6 +435,7 @@ Defined in `app/tasks/` (package), scheduled via `app/core/celery_app.py`. All t
 | `quality.py` | `analyze_universe_quality` | On-demand via `POST /api/v1/universe/{id}/quality` | Run data-quality analysis and persist grade/score |
 | `quality.py` | `normalize_universe_quality` | On-demand via `POST /api/v1/universe/{id}/normalize` | Fix data gaps/duplicates and re-run quality analysis |
 | `quality.py` | `analyze_signal_features` | Beat (11:00 UTC weekdays) / on-demand via `POST /api/v1/outcomes/analyze` | Statistical discovery: correlation, SHAP, K-means clustering. Requires ≥500 complete events. |
+| `backtest.py` | `run_backtest` | On-demand via `POST /api/v1/backtest/runs` | Daily-bar replay of a TradingStrategy vs scanner signals. No retry (deterministic). Updates BacktestRun status queued→running→completed|failed; persists BacktestTrade rows. |
 
 Redis is used as both the Celery broker and result backend. Worker and beat run as separate containers so the scheduler doesn't compete with task execution.
 
