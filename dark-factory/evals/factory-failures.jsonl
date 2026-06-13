@@ -2,3 +2,4 @@
 {"issue":106,"title":"Integrate HMM regime detection to enhance and validate scanner signals","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 11:10pm (UTC) ","promoted_at":"2026-06-12T22:02:51Z"}
 {"issue":106,"title":"Integrate HMM regime detection to enhance and validate scanner signals","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 11:10pm (UTC) ","promoted_at":"2026-06-12T22:05:50Z"}
 {"issue":106,"title":"Integrate HMM regime detection to enhance and validate scanner signals","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 11:10pm (UTC) ","promoted_at":"2026-06-12T22:06:02Z"}
+{"issue":370,"title":"[security] F-NET-01: Redis has no authentication (requirepass unset)","phase":"continue","exit_code":1,"postmortem":"You've hit your session limit · resets 6:30pm (UTC) ","promoted_at":"2026-06-13T17:36:24Z"}
