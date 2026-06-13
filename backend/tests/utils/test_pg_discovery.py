@@ -67,6 +67,34 @@ class TestProbeRunningPostgres:
         assert result is not None
         assert "postgres" in result
 
+    def test_docker_api_non_list_response_falls_through_to_hostname(self, monkeypatch):
+        """When Docker API returns a non-list (e.g. error dict), falls through to hostnames."""
+        monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+        monkeypatch.setenv("DOCKER_HOST", "tcp://docker:2375")
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"message": "authorization failed"}
+
+        mock_conn = MagicMock()
+
+        with (
+            patch("tests.utils.pg_discovery.requests") as mock_requests,
+            patch("tests.utils.pg_discovery.psycopg2") as mock_psycopg2,
+        ):
+            mock_requests.get.return_value = mock_response
+
+            def connect_side_effect(*args, **kwargs):
+                if kwargs.get("host") == "postgres":
+                    return mock_conn
+                raise Exception("unreachable")
+
+            mock_psycopg2.connect.side_effect = connect_side_effect
+
+            result = probe_running_postgres()
+
+        assert result is not None
+        assert "postgres" in result
+
     def test_credential_iteration_order(self, monkeypatch):
         """Iterates through common credentials; returns first working combination."""
         monkeypatch.delenv("TEST_DATABASE_URL", raising=False)

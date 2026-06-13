@@ -1,9 +1,12 @@
 """Postgres discovery for test environments where testcontainers exec is blocked."""
 
+import logging
 import os
 
 import psycopg2
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def probe_running_postgres() -> str | None:
@@ -26,22 +29,26 @@ def probe_running_postgres() -> str | None:
                 f"http://{docker_host[6:]}/containers/json",
                 timeout=3,
             )
-            for c in r.json():
-                if "postgres" not in c.get("Image", "").lower():
-                    continue
-                for net_info in (
-                    c.get("NetworkSettings", {}).get("Networks", {}).values()
-                ):
-                    ip = net_info.get("IPAddress", "")
-                    if ip:
-                        candidate_ips.append(ip)
-        except Exception:
-            pass
+            r.raise_for_status()
+            containers = r.json()
+            if isinstance(containers, list):
+                for c in containers:
+                    if "postgres" not in c.get("Image", "").lower():
+                        continue
+                    for net_info in (
+                        c.get("NetworkSettings", {}).get("Networks", {}).values()
+                    ):
+                        ip = net_info.get("IPAddress", "")
+                        if ip:
+                            candidate_ips.append(ip)
+        except Exception as exc:
+            logger.debug("Docker API discovery failed: %s", exc)
 
     # Also try well-known hostnames.
     for hostname in ["postgres", "stockscanner-db", "localhost"]:
         candidate_ips.append(hostname)
 
+    # Well-known dev defaults only — not production credentials.
     common_creds = [
         ("postgres", "postgres", "postgres"),
         ("postgres", "postgres", "stockscanner"),
@@ -61,4 +68,9 @@ def probe_running_postgres() -> str | None:
                 return f"postgresql://{user}:{pw}@{ip}:5432/{db}"
             except Exception:
                 pass
+
+    logger.debug(
+        "probe_running_postgres: no reachable postgres found after trying %d candidate(s)",
+        len(candidate_ips),
+    )
     return None
