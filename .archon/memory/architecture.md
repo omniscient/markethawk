@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## WebSocket Resource Guards
+
+- [PATTERN] Per-user WebSocket connection caps are implemented as an in-process `defaultdict(int)` counter in a dedicated `app/core/ws_limits.py` module, NOT via Redis — the backend runs as a single process, making in-memory counters correct and cheaper than Redis round-trips per handshake. If the stack ever scales to multiple replicas, migrate to Redis `INCR`/`DECR` with atomic compare. <!-- issue:#377 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not implement WebSocket guards (connection caps, Origin validation, timeout logic) in ASGI middleware — all existing middlewares (`AuthMiddleware`, `CSRFMiddleware`, `PrometheusMiddleware`) explicitly skip `scope["type"] == "websocket"`. WS guards must be FastAPI dependencies (following the `ws_get_current_user` pattern in `app/core/auth.py`) so they run before `websocket.accept()`. <!-- issue:#377 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
