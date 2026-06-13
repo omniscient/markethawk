@@ -30,6 +30,6 @@ Files with blast score ≥ 5.0  (33 found)
      6.0  frontend/src/api/alerts.ts  (4d / 4t)  199 loc
      6.0  frontend/src/hooks/useLiveStockData.ts  (4d / 4t)  115 loc
      5.5  frontend/src/utils/indicators.ts  (2d / 7t)  106 loc
-     5.0  backend/app/routers/alerts.py  (1d / 8t)  396 loc
+     5.0  backend/app/routers/alerts.py  (1d / 8t)  415 loc
      5.0  frontend/src/api/system.ts  (3d / 4t)  55 loc
      5.0  frontend/src/api/watchlist.ts  (4d / 2t)  70 loc

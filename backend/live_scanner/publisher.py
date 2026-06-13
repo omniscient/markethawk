@@ -15,15 +15,20 @@ import json
 import logging
 import uuid as uuid_module
 from datetime import datetime, timezone
+from typing import get_args
 
 import redis.asyncio as aioredis
 
 from app.core.database import SessionLocal
 from app.models.scanner_event import ScannerEvent
+from app.schemas.event import SeverityLiteral
+from app.services.alert_service import _validate_jsonb_dict
 from app.services.event_helpers import compute_event_severity, generate_event_summary
 from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
 from live_scanner.bar_aggregator import ET, MinuteBar
 from live_scanner.conditions import ConditionResult
+
+_VALID_SEVERITIES: frozenset = frozenset(get_args(SeverityLiteral))
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +137,25 @@ class LivePublisher:
 
         summary = generate_event_summary(condition.scanner_type, condition.indicators)
         severity = compute_event_severity(condition.scanner_type, condition.indicators)
+
+        # Fail-open (log + return) rather than raise: this path is async and long-running;
+        # an unexpected severity from a buggy condition does not warrant crashing the publisher
+        # loop. save_event() (batch path) raises instead — callers handle failures synchronously.
+        if severity not in _VALID_SEVERITIES:
+            logger.error(
+                f"LivePublisher: invalid severity '{severity}' for "
+                f"{bar.symbol} {condition.scanner_type} — skipping DB write"
+            )
+            return
+
+        try:
+            _validate_jsonb_dict(condition.indicators, "indicators")
+        except (TypeError, ValueError) as exc:
+            logger.error(
+                f"LivePublisher: non-serializable indicators for "
+                f"{bar.symbol} {condition.scanner_type} — skipping DB write: {exc}"
+            )
+            return
 
         # Write to DB in a background thread (sync SQLAlchemy)
         event_id: int | None = None
