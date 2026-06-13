@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<!--
+  MarketHawk — Defensive Security Review (2026-06-12).
+  Distinct artifact from the numbered Architecture & Quality series (v1–v3): it reuses the same
+  visual shell for consistency but is scored on a security-specific 12-category scorecard, NOT the
+  frozen 16-dimension architecture rubric. Do not renumber the quality series from this file.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketHawk — Defensive Security Review (2026-06-12)</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+    --text:#e2e8f0;--text-dim:#94a3b8;--accent:#0ea5e9;
+    --green:#22c55e;--yellow:#eab308;--red:#ef4444;--orange:#f97316;--purple:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+  .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+  h1{font-size:2rem;font-weight:700;color:#f8fafc;margin-bottom:.25rem}
+  h2{font-size:1.5rem;font-weight:600;color:#f8fafc;margin:2.5rem 0 1rem;padding-bottom:.5rem;border-bottom:2px solid var(--accent)}
+  h3{font-size:1.15rem;font-weight:600;color:#f1f5f9;margin:1.5rem 0 .5rem}
+  h4{font-size:1rem;font-weight:600;color:var(--accent);margin:1rem 0 .4rem}
+  p,li{color:var(--text)} a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .subtitle{color:var(--text-dim);font-size:.95rem;margin-bottom:2rem}
+  .badge{display:inline-block;padding:2px 10px;border-radius:9999px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+  .badge-yellow{background:rgba(234,179,8,.15);color:var(--yellow)}
+  .badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+  .badge-orange{background:rgba(249,115,22,.15);color:var(--orange)}
+  .badge-blue{background:rgba(14,165,233,.15);color:var(--accent)}
+  .badge-purple{background:rgba(167,139,250,.15);color:var(--purple)}
+  .header-banner{background:linear-gradient(135deg,#0c4a6e 0%,#1e293b 100%);padding:2.5rem 2rem;border-radius:12px;margin-bottom:2rem;border:1px solid var(--border)}
+  .header-banner .meta{display:flex;gap:2rem;flex-wrap:wrap;margin-top:.5rem}
+  .header-banner .meta span{color:var(--text-dim);font-size:.85rem}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+  .score-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;text-align:center;position:relative}
+  .score-big{font-size:2.5rem;font-weight:800}
+  .score-label{font-size:.85rem;color:var(--text-dim);margin-top:.25rem}
+  .delta-pill{position:absolute;top:.6rem;right:.6rem;font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:9999px;background:rgba(34,197,94,.18);color:var(--green)}
+  .delta-pill.flat{background:rgba(148,163,184,.18);color:var(--text-dim)}
+  .delta-pill.down{background:rgba(239,68,68,.18);color:var(--red)}
+  .score-5{color:var(--green)}.score-4{color:#4ade80}.score-3{color:var(--yellow)}.score-2{color:var(--orange)}.score-1{color:var(--red)}.score-0{color:#6b7280}
+  table{width:100%;border-collapse:collapse;margin:.75rem 0 1.5rem;font-size:.9rem}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--surface2);color:#cbd5e1;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+  tr:hover td{background:rgba(14,165,233,.04)}
+  td code,p code,li code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:.82rem}
+  .toc{columns:2;column-gap:2rem}.toc li{break-inside:avoid;margin-bottom:.3rem;font-size:.9rem}
+  .meter{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:.3rem 0}
+  .meter-fill{height:100%;border-radius:4px}
+  .meter-green .meter-fill{background:var(--green)}.meter-yellow .meter-fill{background:var(--yellow)}
+  .meter-orange .meter-fill{background:var(--orange)}.meter-red .meter-fill{background:var(--red)}
+  .sev-critical{color:var(--red);font-weight:700}.sev-high{color:var(--orange);font-weight:600}
+  .sev-medium{color:var(--yellow);font-weight:600}.sev-low{color:var(--green)}
+  ul,ol{padding-left:1.3rem;margin:.5rem 0}li{margin-bottom:.3rem}
+  .fp{color:var(--purple);font-family:'JetBrains Mono',monospace;font-size:.82rem}
+  .dimrow{display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;margin:.35rem 0}
+  .dimbar{display:flex;align-items:center;gap:.5rem}
+  .deltaup{color:var(--green);font-weight:700}.deltaflat{color:var(--text-dim);font-weight:700}.deltadown{color:var(--red);font-weight:700}
+  .callout{border-left:4px solid var(--accent);background:var(--surface2);padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.8rem 0}
+  .callout-red{border-color:var(--red)}.callout-green{border-color:var(--green)}.callout-yellow{border-color:var(--yellow)}
+  .mermaid{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;margin:1rem 0;text-align:center}
+  .finding{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:0 10px 10px 0;padding:1rem 1.4rem;margin-bottom:1.2rem}
+  .finding.high{border-left-color:var(--orange)}.finding.medium{border-left-color:var(--yellow)}
+  .finding.low{border-left-color:var(--green)}.finding.info{border-left-color:var(--accent)}
+  .finding h3{margin-top:.2rem}
+  .finding .fmeta{font-size:.8rem;color:var(--text-dim);margin:.2rem 0 .6rem}
+  .finding p{margin:.3rem 0;font-size:.92rem}
+  pre{background:#0b1220;border:1px solid var(--border);border-radius:8px;padding:.8rem 1rem;overflow-x:auto;margin:.5rem 0;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:.8rem;color:#cbd5e1}
+  @media(max-width:768px){.toc{columns:1}.card-grid{grid-template-columns:1fr}}
+  @media print{body{background:#fff;color:#111}.card,th{background:#f3f4f6}.header-banner{background:#e0f2fe}h2{border-color:#0284c7}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header-banner">
+  <h1>MarketHawk &mdash; <span style="color:var(--accent)">Defensive Security Review</span></h1>
+  <div class="subtitle">Comprehensive read-only application-security assessment — backend, frontend, infra, CI/CD, broker &amp; market-data integrations</div>
+  <div class="meta">
+    <span>Repository: <strong>omniscient/markethawk</strong></span>
+    <span>Branch: <strong>main</strong> @ <strong>96727c9</strong></span>
+    <span>Generated: <strong>2026-06-12</strong></span>
+    <span>Reviewer: <strong>Claude Fable 5</strong></span>
+    <span>Method: <strong>static analysis, read-only</strong></span>
+  </div>
+</div>
+
+<div class="callout callout-yellow">
+  <strong>How to read this report.</strong> This is a <em>security</em> review, scored on a security-specific
+  12-category scorecard (§12) — it is <strong>not</strong> a numbered entry in the Architecture &amp; Quality series
+  (v1–v3), which uses a different frozen 16-dimension rubric. Every finding is scored from code and
+  config, not commit messages; load-bearing claims (auth middleware, WebSocket auth, live order
+  placement, config defaults) were re-verified directly against source. Items not executed (live
+  <code>pip-audit</code>/<code>npm audit</code>/<code>trivy</code>, running the stack) are listed in §13.
+</div>
+
+<h2 id="toc">Table of Contents</h2>
+<ol class="toc">
+  <li><a href="#exec">1. Executive Summary</a></li>
+  <li><a href="#top10">2. Top 10 Risks</a></li>
+  <li><a href="#dfd">3. Architecture / Data-Flow Diagram</a></li>
+  <li><a href="#threat">4. Threat Model</a></li>
+  <li><a href="#findings">5. Detailed Findings</a></li>
+  <li><a href="#quickwins">6. Quick Wins (&lt; 1 day)</a></li>
+  <li><a href="#medium">7. Medium-Term Plan (1–2 weeks)</a></li>
+  <li><a href="#strategic">8. Strategic Plan (1–2 months)</a></li>
+  <li><a href="#cipipe">9. Proposed CI Security Pipeline</a></li>
+  <li><a href="#hardening">10. Production Hardening Checklist</a></li>
+  <li><a href="#regress">11. Security Regression Test Plan</a></li>
+  <li><a href="#scorecard">12. Final Scorecard</a></li>
+  <li><a href="#appendix">13. Appendix</a></li>
+</ol>
+
+<!-- ===================== §1 EXEC ===================== -->
+<h2 id="exec">1. Executive Summary</h2>
+<div class="card-grid">
+  <div class="score-card"><div class="score-big score-2">2.6</div><div class="score-label">Overall Security Posture (0&ndash;5)</div><div style="font-size:.75rem;color:var(--text-dim)">single-tenant foundation; exposure-by-default gaps</div></div>
+  <div class="score-card"><div class="score-big score-1">4</div><div class="score-label">High findings</div><div style="font-size:.75rem;color:var(--text-dim)">0 Critical</div></div>
+  <div class="score-card"><div class="score-big score-3">8</div><div class="score-label">Medium findings</div><div style="font-size:.75rem;color:var(--text-dim)">+ 2 Low, 1 Info</div></div>
+  <div class="score-card"><div class="score-big score-3">15</div><div class="score-label">Total findings</div><div style="font-size:.75rem;color:var(--text-dim)">11 confirmed, 4 hypothesis/low-conf</div></div>
+</div>
+
+<div class="card"><h3>Overall Health</h3>
+<p>MarketHawk is materially more hardened than a typical internal trading dashboard, and notably more
+than its own earlier state: it now has real authentication. A global pure-ASGI <code>AuthMiddleware</code>
+validates a JWT (HS256) carried in an <code>HttpOnly; Secure; SameSite=strict</code> cookie on
+<strong>every</strong> request except a small static exempt list; a <code>CSRFMiddleware</code> enforces a
+CSRF check on state-changing routes; <code>slowapi</code> rate-limits sensitive endpoints; config
+<strong>fails fast</strong> when <code>JWT_SECRET_KEY</code> is shorter than 32 chars; stack traces are hidden
+unless <code>ENVIRONMENT=development</code>; and database access is uniformly through the SQLAlchemy ORM
+with bound parameters (no string-built SQL in application code).</p>
+<p>Residual risk concentrates in four areas: <strong>(1)</strong> this is <em>not</em> read-only software — it can
+place live bracket orders at Interactive Brokers (<code>ib.placeOrder</code>), gated only by configuration
+defaults with no hard notional/qty ceiling or order-layer kill switch; <strong>(2)</strong> it is single-user
+with no authorization model (no <code>user_id</code> on any table); <strong>(3)</strong> several surfaces are
+exposed-by-default (Swagger/<code>openapi.json</code>/<code>/metrics</code> auth-exempt, Redis without a
+password, admin tools relying on un-enforced env credentials); and <strong>(4)</strong> supply-chain gaps in
+the build/factory path (<code>curl | bash</code> installers, unpinned images/actions, advisory-only Trivy).
+No hardcoded production secret was found in the tree; no SQLi, command injection, unsafe deserialization,
+or template injection in application code; no <code>dangerouslySetInnerHTML</code> in the frontend.</p>
+<p><strong>Bottom line:</strong> safe to run for a single trusted operator on a trusted host/LAN today. Before
+any internet-facing or multi-user deployment, close the Top-10 list — chiefly the admin-tool /
+<code>/metrics</code> / docs exposure, Redis auth, and explicit trade-execution guardrails.</p>
+</div>
+
+<h3>Confirmed defensive controls (working)</h3>
+<ul>
+  <li>Fail-fast secret validation: <code>config.py:137-145</code> rejects <code>JWT_SECRET_KEY &lt; 32</code> chars; <code>DATABASE_URL</code> scheme validated.</li>
+  <li>Global deny-by-default auth: pure-ASGI <code>AuthMiddleware</code> (<code>main.py:282-312</code>) + <code>CSRFMiddleware</code> + <code>SameSite=strict</code>, <code>COOKIE_SECURE=True</code> default.</li>
+  <li>ORM-only data access; bound parameters throughout. Only f-string SQL is in a <em>seed</em> migration with hardcoded data.</li>
+  <li>No <code>pickle</code>/<code>yaml.load</code>/<code>eval</code>/<code>exec</code>; Celery uses the JSON serializer.</li>
+  <li>Circuit breakers on Polygon and IBKR (<code>pybreaker</code>) bound retry storms.</li>
+  <li>Tokens in <code>HttpOnly</code> cookies (not <code>localStorage</code>); all 3 WebSocket routes authenticate via <code>ws_get_current_user</code>.</li>
+</ul>
+
+<!-- ===================== §2 TOP 10 ===================== -->
+<h2 id="top10">2. Top 10 Risks (severity &times; exploitability)</h2>
+<table>
+<tr><th>#</th><th>Risk</th><th>Sev</th><th>Conf</th><th>Anchor</th></tr>
+<tr><td>1</td><td><strong>Live trade execution path with config-only guardrails</strong> — <code>ib.placeOrder</code> reachable; no hard notional/qty ceiling or order-layer kill switch</td><td class="sev-high">High</td><td>High</td><td class="fp">providers/ibkr_orders.py:276</td></tr>
+<tr><td>2</td><td><strong>Swagger/ReDoc/<code>openapi.json</code> + <code>/metrics</code> exempt from auth</strong> in prod</td><td class="sev-high">High</td><td>High</td><td class="fp">main.py:266-275</td></tr>
+<tr><td>3</td><td><strong>Redis has no authentication</strong> (no <code>requirepass</code>) — Celery broker/result + pub/sub open on the docker network</td><td class="sev-high">High</td><td>High</td><td class="fp">config.py:24</td></tr>
+<tr><td>4</td><td><strong>Admin tools rely on un-enforced env credentials</strong> — pgAdmin / Flower / Seq / Grafana; empty cred ⇒ no auth, no fail-fast</td><td class="sev-high">High</td><td>Medium</td><td class="fp">docker-compose.yml</td></tr>
+<tr><td>5</td><td><strong>No authorization / single-user model</strong> — auth is all-or-nothing; no <code>user_id</code> on data tables</td><td class="sev-medium">Medium</td><td>High</td><td class="fp">models/*; core/auth.py</td></tr>
+<tr><td>6</td><td><strong>Floating <code>:latest</code> tags + unpinned base images / actions</strong> — non-reproducible builds, supply-chain drift</td><td class="sev-medium">Medium</td><td>High</td><td class="fp">docker-compose.yml:330,352,371,426</td></tr>
+<tr><td>7</td><td><strong><code>curl | bash</code> installers in factory Dockerfile</strong> (NodeSource, Bun) + unsigned Archon fork clone</td><td class="sev-medium">Medium</td><td>High</td><td class="fp">dark-factory/Dockerfile:22,41,69</td></tr>
+<tr><td>8</td><td><strong>Unbounded pagination / reflective sort</strong> — <code>getattr(ScannerEvent, sort_by)</code> + no upper <code>limit</code> ⇒ DoS</td><td class="sev-medium">Medium</td><td>High</td><td class="fp">routers/scanner.py, outcomes.py</td></tr>
+<tr><td>9</td><td><strong>WebSocket resource exhaustion</strong> — authenticated, but no conn/IP cap, no msg-size limit; per-conn Redis pub/sub</td><td class="sev-medium">Medium</td><td>Medium</td><td class="fp">routers/live_data.py, news.py:92, tweets.py:29</td></tr>
+<tr><td>10</td><td><strong>Trivy scan advisory-only; no SAST/CodeQL; <code>ci.yml</code> missing <code>permissions:</code></strong></td><td class="sev-medium">Medium</td><td>High</td><td class="fp">.github/workflows/ci-publish.yml:107,133</td></tr>
+</table>
+
+<!-- ===================== §3 DFD ===================== -->
+<h2 id="dfd">3. Architecture / Data-Flow Diagram</h2>
+<div class="mermaid">
+flowchart TB
+    subgraph Browser["Browser (untrusted)"]
+        UI["React 18 + Vite SPA"]
+    end
+    subgraph Edge["Edge / Reverse Proxy"]
+        Caddy["Caddy - TLS :80/:443 (0.0.0.0)"]
+    end
+    subgraph AppNet["Docker app network (trust boundary)"]
+        API["FastAPI backend :8000<br/>AuthMiddleware(JWT cookie)<br/>CSRFMiddleware - slowapi"]
+        Worker["Celery worker"]
+        Beat["Celery beat (scheduler)"]
+        PG[("PostgreSQL :5432<br/>trades - journal - configs")]
+        Redis[("Redis :6379<br/>NO PASSWORD<br/>broker - cache - pubsub")]
+    end
+    subgraph Admin["Admin / Observability (env-cred gated)"]
+        PgAdmin["pgAdmin :5050"]
+        Flower["Flower :5555"]
+        Seq["Seq :5380 logs"]
+        Graf["Grafana :3001"]
+        Prom["Prometheus :9090"]
+    end
+    subgraph External["External (untrusted sources)"]
+        Poly["Polygon.io REST"]
+        IB["IB Gateway to IBKR<br/>LIVE ORDER PLACEMENT"]
+        News["Massive / news feed"]
+        Tweets["Tweet monitor"]
+    end
+    UI -->|HTTPS, HttpOnly cookie| Caddy --> API
+    UI -.->|WSS feed cookie auth| API
+    API -->|ORM bound params| PG
+    API <-->|cache / pubsub| Redis
+    API -->|enqueue tasks| Redis --> Worker
+    Beat -->|schedules| Redis
+    Worker -->|circuit-broken| Poly
+    Worker -->|circuit-broken| IB
+    Worker -->|poll| News
+    Worker -->|poll| Tweets
+    Worker --> PG
+    API -->|/metrics UNAUTH| Prom --> Graf
+    PgAdmin --> PG
+    Flower --> Redis
+    classDef danger fill:#7f1d1d,stroke:#ef4444,color:#fff
+    classDef warn fill:#78350f,stroke:#f59e0b,color:#fff
+    class Redis,IB danger
+    class Prom,Seq,Flower,PgAdmin warn
+</div>
+<p><strong>Sensitive assets:</strong> Polygon API key, IBKR (TWS) credentials, JWT signing key, Postgres
+credentials, trade-journal + <code>AutoTradeOrder</code> records, watchlists/universes, market-data cache,
+Seq logs (may contain stack traces/SQL), pgAdmin/Grafana/Seq/Flower admin creds, VAPID push keys,
+SMTP app password, Docker volumes (<code>pgdata</code>, <code>seqdata</code>, <code>grafana</code>).</p>
+
+<!-- ===================== §4 THREAT MODEL ===================== -->
+<h2 id="threat">4. Threat Model</h2>
+<table>
+<tr><th>Trust boundary</th><th>Threat</th><th>Existing control</th><th>Residual gap</th></tr>
+<tr><td>Browser → Frontend</td><td>XSS, token theft</td><td>React escaping; no <code>dangerouslySetInnerHTML</code>; <code>HttpOnly</code> cookie</td><td>No CSP; external news/tweet URLs rendered without allowlist</td></tr>
+<tr><td>Frontend → API</td><td>CSRF, auth bypass</td><td>JWT cookie + CSRF + <code>SameSite=strict</code></td><td>docs/<code>/metrics</code> auth-exempt</td></tr>
+<tr><td>API → Postgres</td><td>SQLi, cred theft</td><td>ORM bound params throughout</td><td>Likely superuser-grade app role; 5432 host-published (localhost)</td></tr>
+<tr><td>API ↔ Redis</td><td>Queue/cache poisoning</td><td>Docker network isolation; JSON serializer</td><td><strong>No Redis password</strong></td></tr>
+<tr><td>API → Celery</td><td>Unauth task trigger, retry storm</td><td>Tasks enqueued via authed routes; circuit breakers</td><td>No global task time-limit; some scheduled tasks unbounded</td></tr>
+<tr><td>Worker → Polygon</td><td>Quota exhaustion, bad data</td><td><code>pybreaker</code> + timeouts</td><td>Trusts payloads as-is; limited staleness validation</td></tr>
+<tr><td>Worker → IBKR</td><td><strong>Unintended live orders</strong></td><td><code>paper_mode</code>/<code>AUTO_TRADING_ENABLED</code>/<code>requires_approval</code> defaults</td><td>No hard notional/qty cap or order-layer kill switch</td></tr>
+<tr><td>Backend → Seq</td><td>Sensitive data in logs</td><td>Prod hides stack traces from clients</td><td>Logs may capture SQL/URLs; Seq itself env-cred gated</td></tr>
+<tr><td>Admin tools</td><td>Unauthorized admin access</td><td>localhost binding; env-var creds</td><td>No fail-fast on empty creds; <code>:latest</code> images</td></tr>
+<tr><td>WebSocket</td><td>Unauth subscribe, DoS</td><td><code>ws_get_current_user</code> cookie check on all 3 routes</td><td>No conn/msg-rate caps; per-conn Redis pub/sub</td></tr>
+<tr><td>Docker network</td><td>Lateral movement</td><td>Internal network; non-root app images</td><td>Redis open; docker-socket-proxy allows BUILD/POST</td></tr>
+<tr><td>Dev vs Prod</td><td>Dev config in prod</td><td><code>ENVIRONMENT=production</code> + <code>COOKIE_SECURE=True</code> defaults</td><td>Override relaxes cookie security; preview compose has hardcoded weak creds</td></tr>
+</table>
+
+<!-- ===================== §5 FINDINGS ===================== -->
+<h2 id="findings">5. Detailed Findings</h2>
+
+<div class="finding high">
+<h3>F-TRADE-01 — Live order placement with config-only guardrails</h3>
+<div class="fmeta"><span class="sev-high">HIGH</span> · Confidence High · OWASP A04:2021 Insecure Design · CWE-840</div>
+<p><strong>Affected:</strong> <code class="fp">providers/ibkr_orders.py:205-299</code> (<code>place_bracket_order</code> → <code>ib.placeOrder</code> @276); <code>services/auto_trade_service.py:123-279</code>; <code>tasks/trading.py</code>; <code>routers/auto_trading.py</code>.</p>
+<p><strong>Why it matters:</strong> the highest-impact capability in the codebase — it can move real money. The review brief asked us to confirm read-only vs execution: <strong>confirmed, it executes</strong> OCA-linked bracket orders (entry + stop + target).</p>
+<p><strong>Controls present (good):</strong> strategies default <code>paper_mode=True</code>; a <code>SystemConfig.AUTO_TRADING_ENABLED</code> flag must be on; orders can require manual approval. Paper orders simulate fills and never reach <code>placeOrder</code>.</p>
+<p><strong>Gap / abuse case:</strong> guardrails are all configuration and single-user. No hard order-layer ceiling on quantity/notional, no daily-loss kill switch inside <code>place_bracket_order</code>. Anyone who authenticates (single shared credential) can flip the three flags and the system trades the live account unattended off scanner signals.</p>
+<p><strong>Remediation:</strong> add a non-bypassable guard at the top of <code>place_bracket_order</code> (notional/qty cap + <code>TRADING_KILL_SWITCH</code>); make <code>max_position_usd</code> required when <code>paper_mode=False</code>; require a separate <code>LIVE_TRADING_ARMED</code> flag not settable from the API; WARN-log + Prometheus-count every live placement.</p>
+<pre>if os.getenv("TRADING_KILL_SWITCH","").lower() in ("1","true","yes"):
+    raise PermissionError("Trading kill switch engaged")
+notional = quantity * (entry_price or target_price)
+if notional &gt; settings.MAX_ORDER_NOTIONAL or quantity &gt; settings.MAX_ORDER_QTY:
+    raise ValueError(f"Order exceeds hard cap: notional={notional} qty={quantity}")</pre>
+</div>
+
+<div class="finding high">
+<h3>F-AUTH-01 — Swagger / ReDoc / openapi.json + /metrics unauthenticated in production</h3>
+<div class="fmeta"><span class="sev-high">HIGH</span> · Confidence High · OWASP A05:2021 Misconfiguration · CWE-200</div>
+<p><strong>Affected:</strong> <code class="fp">main.py:266-275</code> — <code>EXEMPT_PREFIXES</code> includes <code>/docs</code>, <code>/redoc</code>, <code>/openapi.json</code>, <code>/metrics</code>.</p>
+<p><strong>Why it matters:</strong> the global <code>AuthMiddleware</code> is otherwise deny-by-default, but these prefixes are whitelisted — so the entire API schema (every route, param, model) and Prometheus operational metrics are world-readable wherever the backend is reachable. <code>openapi.json</code> is a turnkey recon map; <code>/metrics</code> leaks request volumes, WS connection counts, internal timing — all pre-auth.</p>
+<p><strong>Remediation:</strong> disable docs in prod (<code>docs_url=None</code> unless <code>ENVIRONMENT=development</code>); require auth (or Caddy basic-auth / IP-allowlist) on <code>/metrics</code>; remove these four from <code>EXEMPT_PREFIXES</code> in prod.</p>
+<pre>docs_url = "/docs" if settings.ENVIRONMENT == "development" else None
+app = FastAPI(..., docs_url=docs_url, redoc_url=docs_url,
+              openapi_url=("/openapi.json" if docs_url else None))</pre>
+</div>
+
+<div class="finding high">
+<h3>F-NET-01 — Redis has no authentication</h3>
+<div class="fmeta"><span class="sev-high">HIGH</span> · Confidence High · CWE-306 · CIS Docker network controls</div>
+<p><strong>Affected:</strong> <code class="fp">config.py:24</code> (<code>REDIS_URL = "redis://redis:6379/0"</code> — no password); Redis service in <code>docker-compose.yml</code> has no <code>requirepass</code>. Used as Celery broker <em>and</em> result backend <em>and</em> cache <em>and</em> pub/sub.</p>
+<p><strong>Abuse case:</strong> any process on the docker network can read cached data, inject/forge Celery tasks (e.g. enqueue <code>execute_auto_trade</code> with attacker rule/event ids), and publish to live WS pub/sub channels (<code>tweet_signals:all</code>, watchlist, news) that fan straight out to authenticated browser clients.</p>
+<p><strong>Remediation:</strong> set <code>requirepass</code> (ideally ACLs); change <code>REDIS_URL</code> to <code>redis://:${REDIS_PASSWORD}@redis:6379/0</code> everywhere; never publish 6379 beyond <code>127.0.0.1</code>. Keep <code>task_serializer='json'</code> explicit.</p>
+</div>
+
+<div class="finding high">
+<h3>F-ADMIN-01 — Admin tools depend on un-enforced env credentials</h3>
+<div class="fmeta"><span class="sev-high">HIGH</span> · Confidence Medium · OWASP A05:2021 · CWE-1188 / CWE-798</div>
+<p><strong>Affected:</strong> <code class="fp">docker-compose.yml</code> (pgAdmin :5050, Flower :5555, Seq :5380, Grafana :3001); <code>.env.example</code> (<code>change_me_pgadmin_password</code>, <code>FLOWER_BASIC_AUTH</code>, <code>SEQ_ADMIN_PASSWORD_HASH</code>).</p>
+<p><strong>Why it matters:</strong> these expose database contents (pgAdmin), task payloads/logs (Flower), centralized logs incl. stack traces/SQL (Seq), and dashboards (Grafana). If <code>FLOWER_BASIC_AUTH</code> or <code>SEQ_ADMIN_PASSWORD_HASH</code> is left empty, those tools start with <strong>no</strong> auth — and there is no fail-fast. (The recreate in this very session emitted <code>FLOWER_BASIC_AUTH variable is not set</code>.)</p>
+<p><strong>Remediation:</strong> refuse to boot each admin service when its credential env is empty or matches a <code>change_me_*</code> placeholder; bind all admin UIs to <code>127.0.0.1</code> and reach them via SSH tunnel / Caddy basic-auth + IP allowlist; never expose to <code>0.0.0.0</code>.</p>
+</div>
+
+<div class="finding medium">
+<h3>F-AUTHZ-01 — No authorization model; single-user; no user_id on data tables</h3>
+<div class="fmeta"><span class="sev-medium">MEDIUM</span> · Confidence High · OWASP A01:2021 Broken Access Control · CWE-639/862</div>
+<p><strong>Affected:</strong> <code class="fp">core/auth.py</code> (binary authentication only); all <code>models/*</code> (no <code>user_id</code> FK on <code>Trade</code>, journal, <code>ScannerConfig</code>, <code>StockUniverse</code>, <code>AutoTradeOrder</code>, <code>AlertRule</code>).</p>
+<p><strong>Why it matters:</strong> any valid token can read/modify every record, trigger every task, and arm trading. The schema cannot express ownership, so adding a second user silently shares all journals, watchlists, and strategies (horizontal priv-esc by construction).</p>
+<p><strong>Remediation:</strong> before multi-user, add <code>user_id</code> FKs, scope every query by <code>current_user.id</code>, and add a role concept (≥ admin vs viewer) gating trading/system-config endpoints. Until then, document the single-user constraint and keep the deployment single-tenant.</p>
+</div>
+
+<div class="finding medium">
+<h3>F-SUPPLY-01 — Floating image tags + unpinned base images / actions</h3>
+<div class="fmeta"><span class="sev-medium">MEDIUM</span> · Confidence High · CIS Docker 4.x · GitHub Actions hardening / SLSA</div>
+<p><strong>Affected:</strong> <code class="fp">docker-compose.yml:330,352,371,426</code> (<code>pgadmin4:latest</code>, <code>seq:latest</code>, <code>seq-input-gelf:latest</code>, <code>docker-socket-proxy:latest</code>); Dockerfiles (<code>FROM python:3.12-slim</code>, <code>node:22-alpine</code>, <code>ubuntu:24.04</code> — tags, no digests); <code>.github/workflows/*</code> (actions pinned to major version, not SHA).</p>
+<p><strong>Why it matters:</strong> non-reproducible builds; a retagged or compromised upstream image/action silently enters the next rebuild. The factory rebuilds images, so drift is live.</p>
+<p><strong>Remediation:</strong> pin compose images to explicit versions; pin Dockerfile <code>FROM</code> to <code>@sha256:</code> digests; pin Actions to commit SHAs; add Dependabot/Renovate.</p>
+</div>
+
+<div class="finding medium">
+<h3>F-SUPPLY-02 — curl | bash installers + unsigned fork clone in factory image</h3>
+<div class="fmeta"><span class="sev-medium">MEDIUM</span> · Confidence High · CWE-494 · supply-chain best practice</div>
+<p><strong>Affected:</strong> <code class="fp">dark-factory/Dockerfile:22</code> (<code>curl … nodesource … | bash -</code>), <code>:41</code> (<code>curl … bun.sh/install | bash</code>), <code>:69</code> (<code>git clone -b feat/… omniscient/Archon.git</code>).</p>
+<p><strong>Why it matters:</strong> remote code executed at build time with no signature/hash verification; a MITM or upstream compromise injects code into the factory image, which has docker-socket-proxy access (BUILD/POST).</p>
+<p><strong>Remediation:</strong> install Node from distro packages or verify the NodeSource script signature; pin Bun to a release artifact + <code>sha256sum -c</code>; pin the Archon clone to a signed tag or vendored submodule.</p>
+</div>
+
+<div class="finding medium">
+<h3>F-INPUT-01 — Unbounded pagination + reflective sort attribute</h3>
+<div class="fmeta"><span class="sev-medium">MEDIUM</span> · Confidence High · OWASP A04/A05 · CWE-770 / CWE-915</div>
+<p><strong>Affected:</strong> <code class="fp">routers/scanner.py</code> (<code>/scanner/results</code>), <code>routers/outcomes.py</code> (<code>/outcomes/signals</code>) — <code>limit</code> without an upper bound; <code>getattr(ScannerEvent, sort_by)</code> resolving a sort column from a raw query param.</p>
+<p><strong>Why it matters:</strong> an unbounded <code>limit</code> lets one request serialize an entire large table (<code>ScannerEvent</code>, <code>StockAggregate</code>) → memory/CPU DoS. <code>getattr(Model, user_input)</code> widens the surface to unintended attributes.</p>
+<p><strong>Remediation:</strong> cap <code>limit</code> (the tweets route already does this: <code>Query(50, ge=1, le=200)</code> @<code>tweets.py:59</code>); validate <code>sort_by</code> against an explicit allowlist.</p>
+<pre>ALLOWED_SORTS = {"detected_at","volume_ratio","price","symbol"}
+if sort_by not in ALLOWED_SORTS:
+    raise HTTPException(422, "invalid sort field")</pre>
+</div>
+
+<div class="finding medium">
+<h3>F-WS-01 — WebSocket resource exhaustion</h3>
+<div class="fmeta"><span class="sev-medium">MEDIUM</span> · Confidence Medium · OWASP A04 · CWE-770</div>
+<p><strong>Affected:</strong> <code class="fp">routers/live_data.py:20,76</code>, <code>news.py:92</code>, <code>tweets.py:29</code> — all authenticate via <code>ws_get_current_user</code> (cookie JWT, good) but: no per-IP/user connection cap, no idle/lifetime timeout, no inbound message-size limit, and each connection opens its <em>own</em> Redis pub/sub. <code>@limiter.exempt</code> removes slowapi protection.</p>
+<p><strong>Remediation:</strong> cap concurrent WS connections per user and globally; add a server-side idle timeout; share one Redis subscription via the existing <code>websocket_manager</code> fan-out; verify the <code>Origin</code> header against <code>CORS_ORIGINS</code> on handshake.</p>
+</div>
+
+<div class="finding medium">
+<h3>F-CI-01 — Container scan advisory-only; no SAST; CI missing permissions</h3>
+<div class="fmeta"><span class="sev-medium">MEDIUM</span> · Confidence High · GitHub Actions hardening · SLSA · CWE-1104</div>
+<p><strong>Affected:</strong> <code class="fp">.github/workflows/ci-publish.yml:107,133</code> (<code>continue-on-error: true</code>, Trivy <code>exit-code: "0"</code>); <code>ci.yml</code> (no top-level <code>permissions:</code> → broad default token); no CodeQL/Semgrep.</p>
+<p><strong>Why it matters:</strong> vulnerabilities are surfaced but never block a merge/publish (verified this session — the #366 publish run's three Trivy <code>scan</code> jobs failed yet the image still shipped); a compromised test step gets a write-capable token.</p>
+<p><strong>Remediation:</strong> set Trivy <code>exit-code: 1</code> for HIGH/CRITICAL and drop <code>continue-on-error</code>; add <code>permissions: {contents: read}</code> to <code>ci.yml</code>; add CodeQL + <code>bandit</code>/<code>semgrep</code>; validate <code>inputs.image_tag</code> against <code>^[a-z0-9._-]+$</code> in <code>deploy.yml</code> before the SSH shell.</p>
+</div>
+
+<div class="finding medium">
+<h3>F-DOCKER-01 — docker-socket-proxy allows BUILD/POST; preview compose hardcodes weak creds</h3>
+<div class="fmeta"><span class="sev-medium">MEDIUM</span> · Confidence Medium · CIS Docker 2.x · CWE-798</div>
+<p><strong>Affected:</strong> <code class="fp">docker-compose.yml:424-443</code> (socket proxy with <code>BUILD</code>/<code>POST</code>); <code>dark-factory/docker-compose.preview.yml</code> (<code>POSTGRES_PASSWORD: preview_password</code>, <code>JWT_SECRET_KEY: preview-only-not-secret-…</code>).</p>
+<p><strong>Why it matters:</strong> the proxy narrows the socket but still permits container/image creation; the preview compose's hardcoded JWT secret/DB password are fine for ephemeral CI but dangerous if applied to a long-lived host.</p>
+<p><strong>Remediation:</strong> restrict the proxy to the minimum verbs the factory needs; guard that no <code>preview_*</code> credential appears outside ephemeral CI; verify no <code>*-preview</code> containers persist after teardown.</p>
+</div>
+
+<div class="finding medium">
+<h3>F-INPUT-02 — Weak / decentralized ticker &amp; free-form field validation</h3>
+<div class="fmeta"><span class="sev-medium">MEDIUM</span> · Confidence Medium · OWASP A03/A04 · CWE-20 / CWE-915</div>
+<p><strong>Affected:</strong> multiple <code>schemas/*</code> and routers — ticker/symbol inputs validated ad-hoc (<code>.upper()</code>), no central regex/length; some models accept nested <code>Dict[str, Any]</code> without bounds; URL/webhook fields without scheme validation; date-range params without explicit bounds.</p>
+<p><strong>Remediation:</strong> a shared <code>Ticker</code> constrained type (<code>constr(pattern=r'^[A-Z]{1,6}$')</code>); <code>max_length</code> on string fields; bound date ranges; <code>HttpUrl</code> + <code>https</code>-only for URL fields; <code>model_config = ConfigDict(extra="forbid")</code> on request models to block mass assignment.</p>
+</div>
+
+<div class="finding low">
+<h3>F-FRONT-01 — External-content URLs rendered without allowlist; no CSP</h3>
+<div class="fmeta"><span class="sev-low">LOW</span> · Confidence High · OWASP A03 · CWE-601 / CWE-79</div>
+<p><strong>Affected:</strong> <code class="fp">components/NewsFeed.tsx:154-176</code> (<code>article_url</code>/<code>image_url</code>/title), <code>ScannerResults.tsx:240-250</code> (<code>metadata.tweet_url</code>), <code>public/sw.js:38</code> (<code>notification.data?.url</code> → <code>clients.openWindow</code>), <code>GlobalErrorToast.tsx:149</code> (<code>rel="noreferrer"</code> missing <code>noopener</code>).</p>
+<p><strong>Why it matters:</strong> React escapes text, so not stored-XSS today, but unvalidated external <code>href</code>/<code>src</code> and the SW <code>openWindow</code> are open-redirect / <code>javascript:</code>-scheme vectors if upstream data is attacker-influenced; no CSP means a future XSS has no second line of defense.</p>
+<p><strong>Remediation:</strong> validate external URLs (<code>new URL()</code>, <code>https:</code>-only, domain allowlist); restrict <code>sw.js</code> <code>openWindow</code> to same-origin/relative; add <code>rel="noopener noreferrer"</code>; ship a CSP from Caddy.</p>
+</div>
+
+<div class="finding low">
+<h3>F-LOG-01 — Potential sensitive data in logs / Seq</h3>
+<div class="fmeta"><span class="sev-low">LOW</span> · Confidence Medium · OWASP A09:2021 · CWE-532</div>
+<p><strong>Affected:</strong> broad logging to Seq (<code>SEQ_URL</code>); <code class="fp">database.py:23</code> echoes SQL when <code>LOG_LEVEL=DEBUG</code>. Prod correctly hides stack traces from HTTP responses (good).</p>
+<p><strong>Remediation:</strong> add a logging filter redacting known secret keys (<code>*_KEY</code>, <code>*_PASSWORD</code>, <code>DATABASE_URL</code>, <code>access_token</code>); never log <code>settings</code> objects; keep <code>LOG_LEVEL=DEBUG</code> out of production.</p>
+</div>
+
+<div class="finding info">
+<h3>F-AUTH-02 — Correction: /api/v1/tweets/recent IS protected</h3>
+<div class="fmeta"><span class="badge badge-blue">INFO</span> · Confidence High</div>
+<p><strong>Affected:</strong> <code class="fp">routers/tweets.py:57-94</code>. A parallel analysis flagged this as unauthenticated; <strong>it is not</strong>. The route prefix <code>/api/v1/tweets</code> is not in <code>EXEMPT_PREFIXES</code>, so the global <code>AuthMiddleware</code> requires a valid JWT cookie before the handler runs. Recorded to stop a false-positive propagating. Note: the middleware validates the JWT but does not re-check <code>is_active</code>; routes needing live user state should still depend on <code>get_current_user</code> (which all WS routes do).</p>
+</div>
+
+<!-- ===================== §6 QUICK WINS ===================== -->
+<h2 id="quickwins">6. Quick Wins (&lt; 1 day)</h2>
+<ol>
+  <li>Remove <code>/docs</code>, <code>/redoc</code>, <code>/openapi.json</code>, <code>/metrics</code> from <code>EXEMPT_PREFIXES</code>; disable docs in prod. <em>(F-AUTH-01)</em></li>
+  <li>Set Redis <code>requirepass</code> + update <code>REDIS_URL</code>. <em>(F-NET-01)</em></li>
+  <li>Cap <code>limit</code> and allowlist <code>sort_by</code> on scanner/outcomes endpoints. <em>(F-INPUT-01)</em></li>
+  <li>Add hard notional/qty cap + <code>TRADING_KILL_SWITCH</code> to <code>place_bracket_order</code>. <em>(F-TRADE-01)</em></li>
+  <li>Pin the four <code>:latest</code> compose images to versions. <em>(F-SUPPLY-01)</em></li>
+  <li>Add <code>permissions: {contents: read}</code> to <code>ci.yml</code>; set Trivy <code>exit-code: 1</code>. <em>(F-CI-01)</em></li>
+  <li>Validate <code>deploy.yml</code> <code>image_tag</code> against <code>^[a-z0-9._-]+$</code>.</li>
+  <li>Add <code>rel="noopener noreferrer"</code> + same-origin guard in <code>sw.js</code>. <em>(F-FRONT-01)</em></li>
+</ol>
+
+<!-- ===================== §7 MEDIUM ===================== -->
+<h2 id="medium">7. Medium-Term Plan (1–2 weeks)</h2>
+<ul>
+  <li>Fail-fast credential validation for pgAdmin/Flower/Seq/Grafana; bind admin UIs to <code>127.0.0.1</code> + Caddy basic-auth/IP allowlist. <em>(F-ADMIN-01)</em></li>
+  <li>Shared <code>Ticker</code> type, <code>extra="forbid"</code> on request models, URL/date bounds. <em>(F-INPUT-02)</em></li>
+  <li>WebSocket connection/message caps + shared Redis subscription + Origin check. <em>(F-WS-01)</em></li>
+  <li>Replace <code>curl|bash</code> factory installers with verified downloads; pin Archon clone. <em>(F-SUPPLY-02)</em></li>
+  <li>Log-redaction filter for secret keys. <em>(F-LOG-01)</em></li>
+  <li>Add CodeQL + bandit/semgrep to CI; SHA-pin actions; add Dependabot.</li>
+</ul>
+
+<!-- ===================== §8 STRATEGIC ===================== -->
+<h2 id="strategic">8. Strategic Plan (1–2 months)</h2>
+<ul>
+  <li>Authorization model: <code>user_id</code> FKs, per-user query scoping, role separation gating trading/system-config. <em>(F-AUTHZ-01)</em></li>
+  <li>Least-privilege Postgres roles (app / migration / readonly-pgadmin / backup) instead of one superuser.</li>
+  <li>Move secrets to a manager (Docker secrets / Vault / SOPS); rotate Polygon/IBKR/JWT/SMTP/VAPID.</li>
+  <li>Formal trade-execution safety subsystem: armed/disarmed state, daily-loss limit, audit trail, out-of-band confirmation, Prometheus alerting on any live order.</li>
+  <li>Digest-pin all base images; reproducible builds; container image signing (cosign).</li>
+</ul>
+
+<!-- ===================== §9 CI PIPELINE ===================== -->
+<h2 id="cipipe">9. Proposed CI Security Pipeline</h2>
+<pre>permissions: { contents: read }
+jobs:
+  sast:        # CodeQL (python, javascript) + bandit + semgrep --config auto
+  deps-python: # pip-audit (blocking; documented --ignore-vuln only)
+  deps-node:   # npm audit --audit-level=high (blocking)
+  secrets:     # gitleaks detect --redact (blocking on PRs)
+  iac:         # checkov + hadolint on Dockerfiles/compose (blocking on HIGH)
+  container:   # trivy image --exit-code 1 --severity HIGH,CRITICAL (blocking)
+# actions SHA-pinned; deploy gated on all-green + branch protection.</pre>
+
+<!-- ===================== §10 HARDENING ===================== -->
+<h2 id="hardening">10. Production Hardening Checklist</h2>
+<div class="card"><ul>
+  <li>☐ Docs/metrics not publicly reachable; admin UIs localhost-only behind auth.</li>
+  <li>☐ Redis password set; 6379/5432 never on <code>0.0.0.0</code>.</li>
+  <li>☐ All admin creds set to strong non-placeholder values (fail-fast enforced).</li>
+  <li>☐ <code>JWT_SECRET_KEY</code> ≥ 48 random chars; <code>COOKIE_SECURE=True</code>; <code>CORS_ORIGINS</code> exact prod origin.</li>
+  <li>☐ <code>ENVIRONMENT=production</code>; <code>LOG_LEVEL=INFO</code>; override file NOT applied.</li>
+  <li>☐ Trading: <code>paper_mode</code> verified; <code>LIVE_TRADING_ARMED</code> deliberate; notional cap + kill switch live.</li>
+  <li>☐ Images version/digest-pinned; Trivy blocking in CI.</li>
+  <li>☐ Caddy: TLS, HSTS (<code>preload</code>), CSP, <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code>.</li>
+  <li>☐ Least-privilege DB roles; backups encrypted + access-controlled.</li>
+</ul></div>
+
+<!-- ===================== §11 REGRESSION TESTS ===================== -->
+<h2 id="regress">11. Security Regression Test Plan</h2>
+<pre>@pytest.mark.parametrize("path", [
+    "/api/v1/tweets/recent", "/api/v1/scanner/results",
+    "/api/v1/journal/trades", "/api/v1/auto-trading/strategies"])
+def test_protected_endpoints_require_auth(client, path):
+    assert client.get(path).status_code == 401     # no cookie -> 401
+
+def test_openapi_hidden_in_prod(client_prod):
+    assert client_prod.get("/openapi.json").status_code in (401, 404)
+
+def test_metrics_requires_auth_in_prod(client_prod):
+    assert client_prod.get("/metrics").status_code == 401
+
+def test_scanner_limit_is_capped(auth_client):
+    assert auth_client.get("/api/v1/scanner/results?limit=10000000").status_code == 422
+
+def test_invalid_sort_rejected(auth_client):
+    assert auth_client.get("/api/v1/scanner/results?sort_by=__class__").status_code == 422
+
+def test_ws_rejects_without_cookie(client):
+    with pytest.raises(WebSocketDisconnect):        # code 1008
+        with client.websocket_connect("/api/v1/tweets/feed"): pass
+
+def test_paper_strategy_never_places_live_order(monkeypatch, executor):
+    place = Mock(); monkeypatch.setattr(
+        "app.providers.ibkr_orders.IBKROrderManager.place_bracket_order", place)
+    executor.maybe_execute(paper_rule, event, db); place.assert_not_called()
+
+def test_order_notional_cap_enforced(order_mgr):
+    with pytest.raises(ValueError):
+        order_mgr.place_bracket_order("AAPL","long",10**9, None, 1.0, 2.0)</pre>
+<p>Add: oversized-payload (413), CORS preflight from disallowed origin → blocked, secret-redaction unit
+test on the log filter, and gitleaks as a CI regression gate.</p>
+
+<!-- ===================== §12 SCORECARD ===================== -->
+<h2 id="scorecard">12. Final Scorecard</h2>
+<p>Twelve security categories, each scored 0&ndash;5. This is a security-specific scorecard, independent
+of the Architecture &amp; Quality series' 16-dimension rubric.</p>
+<div class="card" id="scorebars"></div>
+<div class="card" style="text-align:center;margin-top:1.5rem">
+  <div style="font-size:.9rem;color:var(--text-dim)">Mean Security Posture</div>
+  <div class="score-big score-2" style="font-size:3rem">2.6 / 5</div>
+  <div style="font-size:.85rem;color:var(--text-dim)">"Solid single-tenant foundation; exposure-by-default surfaces and trade-execution guardrails are the gating gaps"</div>
+</div>
+
+<!-- ===================== §13 APPENDIX ===================== -->
+<h2 id="appendix">13. Appendix</h2>
+<h3>Commands run (read-only)</h3>
+<p><code>git rev-parse/log/ls-files</code>; <code>Glob</code> over <code>backend/app/core</code>; <code>Grep</code> for
+<code>placeOrder|auto_trade|task_serializer|csrf|401|EXEMPT|websocket</code> and secret patterns;
+<code>Read</code> of <code>config.py</code>, <code>database.py</code>, <code>celery_app.py</code>, <code>auth.py</code>,
+<code>main.py</code> (auth/CORS/middleware), <code>ibkr_orders.py</code>, <code>tweets.py</code>,
+<code>live_data.py</code>, <code>news.py</code>.</p>
+<h3>Files / areas reviewed</h3>
+<p><code>backend/app/{main.py, core/*, routers/*, providers/ibkr_orders.py, services/auto_trade_service.py, tasks/*}</code>,
+<code>backend/tests/*</code>, <code>frontend/src/{api,components,hooks,pages}</code> + <code>public/sw.js</code>,
+<code>docker-compose*.yml</code>, <code>*/Dockerfile</code>, <code>caddy/</code>, <code>.github/workflows/*</code>,
+<code>.env.example</code>, <code>.gitignore</code>. Eight parallel read-only Explore agents covered auth/API,
+input/injection, DB, secrets, Docker, CI/supply-chain, frontend, and Celery/logging/domain; load-bearing
+claims were re-verified directly against source.</p>
+<h3>Assumptions</h3>
+<p>Production runs with <code>ENVIRONMENT=production</code>, the override file applied only locally, and admin
+tools bound to <code>127.0.0.1</code>. The app is intended for a single operator today.</p>
+<h3>Blind spots / not executed</h3>
+<p>Did not run <code>pip-audit</code>/<code>npm audit</code>/<code>trivy</code>/<code>bandit</code>/<code>semgrep</code>/<code>gitleaks</code>
+live (no install/network); did not start the stack or send live requests; did not inspect a real
+<code>.env</code> (gitignored, correctly absent). Postgres role privileges inferred from <code>DATABASE_URL</code>
+usage, not confirmed against a live <code>\du</code>. Some router line numbers are from agent reports rather
+than re-read line-by-line; confidence is marked per finding accordingly.</p>
+
+<div style="text-align:center;margin-top:3rem;padding:1.5rem;color:var(--text-dim);font-size:.85rem">
+  <p>Report generated 2026-06-12 by Claude Fable 5 &mdash; verified against <code>main</code> @ 96727c9</p>
+  <p>MarketHawk &mdash; Defensive Security Review &mdash; security-specific scorecard, distinct from the Architecture &amp; Quality series (v1&ndash;v3)</p>
+</div>
+
+</div>
+
+<script>
+mermaid.initialize({startOnLoad:true,theme:'dark',themeVariables:{primaryColor:'#1e293b',primaryBorderColor:'#334155',lineColor:'#64748b',fontSize:'13px'}});
+
+/* §12 security scorecard — [category, score 0-5] */
+const dims = [
+  ["Authentication & Authorization",3],
+  ["Secrets Management",3],
+  ["Dependency Hygiene",3],
+  ["API Input Validation",3],
+  ["WebSocket Security",3],
+  ["Docker / Network Hardening",2],
+  ["CI/CD Security",2],
+  ["Logging & Privacy",3],
+  ["Database Security",3],
+  ["Monitoring / Admin Exposure",2],
+  ["Business-Logic Safety",2],
+  ["Security Testing",3]
+];
+const col = v => v>=5?'#22c55e':v>=4?'#4ade80':v>=3?'#eab308':v>=2?'#f97316':'#ef4444';
+let html = '';
+for(const [name,v] of dims){
+  html += `<div class="dimrow">
+    <div>${name}</div>
+    <div class="dimbar">
+      <div style="width:180px;background:var(--surface2);border-radius:4px;height:14px;overflow:hidden">
+        <div style="width:${v/5*100}%;height:100%;background:${col(v)}"></div>
+      </div>
+      <strong style="width:48px;text-align:right">${v} / 5</strong>
+    </div>
+  </div>`;
+}
+document.getElementById('scorebars').innerHTML = html;
+</script>
+</body>
+</html>
