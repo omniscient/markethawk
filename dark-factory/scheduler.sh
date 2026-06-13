@@ -19,6 +19,7 @@ STATUS_BLOCKED="93d87b2f"
 STATUS_DONE="98236657"
 STATUS_BACKLOG="f75ad846"
 STATUS_REFINED="0c79ebe5"
+FACTORY_CORE_CLI="${FACTORY_CORE_CLI:-/workspace/project/dark-factory/scripts/factory_core/cli.py}"
 
 # Refinement pipeline (env-only: REFINE_MAX_RETRIES is not in config.yaml by design)
 REFINE_SKIP_LABELS="needs-discussion,epic,spec-pending-review,plan-pending-review"
@@ -132,27 +133,17 @@ check_rate_limit() {
   fi
 }
 
-# --- Retry tracking ---
+# --- Retry tracking (thin adapters — logic lives in factory_core/breaker.py) ---
 get_retry_count() {
-  local issue_num="$1"
-  jq -r --arg n "$issue_num" '.[$n] // 0' "$STATE_FILE"
+  STATE_FILE="$STATE_FILE" python3 "$FACTORY_CORE_CLI" breaker-get --key "$1"
 }
 
 increment_retry() {
-  local issue_num="$1"
-  local current
-  current=$(get_retry_count "$issue_num")
-  local new_count=$((current + 1))
-  local tmp
-  tmp=$(mktemp)
-  jq --arg n "$issue_num" --argjson c "$new_count" '.[$n] = $c' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+  STATE_FILE="$STATE_FILE" python3 "$FACTORY_CORE_CLI" breaker-incr --key "$1"
 }
 
 reset_retry() {
-  local issue_num="$1"
-  local tmp
-  tmp=$(mktemp)
-  jq --arg n "$issue_num" 'del(.[$n])' "$STATE_FILE" > "$tmp" && mv "$tmp" "$STATE_FILE"
+  STATE_FILE="$STATE_FILE" python3 "$FACTORY_CORE_CLI" breaker-reset --key "$1"
 }
 
 # --- Duplicate dispatch prevention ---
@@ -436,84 +427,20 @@ dispatch() {
   return "$exit_code"
 }
 
-# --- Move an issue to a board status (used by the orphaned-in-progress sweep) ---
+# --- Move an issue to a board status (thin adapter — logic lives in factory_core/board.py) ---
 set_board_status() {
-  local issue_num="$1"
-  local option_id="$2"
-  local item_id
-  item_id=$(gh project item-list "$PROJECT_NUMBER" --owner "$OWNER" --format json --limit 200 2>/dev/null \
-    | jq -r ".items[] | select(.content.number == $issue_num and .content.type == \"Issue\") | .id")
-  if [ -n "$item_id" ]; then
-    gh project item-edit --project-id "$PROJECT_ID" --id "$item_id" \
-      --field-id "$STATUS_FIELD" --single-select-option-id "$option_id" >/dev/null 2>&1 || true
-  fi
+  python3 "$FACTORY_CORE_CLI" board-move --issue "$1" --status "$2"
 }
 
-# --- Universal circuit-breaker ---
-# Moves an issue to Blocked, adds needs-discussion (filters it from all dispatch loops via
-# SKIP_LABELS), posts an explanatory comment, and resets the retry counter so a later
-# manual re-trigger starts clean.
-# Usage: trip_to_blocked <issue_num> <phase: implement|plan|refine> <reason>
+# --- Universal circuit-breaker (thin adapter — logic lives in factory_core/breaker.py) ---
+# Usage: trip_to_blocked <issue_num> <phase: implement|plan|refine|resolve> <reason>
 trip_to_blocked() {
   local issue_num="$1"
   local phase="$2"
   local reason="${3:-repeated dispatch failure}"
-
-  # implement uses bare issue number; plan/refine use ':phase' suffix
-  local key
-  case "$phase" in
-    implement) key="$issue_num" ;;
-    *)         key="${issue_num}:${phase}" ;;
-  esac
-  local attempts
-  attempts=$(get_retry_count "$key")
-
-  echo "[$(date -u +%FT%TZ)] circuit_breaker=trip issue=#${issue_num} phase=${phase} attempts=${attempts}"
-
-  # 1. Board → Blocked (no-op if already Blocked)
-  set_board_status "$issue_num" "$STATUS_BLOCKED" || true
-
-  # 2. needs-discussion is in SKIP_LABELS — filters this issue from every dispatch loop
-  gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
-    --add-label needs-discussion 2>/dev/null || true
-
-  # Promote to eval flywheel: factory-regression label marks this failure for replay benchmark
-  gh issue edit "$issue_num" --repo "${OWNER}/markethawk" \
-    --add-label factory-regression 2>/dev/null || true
-
-  # 3. Manual retry command varies by phase
-  local retry_cmd
-  case "$phase" in
-    refine)  retry_cmd="Refine issue #${issue_num}" ;;
-    plan)    retry_cmd="Plan issue #${issue_num}" ;;
-    resolve) retry_cmd="Deconflict issue #${issue_num}" ;;
-    *)       retry_cmd="Fix issue #${issue_num}" ;;
-  esac
-
-  # 4. Explanatory comment
-  gh issue comment "$issue_num" --repo "${OWNER}/markethawk" --body \
-"## Scheduler — Circuit-Breaker Tripped (\`${phase}\`)
-
-The scheduler attempted **${phase}** **${attempts} time(s)** without success and cannot recover automatically.
-
-**Reason:** ${reason}
-
-This ticket has been moved to **Blocked** and labelled \`needs-discussion\` to pause automation.
-
-**To resume:**
-1. Investigate the failure comments above and fix the root cause.
-2. Remove the \`needs-discussion\` label — the scheduler resumes on its next poll.
-
-\`\`\`bash
-# Or re-run manually:
-docker compose --profile factory run --rm dark-factory \"${retry_cmd}\"
-\`\`\`
-
----
-*Posted by MarketHawk Backlog Scheduler*" 2>/dev/null || true
-
-  # 5. Reset counter so a future manual retry starts clean
-  reset_retry "$key"
+  echo "[$(date -u +%FT%TZ)] circuit_breaker=trip issue=#${issue_num} phase=${phase}"
+  STATE_FILE="$STATE_FILE" python3 "$FACTORY_CORE_CLI" \
+    breaker-trip --issue "$issue_num" --phase "$phase" --reason "$reason"
 }
 
 # --- Mergeable status for a PR: CONFLICTING, MERGEABLE, or UNKNOWN ---
