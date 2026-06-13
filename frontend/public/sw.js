@@ -35,7 +35,17 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/alerts';
+  const rawUrl = event.notification.data?.url || '/alerts';
+  // Only open same-origin URLs to prevent open-redirect via push payload.
+  let urlToOpen = '/alerts';
+  try {
+    const resolved = new URL(rawUrl, self.location.origin);
+    if (resolved.origin === self.location.origin) {
+      urlToOpen = resolved.pathname + resolved.search + resolved.hash;
+    }
+  } catch {
+    // malformed URL — fall through to /alerts
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
