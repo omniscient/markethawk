@@ -3,6 +3,10 @@
 This file is maintained automatically by the dark factory implement agent. Do not edit manually.
 Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, follow those documents.
 
+## Config Parsing
+
+- [PATTERN] Use `mikefarah/yq` (Go binary, installed in the dark-factory Dockerfile from issue #338 onward) to parse YAML in dark-factory shell scripts. Do NOT rely on `python3 -c "import yaml"` — PyYAML is not an explicit dark-factory dependency (no requirements.txt); it may be present transitively but must not be depended on. For YAML values needed by pure-stdlib Python scripts, extract with yq in the calling shell script and pass as a required CLI arg (no default = hard failure when config is absent). <!-- issue:#338 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ## Docker Volume Sharing
 
 - [AVOID] Never define a Docker named volume with `driver_opts: type: tmpfs` when the intent is to share files across containers — Docker tmpfs mounts are per-container; each container that mounts the volume gets its own independent tmpfs, making writes from one container invisible to another. Use a regular named volume (no `driver_opts`) for shared-directory patterns like prometheus-client multiprocess mode. <!-- issue:#194 date:2026-06-05 expires:2026-12-05 source:implement -->
