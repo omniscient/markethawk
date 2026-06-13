@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Outcomes / Review Dashboard (issue #303)
+
+- [PATTERN] Decouple the review-precision window from the scorecard outcome window: `start_date`/`end_date` (user-selectable period toggle) govern outcome-side stats; a separate `review_window_days` param (default 90) governs precision/coverage. Reviews accumulate more slowly than scanner events, so short windows (7d) would yield near-zero precision — a fixed 90d review window produces a statistically useful signal regardless of the selected outcome period. <!-- issue:#303 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Do not wire the review precision window to the same period selector as outcome stats — tying them together causes the precision badge to show zero (or null) on short windows even when the scanner has 90 days of review history. Keep them independent parameters. <!-- issue:#303 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
