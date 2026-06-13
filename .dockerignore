@@ -1,5 +1,8 @@
-# Dark factory build context — only include what the Dockerfile needs
+# Build context — only include what each Dockerfile needs
 *
 !dark-factory/
 !.claude/skills/refinement/
 !docker-compose.yml
+!docker/
+!scripts/backup.sh
+!scripts/backup-entrypoint.sh

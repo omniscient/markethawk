@@ -32,8 +32,39 @@ STATUS_IN_PROGRESS="47fc9ee4"
 STATUS_IN_REVIEW="df73e18b"
 STATUS_BLOCKED="93d87b2f"
 
-# Conflict resolution
+# Bootstrap defaults for pre-clone concurrency guard — overridden by _entrypoint_cfg_apply post-clone.
+FACTORY_WIP_LIMIT="${FACTORY_WIP_LIMIT:-1}"
 CONFLICT_RESOLUTION_AI_TIER="${CONFLICT_RESOLUTION_AI_TIER:-true}"
+
+# Read FACTORY_WIP_LIMIT and CONFLICT_RESOLUTION_AI_TIER from config.yaml post-clone.
+# Env overrides are kept and logged; bootstrap defaults above handle pre-clone use.
+_entrypoint_cfg_apply() {
+  local cfg
+  for cfg in "${CLONE_DIR}/.claude/skills/refinement/config.yaml" "/opt/refinement-skills/config.yaml"; do
+    [ -f "$cfg" ] && break
+    cfg=""
+  done
+  if [ -z "$cfg" ]; then
+    echo "WARNING: config.yaml not found post-clone — keeping bootstrap defaults" >&2
+    return 0
+  fi
+
+  _epcfg() {
+    local var="$1" yq_expr="$2"
+    local cfg_val
+    cfg_val=$(yq "$yq_expr" "$cfg" 2>/dev/null || true)
+    [ "${cfg_val:-null}" = "null" ] && return 0
+    if [ "${!var}" != "$cfg_val" ]; then
+      echo "[entrypoint-config] ${var}=${!var} (env/bootstrap override; config has '${cfg_val}')" >&2
+    else
+      export "${var}=${cfg_val}"
+    fi
+  }
+
+  _epcfg FACTORY_WIP_LIMIT          '.scheduler.factory_wip_limit'
+  _epcfg CONFLICT_RESOLUTION_AI_TIER '.conflict_resolution.ai_tier'
+  echo "[entrypoint-config] loaded from ${cfg}"
+}
 
 # --- Parse arguments ---
 ARGUMENTS="${*}"
@@ -591,6 +622,9 @@ if [ -d "$CLONE_DIR" ]; then
 fi
 git clone "$REPO_URL" "$CLONE_DIR"
 cd "$CLONE_DIR"
+
+# --- Apply config.yaml policy knobs post-clone (env overrides logged when active) ---
+_entrypoint_cfg_apply
 
 # --- Copy preview template and seed data into clone ---
 mkdir -p "$CLONE_DIR/dark-factory"

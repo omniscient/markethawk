@@ -174,7 +174,8 @@ def test_cli_emits_json(tmp_path):
     )
     out = subprocess.check_output(
         [sys.executable, str(SCRIPT), "--review", str(review), "--diff", str(diff),
-         "--block-threshold", "high", "--max-findings", "50"],
+         "--block-threshold", "high", "--severity-order", "low,medium,high,critical",
+         "--max-findings", "50"],
         text=True,
     )
     result = json.loads(out)
@@ -182,3 +183,16 @@ def test_cli_emits_json(tmp_path):
     assert result["event"] == "REQUEST_CHANGES"
     assert result["payload"]["comments"][0]["path"] == "a.py"
     assert result["payload"]["comments"][0]["line"] == 1
+
+
+def test_missing_severity_order_exits_nonzero(tmp_path):
+    review = tmp_path / "review.md"
+    review.write_text("### Findings\nNo findings.\n", encoding="utf-8")
+    diff = tmp_path / "diff.txt"
+    diff.write_text("", encoding="utf-8")
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT), "--review", str(review), "--diff", str(diff),
+         "--block-threshold", "high"],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode != 0, "script must exit non-zero when --severity-order is omitted"

@@ -23,6 +23,12 @@ source "${REPO_ROOT}/dark-factory/scripts/gate_lib.sh"
 3. Extract `BLOCK_THRESHOLD` from `code_review.block_threshold` (default: `high`).
 4. Extract `FAIL_OPEN` from `code_review.fail_open` (default: `true`).
 5. Extract `MAX_FINDINGS` from `code_review.max_findings` (default: `50`).
+6. Extract `SEVERITY_ORDER_CSV` from `code_review.severity_order` in config.yaml:
+   ```bash
+   CONFIG_YAML=$(git rev-parse --show-toplevel)/.claude/skills/refinement/config.yaml
+   SEVERITY_ORDER_CSV=$(yq '.code_review.severity_order | join(",")' "$CONFIG_YAML" 2>/dev/null || true)
+   SEVERITY_ORDER_CSV="${SEVERITY_ORDER_CSV:-low,medium,high,critical}"
+   ```
 6. Determine `ISSUE_NUM` (from workflow context, or `git branch --show-current | grep -oP 'issue-\K\d+'`).
 7. Determine `PR_NUM`:
    ```bash
@@ -74,6 +80,7 @@ python3 dark-factory/scripts/code_review_payload.py \
   --review "$ARTIFACTS_DIR/review_findings.md" \
   --diff "$ARTIFACTS_DIR/review_diff.txt" \
   --block-threshold "$BLOCK_THRESHOLD" \
+  --severity-order "$SEVERITY_ORDER_CSV" \
   --max-findings "$MAX_FINDINGS" \
   > "$ARTIFACTS_DIR/review_result.json"
 ```
