@@ -80,6 +80,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("run_id", sa.Integer(), nullable=False),
         sa.Column("ticker", sa.String(length=10), nullable=False),
+        sa.Column("signal_date", sa.Date(), nullable=False),
         sa.Column("source_event_id", sa.Integer(), nullable=True),
         sa.Column(
             "signal_indicators", postgresql.JSONB(astext_type=sa.Text()), nullable=True
