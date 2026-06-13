@@ -8,6 +8,7 @@ os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 os.environ.setdefault("POLYGON_API_KEY", "test-key-for-unit-tests-only")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-for-unit-tests-only-aaa")
+os.environ.setdefault("REDIS_PASSWORD", "devpassword1234567890abc")
 
 import logging as _logging
 from contextlib import contextmanager

@@ -25,6 +25,7 @@ These must be set before starting the stack. The application will start without 
 | `PGADMIN_DEFAULT_PASSWORD` | Login password for pgAdmin web UI | `change_me` |
 | `SEQ_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Seq admin password. Generate with: `echo 'YourPassword' \| docker run --rm -i datalust/seq config hash` | `$2a$11$...` |
 | `FLOWER_BASIC_AUTH` | Basic auth credentials for the Flower Celery UI (http://localhost:5555). Flower reads this automatically. Format: `user:password` | `admin:change_me_flower_password` |
+| `REDIS_PASSWORD` | Password for the Redis container (`requirepass`). All services derive their `REDIS_URL` from this. Generate with: `python -c "import secrets; print(secrets.token_urlsafe(32))"` | `change_me_redis_password` |
 
 ---
 
@@ -34,7 +35,7 @@ These must be set before starting the stack. The application will start without 
 |----------|---------|---------|
 | `POSTGRES_DB` | `stockscanner` | PostgreSQL database name |
 | `POSTGRES_USER` | `postgres` | PostgreSQL superuser name |
-| `REDIS_URL` | `redis://redis:6379/0` | Redis connection string. Overriding is only needed for external Redis. |
+| `REDIS_URL` | `redis://:${REDIS_PASSWORD}@redis:6379/0` | Redis connection string with password. Constructed automatically by docker-compose from `REDIS_PASSWORD`. Override only for an external Redis instance. |
 | `RATE_LIMITING_ENABLED` | `true` | When `false`, disables all API rate limiting (SlowAPI `enabled=False` — no-op at both middleware and decorator level). Useful during local development to avoid 429s while iterating on scanner endpoints. |
 | `ENVIRONMENT` | `production` | Set to `development` to include stack traces in API error responses. Defaults to `production` so unset envs never leak internals. |
 | `LOG_LEVEL` | `INFO` | Backend and Celery log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |

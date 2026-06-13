@@ -100,6 +100,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Never use a simple hex-sequence like `a1b2c3d4e5f6` as an Alembic revision ID — the existing migration set contains files with IDs following this pattern and conflicts will produce a `CycleDetected` error. Use `python -m alembic revision -m "..."` to generate a unique ID, or pick a random 12-char alphanumeric string that doesn't appear in `ls backend/app/alembic/versions/` output. <!-- issue:#299 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+- [PATTERN] `env_file:` in docker-compose does NOT perform variable substitution — values are read literally. For services that use `env_file: .env` (e.g. `forecast-worker`), add an explicit `environment:` key to override any URL that requires compose-variable interpolation (e.g. `REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0`); without this override the literal string `${REDIS_PASSWORD}` is passed to the container unresolved. <!-- issue:#370 date:2026-06-13 expires:2026-12-13 source:implement -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from

@@ -3,8 +3,9 @@ Application configuration using pydantic-settings.
 """
 
 from functools import lru_cache
+from urllib.parse import quote
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,7 @@ class Settings(BaseSettings):
     LIVE_WEBSOCKET_ENABLED: bool = True
 
     # Redis / Celery
+    REDIS_PASSWORD: str = ""
     REDIS_URL: str = "redis://redis:6379/0"
     RATE_LIMITING_ENABLED: bool = True
 
@@ -137,6 +139,28 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_environment(cls, v: str) -> str:
         return v.lower()
+
+    @field_validator("REDIS_PASSWORD")
+    @classmethod
+    def validate_redis_password(cls, v: str) -> str:
+        if len(v) < 16:
+            raise ValueError(
+                "REDIS_PASSWORD must be at least 16 characters. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(24))'"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _build_redis_url(self) -> "Settings":
+        if self.REDIS_PASSWORD:
+            if "://" not in self.REDIS_URL:
+                raise ValueError("REDIS_URL must include a scheme (e.g. redis://...)")
+            scheme, rest = self.REDIS_URL.split("://", 1)
+            if "@" in rest:
+                rest = rest.split("@", 1)[1]
+            encoded = quote(self.REDIS_PASSWORD, safe="")
+            self.REDIS_URL = f"{scheme}://:{encoded}@{rest}"
+        return self
 
     @field_validator("JWT_SECRET_KEY")
     @classmethod
