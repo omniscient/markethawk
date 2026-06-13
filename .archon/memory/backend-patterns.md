@@ -69,6 +69,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not use `SQLite in-memory` (`create_engine("sqlite:///:memory:")`) for full-pipeline tests in this codebase — `Base.metadata.create_all` fails because several models use `JSONB` columns (e.g. `monitored_accounts.classification_config`) that SQLite's compiler cannot render. Use a mock DB (`MagicMock` with a `query.side_effect` dispatcher) instead, patching `ScannerService._save_event` to capture indicator assertions from `call_args.kwargs`. <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:implement -->
 
+## Backend: Input Validation
+
+- [PATTERN] For paginated endpoints, cap `limit` using FastAPI `Query(default, ge=1, le=200)` — this rejects out-of-range values with a 422 before the handler body runs. Never leave `limit: int = N` without an upper bound; it enables full-table serialization DoS. Reference pattern: `routers/tweets.py:59`. <!-- issue:#376 date:2026-06-13 expires:2026-12-13 source:refine -->
+
+- [AVOID] Never use `getattr(Model, user_supplied_sort_by, fallback_column)` to resolve a sort column — the fallback silently masks invalid input and the reflective lookup exposes unintended attributes. Instead, define a module-level dict mapping allowed sort key strings to SQLAlchemy column objects (`sort_col_map = {"event_date": Model.event_date, ...}`) and use `.get(sort_by, default_col)`. `StatsService.get_signals()` (`stats.py:463`) and `SCANNER_RESULTS_SORT_COLUMNS` in `scanner.py` are the reference implementations. <!-- issue:#376 date:2026-06-13 expires:2026-12-13 source:refine -->
+
 ## Backend: Middleware
 
 - [PATTERN] Pure-ASGI middleware classes (like `CSRFMiddleware`) should be defined at module level in `main.py`, not inside `create_app()` — module-level placement makes them importable by the test suite without triggering the full app factory. The `AuthMiddleware` is an exception because it closes over `EXEMPT_PREFIXES`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
