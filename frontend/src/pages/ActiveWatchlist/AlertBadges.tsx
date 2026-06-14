@@ -14,7 +14,11 @@ export function AlertBadge({ alert }: { alert: LiveAlert | null }) {
     : 'bg-gray-800 text-gray-400 border-gray-600';
 
   return (
-    <span className={`inline-block text-xs px-1.5 py-0.5 rounded border ${color}`} title={alert.summary}>
+    <span
+      className={`inline-block text-xs px-1.5 py-0.5 rounded border ${color}`}
+      title={alert.summary}
+      aria-label={`${alert.severity} severity`}
+    >
       {alert.scanner_type === 'live_volume_spike' ? 'VOL' : 'MOVE'}
     </span>
   );

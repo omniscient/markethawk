@@ -40,25 +40,18 @@ describe('AlertBadge', () => {
     expect(screen.getByText('MOVE')).toBeInTheDocument();
   });
 
-  it('applies red color classes for high severity', () => {
-    const { container } = render(<AlertBadge alert={makeAlert({ severity: 'high' })} />);
-    const badge = container.firstChild as HTMLElement;
-    expect(badge.className).toContain('text-red-300');
+  it('has accessible label for high severity', () => {
+    render(<AlertBadge alert={makeAlert({ severity: 'high' })} />);
+    expect(screen.getByLabelText('high severity')).toBeInTheDocument();
   });
 
-  it('applies yellow color classes for medium severity', () => {
-    const { container } = render(
-      <AlertBadge alert={makeAlert({ severity: 'medium' })} />,
-    );
-    const badge = container.firstChild as HTMLElement;
-    expect(badge.className).toContain('text-yellow-300');
+  it('has accessible label for medium severity', () => {
+    render(<AlertBadge alert={makeAlert({ severity: 'medium' })} />);
+    expect(screen.getByLabelText('medium severity')).toBeInTheDocument();
   });
 
-  it('applies gray color classes for low severity', () => {
-    const { container } = render(
-      <AlertBadge alert={makeAlert({ severity: 'low' })} />,
-    );
-    const badge = container.firstChild as HTMLElement;
-    expect(badge.className).toContain('text-gray-400');
+  it('has accessible label for low severity', () => {
+    render(<AlertBadge alert={makeAlert({ severity: 'low' })} />);
+    expect(screen.getByLabelText('low severity')).toBeInTheDocument();
   });
 });

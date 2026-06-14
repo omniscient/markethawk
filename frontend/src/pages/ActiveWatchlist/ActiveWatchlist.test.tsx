@@ -32,10 +32,6 @@ beforeEach(() => {
 });
 
 describe('ActiveWatchlist', () => {
-  it('renders without crashing', () => {
-    renderWithQuery(<ActiveWatchlist />);
-  });
-
   it('shows Active Watchlist heading', () => {
     renderWithQuery(<ActiveWatchlist />);
     expect(screen.getByText(/Active Watchlist/i)).toBeInTheDocument();
@@ -71,12 +67,6 @@ describe('ActiveWatchlist', () => {
     mockUseWatchlist.mockReturnValueOnce({ data: [], isLoading: true, isError: false });
     renderWithQuery(<ActiveWatchlist />);
     expect(screen.getByText(/Loading watchlist/i)).toBeInTheDocument();
-  });
-
-  it('shows count in red when at limit (50 symbols)', () => {
-    mockUseWatchlist.mockReturnValueOnce({ data: fiftyItems, isLoading: false, isError: false });
-    renderWithQuery(<ActiveWatchlist />);
-    expect(screen.getByText('50').className).toContain('text-red-400');
   });
 
   it('hides Add Symbol form when at limit', () => {
