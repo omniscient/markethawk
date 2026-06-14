@@ -10,7 +10,13 @@ import pandas as pd
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from app.core.metrics import scan_duration_seconds, scanner_events_total
+from app.core.metrics import (
+    scan_data_to_detection_seconds,
+    scan_duration_seconds,
+    scan_failed_tickers_ratio,
+    scan_last_success_timestamp,
+    scanner_events_total,
+)
 from app.exceptions import DataFetchError, ProviderError, ScanError
 from app.models.stock_aggregate import StockAggregate
 from app.models.system_config import SystemConfig
@@ -547,6 +553,34 @@ async def run_pre_market_scan(
     )
     failed.extend(enrich_failed)
     results = _persist(enriched, failed, db, event_date, ranker_config, scanner_run)
+    # --- SLO metrics -------------------------------------------------------
+    scan_last_success_timestamp.labels(scanner_type="pre_market_volume_spike").set(
+        _time.time()
+    )
+    scan_failed_tickers_ratio.labels(scanner_type="pre_market_volume_spike").set(
+        len(failed) / len(tickers) if tickers else 0.0
+    )
+    # data-to-detection: freshest pre-market minute bar consumed vs. wall-clock now
+    _max_bar_ts = (
+        db.query(func.max(StockAggregate.timestamp))
+        .filter(
+            StockAggregate.ticker.in_(tickers),
+            StockAggregate.timespan == "minute",
+            StockAggregate.is_pre_market == True,
+            StockAggregate.timestamp >= day_start_utc,
+            StockAggregate.timestamp < day_end_utc,
+        )
+        .scalar()
+    )
+    if _max_bar_ts is not None:
+        _bar_utc = (
+            _max_bar_ts
+            if _max_bar_ts.tzinfo
+            else _max_bar_ts.replace(tzinfo=timezone.utc)
+        )
+        scan_data_to_detection_seconds.labels(
+            scanner_type="pre_market_volume_spike"
+        ).observe((datetime.now(timezone.utc) - _bar_utc).total_seconds())
     scan_duration_seconds.labels(scanner_type="pre_market_volume_spike").observe(
         _time.monotonic() - _start
     )
