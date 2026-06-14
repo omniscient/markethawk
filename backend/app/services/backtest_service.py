@@ -143,13 +143,13 @@ def _simulate_trade(
     """
     open_price = Decimal(str(entry_bar.open))
     if entry_type == "limit":
-        # Limit price = signal_previous_close * (1 + offset/100); fill at open if open <= limit_price
-        if signal_previous_close is not None:
-            prev_close = Decimal(str(signal_previous_close))
-            limit_price = prev_close * (1 + Decimal(str(limit_offset_pct)) / 100)
-        else:
-            # Fallback when previous_close unavailable: use open as base
-            limit_price = open_price * (1 + Decimal(str(limit_offset_pct)) / 100)
+        # Limit price = signal_previous_close * (1 + offset/100); fill at open if open <= limit_price.
+        # When signal_previous_close is unavailable, treat as missing data and skip rather than
+        # silently falling back to open-based limit (which always fills on positive offset).
+        if signal_previous_close is None:
+            return None, None, EXIT_NO_ENTRY, 0, None, None
+        prev_close = Decimal(str(signal_previous_close))
+        limit_price = prev_close * (1 + Decimal(str(limit_offset_pct)) / 100)
         if open_price > limit_price:
             return None, None, EXIT_NO_ENTRY, 0, None, None
         entry_price = open_price  # filled at open (at or better than limit)
@@ -215,13 +215,19 @@ def _compute_stats(trades: list[SimulatedTrade]) -> dict:
         return {}
 
     wins = [t for t in completed if t.result_r > 0]
-    losses = [t for t in completed if t.result_r <= 0]
+    losses = [t for t in completed if t.result_r < 0]
 
     win_rate = len(wins) / len(completed) if completed else None
 
     gross_profit = sum(t.result_r for t in wins) if wins else 0.0
     gross_loss = abs(sum(t.result_r for t in losses)) if losses else 0.0
-    profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else None
+    # gross_loss == 0 and wins exist → undefined/infinite; None means "not enough trades"
+    if gross_loss > 0:
+        profit_factor = gross_profit / gross_loss
+    elif wins:
+        profit_factor = float("inf")
+    else:
+        profit_factor = None
 
     expectancy_r = (
         sum(t.result_r for t in completed) / len(completed) if completed else None
@@ -260,6 +266,7 @@ def _get_signals_for_date(
     tickers: list[str],
     event_date: date,
     db: Session,
+    fallback_loop=None,
 ) -> list[tuple[str, Optional[int], dict]]:
     """
     Return (ticker, source_event_id, indicators) for tickers that signaled on event_date.
@@ -290,22 +297,26 @@ def _get_signals_for_date(
             try:
                 from app.services import scan_orchestrator as _so
 
-                descriptor = _so._REGISTRY.get(scanner_type)
-            except Exception:
-                pass
+                descriptor = next(
+                    (d for d in _so.get_all() if d.key == scanner_type), None
+                )
+            except ImportError:
+                logger.warning(
+                    "scan_orchestrator unavailable; skipping in-memory fallback"
+                )
 
-            if descriptor is not None and descriptor.supports_date_range:
-                loop = asyncio.new_event_loop()
-                try:
-                    raw_signals = loop.run_until_complete(
-                        descriptor.run(missing, db, event_date, scanner_run=None)
-                    )
-                    for sig in raw_signals:
-                        ticker = sig.get("ticker")
-                        if ticker:
-                            result.append((ticker, None, sig.get("indicators", {})))
-                finally:
-                    loop.close()
+            if (
+                descriptor is not None
+                and descriptor.supports_date_range
+                and fallback_loop is not None
+            ):
+                raw_signals = fallback_loop.run_until_complete(
+                    descriptor.run(missing, db, event_date, scanner_run=None)
+                )
+                for sig in raw_signals:
+                    ticker = sig.get("ticker")
+                    if ticker:
+                        result.append((ticker, None, sig.get("indicators", {})))
         except Exception as exc:
             logger.warning(
                 f"In-memory scanner fallback failed for {scanner_type} on {event_date}: {exc}"
@@ -329,7 +340,6 @@ def run_backtest_logic(
 
     Deterministic: same inputs, same StockAggregate data → same output.
     """
-    from datetime import date as date_type
     from datetime import datetime, timezone
 
     from app.models.stock_aggregate import StockAggregate
@@ -341,6 +351,12 @@ def run_backtest_logic(
     )
     if strategy is None:
         raise ValueError(f"TradingStrategy id={strategy_id} not found")
+
+    stop_pct = float(strategy.stop_pct)
+    if stop_pct <= 0:
+        raise ValueError(
+            f"TradingStrategy id={strategy_id} has stop_pct={stop_pct}; must be > 0"
+        )
 
     # Snapshot strategy fields at run time for determinism (spec req #9, #11)
     strategy_snapshot_data = {
@@ -387,139 +403,160 @@ def run_backtest_logic(
 
     result = BacktestResult(
         run_uuid=str(_uuid.uuid4()),
-        universe_as_of=str(date_type.today()),
+        # Derived from inputs for determinism: "as of the end of the replay window"
+        universe_as_of=str(end_date),
         bars_source="polygon_adjusted",
         strategy_snapshot=strategy_snapshot_data,
     )
 
-    stop_pct = float(strategy.stop_pct)
     risk_reward_ratio = float(strategy.risk_reward_ratio)
     entry_type = strategy.entry_type
     limit_offset_pct = (
         float(strategy.limit_offset_pct) if strategy.limit_offset_pct else 0.0
     )
 
-    # Walk each trading day in [start_date, end_date]
+    # Walk each trading day in [start_date, end_date].
+    # Create the asyncio loop once for in-memory scanner fallbacks to avoid creating
+    # a new loop for every missing date in the day-walk.
+    _fallback_loop = asyncio.new_event_loop()
     cursor = start_date
     one_day = timedelta(days=1)
     simulated_trades: list[SimulatedTrade] = []
 
-    while cursor <= end_date:
-        # Get signals for this date
-        daily_signals = _get_signals_for_date(
-            scanner_type, eligible_tickers, cursor, db
-        )
-        result.total_signals += len(daily_signals)
-
-        for ticker, source_event_id, indicators in daily_signals:
-            trade = SimulatedTrade(
-                ticker=ticker,
-                signal_date=cursor,
-                source_event_id=source_event_id,
-                signal_indicators=indicators,
+    try:
+        while cursor <= end_date:
+            # Get signals for this date
+            daily_signals = _get_signals_for_date(
+                scanner_type, eligible_tickers, cursor, db, fallback_loop=_fallback_loop
             )
+            result.total_signals += len(daily_signals)
 
-            # Entry bar: the NEXT session's open (first daily bar after signal date)
-            next_day = cursor + one_day
-            entry_bars = _get_daily_bars(
-                ticker, next_day, end_date + timedelta(days=365), db
-            )
-
-            if not entry_bars:
-                result.signals_skipped_no_data += 1
-                trade.exit_reason = EXIT_NO_ENTRY
-                simulated_trades.append(trade)
-                continue
-
-            entry_bar = entry_bars[0]
-            subsequent_bars = entry_bars[1:]
-
-            previous_close = indicators.get("previous_close")
-
-            (
-                entry_price,
-                exit_price,
-                exit_reason,
-                hold_sessions,
-                stop_price,
-                target_price,
-            ) = _simulate_trade(
-                entry_bar=entry_bar,
-                subsequent_bars=subsequent_bars,
-                stop_pct=stop_pct,
-                risk_reward_ratio=risk_reward_ratio,
-                entry_type=entry_type,
-                limit_offset_pct=limit_offset_pct,
-                max_hold_sessions=max_hold_sessions,
-                signal_previous_close=float(previous_close)
-                if previous_close is not None
-                else None,
-            )
-
-            if exit_reason == EXIT_NO_ENTRY:
-                result.signals_skipped_no_data += 1
-                trade.exit_reason = EXIT_NO_ENTRY
-                simulated_trades.append(trade)
-                continue
-
-            entry_date_val = date(
-                entry_bar.timestamp.year,
-                entry_bar.timestamp.month,
-                entry_bar.timestamp.day,
-            )
-
-            # Compute exit_date from bars and hold_sessions
-            if hold_sessions == 0:
-                exit_date_val = (
-                    entry_date_val  # delisted immediately (no subsequent bars)
-                )
-            elif exit_reason == EXIT_TIME_STOP:
-                # Time stop: exit at NEXT bar's open; that bar is subsequent_bars[hold_sessions]
-                next_idx = hold_sessions
-                next_bar = (
-                    subsequent_bars[next_idx]
-                    if next_idx < len(subsequent_bars)
-                    else subsequent_bars[-1]
-                )
-                exit_date_val = date(
-                    next_bar.timestamp.year,
-                    next_bar.timestamp.month,
-                    next_bar.timestamp.day,
-                )
-            else:
-                exit_bar = subsequent_bars[hold_sessions - 1]
-                exit_date_val = date(
-                    exit_bar.timestamp.year,
-                    exit_bar.timestamp.month,
-                    exit_bar.timestamp.day,
+            for ticker, source_event_id, indicators in daily_signals:
+                trade = SimulatedTrade(
+                    ticker=ticker,
+                    signal_date=cursor,
+                    source_event_id=source_event_id,
+                    signal_indicators=indicators,
                 )
 
-            trade.entry_date = entry_date_val
-            trade.entry_price = entry_price
-            trade.exit_date = exit_date_val
-            trade.exit_reason = exit_reason
-            trade.hold_sessions = hold_sessions
-            trade.stop_price = stop_price
-            trade.target_price = target_price
+                # Entry bar: the NEXT session's open (first daily bar after signal date).
+                # Bound the search to ~5 calendar days (≈3-4 trading sessions) to prevent
+                # stale-bar entry after halts or data gaps.
+                next_day = cursor + one_day
+                entry_bars = _get_daily_bars(
+                    ticker, next_day, next_day + timedelta(days=7), db
+                )
 
-            if (
-                exit_price is not None
-                and entry_price is not None
-                and stop_price is not None
-            ):
-                trade.exit_price = exit_price
-                stop_dist = float(entry_price - stop_price)
-                if stop_dist > 0:
-                    trade.result_r = float(exit_price - entry_price) / stop_dist
+                if not entry_bars:
+                    result.signals_skipped_no_data += 1
+                    trade.exit_reason = EXIT_NO_ENTRY
+                    simulated_trades.append(trade)
+                    continue
+
+                entry_bar = entry_bars[0]
+                # Subsequent bars for simulation: fetch from entry date + 1 through a window
+                # large enough to cover max_hold_sessions (add buffer for weekends/holidays).
+                entry_bar_date = date(
+                    entry_bar.timestamp.year,
+                    entry_bar.timestamp.month,
+                    entry_bar.timestamp.day,
+                )
+                subsequent_bars = _get_daily_bars(
+                    ticker,
+                    entry_bar_date + one_day,
+                    entry_bar_date + timedelta(days=max_hold_sessions * 2 + 14),
+                    db,
+                )
+
+                previous_close = indicators.get("previous_close")
+
+                (
+                    entry_price,
+                    exit_price,
+                    exit_reason,
+                    hold_sessions,
+                    stop_price,
+                    target_price,
+                ) = _simulate_trade(
+                    entry_bar=entry_bar,
+                    subsequent_bars=subsequent_bars,
+                    stop_pct=stop_pct,
+                    risk_reward_ratio=risk_reward_ratio,
+                    entry_type=entry_type,
+                    limit_offset_pct=limit_offset_pct,
+                    max_hold_sessions=max_hold_sessions,
+                    signal_previous_close=float(previous_close)
+                    if previous_close is not None
+                    else None,
+                )
+
+                if exit_reason == EXIT_NO_ENTRY:
+                    result.signals_skipped_no_data += 1
+                    trade.exit_reason = EXIT_NO_ENTRY
+                    simulated_trades.append(trade)
+                    continue
+
+                entry_date_val = date(
+                    entry_bar.timestamp.year,
+                    entry_bar.timestamp.month,
+                    entry_bar.timestamp.day,
+                )
+
+                # Compute exit_date from bars and hold_sessions
+                if hold_sessions == 0:
+                    exit_date_val = (
+                        entry_date_val  # delisted immediately (no subsequent bars)
+                    )
+                elif exit_reason == EXIT_TIME_STOP:
+                    # Time stop: exit at NEXT bar's open; that bar is subsequent_bars[hold_sessions]
+                    next_idx = hold_sessions
+                    next_bar = (
+                        subsequent_bars[next_idx]
+                        if next_idx < len(subsequent_bars)
+                        else subsequent_bars[-1]
+                    )
+                    exit_date_val = date(
+                        next_bar.timestamp.year,
+                        next_bar.timestamp.month,
+                        next_bar.timestamp.day,
+                    )
                 else:
-                    trade.result_r = 0.0
+                    exit_bar = subsequent_bars[hold_sessions - 1]
+                    exit_date_val = date(
+                        exit_bar.timestamp.year,
+                        exit_bar.timestamp.month,
+                        exit_bar.timestamp.day,
+                    )
 
-            if exit_reason == EXIT_DELISTED:
-                result.trades_exited_on_data_end += 1
+                trade.entry_date = entry_date_val
+                trade.entry_price = entry_price
+                trade.exit_date = exit_date_val
+                trade.exit_reason = exit_reason
+                trade.hold_sessions = hold_sessions
+                trade.stop_price = stop_price
+                trade.target_price = target_price
 
-            simulated_trades.append(trade)
+                if (
+                    exit_price is not None
+                    and entry_price is not None
+                    and stop_price is not None
+                ):
+                    trade.exit_price = exit_price
+                    stop_dist = float(entry_price - stop_price)
+                    if stop_dist > 0:
+                        trade.result_r = float(exit_price - entry_price) / stop_dist
+                    else:
+                        trade.result_r = 0.0
 
-        cursor += one_day
+                if exit_reason == EXIT_DELISTED:
+                    result.trades_exited_on_data_end += 1
+
+                simulated_trades.append(trade)
+
+            cursor += one_day
+
+    finally:
+        _fallback_loop.close()
 
     # Tally completed trades (exclude no_entry signals)
     completed = [t for t in simulated_trades if t.exit_reason != EXIT_NO_ENTRY]

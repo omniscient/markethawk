@@ -16,6 +16,8 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock
 
+import pytest
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -230,6 +232,29 @@ def test_limit_entry_no_fill_when_gap_down():
     assert entry_price is None
 
 
+def test_limit_entry_no_previous_close_is_no_entry():
+    """
+    Limit entry with signal_previous_close=None → no_entry_bar (treat as missing data).
+    Must NOT silently fall back to open-based limit which would always fill on positive offset.
+    """
+    from app.services.backtest_service import _simulate_trade
+
+    entry = _bar(open_=100, high=102, low=99, close=101)
+    result = _simulate_trade(
+        entry_bar=entry,
+        subsequent_bars=[_bar(open_=100, high=104, low=97, close=101)],
+        stop_pct=2.0,
+        risk_reward_ratio=2.0,
+        entry_type="limit",
+        limit_offset_pct=2.0,
+        max_hold_sessions=10,
+        signal_previous_close=None,
+    )
+    entry_price, exit_price, exit_reason, hold, _, _ = result
+    assert exit_reason == "no_entry_bar"
+    assert entry_price is None
+
+
 # ---------------------------------------------------------------------------
 # Stop / target level computation
 # ---------------------------------------------------------------------------
@@ -325,3 +350,81 @@ def test_compute_stats_max_drawdown():
     trades = [_trade(2.0), _trade(2.0), _trade(-3.0), _trade(2.0)]
     stats = _compute_stats(trades)
     assert abs(stats["max_drawdown_r"] - 3.0) < 1e-6
+
+
+def test_compute_stats_all_wins_profit_factor():
+    """All-wins run: no losses → profit_factor=inf (undefined/infinite, not None)."""
+    import math
+
+    from app.services.backtest_service import SimulatedTrade, _compute_stats
+
+    def _trade(r):
+        t = SimulatedTrade(
+            ticker="X",
+            signal_date=date(2026, 1, 1),
+            source_event_id=None,
+            signal_indicators={},
+        )
+        t.result_r = r
+        t.hold_sessions = 1
+        return t
+
+    trades = [_trade(2.0), _trade(1.5)]
+    stats = _compute_stats(trades)
+    assert stats["wins"] == 2
+    assert stats["losses"] == 0
+    assert math.isinf(stats["profit_factor"])
+
+
+def test_compute_stats_breakeven_not_a_loss():
+    """Break-even trades (result_r == 0) must not be counted as losses."""
+    from app.services.backtest_service import SimulatedTrade, _compute_stats
+
+    def _trade(r):
+        t = SimulatedTrade(
+            ticker="X",
+            signal_date=date(2026, 1, 1),
+            source_event_id=None,
+            signal_indicators={},
+        )
+        t.result_r = r
+        t.hold_sessions = 1
+        return t
+
+    trades = [_trade(2.0), _trade(0.0), _trade(-1.0)]
+    stats = _compute_stats(trades)
+    assert stats["wins"] == 1
+    assert stats["losses"] == 1  # break-even is NOT a loss
+
+
+# ---------------------------------------------------------------------------
+# run_backtest_logic validation
+# ---------------------------------------------------------------------------
+
+
+def test_run_backtest_logic_raises_on_zero_stop_pct():
+    """run_backtest_logic raises ValueError when strategy.stop_pct == 0 (silent zeroing of result_r)."""
+    from decimal import Decimal as D
+
+    from app.services.backtest_service import run_backtest_logic
+
+    mock_strategy = MagicMock()
+    mock_strategy.stop_pct = D("0")
+    mock_strategy.risk_reward_ratio = D("2")
+    mock_strategy.entry_type = "market"
+    mock_strategy.limit_offset_pct = None
+
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.first.return_value = mock_strategy
+
+    with pytest.raises(ValueError, match="stop_pct"):
+        run_backtest_logic(
+            run_id=1,
+            scanner_type="pre_market_volume_spike",
+            strategy_id=1,
+            universe_id=1,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 31),
+            max_hold_sessions=10,
+            db=mock_db,
+        )
