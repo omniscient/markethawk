@@ -474,6 +474,27 @@ services:
     networks:
       - factory-network
 
+  # Remote BuildKit daemon — lets factory preview builds run WITHOUT the docker.sock
+  # connection-hijack that the socket-proxy blocks (BuildKit's gRPC build session needs
+  # an HTTP upgrade the HAProxy proxy can't forward → 403, see #436). The per-issue run
+  # container builds with `docker buildx build --builder remote tcp://buildkit:1234 --load`,
+  # which talks to this daemon directly over TCP (never the proxied socket) and then loads
+  # the result into dockerd via POST /images/load (allowed: POST:1, IMAGES:1). No host port
+  # is published — it is reachable only from inside factory-network.
+  buildkit:
+    image: moby/buildkit:latest
+    container_name: markethawk-buildkit
+    restart: unless-stopped
+    privileged: true            # buildkitd needs runc + overlayfs
+    command: --addr tcp://0.0.0.0:1234
+    volumes:
+      - buildkit_cache:/var/lib/buildkit
+    networks:
+      - factory-network
+    profiles:
+      - factory
+      - scheduler
+
   # Dark Factory — autonomous development agent (run on demand)
   dark-factory:
     image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
@@ -491,6 +512,7 @@ services:
       - scheduler_state:/var/lib/dark-factory
     depends_on:
       - docker-socket-proxy
+      - buildkit
     networks:
       - factory-network
       - stockscanner-network
@@ -646,6 +668,7 @@ volumes:
     external: true
     name: markethawk_ib_gateway_settings
   scheduler_state:
+  buildkit_cache:
   timesfm_cache:
   # Regular named volume (not tmpfs) so all containers (backend + celery-worker)
   # share the same directory. prometheus-client MultiProcessCollector reads every

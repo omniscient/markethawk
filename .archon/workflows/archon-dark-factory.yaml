@@ -575,41 +575,37 @@ nodes:
 
       PREVIEW_START=$(date +%s)
       echo "Starting preview stack mh-preview-${ISSUE} (ports: 1${PADDED}33, 1${PADDED}80)..."
-      # Build/boot noise goes to the build log, NOT stdout: this node's stdout becomes
-      # the preview-up node output, and oversized node output triggered the E2BIG loop.
-      if ! docker compose -p "mh-preview-${ISSUE}" \
-        -f dark-factory/docker-compose.preview.yml \
-        up -d --build >> "$BUILD_LOG" 2>&1; then
-        preview_fail "docker compose up --build failed (see preview_build.log tail below)"
+
+      # Pre-bake images via the remote BuildKit daemon (tcp://buildkit:1234 on factory-network).
+      # buildx talks to buildkitd directly over TCP — never the proxied docker.sock — so it
+      # sidesteps the connection-hijack the socket-proxy blocks (#436). --load then imports the
+      # result into dockerd via POST /images/load (allowed by the proxy), so `up -d` finds the
+      # images locally. Build/boot noise goes to the build log, NOT stdout: this node's stdout
+      # becomes the preview-up node output, and oversized node output triggered the E2BIG loop.
+      export PREVIEW_BACKEND_IMAGE="mh-preview-${ISSUE}-backend:latest"
+      export PREVIEW_FRONTEND_IMAGE="mh-preview-${ISSUE}-frontend:latest"
+      BUILDKIT_ADDR="tcp://${BUILDKIT_HOST:-buildkit}:${BUILDKIT_PORT:-1234}"
+      # Builder is per-run (the run container is ephemeral); ignore "already exists" on re-run.
+      docker buildx create --name preview-remote --driver remote "$BUILDKIT_ADDR" >> "$BUILD_LOG" 2>&1 || true
+      echo "Building ${PREVIEW_BACKEND_IMAGE} via remote BuildKit..."
+      if ! docker buildx build --builder preview-remote --load \
+        -t "$PREVIEW_BACKEND_IMAGE" -f backend/Dockerfile backend >> "$BUILD_LOG" 2>&1; then
+        preview_fail "buildx build of backend image failed (see preview_build.log tail below)"
+      fi
+      echo "Building ${PREVIEW_FRONTEND_IMAGE} via remote BuildKit..."
+      if ! docker buildx build --builder preview-remote --load \
+        -t "$PREVIEW_FRONTEND_IMAGE" -f frontend/Dockerfile frontend >> "$BUILD_LOG" 2>&1; then
+        preview_fail "buildx build of frontend image failed (see preview_build.log tail below)"
       fi
 
-      echo "Checking database state..."
-      TABLE_COUNT=$(docker compose -p "mh-preview-${ISSUE}" \
+      # Bring the stack up WITHOUT --build (images are pre-baked). The one-shot `migrate` service
+      # applies the schema (alembic upgrade head) and gates backend/celery startup; a migrate
+      # failure makes `up -d` exit non-zero (compose aborts on a failed
+      # service_completed_successfully dependency), so it is caught here.
+      if ! docker compose -p "mh-preview-${ISSUE}" \
         -f dark-factory/docker-compose.preview.yml \
-        exec -T postgres psql -U postgres -d stockscanner -tAc \
-        "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" 2>/dev/null || echo "0")
-      TABLE_COUNT=$(echo "$TABLE_COUNT" | tr -dc '0-9')
-
-      if [ "${TABLE_COUNT:-0}" -gt 0 ] 2>/dev/null; then
-        echo "Existing DB detected (${TABLE_COUNT} tables) — skipping create_all and stamp head, running alembic upgrade head only..."
-        docker compose -p "mh-preview-${ISSUE}" \
-          -f dark-factory/docker-compose.preview.yml \
-          exec -T backend python -m alembic upgrade head >> "$BUILD_LOG" 2>&1 \
-          || preview_fail "alembic upgrade head failed on existing DB"
-      else
-        echo "Fresh DB — running full bootstrap (create_all, stamp head, upgrade head)..."
-        docker compose -p "mh-preview-${ISSUE}" \
-          -f dark-factory/docker-compose.preview.yml \
-          exec -T backend python -c 'from app.core.database import Base, engine; from app.models import *; Base.metadata.create_all(bind=engine); print("Tables created")' \
-          >> "$BUILD_LOG" 2>&1 || preview_fail "DB bootstrap (create_all) failed"
-        docker compose -p "mh-preview-${ISSUE}" \
-          -f dark-factory/docker-compose.preview.yml \
-          exec -T backend python -m alembic stamp head >> "$BUILD_LOG" 2>&1 \
-          || preview_fail "alembic stamp head failed"
-        docker compose -p "mh-preview-${ISSUE}" \
-          -f dark-factory/docker-compose.preview.yml \
-          exec -T backend python -m alembic upgrade head >> "$BUILD_LOG" 2>&1 \
-          || preview_fail "alembic upgrade head failed on fresh DB"
+        up -d >> "$BUILD_LOG" 2>&1; then
+        preview_fail "docker compose up failed (migrate/boot — see preview_build.log tail below)"
       fi
 
       PREVIEW_NET="mh-preview-${ISSUE}_preview-network"
@@ -627,9 +623,14 @@ nodes:
       BACKEND_HOSTNAME="mh-preview-${ISSUE}-backend-1"
       BACKEND_INTERNAL="http://${BACKEND_HOSTNAME}:8000"
 
+      # Poll the backend container's healthcheck via `docker inspect` (GET /containers/<id>/json,
+      # allowed by the proxy via CONTAINERS:1) instead of `docker compose exec` (proxy is EXEC:0,
+      # and exec-start also needs the connection-hijack the proxy can't forward). The backend
+      # service defines an /api/health healthcheck, so State.Health.Status flips to "healthy".
       echo "Waiting for backend health..."
       for i in $(seq 1 60); do
-        if docker compose -p "mh-preview-${ISSUE}" -f dark-factory/docker-compose.preview.yml exec -T backend python -c 'import urllib.request; urllib.request.urlopen("http://localhost:8000/api/health")' 2>/dev/null; then
+        HEALTH=$(docker inspect --format '{{.State.Health.Status}}' "$BACKEND_HOSTNAME" 2>/dev/null || echo "missing")
+        if [ "$HEALTH" = "healthy" ]; then
           PREVIEW_SECS=$(( $(date +%s) - PREVIEW_START ))
           echo "Backend healthy!"
           echo "PREVIEW_SLOT=${PADDED}"
@@ -649,7 +650,9 @@ nodes:
       preview_fail "backend did not become healthy within 180s"
     depends_on: [classify-preview]
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
-    timeout: 300000
+    # Budget covers two remote buildx builds (cold-cache transfer overhead) + migrate gate +
+    # up-to-180s health poll. Bumped from 300000 for #436's pre-bake step.
+    timeout: 420000
 
   # preview-up-resolve: resolve runs skip the preview stack — validate uses pytest/tsc only
   - id: preview-up-resolve
