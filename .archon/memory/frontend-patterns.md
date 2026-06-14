@@ -5,13 +5,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Frontend: Data Fetching
 
-- [PATTERN] Use React Query (`useQuery` / `useMutation`) for all server state — never `useState` + `useEffect` + `fetch`. The existing query client is configured in `frontend/src/main.tsx`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
-
 - [PATTERN] Query keys follow the format `['resource', id?]` — e.g. `['scanner-results']`, `['stock', ticker]`. Keep keys consistent across the file so React Query can cache and invalidate correctly. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 ## Frontend: TypeScript
-
-- [AVOID] Do not use `any` in TypeScript — it defeats type-checking and will cause `tsc --noEmit` to fail in strict mode. Prefer `unknown` with narrowing, or derive types from the API response schema in `frontend/src/api/`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 - [PATTERN] Reuse API response types defined in `frontend/src/api/*.ts` rather than re-declaring interfaces in components. Type imports keep the schema as the single source of truth. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
@@ -94,6 +90,11 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PROVISIONAL] For date-sensitive Vitest tests, isolate fake timers in a sibling `describe` block: call `vi.useFakeTimers()` + `vi.setSystemTime(new Date('YYYY-MM-DDT00:00:00.000Z'))` in `beforeEach`, and `vi.useRealTimers()` in `afterEach` — this prevents timer state from leaking into adjacent tests that use real dates. <!-- evidence:test-output issue:#315 date:2026-06-13 expires:2026-12-13 source:implement -->
 
 - [PROVISIONAL] When asserting absence of a CSS class (e.g. `text-positive`) in a `WatchlistRow` test, choose a live-data fixture whose other cells (`SessionCell` for `regular` also uses `text-positive`) do not share that class — or scope the query: `container.querySelector('td:nth-child(2) span.text-positive')`. <!-- evidence:test-output issue:#312 date:2026-06-13 expires:2026-12-13 source:implement -->
+
+## Frontend: Auth Token Refresh
+
+- [PATTERN] For concurrent 401s at token expiry, use a module-level `refreshPromise: Promise<void> | null` in `frontend/src/api/client.ts`. The first 401 starts the refresh and stores the promise; all concurrent 401s await the same promise, then each retries its own request. Reset the promise in a `finally` block so the next expiry cycle starts fresh. <!-- issue:#425 date:2026-06-14 expires:2026-12-14 source:refine -->
+- [AVOID] Do not add a backend refresh-reuse grace window (Redis `prev_token → new_token` mapping) to mitigate the rotation race — the frontend single-flight guard eliminates the race structurally and the grace window softens single-use token rotation as a theft-detection signal without adding any benefit once the frontend fix is in place. <!-- issue:#425 date:2026-06-14 expires:2026-12-14 source:refine -->
 
 ## Frontend: URL Validation
 
