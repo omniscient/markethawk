@@ -852,6 +852,13 @@ nodes:
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     idle_timeout: 600000
 
+  # Layer 4.6: Auto-address advisory findings from code review
+  - id: revise-advisory
+    command: dark-factory-revise-advisory
+    depends_on: [code-review]
+    when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
+    idle_timeout: 600000
+
   # Layer 5: Move to "In review" and post report
   - id: status-in-review
     bash: |
@@ -875,9 +882,9 @@ nodes:
       else
         echo "WARNING: Issue #$ISSUE not found on project board"
       fi
-    depends_on: [push-and-pr, push-resolve, code-review]
-    # OR-join: push-and-pr/code-review (new/continue) vs push-resolve (resolve) are
-    # mutually exclusive. Tolerate the skipped sibling; still skip if a real upstream failed.
+    depends_on: [push-and-pr, push-resolve, code-review, revise-advisory]
+    # OR-join: push-and-pr/code-review/revise-advisory (new/continue) vs push-resolve (resolve) are
+    # mutually exclusive. Tolerate skipped siblings; still skip if a real upstream failed.
     trigger_rule: none_failed_min_one_success
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue' || $parse-intent.output.intent == 'resolve'"
     timeout: 15000
