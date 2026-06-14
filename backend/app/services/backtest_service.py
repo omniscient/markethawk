@@ -170,12 +170,11 @@ def _simulate_trade(
         high = Decimal(str(bar.high))
         close = Decimal(str(bar.close))
 
-        # Conservative intrabar rule: if both stop and target hit in the same bar → stop wins
+        # Conservative intrabar rule: stop is evaluated first, so a bar that touches both
+        # the stop and the target in the same session counts as a stop (worst-case).
         stop_hit = low <= stop_price
         target_hit = high >= target_price
 
-        if stop_hit and target_hit:
-            return entry_price, stop_price, EXIT_STOP, hold, stop_price, target_price
         if stop_hit:
             return entry_price, stop_price, EXIT_STOP, hold, stop_price, target_price
         if target_hit:
@@ -288,7 +287,15 @@ def _get_signals_for_date(
     )
 
     found_tickers = {e.ticker for e in db_events}
-    result = [(e.ticker, e.id, e.indicators or {}) for e in db_events]
+    result = []
+    for e in db_events:
+        # previous_close is a ScannerEvent column, not an indicators JSON key. Fold it into
+        # the indicators dict the caller reads from so limit-entry strategies can compute a
+        # limit price; without this, DB-sourced limit signals always resolve to no_entry_bar.
+        ind = dict(e.indicators or {})
+        if e.previous_close is not None and "previous_close" not in ind:
+            ind["previous_close"] = float(e.previous_close)
+        result.append((e.ticker, e.id, ind))
 
     missing = [t for t in tickers if t not in found_tickers]
     if missing:

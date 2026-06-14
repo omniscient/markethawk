@@ -256,6 +256,69 @@ def test_limit_entry_no_previous_close_is_no_entry():
 
 
 # ---------------------------------------------------------------------------
+# Signal sourcing — previous_close lives on the ScannerEvent column
+# ---------------------------------------------------------------------------
+
+
+def test_get_signals_surfaces_previous_close_from_event_column():
+    """
+    previous_close is a ScannerEvent *column*, not an indicators JSON key.
+    _get_signals_for_date must fold it into the indicators dict so limit-entry
+    strategies can compute a limit price; otherwise every DB-sourced limit
+    signal falls through to no_entry_bar.
+    """
+    from app.services.backtest_service import _get_signals_for_date
+
+    event = MagicMock()
+    event.ticker = "AAPL"
+    event.id = 42
+    event.indicators = {"rsi": 70}
+    event.previous_close = Decimal("123.45")
+
+    mock_db = MagicMock()
+    # All requested tickers resolve from the DB → no in-memory fallback path.
+    mock_db.query.return_value.filter.return_value.all.return_value = [event]
+
+    signals = _get_signals_for_date(
+        scanner_type="pre_market_volume_spike",
+        tickers=["AAPL"],
+        event_date=date(2026, 1, 5),
+        db=mock_db,
+    )
+
+    assert len(signals) == 1
+    ticker, source_event_id, indicators = signals[0]
+    assert ticker == "AAPL"
+    assert source_event_id == 42
+    assert indicators["previous_close"] == 123.45  # sourced from the column
+    assert indicators["rsi"] == 70  # existing indicators preserved
+
+
+def test_get_signals_does_not_override_indicators_previous_close():
+    """If indicators already carries previous_close, the JSON value wins (no clobber)."""
+    from app.services.backtest_service import _get_signals_for_date
+
+    event = MagicMock()
+    event.ticker = "MSFT"
+    event.id = 7
+    event.indicators = {"previous_close": 999.0}
+    event.previous_close = Decimal("123.45")
+
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.all.return_value = [event]
+
+    signals = _get_signals_for_date(
+        scanner_type="pre_market_volume_spike",
+        tickers=["MSFT"],
+        event_date=date(2026, 1, 5),
+        db=mock_db,
+    )
+
+    _, _, indicators = signals[0]
+    assert indicators["previous_close"] == 999.0
+
+
+# ---------------------------------------------------------------------------
 # Stop / target level computation
 # ---------------------------------------------------------------------------
 
