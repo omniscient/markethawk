@@ -4,7 +4,7 @@ import Modal from './ui/Modal';
 import Button from './ui/Button';
 import { RefreshCw, TrendingUp, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import Ticker from './Ticker';
-import { StockUniverse, MonitoredStock, refreshUniverse, fetchUniverseStocks } from '../api/scanner';
+import { StockUniverse, MonitoredStock, refreshUniverse, fetchUniverseStocks } from '../api/universe';
 
 type SortField = 'ticker' | 'company_name' | 'sector' | 'market_cap';
 type SortDirection = 'asc' | 'desc';

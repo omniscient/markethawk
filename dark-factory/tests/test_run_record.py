@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-import run_record as rr
+from factory_core import run_record as rr
 
 
 # ---------------------------------------------------------------------------

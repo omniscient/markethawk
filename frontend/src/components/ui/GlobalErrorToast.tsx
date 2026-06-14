@@ -146,7 +146,7 @@ export function GlobalErrorToast() {
             <a
               href={buildSeqLink(error.error_id)}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               id={`seq-link-${error.error_id}`}
               style={{
                 display: 'inline-flex',

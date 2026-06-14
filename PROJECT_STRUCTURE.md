@@ -143,7 +143,8 @@ MarketHawk/
 │   ├── src/
 │   │   ├── api/
 │   │   │   ├── client.ts
-│   │   │   ├── scanner.ts
+│   │   │   ├── scanner/         ← facade index + sub-modules (types, runs, results, configs, reviews, ws, misc)
+│   │   │   ├── universe.ts      ← StockUniverse, QualityReport CRUD (extracted from scanner)
 │   │   │   ├── stocks.ts
 │   │   │   ├── news.ts
 │   │   │   ├── system.ts
