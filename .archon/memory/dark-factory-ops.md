@@ -9,13 +9,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Preview Stack
 
-- [PATTERN] Preview ports follow the formula `1{ISSUE_NUM_PADDED}XX` where `ISSUE_NUM_PADDED` is zero-padded to two digits and XX is the service suffix (33=frontend, 80=backend, 54=postgres, 63=redis). Example: issue #3 → frontend `:10333`, backend `:10380`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
-
 ## Container Root and Mounts
 
 - [PATTERN] Copy shared entrypoint scripts to `/entrypoint.sh` (outside `/app`) in `backend/Dockerfile` — not to `./entrypoint.sh` or `/app/entrypoint.sh`. The `docker-compose.override.yml` local-dev bind-mount `./backend:/app:ro` shadows the entire `/app` directory, so any file placed inside `/app` is invisible at runtime in dev; files outside `/app` are unaffected. <!-- issue:#289 date:2026-06-12 expires:2026-12-12 source:implement -->
-
-- [PATTERN] The dark factory container runs as the `factory` user (uid 1000) with `/workspace` as the working directory. The repo is cloned to `/workspace/markethawk`. Paths inside the container that start with `/opt/` (e.g. `/opt/refinement-skills/`) are read-only mounts from the host and are not git-tracked by the cloned repo. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 - [PATTERN] `.archon/commands/` files are read from the cloned repo at runtime (live — no image rebuild needed). `.claude/skills/refinement/` files are COPYed into the image as `/opt/refinement-skills/` at build time (requires `docker compose --profile factory build dark-factory` to pick up changes). New prompt files for pipeline agents go in `.claude/skills/refinement/`. <!-- issue:#162 date:2026-06-03 expires:2026-12-03 source:implement -->
 
@@ -60,6 +56,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] Profile-gated infra services (Caddy, forecaster, scheduler) follow the same restart pattern in `deploy.yml`: `docker compose --profile <name> up -d <service>`. Guard the Caddy step with `[ -n "${DOMAIN:-}" ]` so a missing `DOMAIN` emits a clear message rather than starting Caddy with an empty hostname. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
 
 - [PATTERN] `caddy/Caddyfile` must use `{$DOMAIN}` (no `:default` fallback) — adding `{$DOMAIN:localhost}` causes Caddy to silently serve via a self-signed local-CA cert on real deploys where `DOMAIN` is unset, producing broken TLS without an obvious error. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
+
+## Archon when: Expression Grammar
+
+- [PATTERN] Archon's `when:` parser supports simple equality (`$node.output == 'value'`), same-operator chains (`$a == 'x' && $b == 'y'`), but NOT parentheses or mixed `&&`/`||`. CI enforces this via `dark-factory/scripts/check_workflow_when.py` (called from the "Validate Archon workflow YAML" step in `.github/workflows/ci.yml`). Adding `(` `)` or mixing `&&` with `||` will fail CI. <!-- issue:#403 date:2026-06-14 expires:2026-12-14 source:implement -->
 
 ## DAG Trigger Rules
 

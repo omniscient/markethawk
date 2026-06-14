@@ -68,6 +68,19 @@ jobs:
               sys.exit(1)
           print('DAG trigger_rule check passed.')
 
+          # when: expression lint: reject parentheses and mixed &&/|| operators.
+          # Catches the class of regression from PR #359 (issue #397/403).
+          from check_workflow_when import check as when_check
+          when_errors = []
+          for path in sorted(glob.glob('.archon/workflows/*.yaml')):
+              when_errors.extend(when_check(path))
+          if when_errors:
+              print('Archon workflow when: expression lint failed:')
+              for e in when_errors:
+                  print(f'  {e}')
+              sys.exit(1)
+          print('when: expression lint passed for all workflow file(s).')
+
       - name: Dependency audit
         run: |
           pip install pip-audit
