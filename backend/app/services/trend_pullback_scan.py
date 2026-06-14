@@ -20,7 +20,12 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 from sqlalchemy.orm import Session
 
-from app.core.metrics import scan_duration_seconds, scanner_events_total
+from app.core.metrics import (
+    scan_duration_seconds,
+    scan_failed_tickers_ratio,
+    scan_last_success_timestamp,
+    scanner_events_total,
+)
 from app.models.stock_aggregate import StockAggregate
 from app.services.alert_service import save_event as _save_event
 from app.utils.session import get_market_today
@@ -369,6 +374,10 @@ async def run_trend_pullback_scan(
             }
         )
 
+    scan_last_success_timestamp.labels(scanner_type="trend_pullback").set(_time.time())
+    scan_failed_tickers_ratio.labels(scanner_type="trend_pullback").set(
+        counts["errors"] / max(1, len(tickers) * len(trading_days))
+    )
     scan_duration_seconds.labels(scanner_type="trend_pullback").observe(
         _time.monotonic() - _perf_start
     )

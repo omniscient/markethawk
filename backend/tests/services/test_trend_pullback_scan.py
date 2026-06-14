@@ -323,3 +323,41 @@ def test_severity_medium_otherwise():
         )
         == "medium"
     )
+
+
+def test_trend_pullback_observes_slo_metrics():
+    """scan_last_success_timestamp and scan_failed_tickers_ratio are set after a run."""
+    import asyncio
+    import time
+    from unittest.mock import MagicMock, patch
+
+    with (
+        patch("app.services.trend_pullback_scan.scanner_events_total"),
+        patch("app.services.trend_pullback_scan.scan_duration_seconds"),
+        patch(
+            "app.services.trend_pullback_scan.scan_last_success_timestamp"
+        ) as mock_ts,
+        patch(
+            "app.services.trend_pullback_scan.scan_failed_tickers_ratio"
+        ) as mock_ratio,
+        patch("app.services.trend_pullback_scan._get_daily_bars", return_value=[]),
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio_lbl = MagicMock()
+        mock_ratio.labels.return_value = mock_ratio_lbl
+
+        from app.services.trend_pullback_scan import run_trend_pullback_scan
+
+        asyncio.run(
+            run_trend_pullback_scan(
+                [], db=MagicMock(), start_date=_EVENT_DATE, end_date=_EVENT_DATE
+            )
+        )
+
+    mock_ts.labels.assert_called_with(scanner_type="trend_pullback")
+    mock_ts_lbl.set.assert_called_once()
+    assert abs(mock_ts_lbl.set.call_args[0][0] - time.time()) < 30
+    mock_ratio.labels.assert_called_with(scanner_type="trend_pullback")
+    mock_ratio_lbl.set.assert_called_once()
+    assert 0.0 <= mock_ratio_lbl.set.call_args[0][0] <= 1.0

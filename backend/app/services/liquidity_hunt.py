@@ -22,7 +22,12 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.core.metrics import scan_duration_seconds, scanner_events_total
+from app.core.metrics import (
+    scan_duration_seconds,
+    scan_failed_tickers_ratio,
+    scan_last_success_timestamp,
+    scanner_events_total,
+)
 from app.models.monitored_stock import MonitoredStock
 from app.models.stock_aggregate import StockAggregate
 from app.models.stock_split import StockSplit
@@ -630,6 +635,10 @@ async def run_liquidity_hunt_scan(
             }
         )
 
+    scan_last_success_timestamp.labels(scanner_type="liquidity_hunt").set(_time.time())
+    scan_failed_tickers_ratio.labels(scanner_type="liquidity_hunt").set(
+        counts["errors"] / max(1, len(tickers) * len(trading_days))
+    )
     scan_duration_seconds.labels(scanner_type="liquidity_hunt").observe(
         _time.monotonic() - _start
     )

@@ -8,7 +8,12 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 from sqlalchemy.orm import Session
 
-from app.core.metrics import scan_duration_seconds, scanner_events_total
+from app.core.metrics import (
+    scan_duration_seconds,
+    scan_failed_tickers_ratio,
+    scan_last_success_timestamp,
+    scanner_events_total,
+)
 from app.exceptions import DataFetchError, ProviderError, ScanError
 from app.models.stock_aggregate import StockAggregate
 from app.services.scan_orchestrator import ScannerDescriptor, register
@@ -207,6 +212,10 @@ async def run_oversold_bounce_scan(
         db.add(scanner_run)
 
     db.commit()
+    scan_last_success_timestamp.labels(scanner_type="oversold_bounce").set(_time.time())
+    scan_failed_tickers_ratio.labels(scanner_type="oversold_bounce").set(
+        len(failed) / max(1, len(tickers))
+    )
     scan_duration_seconds.labels(scanner_type="oversold_bounce").observe(
         _time.monotonic() - _start
     )

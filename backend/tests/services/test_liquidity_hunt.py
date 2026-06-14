@@ -738,3 +738,41 @@ def test_scan_fires_events_despite_high_regular_vol():
         )
 
     assert mock_save.call_count == 2  # pre + post both fire
+
+
+def test_liquidity_hunt_observes_slo_metrics():
+    """scan_last_success_timestamp and scan_failed_tickers_ratio are set after a run."""
+    import asyncio
+    import time
+    from datetime import date
+    from unittest.mock import MagicMock, patch
+
+    with (
+        patch("app.services.liquidity_hunt.scanner_events_total"),
+        patch("app.services.liquidity_hunt.scan_duration_seconds"),
+        patch("app.services.liquidity_hunt.scan_last_success_timestamp") as mock_ts,
+        patch("app.services.liquidity_hunt.scan_failed_tickers_ratio") as mock_ratio,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio_lbl = MagicMock()
+        mock_ratio.labels.return_value = mock_ratio_lbl
+
+        from app.services.liquidity_hunt import run_liquidity_hunt_scan
+
+        # tickers=[] skips the inner loop; explicit dates avoid get_market_today() call
+        asyncio.run(
+            run_liquidity_hunt_scan(
+                [],
+                db=MagicMock(),
+                start_date=date(2026, 1, 15),
+                end_date=date(2026, 1, 15),
+            )
+        )
+
+    mock_ts.labels.assert_called_with(scanner_type="liquidity_hunt")
+    mock_ts_lbl.set.assert_called_once()
+    assert abs(mock_ts_lbl.set.call_args[0][0] - time.time()) < 30
+    mock_ratio.labels.assert_called_with(scanner_type="liquidity_hunt")
+    mock_ratio_lbl.set.assert_called_once()
+    assert 0.0 <= mock_ratio_lbl.set.call_args[0][0] <= 1.0

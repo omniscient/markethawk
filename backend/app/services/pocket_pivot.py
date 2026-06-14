@@ -19,7 +19,12 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.core.metrics import scan_duration_seconds, scanner_events_total
+from app.core.metrics import (
+    scan_duration_seconds,
+    scan_failed_tickers_ratio,
+    scan_last_success_timestamp,
+    scanner_events_total,
+)
 from app.models.monitored_stock import MonitoredStock
 from app.models.stock_aggregate import StockAggregate
 from app.models.stock_split import StockSplit
@@ -359,6 +364,10 @@ async def run_pocket_pivot_scan(
             }
         )
 
+    scan_last_success_timestamp.labels(scanner_type="pocket_pivot").set(_time.time())
+    scan_failed_tickers_ratio.labels(scanner_type="pocket_pivot").set(
+        counts["errors"] / max(1, len(tickers) * len(trading_days))
+    )
     scan_duration_seconds.labels(scanner_type="pocket_pivot").observe(
         _time.monotonic() - _perf_start
     )
