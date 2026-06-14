@@ -5,6 +5,7 @@ Routers package.
 from app.routers.alerts import router as alerts_router
 from app.routers.auth import router as auth_router
 from app.routers.auto_trading import router as auto_trading_router
+from app.routers.backtest import router as backtest_router
 from app.routers.futures import router as futures_router
 from app.routers.health import router as health_router
 from app.routers.journal import router as journal_router
@@ -18,6 +19,7 @@ from app.routers.universe import router as universe_router
 from app.routers.watchlist import router as watchlist_router
 
 __all__ = [
+    "backtest_router",
     "health_router",
     "scanner_router",
     "universe_router",
