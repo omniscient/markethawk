@@ -103,7 +103,7 @@ def test_mixed_operators_rejected(tmp_path):
 
 def test_regression_pr359_expression_rejected(tmp_path):
     """The exact parenthesised expression from PR #359 that broke the factory must be caught."""
-    pr359_expr = "($parse-intent.output.intent == 'new') && $bench-mode-probe.output == 'live'"
+    pr359_expr = "($parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue') && $bench-mode-probe.output != 'stub'"
     nodes = [{"id": "implement", "when": pr359_expr}]
     path = _write_tmp(tmp_path, _make_workflow(nodes))
     errors = check(path)
