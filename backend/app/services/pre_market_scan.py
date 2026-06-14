@@ -572,7 +572,7 @@ async def run_pre_market_scan(
         )
         .scalar()
     )
-    if _max_bar_ts is not None:
+    if _max_bar_ts is not None and isinstance(_max_bar_ts, datetime):
         _bar_utc = (
             _max_bar_ts
             if _max_bar_ts.tzinfo
