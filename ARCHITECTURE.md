@@ -31,7 +31,8 @@ graph TD
     end
 
     subgraph factory["factory-network"]
-        proxy["docker-socket-proxy :2375"]
+        proxyfactory["docker-socket-proxy-factory :2375"]
+        proxyscheduler["docker-socket-proxy-scheduler :2375"]
         darkfactory["dark-factory (factory profile)"]
         scheduler["backlog-scheduler (scheduler profile)"]
     end
@@ -73,9 +74,10 @@ graph TD
     jaeger -->|OTLP| celery
     jaeger -->|OTLP| beat
 
-    proxy -->|":ro"| dockersock
-    darkfactory -->|"tcp :2375"| proxy
-    scheduler -->|"tcp :2375"| proxy
+    proxyfactory -->|":ro"| dockersock
+    proxyscheduler -->|":ro"| dockersock
+    darkfactory -->|"tcp :2375"| proxyfactory
+    scheduler -->|"tcp :2375"| proxyscheduler
 
     seqgelf -->|"GELF → HTTP"| seq
     forecastworker --> postgres
