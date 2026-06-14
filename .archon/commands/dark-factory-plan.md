@@ -189,13 +189,41 @@ If `conformance.enabled` is `false`, skip this phase entirely and proceed to Pha
    ```
    If `IS_DIRECT_TO_PR=yes`, prepend the following note to the "### Next Steps" section of the comment (replacing `$PLAN_GRACE` with the actual value):
    > ⏩ **Auto-advancing in ~`$PLAN_GRACE` min** unless you comment — the scheduler will move this to **Ready** automatically. Leave a comment to re-run the plan or redirect.
-4. Commit the plan
-5. Post a summary comment on the issue:
+4. Run the OOS gate — detect and revert any files committed outside the plan allowlist:
+   ```bash
+   ALLOWED_PREFIXES="docs/superpowers/plans/"
+   OOS_FILES=$(git diff --name-only origin/main HEAD 2>/dev/null | while read -r f; do
+     ALLOWED=false
+     for prefix in $ALLOWED_PREFIXES; do
+       case "$f" in "$prefix"*) ALLOWED=true; break;; esac
+     done
+     $ALLOWED || echo "$f"
+   done)
+   if [ -n "$OOS_FILES" ]; then
+     echo "OOS gate: excising out-of-scope files: $OOS_FILES"
+     for f in $OOS_FILES; do
+       if git show origin/main:"$f" > /dev/null 2>&1; then
+         git checkout origin/main -- "$f"
+       else
+         git rm -f --cached "$f" 2>/dev/null; rm -f "$f"
+       fi
+     done
+     git commit -m "chore: excise out-of-scope files from plan run (#$ISSUE_NUM)" --allow-empty
+     mkdir -p "$ARTIFACTS_DIR"
+     echo "$OOS_FILES" | while read -r f; do
+       echo "- $f: removed by plan OOS gate (should not have been created/modified)" >> "$ARTIFACTS_DIR/out-of-scope.md"
+     done
+   fi
+   ```
+5. Commit the plan
+6. Post a summary comment on the issue:
    ```
    ## Refinement Pipeline — Plan Generated
 
    **Plan:** [<plan-file-path>](https://github.com/omniscient/markethawk/blob/<BRANCH>/<plan-file-path>)
    **Branch:** [`<BRANCH>`](https://github.com/omniscient/markethawk/tree/<BRANCH>)
+   <!-- If OOS_FILES is non-empty, include this line: -->
+   > ⚠️ **OOS excision**: The following files were created outside the plan scope and were reverted before publishing: `$OOS_FILES`. Scope-spillover tickets may be filed automatically.
    **Tasks:** <count> tasks, <total-steps> steps
 
    ### Task Overview
@@ -232,7 +260,7 @@ If `conformance.enabled` is `false`, skip this phase entirely and proceed to Pha
    ---
    *Posted by MarketHawk Refinement Pipeline*
    ```
-7. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
+8. Write status to `$ARTIFACTS_DIR/refinement-status.md`:
    ```
    STATUS: PLAN_COMPLETE
    PLAN_PATH: <path>
