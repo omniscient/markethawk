@@ -202,6 +202,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `auto_trade_service.py` | `AutoTradeExecutor` — full auto-trade lifecycle (guard checks, sizing, IBKR submission). `approve_order(order, strategy, db)` handles paper vs. live approval. `cancel_order(order, db)` cancels via IBKR or marks paper cancelled. `get_account()` fetches IBKR account summary with graceful fallback. `get_stats(db, days)` computes P&L, win rate, and status breakdown. |
 | `stats.py` | Aggregate statistics helpers for dashboard metrics. |
 | `event_helpers.py` | Utility functions for `ScannerEvent` construction and querying. |
+| `alert_service.py` | `AlertRuleService` — rule matching (scanner type + severity + cooldown filters). `NotificationDispatcher` — fan-out to browser push / email / Google Chat / webhook channels; records `AlertDeliveryLog`. `save_event()` — centralized write path for scanner events: computes severity (`low`/`medium`/`high` enforced) and validates JSONB dicts (`indicators`, `criteria_met`, `enrichment`) are JSON-serializable before persisting. |
 | `statistical_discovery.py` | Pure-Python statistical analysis service: `build_feature_matrix`, `compute_correlations` (Pearson + Spearman), `compute_shap_weights` (LightGBM + SHAP), `run_kmeans`, `compute_conditional_stats`, `generate_label`. No DB dependencies; accepts DataFrames, returns typed dicts. |
 
 ### Providers (`app/providers/`)
