@@ -49,6 +49,7 @@ MarketHawk/
 │   │   │   ├── signal_review.py
 │   │   │   ├── monitored_account.py
 │   │   │   ├── tweet_signal.py
+│   │   │   ├── regime_model.py     (RegimeModel — serialised GaussianHMM + state label mapping)
 │   │   │   ├── user.py
 │   │   │   └── __init__.py
 │   │   ├── routers/
@@ -101,6 +102,7 @@ MarketHawk/
 │   │   │   ├── data_quality.py
 │   │   │   ├── stats.py
 │   │   │   ├── event_helpers.py
+│   │   │   ├── regime_service.py   (RegimeService — HMM train/persist/query; Redis regime cache)
 │   │   │   ├── statistical_discovery.py
 │   │   │   ├── signal_ranker.py
 │   │   │   ├── universe_orchestrator.py
@@ -122,6 +124,7 @@ MarketHawk/
 │   │   │   ├── test_health.py
 │   │   │   ├── test_journal.py
 │   │   │   ├── test_outcomes.py
+│   │   │   ├── test_outcomes_regime.py
 │   │   │   ├── test_scanner.py
 │   │   │   ├── test_stocks.py
 │   │   │   ├── test_universe.py
@@ -136,6 +139,7 @@ MarketHawk/
 │   │       ├── test_journal_service.py
 │   │       ├── test_normalization_helpers.py
 │   │       ├── test_outcome_service.py
+│   │       ├── test_regime_service.py
 │   │       └── test_split_adjustment.py
 │   ├── alembic.ini
 │   ├── requirements.txt
