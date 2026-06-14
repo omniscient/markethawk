@@ -108,5 +108,5 @@ def test_regression_pr359_expression_rejected(tmp_path):
     path = _write_tmp(tmp_path, _make_workflow(nodes))
     errors = check(path)
     assert errors, (
-        f"PR #359 regression: expected lint to catch parenthesised expression but got no errors"
+        "PR #359 regression: expected lint to catch parenthesised expression but got no errors"
     )

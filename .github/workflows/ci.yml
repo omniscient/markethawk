@@ -79,7 +79,7 @@ jobs:
               for e in when_errors:
                   print(f'  {e}')
               sys.exit(1)
-          print(f'when: expression lint passed for all workflow file(s).')
+          print('when: expression lint passed for all workflow file(s).')
 
       - name: Dependency audit
         run: |
