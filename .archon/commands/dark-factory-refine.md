@@ -16,6 +16,16 @@ If the issue has any of these labels, STOP immediately and exit with code 0 (not
 - `needs-discussion` — waiting for human input
 - `epic` — needs manual decomposition
 
+## SCOPE BOUNDARY
+
+This command's only authorized file outputs are:
+- Documents under `docs/superpowers/specs/` (the spec file)
+- Entries under `.archon/memory/` (optional architecture memory)
+
+Do NOT create or modify any other files. Do NOT implement code, write tests, or edit configuration.
+
+---
+
 ## Phase 1: LOAD
 
 1. Read `CLAUDE.md` for development rules, architecture, and conventions
