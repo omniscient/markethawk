@@ -114,9 +114,36 @@ Follow the process in `orchestrator-prompt.md`:
    - Open questions (non-blocking)
    - Assumptions (flagged)
 4. Self-review: placeholder scan, consistency check, scope check, ambiguity check. Fix inline.
-5. Commit the spec
+5. Run the OOS gate — detect and revert any files committed outside the refine allowlist:
+   ```bash
+   ALLOWED_PREFIXES="docs/superpowers/specs/ .archon/memory/"
+   OOS_FILES=$(git diff --name-only origin/main HEAD 2>/dev/null | while read -r f; do
+     ALLOWED=false
+     for prefix in $ALLOWED_PREFIXES; do
+       case "$f" in "$prefix"*) ALLOWED=true; break;; esac
+     done
+     $ALLOWED || echo "$f"
+   done)
+   if [ -n "$OOS_FILES" ]; then
+     echo "OOS gate: excising out-of-scope files: $OOS_FILES"
+     for f in $OOS_FILES; do
+       if git show origin/main:"$f" > /dev/null 2>&1; then
+         git checkout origin/main -- "$f"
+       else
+         git rm -f --cached "$f" 2>/dev/null; rm -f "$f"
+       fi
+     done
+     git commit -m "chore: excise out-of-scope files from refine run (#$ISSUE_NUM)" --allow-empty
+     mkdir -p "$ARTIFACTS_DIR"
+     echo "$OOS_FILES" | while read -r f; do
+       echo "- $f: removed by refine OOS gate (should not have been created/modified)" >> "$ARTIFACTS_DIR/out-of-scope.md"
+     done
+   fi
+   ```
+   Retain `$OOS_FILES` for use in the Phase 6 comment.
+6. Commit the spec
 
-6. Append memory entries to `.archon/memory/`:
+7. Append memory entries to `.archon/memory/`:
 
    **Expiry cleanup (run before appending to any file):**
    For each target memory file you are about to write, remove expired entries first:
@@ -199,6 +226,8 @@ Follow the process in `orchestrator-prompt.md`:
 
    **Spec:** [<spec-file-path>](https://github.com/omniscient/markethawk/blob/<BRANCH>/<spec-file-path>)
    **Branch:** [`<BRANCH>`](https://github.com/omniscient/markethawk/tree/<BRANCH>)
+   <!-- If OOS_FILES is non-empty, include this line: -->
+   > ⚠️ **OOS excision**: The following files were created outside the refine scope and were reverted before publishing: `$OOS_FILES`. Scope-spillover tickets may be filed automatically.
 
    ### Summary
    <2-3 sentence overview>
