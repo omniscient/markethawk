@@ -188,6 +188,9 @@ services:
     environment:
       REACT_APP_API_URL: http://localhost:8000
       VITE_API_TARGET: http://backend:8000
+      # Extra Host-header allowlist entries for the Vite dev server (comma-separated).
+      # Set in your local .env for reverse-proxy / tunnel / Tailscale hostnames.
+      VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-}
     depends_on:
       backend:
         condition: service_healthy
