@@ -40,7 +40,7 @@ async def stock_live_websocket(
         await websocket.accept()
         active_websocket_connections.inc()
         websocket_manager.subscribe(ticker)
-        queue = websocket_manager.register(channel)
+        queue = await websocket_manager.register(channel)
 
         logger.info(f"Client connected to {resolution} updates for {ticker}")
 
@@ -86,8 +86,8 @@ async def watchlist_live_websocket(
         active_websocket_connections.inc()
 
         # Register on both watchlist channels
-        live_queue = websocket_manager.register("watchlist:live_data")
-        alert_queue = websocket_manager.register("watchlist:alerts")
+        live_queue = await websocket_manager.register("watchlist:live_data")
+        alert_queue = await websocket_manager.register("watchlist:alerts")
 
         logger.info("Client connected to watchlist live stream")
 
