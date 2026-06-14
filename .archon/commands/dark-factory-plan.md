@@ -9,6 +9,16 @@ argument-hint: (no arguments - reads issue context from workflow)
 
 ---
 
+## SCOPE BOUNDARY
+
+This command's only authorized file outputs are:
+- Documents under `docs/superpowers/plans/` (the plan file)
+
+Do NOT create or modify any other files. Do NOT implement code, write tests, or edit configuration.
+Implementation belongs to the `Fix issue #N` workflow on a `feat/issue-N-*` branch.
+
+---
+
 ## Phase 1: LOAD
 
 1. Read `CLAUDE.md` for development rules, architecture, and conventions
