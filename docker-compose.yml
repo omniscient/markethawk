@@ -453,7 +453,7 @@ services:
       - stockscanner-network
     restart: unless-stopped
 
-  # Docker Socket Proxy (scheduler) — minimal verbs for backlog-scheduler: inspect/list/pull only
+  # Docker Socket Proxy (scheduler) — allows container lifecycle ops (create/run/stop/delete) via POST+CONTAINERS for `docker compose run`; BUILD/EXEC/NETWORKS/VOLUMES are denied
   docker-socket-proxy-scheduler:
     image: tecnativa/docker-socket-proxy:latest
     container_name: markethawk-docker-socket-proxy-scheduler

@@ -180,7 +180,7 @@ nodes:
       docker compose -p "mh-preview-${ISSUE}" down -v 2>/dev/null || echo "No preview stack found"
 
       # Assert no containers survive teardown
-      STALE=$(docker ps -a --filter "name=mh-preview-${ISSUE}" --format '{{.Names}}' 2>/dev/null || true)
+      STALE=$(docker ps -a --filter "label=com.docker.compose.project=mh-preview-${ISSUE}" --format '{{.Names}}' 2>/dev/null || true)
       if [ -n "$STALE" ]; then
         echo "ERROR: Stale preview containers remain after teardown:" >&2
         echo "$STALE" >&2
