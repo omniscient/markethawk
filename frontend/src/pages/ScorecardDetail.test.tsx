@@ -68,10 +68,6 @@ const noDataDefaults = () => {
 describe('ScorecardDetail — shell', () => {
   beforeEach(noDataDefaults);
 
-  it('renders without crashing', () => {
-    renderWithQuery(<ScorecardDetail />);
-  });
-
   it('shows period selector buttons', () => {
     renderWithQuery(<ScorecardDetail />);
     expect(screen.getByRole('button', { name: /7D/i })).toBeInTheDocument();
@@ -130,13 +126,12 @@ describe('ScorecardDetail — render branches', () => {
 describe('ScorecardDetail — period selector', () => {
   beforeEach(noDataDefaults);
 
-  it('marks ALL button active with bg-financial-blue after clicking it', () => {
+  it('marks ALL button aria-pressed=true after clicking it', () => {
     renderWithQuery(<ScorecardDetail />);
     const allButton = screen.getByRole('button', { name: /^ALL$/i });
     fireEvent.click(allButton);
-    expect(allButton.className).toContain('bg-financial-blue');
-    expect(screen.getByRole('button', { name: /^7D$/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^30D$/i })).toBeInTheDocument();
+    expect(allButton).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^30D$/i })).toHaveAttribute('aria-pressed', 'false');
   });
 });
 

@@ -34,10 +34,6 @@ describe('PreMarketMovers page', () => {
     mockFetchPreMarketMovers.mockResolvedValue(EMPTY_RESPONSE);
   });
 
-  it('renders without crashing', () => {
-    renderWithQuery(<PreMarketMovers />);
-  });
-
   it('shows loading spinner initially', () => {
     renderWithQuery(<PreMarketMovers />);
     expect(screen.getByText(/Loading/i)).toBeInTheDocument();
