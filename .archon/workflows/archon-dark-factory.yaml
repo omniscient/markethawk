@@ -179,6 +179,15 @@ nodes:
       echo "Tearing down mh-preview-${ISSUE}..."
       docker compose -p "mh-preview-${ISSUE}" down -v 2>/dev/null || echo "No preview stack found"
 
+      # Assert no containers survive teardown
+      STALE=$(docker ps -a --filter "name=mh-preview-${ISSUE}" --format '{{.Names}}' 2>/dev/null || true)
+      if [ -n "$STALE" ]; then
+        echo "ERROR: Stale preview containers remain after teardown:" >&2
+        echo "$STALE" >&2
+        exit 1
+      fi
+      echo "close-preview: teardown verified — no mh-preview-${ISSUE} containers remain"
+
       # Find the PR (branch includes a slug suffix, so use search prefix match)
       PR_NUM=$(gh pr list --search "head:feat/issue-${ISSUE}-" --json number --jq '.[0].number // empty')
       if [ -z "$PR_NUM" ]; then

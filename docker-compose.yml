@@ -453,10 +453,31 @@ services:
       - stockscanner-network
     restart: unless-stopped
 
-  # Docker Socket Proxy — restricts Docker API access for dark-factory and backlog-scheduler
-  docker-socket-proxy:
+  # Docker Socket Proxy (scheduler) — minimal verbs for backlog-scheduler: inspect/list/pull only
+  docker-socket-proxy-scheduler:
     image: tecnativa/docker-socket-proxy:latest
-    container_name: markethawk-docker-socket-proxy
+    container_name: markethawk-docker-socket-proxy-scheduler
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      POST: 1
+      NETWORKS: 0
+      VOLUMES: 0
+      BUILD: 0
+      SERVICES: 0
+      EXEC: 0
+      AUTH: 0
+      SECRETS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - factory-network
+
+  # Docker Socket Proxy (factory) — full verbs for dark-factory: build/exec/networks/volumes + EXEC fixes postgres-probe
+  docker-socket-proxy-factory:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: markethawk-docker-socket-proxy-factory
     restart: unless-stopped
     environment:
       CONTAINERS: 1
@@ -465,8 +486,8 @@ services:
       VOLUMES: 1
       BUILD: 1
       POST: 1
+      EXEC: 1
       SERVICES: 0
-      EXEC: 0
       AUTH: 0
       SECRETS: 0
     volumes:
@@ -485,12 +506,12 @@ services:
       - path: .archon/.env
         required: true
     environment:
-      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      DOCKER_HOST: tcp://docker-socket-proxy-factory:2375
       SEQ_URL: http://seq:5341
     volumes:
       - scheduler_state:/var/lib/dark-factory
     depends_on:
-      - docker-socket-proxy
+      - docker-socket-proxy-factory
     networks:
       - factory-network
       - stockscanner-network
@@ -516,9 +537,9 @@ services:
         required: true
     environment:
       FACTORY_IMAGE: "ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}"
-      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      DOCKER_HOST: tcp://docker-socket-proxy-scheduler:2375
     depends_on:
-      - docker-socket-proxy
+      - docker-socket-proxy-scheduler
     # Bind-mount (.:/workspace/project:ro) is restored in docker-compose.override.yml for local dev.
     volumes:
       - scheduler_state:/var/lib/dark-factory

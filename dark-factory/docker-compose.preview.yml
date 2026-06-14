@@ -11,7 +11,7 @@ services:
     environment:
       POSTGRES_DB: stockscanner
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: preview_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-preview_password}
     ports:
       - "1${ISSUE_NUM_PADDED:-00}54:5432"
     volumes:
@@ -43,14 +43,14 @@ services:
       context: ../backend
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://postgres:preview_password@postgres:5432/stockscanner
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-preview_password}@postgres:5432/stockscanner
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       LOG_LEVEL: INFO
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       # Dev-only throwaway key (>=32 chars) so the JWT_SECRET_KEY startup validator (#190)
       # is satisfied. NOT a real secret — preview stacks are ephemeral and network-isolated.
-      JWT_SECRET_KEY: preview-only-not-secret-0123456789abcdef
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-preview-only-not-secret-0123456789abcdef}
     ports:
       - "1${ISSUE_NUM_PADDED:-00}80:8000"
     depends_on:
@@ -86,13 +86,13 @@ services:
       dockerfile: Dockerfile
     command: celery -A app.core.celery_app:celery_app worker --loglevel=info
     environment:
-      DATABASE_URL: postgresql://postgres:preview_password@postgres:5432/stockscanner
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-preview_password}@postgres:5432/stockscanner
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       LOG_LEVEL: INFO
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       # Dev-only throwaway key (>=32 chars) — see backend service note above.
-      JWT_SECRET_KEY: preview-only-not-secret-0123456789abcdef
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-preview-only-not-secret-0123456789abcdef}
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,7 +109,7 @@ services:
     entrypoint: >
       sh -c "for f in /seed/*.sql; do
         echo \"Running $$f...\";
-        PGPASSWORD=preview_password psql -h postgres -U postgres -d stockscanner -f \"$$f\";
+        PGPASSWORD=${POSTGRES_PASSWORD:-preview_password} psql -h postgres -U postgres -d stockscanner -f \"$$f\";
       done && echo 'All seed modules loaded'"
     depends_on:
       backend:
