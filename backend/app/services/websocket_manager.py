@@ -2,7 +2,8 @@ import asyncio
 import json
 import logging
 import threading
-from typing import Any, Dict, Optional, Set
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set
 
 import redis.asyncio as aioredis
 from polygon import WebSocketClient
@@ -40,6 +41,8 @@ class StockWebSocketManager:
         self._loop = None
         self._initialized = True
         self._connected = False
+        # Fan-out registry: channel -> list of asyncio.Queue instances (one per subscriber)
+        self._fan_out_subscribers: Dict[str, List[asyncio.Queue]] = defaultdict(list)
 
     async def _get_redis(self):
         if self.redis_client is None:
@@ -83,9 +86,13 @@ class StockWebSocketManager:
     ):
         try:
             redis = await self._get_redis()
-            # Channel format supports specific resolution subscriptions
             channel = f"stock_updates:{ticker}:{resolution}"
-            await redis.publish(channel, json.dumps(payload))
+            data = json.dumps(payload)
+            await redis.publish(channel, data)
+            # Also push to in-process fan-out subscribers (ticker route)
+            await self.fan_out(channel, data)
+            # Watchlist subscribers receive all ticker updates
+            await self.fan_out("watchlist:live_data", data)
         except Exception as e:
             logger.error(f"Error publishing to Redis: {e}")
 
@@ -140,6 +147,40 @@ class StockWebSocketManager:
         # Note: We might want a reference counter here if multiple clients watch the same ticker
         # For simplicity, we'll just keep it subscribed for now, or implement a basic TTL
         pass
+
+    # ── Fan-out registry ────────────────────────────────────────────────────
+
+    def register(self, channel: str) -> asyncio.Queue:
+        """Register a new subscriber queue for *channel*.
+
+        Returns a per-subscriber asyncio.Queue(maxsize=100).  The caller should
+        call unregister(channel, queue) when done.
+        """
+        q: asyncio.Queue = asyncio.Queue(maxsize=100)
+        self._fan_out_subscribers[channel].append(q)
+        return q
+
+    def unregister(self, channel: str, queue: asyncio.Queue) -> None:
+        """Remove *queue* from the fan-out registry for *channel*."""
+        try:
+            self._fan_out_subscribers[channel].remove(queue)
+        except ValueError:
+            pass
+        if not self._fan_out_subscribers[channel]:
+            del self._fan_out_subscribers[channel]
+
+    async def fan_out(self, channel: str, message: str) -> None:
+        """Publish *message* to all queues registered for *channel*.
+
+        Drops the message for any subscriber whose queue is full (backpressure).
+        """
+        for q in list(self._fan_out_subscribers.get(channel, [])):
+            try:
+                q.put_nowait(message)
+            except asyncio.QueueFull:
+                logger.warning(
+                    f"Fan-out queue full for channel {channel}, dropping message"
+                )
 
 
 # Global instance
