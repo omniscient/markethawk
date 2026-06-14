@@ -3,13 +3,19 @@ Tests for AlertRuleService — rule matching, cooldown logic, and delivery dispa
 """
 
 from datetime import date, datetime, timedelta, timezone
+from unittest.mock import patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.scanner_event import ScannerEvent
-from app.services.alert_service import AlertRuleService
+from app.services.alert_service import (
+    AlertRuleService,
+    _validate_jsonb_dict,
+    save_event,
+)
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
@@ -134,3 +140,79 @@ def test_cooldown_expired_returns_false(db: Session):
     db.add(log)
     db.flush()
     assert AlertRuleService.is_on_cooldown(rule, "AAPL", db) is False
+
+
+# ── _validate_jsonb_dict ──────────────────────────────────────────────────
+
+
+def test_validate_jsonb_dict_accepts_plain_dict():
+    _validate_jsonb_dict({"key": "value", "num": 1}, "field")
+
+
+def test_validate_jsonb_dict_rejects_non_dict():
+    with pytest.raises(ValueError, match="must be a dict"):
+        _validate_jsonb_dict(["not", "a", "dict"], "field")
+
+
+def test_validate_jsonb_dict_rejects_datetime_value():
+    from datetime import datetime
+
+    with pytest.raises(ValueError, match="non-JSON-serializable"):
+        _validate_jsonb_dict({"ts": datetime(2026, 1, 1)}, "field")
+
+
+def test_validate_jsonb_dict_rejects_decimal_value():
+    from decimal import Decimal
+
+    with pytest.raises(ValueError, match="non-JSON-serializable"):
+        _validate_jsonb_dict({"amount": Decimal("1.23")}, "field")
+
+
+# ── save_event validation ─────────────────────────────────────────────────
+
+
+def test_save_event_rejects_invalid_severity(db: Session):
+    with patch(
+        "app.services.event_helpers.compute_event_severity", return_value="critical"
+    ):
+        with pytest.raises(ValueError, match="Invalid severity"):
+            save_event(
+                db,
+                ticker="AAPL",
+                event_date=date.today(),
+                scanner_type="pre_market_volume_spike",
+                indicators={"relative_volume": 5.0},
+                criteria_met={},
+                enrichment={},
+            )
+
+
+def test_save_event_rejects_non_serializable_indicators(db: Session):
+    from datetime import datetime
+
+    with pytest.raises(ValueError, match="non-JSON-serializable"):
+        save_event(
+            db,
+            ticker="AAPL",
+            event_date=date.today(),
+            scanner_type="pre_market_volume_spike",
+            indicators={"ts": datetime(2026, 1, 1)},
+            criteria_met={},
+            enrichment={},
+        )
+
+
+@patch("app.services.alert_service.trigger_scanner_alert")
+def test_save_event_accepts_valid_payload(mock_trigger, db: Session):
+    result = save_event(
+        db,
+        ticker="AAPL",
+        event_date=date.today(),
+        scanner_type="pre_market_volume_spike",
+        indicators={"relative_volume": 5.0},
+        criteria_met={"volume_ok": True},
+        enrichment={"source": "test"},
+    )
+    assert "id" in result
+    assert result["ticker"] == "AAPL"
+    mock_trigger.assert_called_once_with(result["id"])

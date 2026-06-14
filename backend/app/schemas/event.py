@@ -4,11 +4,13 @@ Scanner Event Pydantic schemas.
 
 import uuid
 from datetime import date, datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.signal_review import SignalReviewResponse
+
+SeverityLiteral = Literal["low", "medium", "high"]
 
 
 class ScannerEventResponse(BaseModel):
@@ -21,7 +23,7 @@ class ScannerEventResponse(BaseModel):
     scanner_type: str
 
     summary: Optional[str] = None
-    severity: Optional[str] = "medium"
+    severity: Optional[SeverityLiteral] = "medium"
 
     previous_close: Optional[float] = None
     opening_price: Optional[float] = None
@@ -50,6 +52,6 @@ class ScannerEventSummary(BaseModel):
     event_date: date
     scanner_type: str
     summary: Optional[str] = None
-    severity: Optional[str] = "medium"
+    severity: Optional[SeverityLiteral] = "medium"
 
     model_config = ConfigDict(from_attributes=True)

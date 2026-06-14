@@ -203,6 +203,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `stats.py` | Aggregate statistics helpers for dashboard metrics. |
 | `event_helpers.py` | Utility functions for `ScannerEvent` construction and querying. |
 | `backtest_service.py` | Daily-bar replay engine. `_simulate_trade()` — pure function; simulates one position with conservative intrabar rule (both stop and target hit on same bar → stop wins), market/limit entry, stop/target/time-stop/delisting exits. `run_backtest_logic()` — orchestrates signal sourcing (existing ScannerEvents first, in-memory scanner fallback), bar-presence-based ticker eligibility (survivorship-bias avoidance), `_compute_stats()` for aggregate metrics. |
+| `alert_service.py` | `AlertRuleService` — rule matching (scanner type + severity + cooldown filters). `NotificationDispatcher` — fan-out to browser push / email / Google Chat / webhook channels; records `AlertDeliveryLog`. `save_event()` — centralized write path for scanner events: computes severity (`low`/`medium`/`high` enforced) and validates JSONB dicts (`indicators`, `criteria_met`, `enrichment`) are JSON-serializable before persisting. |
 | `statistical_discovery.py` | Pure-Python statistical analysis service: `build_feature_matrix`, `compute_correlations` (Pearson + Spearman), `compute_shap_weights` (LightGBM + SHAP), `run_kmeans`, `compute_conditional_stats`, `generate_label`. No DB dependencies; accepts DataFrames, returns typed dicts. |
 
 ### Providers (`app/providers/`)
