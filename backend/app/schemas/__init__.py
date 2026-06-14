@@ -4,6 +4,7 @@ Pydantic schemas package.
 
 from app.schemas.auto_trade import AutoTradeOrderResponse, TradingStrategyResponse
 from app.schemas.event import ScannerEventResponse, ScannerEventSummary
+from app.schemas.regime import RegimeBreakdownResponse, RegimeSliceSchema
 from app.schemas.scanner import (
     ClearEventsResponse,
     PreMarketMover,
@@ -46,4 +47,6 @@ __all__ = [
     "ScannerRangeRequest",
     "ScannerStatusBlockResponse",
     "ClearEventsResponse",
+    "RegimeSliceSchema",
+    "RegimeBreakdownResponse",
 ]
