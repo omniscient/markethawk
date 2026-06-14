@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     # Must be a mailto: or https: URL identifying the push sender
     VAPID_CLAIMS_EMAIL: str = "mailto:admin@example.com"
 
+    # Scanner SLO thresholds — documented in ENV_VARIABLES.md
+    SCAN_DURATION_SLO_SECONDS: int = 120
+    SCAN_STALENESS_SLO_SECONDS: int = 900
+
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:

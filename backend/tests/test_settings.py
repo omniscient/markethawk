@@ -132,3 +132,29 @@ class TestCorsOrigins:
 
         source = inspect.getsource(config)
         assert "load_dotenv" not in source
+
+
+def test_scan_slo_defaults():
+    """SCAN_DURATION_SLO_SECONDS and SCAN_STALENESS_SLO_SECONDS default to spec values."""
+    from app.core.config import Settings
+
+    s = Settings(
+        DATABASE_URL="postgresql://test:test@localhost/test",
+        POLYGON_API_KEY="test-key",
+    )
+    assert s.SCAN_DURATION_SLO_SECONDS == 120
+    assert s.SCAN_STALENESS_SLO_SECONDS == 900
+
+
+def test_scan_slo_overridable():
+    """SLO fields must accept int overrides from init kwargs."""
+    from app.core.config import Settings
+
+    s = Settings(
+        DATABASE_URL="postgresql://test:test@localhost/test",
+        POLYGON_API_KEY="test-key",
+        SCAN_DURATION_SLO_SECONDS=60,
+        SCAN_STALENESS_SLO_SECONDS=600,
+    )
+    assert s.SCAN_DURATION_SLO_SECONDS == 60
+    assert s.SCAN_STALENESS_SLO_SECONDS == 600
