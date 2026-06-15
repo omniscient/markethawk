@@ -35,6 +35,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When scheduler.sh defers `read_config()` until after the `SCHEDULER_SOURCE_ONLY` guard, every bash test file that sources scheduler.sh (`SCHEDULER_SOURCE_ONLY=1 source "$SCHED"`) must explicitly `export VAR=value` for all config-driven policy vars before sourcing — otherwise helper functions that reference those vars fail with `set -u` unbound-variable errors. The canonical list is in `test_scheduler.sh`'s pre-source export block. <!-- issue:#338 date:2026-06-13 expires:2026-12-13 source:implement -->
 
+- [PATTERN] In `test_scheduler.sh`, `$STUB_LOG` captures only calls to stubbed external commands (`gh`, `docker`, `set_board_status`). Scheduler functions that emit log lines via `echo` write to stdout — to assert on these in a test, capture the function's output with `_OUTPUT=$(fn_name args 2>&1) && _RET=0 || _RET=1` and grep `$_OUTPUT`, not `$STUB_LOG`. <!-- issue:#389 date:2026-06-15 expires:2026-12-15 source:implement -->
+
 ## Scheduler Architecture
 
 - [PATTERN] All `dispatch()` call sites in `scheduler.sh` must use `if dispatch ...; then ... fi` guards. A bare `dispatch "..."` under `set -e` exits the daemon on non-zero return, which triggers `restart: unless-stopped` and wipes the retry counter — the root cause of the #159 loop. <!-- issue:#160 date:2026-06-03 expires:2026-12-03 source:implement -->
