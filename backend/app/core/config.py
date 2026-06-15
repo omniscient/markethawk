@@ -22,8 +22,9 @@ class Settings(BaseSettings):
     POLYGON_DELAYED: bool = True
     LIVE_WEBSOCKET_ENABLED: bool = True
 
-    # Redis / Celery
-    REDIS_PASSWORD: str = ""
+    # Redis / Celery - REDIS_PASSWORD is REQUIRED (no default): an omitted value
+    # must fail startup, not silently fall back to an unauthenticated URL (F-NET-01).
+    REDIS_PASSWORD: str
     REDIS_URL: str = "redis://redis:6379/0"
     RATE_LIMITING_ENABLED: bool = True
 
@@ -159,6 +160,12 @@ class Settings(BaseSettings):
     @field_validator("REDIS_PASSWORD")
     @classmethod
     def validate_redis_password(cls, v: str) -> str:
+        if not v:
+            raise ValueError(
+                "REDIS_PASSWORD is required — Redis runs with requirepass and an "
+                "unauthenticated connection is refused. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(24))'"
+            )
         if len(v) < 16:
             raise ValueError(
                 "REDIS_PASSWORD must be at least 16 characters. "

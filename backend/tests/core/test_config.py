@@ -65,6 +65,21 @@ def test_redis_password_empty_raises_validation_error():
         Settings(REDIS_PASSWORD="")
 
 
+def test_redis_password_is_required_field():
+    """F-NET-01: REDIS_PASSWORD must be a required field with no default, so an
+    omitted value cannot silently fall back to an unauthenticated REDIS_URL."""
+    assert Settings.model_fields["REDIS_PASSWORD"].is_required()
+
+
+def test_redis_password_omitted_raises_validation_error(monkeypatch):
+    """The real F-NET-01 hole: with REDIS_PASSWORD absent from the environment,
+    constructing Settings must raise rather than boot with the unauthenticated
+    fallback URL. (_env_file=None makes this deterministic regardless of any .env.)"""
+    monkeypatch.delenv("REDIS_PASSWORD", raising=False)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
 def test_redis_url_built_with_authenticated_form():
     s = Settings(REDIS_PASSWORD="a" * 16)
     assert f":{'a' * 16}@" in s.REDIS_URL
