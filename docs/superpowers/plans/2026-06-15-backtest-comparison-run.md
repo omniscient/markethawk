@@ -1068,7 +1068,7 @@ Celery workers healthy (`docker-compose ps celery-worker`).
 ## Step 6.1 — Run the comparison script
 
 ```bash
-# Without the :ro override so the container can write files
+# Without the :ro override so the container can write files into the baked image layer
 docker-compose -f docker-compose.yml exec backend \
   python scripts/run_backtest_comparison.py
 # Expected output (may take 10–30 min depending on history coverage):
@@ -1083,9 +1083,22 @@ docker-compose -f docker-compose.yml exec backend \
 #   Written: /app/docs/backtest/comparison-<end_date>.md
 ```
 
-## Step 6.2 — Verify the output file was created
+## Step 6.2 — Copy the output file from the container to the host
+
+The baked-image stack has no docs bind-mount, so the file lives inside the container layer.
+Copy it to the host repo before verifying or committing:
 
 ```bash
+# Identify the backend container name
+CONTAINER=$(docker-compose -f docker-compose.yml ps -q backend)
+
+# Create the host directory if absent
+mkdir -p backend/docs/backtest
+
+# Copy the comparison file(s) out of the container
+docker cp "${CONTAINER}:/app/docs/backtest/." backend/docs/backtest/
+
+# Verify
 ls backend/docs/backtest/
 # Expected: comparison-<end_date>.md present
 
