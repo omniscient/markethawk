@@ -714,6 +714,19 @@ else
   echo "[$(date -u +%FT%TZ)] probe=image_ok image=${FACTORY_IMAGE}"
 fi
 
+# --- Startup: warn if stale preview containers exist (non-blocking) ---
+STALE_PREVIEW_WARN_COUNT="${STALE_PREVIEW_WARN_COUNT:-3}"
+# Validate that STALE_PREVIEW_WARN_COUNT is numeric; reset to default if not to avoid
+# integer comparison errors under set -euo pipefail.
+if ! [[ "$STALE_PREVIEW_WARN_COUNT" =~ ^[0-9]+$ ]]; then
+  echo "[$(date -u +%FT%TZ)] WARNING: STALE_PREVIEW_WARN_COUNT='${STALE_PREVIEW_WARN_COUNT}' is not a non-negative integer; resetting to default 3." >&2
+  STALE_PREVIEW_WARN_COUNT=3
+fi
+STALE_COUNT=$(docker ps -a --filter "name=mh-preview-" --format '{{.Names}}' 2>/dev/null | wc -l | tr -d ' ')
+if [ "$STALE_COUNT" -gt "$STALE_PREVIEW_WARN_COUNT" ]; then
+  echo "[$(date -u +%FT%TZ)] WARNING: $STALE_COUNT stale mh-preview-* containers found (threshold: ${STALE_PREVIEW_WARN_COUNT}). Run 'docker ps -a --filter name=mh-preview-' to inspect and clean up." >&2
+fi
+
 # --- Main loop ---
 echo "Backlog scheduler started (poll every ${POLL_INTERVAL}s)"
 

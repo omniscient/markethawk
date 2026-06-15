@@ -2,7 +2,8 @@ import asyncio
 import json
 import logging
 import threading
-from typing import Any, Dict, Optional, Set
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set
 
 import redis.asyncio as aioredis
 from polygon import WebSocketClient
@@ -40,6 +41,10 @@ class StockWebSocketManager:
         self._loop = None
         self._initialized = True
         self._connected = False
+        # Fan-out registry: channel -> list of asyncio.Queue instances (one per subscriber)
+        self._fan_out_subscribers: Dict[str, List[asyncio.Queue]] = defaultdict(list)
+        # Background Redis-subscriber tasks: channel -> Task (one per active channel)
+        self._fan_out_tasks: Dict[str, asyncio.Task] = {}
 
     async def _get_redis(self):
         if self.redis_client is None:
@@ -83,9 +88,9 @@ class StockWebSocketManager:
     ):
         try:
             redis = await self._get_redis()
-            # Channel format supports specific resolution subscriptions
             channel = f"stock_updates:{ticker}:{resolution}"
-            await redis.publish(channel, json.dumps(payload))
+            data = json.dumps(payload)
+            await redis.publish(channel, data)
         except Exception as e:
             logger.error(f"Error publishing to Redis: {e}")
 
@@ -140,6 +145,78 @@ class StockWebSocketManager:
         # Note: We might want a reference counter here if multiple clients watch the same ticker
         # For simplicity, we'll just keep it subscribed for now, or implement a basic TTL
         pass
+
+    # ── Fan-out registry ────────────────────────────────────────────────────
+
+    async def register(self, channel: str) -> asyncio.Queue:
+        """Register a new subscriber queue for *channel*.
+
+        Returns a per-subscriber asyncio.Queue(maxsize=100). Starts a Redis
+        pubsub subscriber background task for the channel on first registration
+        so that messages published by any process (including the live-scanner
+        container) are delivered to all in-process queues.  The caller must
+        call unregister(channel, queue) when done.
+        """
+        q: asyncio.Queue = asyncio.Queue(maxsize=100)
+        self._fan_out_subscribers[channel].append(q)
+        if channel not in self._fan_out_tasks:
+            self._fan_out_tasks[channel] = asyncio.create_task(
+                self._fan_out(channel), name=f"fan_out:{channel}"
+            )
+        return q
+
+    def unregister(self, channel: str, queue: asyncio.Queue) -> None:
+        """Remove *queue* from the fan-out registry for *channel*.
+
+        Cancels the Redis subscriber background task when the last subscriber leaves.
+        """
+        try:
+            self._fan_out_subscribers[channel].remove(queue)
+        except ValueError:
+            pass
+        if not self._fan_out_subscribers[channel]:
+            if channel in self._fan_out_subscribers:
+                del self._fan_out_subscribers[channel]
+            task = self._fan_out_tasks.pop(channel, None)
+            if task and not task.done():
+                task.cancel()
+
+    async def _fan_out(self, channel: str) -> None:
+        """Background task: subscribe to *channel* on Redis and fan out to in-process queues.
+
+        Runs for the lifetime of any subscriber on the channel. Cancelled by
+        unregister() when the last subscriber leaves.
+        """
+        redis = await self._get_redis()
+        pubsub = redis.pubsub()
+        await pubsub.subscribe(channel)
+        try:
+            while True:
+                msg = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=1.0
+                )
+                if msg:
+                    data = msg["data"]
+                    dead = []
+                    for q in list(self._fan_out_subscribers.get(channel, [])):
+                        try:
+                            q.put_nowait(data)
+                        except asyncio.QueueFull:
+                            logger.warning(
+                                f"Fan-out queue full for channel {channel}, dropping message"
+                            )
+                            dead.append(q)
+                    for q in dead:
+                        try:
+                            self._fan_out_subscribers[channel].remove(q)
+                        except ValueError:
+                            pass
+                await asyncio.sleep(0.01)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await pubsub.unsubscribe(channel)
+            await pubsub.aclose()
 
 
 # Global instance

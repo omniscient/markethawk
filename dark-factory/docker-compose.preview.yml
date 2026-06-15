@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: stockscanner
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: preview_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-preview_password}
     ports:
       - "1${ISSUE_NUM_PADDED:-00}54:5432"
     volumes:
@@ -60,8 +60,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       LOG_LEVEL: INFO
-      # Dev-only throwaway key (>=32 chars) — satisfies the JWT_SECRET_KEY startup validator
-      # (#190) that alembic env.py triggers when it imports app settings.
+      # alembic env.py imports the app Settings, whose validator requires these fields.
+      # Must mirror the backend service's env or `alembic upgrade head` aborts before migrating.
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      # Dev-only throwaway key (>=32 chars) — satisfies the JWT_SECRET_KEY startup validator (#190).
       JWT_SECRET_KEY: preview-only-not-secret-0123456789abcdef
     depends_on:
       postgres:
@@ -73,14 +75,14 @@ services:
   backend:
     image: ${PREVIEW_BACKEND_IMAGE:-mh-preview-backend:latest}
     environment:
-      DATABASE_URL: postgresql://postgres:preview_password@postgres:5432/stockscanner
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-preview_password}@postgres:5432/stockscanner
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       LOG_LEVEL: INFO
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       # Dev-only throwaway key (>=32 chars) so the JWT_SECRET_KEY startup validator (#190)
       # is satisfied. NOT a real secret — preview stacks are ephemeral and network-isolated.
-      JWT_SECRET_KEY: preview-only-not-secret-0123456789abcdef
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-preview-only-not-secret-0123456789abcdef}
     ports:
       - "1${ISSUE_NUM_PADDED:-00}80:8000"
     depends_on:
@@ -114,13 +116,13 @@ services:
     image: ${PREVIEW_BACKEND_IMAGE:-mh-preview-backend:latest}
     command: celery -A app.core.celery_app:celery_app worker --loglevel=info
     environment:
-      DATABASE_URL: postgresql://postgres:preview_password@postgres:5432/stockscanner
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-preview_password}@postgres:5432/stockscanner
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       LOG_LEVEL: INFO
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       # Dev-only throwaway key (>=32 chars) — see backend service note above.
-      JWT_SECRET_KEY: preview-only-not-secret-0123456789abcdef
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-preview-only-not-secret-0123456789abcdef}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -139,7 +141,7 @@ services:
     entrypoint: >
       sh -c "for f in /seed/*.sql; do
         echo \"Running $$f...\";
-        PGPASSWORD=preview_password psql -h postgres -U postgres -d stockscanner -f \"$$f\";
+        PGPASSWORD=${POSTGRES_PASSWORD:-preview_password} psql -h postgres -U postgres -d stockscanner -f \"$$f\";
       done && echo 'All seed modules loaded'"
     depends_on:
       backend:

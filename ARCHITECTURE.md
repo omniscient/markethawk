@@ -31,7 +31,8 @@ graph TD
     end
 
     subgraph factory["factory-network"]
-        proxy["docker-socket-proxy :2375"]
+        proxyfactory["docker-socket-proxy-factory :2375"]
+        proxyscheduler["docker-socket-proxy-scheduler :2375"]
         darkfactory["dark-factory (factory profile)"]
         scheduler["backlog-scheduler (scheduler profile)"]
         buildkit["buildkit :1234 (factory/scheduler profiles)"]
@@ -74,10 +75,11 @@ graph TD
     jaeger -->|OTLP| celery
     jaeger -->|OTLP| beat
 
-    proxy -->|":ro"| dockersock
-    darkfactory -->|"tcp :2375"| proxy
+    proxyfactory -->|":ro"| dockersock
+    proxyscheduler -->|":ro"| dockersock
+    darkfactory -->|"tcp :2375"| proxyfactory
     darkfactory -->|"buildx tcp :1234"| buildkit
-    scheduler -->|"tcp :2375"| proxy
+    scheduler -->|"tcp :2375"| proxyscheduler
 
     seqgelf -->|"GELF → HTTP"| seq
     forecastworker --> postgres
@@ -154,6 +156,7 @@ sequenceDiagram
 | `error_tracking.py` | `ErrorTracker` protocol; `SeqErrorTracker` and `StdoutErrorTracker` implementations; MD5-based `ErrorId` generation. |
 | `rate_limits.py` | SlowAPI `limiter` instance + four tier constants: `GLOBAL_LIMIT` (100/min), `SCANNER_LIMIT` (5/min), `TRADING_LIMIT` (10/min), `AUTH_LIMIT` (5/min). Lives in `core/` (not `main.py`) to break the circular import from routers importing `limiter`. Redis db 1 storage when `RATE_LIMITING_ENABLED=true`. |
 | `cache.py` | Application-level Redis caching. `get_redis()` — process-scoped `@lru_cache` singleton (sync `redis.Redis`, fast-fail timeouts). `get_cached(key, ttl, fn)` — read-through helper; transparent on Redis failure. `invalidate(key)`, `invalidate_pattern(pattern)` — cache busting. `@cache_response(key, ttl)` — convenience decorator for parameter-less GETs. All keys use `mh:` prefix. Applied to six hot endpoints: `scanner/types` (1h), `scanner/configs` (5min), `system/status` (30s), `system/storage` (5min), `universe/list` (1min), `stocks/details/{ticker}` (60s). |
+| `ws_limits.py` | In-process WebSocket connection counters. `ws_connection_slot(user_id)` — async context manager that enforces per-user (`WS_MAX_CONNECTIONS_PER_USER`, default 10) and global (`WS_MAX_CONNECTIONS_GLOBAL`, default 100) caps via `defaultdict(int)` counters; raises `WebSocketException(1008)` before `accept()` when a cap is reached. Single-process only — for multi-replica deployments, replace with Redis-backed atomics. |
 
 ### Exception Hierarchy (`app/exceptions.py`)
 
@@ -198,7 +201,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `futures_series.py` | Continuous series assembly extracted from `FuturesDataService`. `FutureSeriesService.get_continuous_series(symbol, ...)` — self-managed session, calls `_get_continuous_series_with_db`. `_get_continuous_series_with_db(db, symbol, ...)` — queries `FuturesRollover` + `FuturesContract`, builds time slices, stitches per-slice SQL queries into a deduplicated `pd.DataFrame`. |
 | `chart_indicators.py` | Technical indicator computation (e.g., VWAP, moving averages) for chart endpoints. |
 | `journal_service.py` | Trade journal CRUD operations. |
-| `websocket_manager.py` | WebSocket connection pool; `broadcast()` to all connected clients. |
+| `websocket_manager.py` | Polygon.io WebSocket manager (singleton). Maintains a live subscription to Polygon's feed; publishes updates to Redis pub/sub channels (`stock_updates:{ticker}:{resolution}`, `watchlist:live_data`). Also exposes an in-process fan-out registry (`register`/`unregister`/`fan_out`) used by the ticker and watchlist WS handlers to avoid per-connection Redis subscriptions. |
 | `normalization.py` | Data normalization helpers (price/volume units, split adjustments). |
 | `data_quality.py` | Quality checks and `UniverseQualityReport` generation. |
 | `auto_trade_service.py` | `AutoTradeExecutor` — full auto-trade lifecycle (guard checks, sizing, IBKR submission). `approve_order(order, strategy, db)` handles paper vs. live approval. `cancel_order(order, db)` cancels via IBKR or marks paper cancelled. `get_account()` fetches IBKR account summary with graceful fallback. `get_stats(db, days)` computes P&L, win rate, and status breakdown. |
@@ -225,7 +228,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `universe.py` | `/api/v1/universe/*` — CRUD for stock universes and memberships |
 | `stocks.py` | `/api/v1/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/v1/news/*` — news articles and preferences |
-| `live_data.py` | `/api/v1/live/ws/{ticker}/{resolution}` — per-symbol WebSocket; `/api/v1/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts) |
+| `live_data.py` | `/api/v1/live/ws/{ticker}/{resolution}` — per-symbol WebSocket (shared fan-out via `websocket_manager`); `/api/v1/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts, shared fan-out); `/api/v1/live/ws/scan-task/{task_id}` — Celery task progress stream. All three endpoints enforce per-user/global connection caps, idle (5 min) and lifetime (8 h) timeouts, and Origin validation. |
 | `futures.py` | `/api/v1/futures/*` — `GET /history/{symbol}`, `GET /contracts/{symbol}`, `GET /rollovers/{symbol}`, `POST /download/{symbol}` (catalog refresh), `GET /providers` |
 | `journal.py` | `/api/v1/journal/*` — trade journal entries |
 | `watchlist.py` | `/api/v1/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |

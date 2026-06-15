@@ -179,6 +179,15 @@ nodes:
       echo "Tearing down mh-preview-${ISSUE}..."
       docker compose -p "mh-preview-${ISSUE}" down -v 2>/dev/null || echo "No preview stack found"
 
+      # Assert no containers survive teardown
+      STALE=$(docker ps -a --filter "label=com.docker.compose.project=mh-preview-${ISSUE}" --format '{{.Names}}' 2>/dev/null || true)
+      if [ -n "$STALE" ]; then
+        echo "ERROR: Stale preview containers remain after teardown:" >&2
+        echo "$STALE" >&2
+        exit 1
+      fi
+      echo "close-preview: teardown verified — no mh-preview-${ISSUE} containers remain"
+
       # Find the PR (branch includes a slug suffix, so use search prefix match)
       PR_NUM=$(gh pr list --search "head:feat/issue-${ISSUE}-" --json number --jq '.[0].number // empty')
       if [ -z "$PR_NUM" ]; then
@@ -650,9 +659,11 @@ nodes:
       preview_fail "backend did not become healthy within 180s"
     depends_on: [classify-preview]
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
-    # Budget covers two remote buildx builds (cold-cache transfer overhead) + migrate gate +
-    # up-to-180s health poll. Bumped from 300000 for #436's pre-bake step.
-    timeout: 420000
+    # Budget covers two remote buildx builds + migrate gate + up-to-180s health poll.
+    # Warm buildkit cache (the steady state) builds both images in ~40s; a full-cold cache
+    # is ~300s and a cold build under concurrent-run contention can exceed 420s (#436 hit
+    # this). 600000 covers a cold rebuild with headroom without over-waiting on a real hang.
+    timeout: 600000
 
   # preview-up-resolve: resolve runs skip the preview stack — validate uses pytest/tsc only
   - id: preview-up-resolve

@@ -80,9 +80,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Service Dependencies
 
-- [PATTERN] The `docker-socket-proxy` service must have no `profiles:` key so it is a lifecycle superset of both `factory` and `scheduler` profiles. Consumers (`dark-factory`, `backlog-scheduler`) drop their raw `/var/run/docker.sock` volumes and instead set `DOCKER_HOST: tcp://docker-socket-proxy:2375` with `depends_on: [docker-socket-proxy]`. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
+- [PATTERN] Two per-consumer socket proxies replace the old shared one (issue #379): `docker-socket-proxy-scheduler` (CONTAINERS/IMAGES/POST=1, no BUILD/EXEC/NETWORKS/VOLUMES) for `backlog-scheduler`; `docker-socket-proxy-factory` (all verbs incl. EXEC=1) for `dark-factory`. Both have no `profiles:` key. Wire consumers via `DOCKER_HOST: tcp://docker-socket-proxy-<consumer>:2375` and `depends_on: [docker-socket-proxy-<consumer>]`. <!-- issue:#379 date:2026-06-14 expires:2026-12-14 source:implement -->
 
-- [PATTERN] The `docker-socket-proxy` blocks `exec` operations (HTTP 403) from inside the factory container — `docker exec` and testcontainer healthchecks both fail; verify container user via `docker inspect --format '{{.Config.User}}'` or source Dockerfile instead. <!-- evidence:curl-response issue:#287 date:2026-06-11 evidence2:docker-exec issue:#259 date:2026-06-13 expires:2026-12-13 source:implement -->
+- [INVALID: factory proxy now has EXEC=1 as of issue #379] The `docker-socket-proxy` blocks `exec` operations (HTTP 403) from inside the factory container — `docker exec` and testcontainer healthchecks both fail; verify container user via `docker inspect --format '{{.Config.User}}'` or source Dockerfile instead. <!-- evidence:curl-response issue:#287 date:2026-06-11 evidence2:docker-exec issue:#259 date:2026-06-13 expires:2026-12-13 source:implement -->
 
 ## Gate Shared Library
 
