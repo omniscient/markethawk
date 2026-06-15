@@ -742,6 +742,126 @@ dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
 export -f is_recheck_running dispatch
 
 # ==========================================
+# N: dependencies_met() — off-board fallback
+# ==========================================
+echo ""
+echo "--- N: dependencies_met ---"
+> "$STUB_LOG"
+
+# Shared stub variables for this section
+_N_BODY=""
+_N_DEP200_STATE=""
+_N_DEP200_GH_EXIT=0
+_N_DEP201_STATE=""
+
+# gh stub: routes by issue number; body call → _N_BODY; state call → per-dep state var
+gh() {
+  echo "gh $*" >> "$STUB_LOG"
+  if echo "$*" | grep -qE "view 100( |$)"; then
+    printf '%s\n' "$_N_BODY"; return 0
+  fi
+  if echo "$*" | grep -qE "view 201( |$)"; then
+    printf '%s\n' "$_N_DEP201_STATE"; return 0
+  fi
+  if echo "$*" | grep -qE "view 200( |$)"; then
+    printf '%s\n' "$_N_DEP200_STATE"; return $_N_DEP200_GH_EXIT
+  fi
+  return 0
+}
+export -f gh
+
+_BOARD_EMPTY='{"items":[]}'
+_BOARD_200_DONE='{"items":[{"content":{"number":200},"status":"Done"}]}'
+_BOARD_200_WIP='{"items":[{"content":{"number":200},"status":"In Progress"}]}'
+_BOARD_200_DONE_201_ABSENT='{"items":[{"content":{"number":200},"status":"Done"}]}'
+
+# N1: no deps in body → returns 0
+_N_BODY="No dependencies here"
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_EMPTY" && _N_RET=0 || _N_RET=1
+assert_eq "N1: no deps → returns 0" "0" "$_N_RET"
+
+# N2: dep Done on board → returns 0, no dep_gate log
+_N_BODY="Depends on: #200"
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_200_DONE" && _N_RET=0 || _N_RET=1
+assert_eq "N2: dep Done on board → returns 0" "0" "$_N_RET"
+assert_eq "N2: Done dep is silent (no dep_gate log)" \
+  "0" "$(grep -c 'dep_gate' "$STUB_LOG" || true)"
+
+# N3: dep non-Done on board → returns 1, logs dep_gate
+_N_BODY="Depends on: #200"
+> "$STUB_LOG"
+_N_OUTPUT=$(dependencies_met "100" "$_BOARD_200_WIP" 2>&1) && _N_RET=0 || _N_RET=1
+assert_eq "N3: non-Done dep → returns 1" "1" "$_N_RET"
+assert_eq "N3: non-Done dep → dep_gate logged" \
+  "1" "$(echo "$_N_OUTPUT" | grep -c 'dep_gate' || true)"
+
+# N4: dep off-board, gh state=CLOSED → returns 0, logs resolved=closed_off_board
+_N_BODY="Depends on: #200"
+_N_DEP200_STATE="CLOSED"
+_N_DEP200_GH_EXIT=0
+> "$STUB_LOG"
+_N_OUTPUT=$(dependencies_met "100" "$_BOARD_EMPTY" 2>&1) && _N_RET=0 || _N_RET=1
+assert_eq "N4: off-board CLOSED dep → returns 0" "0" "$_N_RET"
+assert_eq "N4: off-board CLOSED → logs resolved=closed_off_board" \
+  "1" "$(echo "$_N_OUTPUT" | grep -c 'resolved=closed_off_board' || true)"
+
+# N5: dep off-board, gh state=OPEN → returns 1, logs dep_status=off_board
+_N_BODY="Depends on: #200"
+_N_DEP200_STATE="OPEN"
+_N_DEP200_GH_EXIT=0
+> "$STUB_LOG"
+_N_OUTPUT=$(dependencies_met "100" "$_BOARD_EMPTY" 2>&1) && _N_RET=0 || _N_RET=1
+assert_eq "N5: off-board OPEN dep → returns 1" "1" "$_N_RET"
+assert_eq "N5: off-board OPEN → logs dep_status=off_board" \
+  "1" "$(echo "$_N_OUTPUT" | grep -c 'dep_status=off_board' || true)"
+
+# N6: dep off-board, gh state call fails/empty → returns 1 (safe direction)
+_N_BODY="Depends on: #200"
+_N_DEP200_STATE=""
+_N_DEP200_GH_EXIT=1
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_EMPTY" && _N_RET=0 || _N_RET=1
+assert_eq "N6: off-board gh-failure dep → returns 1 (safe)" "1" "$_N_RET"
+
+# N7: two deps — first Done on board, second off-board OPEN → returns 1
+_N_BODY="$(printf 'Depends on: #200\nDepends on: #201')"
+_N_DEP200_STATE=""
+_N_DEP200_GH_EXIT=0
+_N_DEP201_STATE="OPEN"
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_200_DONE_201_ABSENT" && _N_RET=0 || _N_RET=1
+assert_eq "N7: two deps, second off-board OPEN → returns 1" "1" "$_N_RET"
+
+# N8: two deps — first Done on board, second off-board CLOSED → returns 0
+_N_BODY="$(printf 'Depends on: #200\nDepends on: #201')"
+_N_DEP200_STATE=""
+_N_DEP200_GH_EXIT=0
+_N_DEP201_STATE="CLOSED"
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_200_DONE_201_ABSENT" && _N_RET=0 || _N_RET=1
+assert_eq "N8: two deps, second off-board CLOSED → returns 0" "0" "$_N_RET"
+
+# N9: body fetch fails → returns 0 (pre-existing behaviour)
+# Override gh so body call for issue 100 returns non-zero
+gh() {
+  echo "gh $*" >> "$STUB_LOG"
+  if echo "$*" | grep -qE "view 100"; then
+    return 1
+  fi
+  return 0
+}
+export -f gh
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_EMPTY" && _N_RET=0 || _N_RET=1
+assert_eq "N9: body fetch fails → returns 0" "0" "$_N_RET"
+
+# Restore global gh stub
+gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
+export -f gh
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"
