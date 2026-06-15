@@ -60,8 +60,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       ENVIRONMENT: development
       LOG_LEVEL: INFO
-      # Dev-only throwaway key (>=32 chars) — satisfies the JWT_SECRET_KEY startup validator
-      # (#190) that alembic env.py triggers when it imports app settings.
+      # alembic env.py imports the app Settings, whose validator requires these fields.
+      # Must mirror the backend service's env or `alembic upgrade head` aborts before migrating.
+      POLYGON_API_KEY: ${POLYGON_API_KEY:-}
+      # Dev-only throwaway key (>=32 chars) — satisfies the JWT_SECRET_KEY startup validator (#190).
       JWT_SECRET_KEY: preview-only-not-secret-0123456789abcdef
     depends_on:
       postgres:

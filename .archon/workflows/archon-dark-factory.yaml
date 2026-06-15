@@ -650,9 +650,11 @@ nodes:
       preview_fail "backend did not become healthy within 180s"
     depends_on: [classify-preview]
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
-    # Budget covers two remote buildx builds (cold-cache transfer overhead) + migrate gate +
-    # up-to-180s health poll. Bumped from 300000 for #436's pre-bake step.
-    timeout: 420000
+    # Budget covers two remote buildx builds + migrate gate + up-to-180s health poll.
+    # Warm buildkit cache (the steady state) builds both images in ~40s; a full-cold cache
+    # is ~300s and a cold build under concurrent-run contention can exceed 420s (#436 hit
+    # this). 600000 covers a cold rebuild with headroom without over-waiting on a real hang.
+    timeout: 600000
 
   # preview-up-resolve: resolve runs skip the preview stack — validate uses pytest/tsc only
   - id: preview-up-resolve
