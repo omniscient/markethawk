@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Scanner Event JSONB Column Design (issue #451)
+
+- [PATTERN] Use `nullable=True, default=None` for JSONB columns on `ScannerEvent` that are written by a downstream subsystem rather than at event-creation time. NULL cleanly represents "not yet computed." The migration is a catalog-only `add_column` with no `server_default` and no row rewrite. <!-- issue:#451 date:2026-06-15 expires:2026-12-15 source:refine -->
+
+- [AVOID] Do not apply `nullable=False, default=dict` (the pattern for `indicators`, `criteria_met`, `metadata_`) to JSONB fields that will be populated by a future builder or backfill job. Those fields are NOT NULL because they are always written at event-creation time; fields like `explanation` that are produced later are different and must be nullable to avoid a `server_default` footgun and semantic ambiguity between "empty" and "not yet computed." <!-- issue:#451 date:2026-06-15 expires:2026-12-15 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
