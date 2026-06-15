@@ -178,7 +178,16 @@ class StatsService:
             "unknown": 0,
         }
         for row in tier_count_rows:
-            key = row.tier if row.tier in gate_status else "unknown"
+            # A NULL tier means a legacy event with no gate record — treated as
+            # trusted, consistent with _build_trust_filter (which keeps _GATE_TIER IS NULL
+            # in the default trusted filter). Only genuinely unexpected non-NULL tiers
+            # fall through to "unknown".
+            if row.tier is None:
+                key = "trusted"
+            elif row.tier in gate_status:
+                key = row.tier
+            else:
+                key = "unknown"
             gate_status[key] += int(row.n)
 
         # Determine gate_filter label for response
