@@ -222,6 +222,27 @@ def test_get_regime_at_date_memoizes_result(db):
 # ── get_current_regime / get_regime_at_date tests ────────────────────────────
 
 
+def test_get_regime_at_date_memoizes_missing_active_model():
+    """No-model lookups are cached so scanner loops do not re-query once per event."""
+    import app.services.regime_service as rs_mod
+
+    query = MagicMock()
+    query.filter.return_value.order_by.return_value.first.return_value = None
+    db = MagicMock()
+    db.query.return_value = query
+
+    rs_mod._regime_date_cache.clear()
+    try:
+        first = RegimeService.get_regime_at_date(db, date(2025, 3, 15))
+        second = RegimeService.get_regime_at_date(db, date(2025, 3, 15))
+    finally:
+        rs_mod._regime_date_cache.clear()
+
+    assert first is None
+    assert second is None
+    db.query.assert_called_once_with(RegimeModel)
+
+
 def test_get_current_regime_reads_from_redis():
     payload = json.dumps(
         {"regime": "risk_on", "as_of_date": "2026-06-01", "model_version": 1}
@@ -250,9 +271,12 @@ def test_get_regime_at_date_returns_none_when_no_active_model(db):
 
 
 def test_save_event_populates_regime_field(db):
-    with patch(
-        "app.services.regime_service.RegimeService.get_regime_at_date",
-        return_value="risk_on",
+    with (
+        patch(
+            "app.services.regime_service.RegimeService.get_regime_at_date",
+            return_value="risk_on",
+        ),
+        patch("app.services.alert_service.trigger_scanner_alert") as mock_trigger,
     ):
         result = save_event(
             db=db,
@@ -264,12 +288,16 @@ def test_save_event_populates_regime_field(db):
             enrichment={},
         )
     assert result.get("regime") == "risk_on"
+    mock_trigger.assert_called_once_with(result["id"])
 
 
 def test_save_event_regime_is_none_when_service_returns_none(db):
-    with patch(
-        "app.services.regime_service.RegimeService.get_regime_at_date",
-        return_value=None,
+    with (
+        patch(
+            "app.services.regime_service.RegimeService.get_regime_at_date",
+            return_value=None,
+        ),
+        patch("app.services.alert_service.trigger_scanner_alert") as mock_trigger,
     ):
         result = save_event(
             db=db,
@@ -281,6 +309,7 @@ def test_save_event_regime_is_none_when_service_returns_none(db):
             enrichment={},
         )
     assert result.get("regime") is None
+    mock_trigger.assert_called_once_with(result["id"])
 
 
 # ── Celery task importability tests ──────────────────────────────────────────

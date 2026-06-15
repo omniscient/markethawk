@@ -278,6 +278,7 @@ class RegimeService:
             .first()
         )
         if not active_row:
+            _regime_date_cache[cache_key] = None
             return None
 
         try:
@@ -285,6 +286,7 @@ class RegimeService:
             state_label_mapping = active_row.state_label_mapping
         except Exception as exc:
             logger.error("get_regime_at_date: model deserialization failed: %s", exc)
+            _regime_date_cache[cache_key] = None
             return None
 
         cutoff = datetime.combine(target_date, datetime.min.time()) - timedelta(
@@ -303,11 +305,13 @@ class RegimeService:
             .all()
         )
         if not rows:
+            _regime_date_cache[cache_key] = None
             return None
 
         df = pd.DataFrame([{"close": float(r.close)} for r in rows])
         result = RegimeService._build_feature_matrix(df)
         if result is None:
+            _regime_date_cache[cache_key] = None
             return None
 
         X, _ = result
@@ -318,4 +322,5 @@ class RegimeService:
             return regime
         except Exception as exc:
             logger.error("get_regime_at_date: prediction failed: %s", exc)
+            _regime_date_cache[cache_key] = None
             return None
