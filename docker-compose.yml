@@ -60,6 +60,12 @@ services:
   redis:
     image: redis:7-alpine
     container_name: stockscanner-redis
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -67,7 +73,7 @@ services:
     networks:
       - stockscanner-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -125,7 +131,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
       WATCHFILES_FORCE_POLLING: "true"
@@ -210,7 +216,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -262,7 +268,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -300,7 +306,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -340,8 +346,7 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       POLYGON_API_KEY: ${POLYGON_API_KEY:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH}
     ports:
       - "127.0.0.1:5555:5555"
@@ -613,7 +618,7 @@ services:
       - "127.0.0.1:8001:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       PROMOTION_THRESHOLD: ${PROMOTION_THRESHOLD:-0.7}

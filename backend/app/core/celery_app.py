@@ -13,6 +13,12 @@ celery_app = Celery(
     include=["app.tasks"],
 )
 
+celery_app.conf.update(
+    task_serializer="json",
+    result_serializer="json",
+    accept_content=["json"],
+)
+
 
 @worker_ready.connect
 def _on_worker_ready(sender, **kwargs):
