@@ -9,6 +9,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Preview Stack
 
+- [PATTERN] Preview builds in the factory must use `docker buildx build --builder remote tcp://buildkit:1234 --load` (not `compose up --build`). BuildKit's gRPC build session needs an HTTP connection-hijack that the HAProxy `docker-socket-proxy` cannot forward (→ 403 on any `--build` over the proxy). A dedicated `moby/buildkit` sidecar on `factory-network` exposed over plain TCP is the only proxy-compatible build path. `--load` imports via `POST /images/load` (allowed: `POST:1 IMAGES:1`). <!-- issue:#436 date:2026-06-14 expires:2026-12-14 source:implement -->
+
+- [PATTERN] The preview `migrate` service must override the backend entrypoint (`entrypoint: ["python","-m","alembic","upgrade","head"]`) because `backend/entrypoint.sh` runs `alembic check` under `set -e` and fails on an unmigrated DB. `backend` and `celery-worker` must declare `depends_on: { migrate: { condition: service_completed_successfully } }` to avoid crash-looping before the schema exists. <!-- issue:#436 date:2026-06-14 expires:2026-12-14 source:implement -->
+
+- [PATTERN] Poll preview backend health via `docker inspect --format '{{.State.Health.Status}}' <container>` (allowed: `CONTAINERS:1`) instead of `docker exec` (`EXEC:0` on the socket proxy). Switch from `compose exec` for any health/bootstrap check inside the factory preview stack. <!-- issue:#436 date:2026-06-14 expires:2026-12-14 source:implement -->
+
 ## Container Root and Mounts
 
 - [PATTERN] Copy shared entrypoint scripts to `/entrypoint.sh` (outside `/app`) in `backend/Dockerfile` — not to `./entrypoint.sh` or `/app/entrypoint.sh`. The `docker-compose.override.yml` local-dev bind-mount `./backend:/app:ro` shadows the entire `/app` directory, so any file placed inside `/app` is invisible at runtime in dev; files outside `/app` are unaffected. <!-- issue:#289 date:2026-06-12 expires:2026-12-12 source:implement -->
@@ -21,15 +27,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Seed SQL that INSERTs into `scanner_configs` must always include `universe_id` in the column list (value `1` for the default universe). The column is NOT NULL with no server default; omitting it causes a NOT NULL violation on fresh preview stacks. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
 
-- [AVOID] Do not embed data directly in Alembic migration files — migrations are schema-only. Feature-specific seed data goes in `dark-factory/seed/99_feature.sql` (idempotent, `ON CONFLICT DO NOTHING`). Data needed across multiple features goes in a new numbered baseline module. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
-
 ## Diff Computation
 
 - [PATTERN] When fetching base file content to compute a formatter delta for a `main...HEAD` three-dot diff, use `git merge-base main HEAD` for the base ref, then `git show "$MERGE_BASE:{filepath}"`. Using `git show "main:{filepath}"` references main's current tip — on branches where main later updated the file, the wrong base produces false positives (feature hunk mis-classified as formatter-only) or false negatives. path:dark-factory/scripts/fmt_hunk_filter.py <!-- issue:#276 date:2026-06-11 expires:2026-12-11 source:implement -->
-
-## Scope Enforcement
-
-- [PATTERN] When an out-of-scope defect is noticed during implementation, write it to `$ARTIFACTS_DIR/out-of-scope.md` with `- <file>: <one-sentence description>` and leave the defect unfixed. The conformance gate reads this file and converts each entry into a `scope-spillover`-labelled backlog ticket automatically. <!-- issue:#206 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 ## Scheduler Config Pattern
 
@@ -70,10 +70,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When the architect subagent implements plan tasks during validation (indicated by "Verdict: Approved (implemented directly...)" in the issue comment), cherry-pick those commits from `origin/refine/issue-NNN-...` onto the feat branch rather than reimplementing from scratch: `git log --oneline main..origin/refine/<branch>` to find the commits, then `git cherry-pick <hashes>` in chronological order. <!-- issue:#173 date:2026-06-04 expires:2026-12-04 source:implement -->
 
-## Plan Drift
-
-- [PATTERN] When a refinement plan specifies exact line numbers or file counts for reference fixes, always re-grep the actual files rather than trusting the plan's enumeration — commits landing between plan creation and implementation can shift line numbers and add/remove references. <!-- issue:#171 date:2026-06-04 expires:2026-12-04 source:implement -->
-
 ## Conflict Resolution
 
 - [PATTERN] `check_pr_mergeable()` calls `gh pr view --json mergeable --jq '.mergeable'`; GitHub returns the string "CONFLICTING", "MERGEABLE", or "UNKNOWN". Always skip UNKNOWN — GitHub hasn't computed mergeability yet and will compute it on the next poll. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
@@ -84,9 +80,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Service Dependencies
 
-- [PATTERN] The `docker-socket-proxy` service must have no `profiles:` key so it is a lifecycle superset of both `factory` and `scheduler` profiles. Consumers (`dark-factory`, `backlog-scheduler`) drop their raw `/var/run/docker.sock` volumes and instead set `DOCKER_HOST: tcp://docker-socket-proxy:2375` with `depends_on: [docker-socket-proxy]`. <!-- issue:#203 date:2026-06-05 expires:2026-12-05 source:implement -->
+- [PATTERN] Two per-consumer socket proxies replace the old shared one (issue #379): `docker-socket-proxy-scheduler` (CONTAINERS/IMAGES/POST=1, no BUILD/EXEC/NETWORKS/VOLUMES) for `backlog-scheduler`; `docker-socket-proxy-factory` (all verbs incl. EXEC=1) for `dark-factory`. Both have no `profiles:` key. Wire consumers via `DOCKER_HOST: tcp://docker-socket-proxy-<consumer>:2375` and `depends_on: [docker-socket-proxy-<consumer>]`. <!-- issue:#379 date:2026-06-14 expires:2026-12-14 source:implement -->
 
-- [PATTERN] The `docker-socket-proxy` blocks `exec` operations (HTTP 403) from inside the factory container — `docker exec` and testcontainer healthchecks both fail; verify container user via `docker inspect --format '{{.Config.User}}'` or source Dockerfile instead. <!-- evidence:curl-response issue:#287 date:2026-06-11 evidence2:docker-exec issue:#259 date:2026-06-13 expires:2026-12-13 source:implement -->
+- [INVALID: factory proxy now has EXEC=1 as of issue #379] The `docker-socket-proxy` blocks `exec` operations (HTTP 403) from inside the factory container — `docker exec` and testcontainer healthchecks both fail; verify container user via `docker inspect --format '{{.Config.User}}'` or source Dockerfile instead. <!-- evidence:curl-response issue:#287 date:2026-06-11 evidence2:docker-exec issue:#259 date:2026-06-13 expires:2026-12-13 source:implement -->
 
 ## Gate Shared Library
 

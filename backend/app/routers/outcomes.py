@@ -43,11 +43,21 @@ def get_scorecard(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     severity: Optional[str] = None,
+    include_warnings: bool = False,
+    include_all: bool = False,
     db: Session = Depends(get_db),
 ):
     if not scanner_type:
         raise HTTPException(status_code=400, detail="scanner_type is required")
-    return StatsService.get_scorecard(db, scanner_type, start_date, end_date, severity)
+    return StatsService.get_scorecard(
+        db,
+        scanner_type,
+        start_date,
+        end_date,
+        severity,
+        include_warnings=include_warnings,
+        include_all=include_all,
+    )
 
 
 @router.get("/scorecard/{scanner_type}")
@@ -56,9 +66,19 @@ def get_scorecard_by_type(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     severity: Optional[str] = None,
+    include_warnings: bool = False,
+    include_all: bool = False,
     db: Session = Depends(get_db),
 ):
-    return StatsService.get_scorecard(db, scanner_type, start_date, end_date, severity)
+    return StatsService.get_scorecard(
+        db,
+        scanner_type,
+        start_date,
+        end_date,
+        severity,
+        include_warnings=include_warnings,
+        include_all=include_all,
+    )
 
 
 @router.get("/intervals/{scanner_type}")

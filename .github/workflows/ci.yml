@@ -81,6 +81,9 @@ jobs:
               sys.exit(1)
           print('when: expression lint passed for all workflow file(s).')
 
+      - name: Check preview credentials not leaked to non-preview compose files
+        run: bash dark-factory/scripts/check_preview_creds.sh
+
       - name: Dependency audit
         run: |
           pip install pip-audit

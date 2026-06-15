@@ -125,7 +125,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Scan ${{ matrix.image }} for HIGH/CRITICAL CVEs (blocking gate)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ matrix.image }}:latest
           format: table
@@ -135,7 +135,7 @@ jobs:
           trivyignores: .trivyignore
 
       - name: Scan ${{ matrix.image }} with Trivy (SARIF for Security tab)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         if: always()
         with:
           image-ref: ${{ matrix.image }}:latest
