@@ -29,6 +29,7 @@ from app.schemas.outcome import (
     ReadinessResponse,
     SignalListResponse,
 )
+from app.schemas.regime import RegimeBreakdownResponse
 from app.services.data_readiness import DataReadinessService
 from app.services.outcome_service import OutcomeService
 from app.services.stats import StatsService
@@ -43,6 +44,7 @@ def get_scorecard(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     severity: Optional[str] = None,
+    regime: Optional[str] = None,
     include_warnings: bool = False,
     include_all: bool = False,
     db: Session = Depends(get_db),
@@ -55,6 +57,7 @@ def get_scorecard(
         start_date,
         end_date,
         severity,
+        regime=regime,
         include_warnings=include_warnings,
         include_all=include_all,
     )
@@ -66,6 +69,7 @@ def get_scorecard_by_type(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     severity: Optional[str] = None,
+    regime: Optional[str] = None,
     include_warnings: bool = False,
     include_all: bool = False,
     db: Session = Depends(get_db),
@@ -76,9 +80,21 @@ def get_scorecard_by_type(
         start_date,
         end_date,
         severity,
+        regime=regime,
         include_warnings=include_warnings,
         include_all=include_all,
     )
+
+
+@router.get("/regime-breakdown/{scanner_type}", response_model=RegimeBreakdownResponse)
+def get_regime_breakdown(
+    scanner_type: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+):
+    result = StatsService.get_regime_breakdown(db, scanner_type, start_date, end_date)
+    return RegimeBreakdownResponse(**result)
 
 
 @router.get("/intervals/{scanner_type}")

@@ -17,6 +17,7 @@ from app.models.monitored_stock import MonitoredStock
 from app.models.news_article import NewsArticle
 from app.models.news_preference import NewsPreference
 from app.models.push_subscription import PushSubscription
+from app.models.regime_model import RegimeModel
 from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
@@ -76,4 +77,5 @@ __all__ = [
     "MonitoredAccount",
     "TweetSignal",
     "User",
+    "RegimeModel",
 ]

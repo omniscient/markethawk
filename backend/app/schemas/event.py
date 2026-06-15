@@ -30,6 +30,7 @@ class ScannerEventResponse(BaseModel):
     closing_price: Optional[float] = None
 
     signal_quality_score: Optional[float] = None
+    regime: Optional[str] = None
 
     indicators: Dict[str, Any] = Field(default_factory=dict)
     criteria_met: Dict[str, Any] = Field(default_factory=dict)

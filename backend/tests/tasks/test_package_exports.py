@@ -25,6 +25,9 @@ PUBLIC_TASKS = [
     "analyze_universe_quality",
     "normalize_universe_quality",
     "analyze_signal_features",
+    # regime
+    "update_regime_model",
+    "backfill_regime_labels",
 ]
 
 SUBMODULE_TASKS = {
@@ -53,6 +56,10 @@ SUBMODULE_TASKS = {
         "analyze_universe_quality",
         "normalize_universe_quality",
         "analyze_signal_features",
+    ],
+    "app.tasks.regime": [
+        "update_regime_model",
+        "backfill_regime_labels",
     ],
 }
 
@@ -141,6 +148,7 @@ def test_celery_beat_string_names_resolve():
         "app.tasks.run_liquidity_hunt_scheduled",
         "app.tasks.analyze_signal_features",
         "app.tasks.trigger_tweet_monitor",
+        "app.tasks.update_regime_model",
     ]
     for task_name in beat_task_names:
         assert task_name in celery_app.tasks, (

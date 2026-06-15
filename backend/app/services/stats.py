@@ -151,6 +151,7 @@ class StatsService:
         start_date=None,
         end_date=None,
         severity: Optional[str] = None,
+        regime: Optional[str] = None,
         include_warnings: bool = False,
         include_all: bool = False,
     ) -> Dict[str, Any]:
@@ -161,6 +162,8 @@ class StatsService:
             base_filters.append(ScannerEvent.event_date <= end_date)
         if severity:
             base_filters.append(ScannerEvent.severity == severity)
+        if regime:
+            base_filters.append(ScannerEvent.regime == regime)
 
         # Gate status counts — query ScannerEvent directly so events without a
         # summary (no inner join) are still reflected in the tier counts.
@@ -589,6 +592,71 @@ class StatsService:
             "total": total,
             "limit": limit,
             "offset": offset,
+        }
+
+    @staticmethod
+    def get_regime_breakdown(
+        db: Session,
+        scanner_type: str,
+        start_date=None,
+        end_date=None,
+    ) -> Dict[str, Any]:
+        """Per-regime win-rate, avg MFE, avg MAE, and sample size for a scanner type."""
+        from collections import defaultdict
+
+        query = (
+            db.query(ScannerOutcomeSummary, ScannerEvent.regime)
+            .join(
+                ScannerEvent, ScannerEvent.id == ScannerOutcomeSummary.scanner_event_id
+            )
+            .filter(
+                ScannerEvent.scanner_type == scanner_type,
+                ScannerEvent.regime.isnot(None),
+            )
+        )
+        if start_date:
+            query = query.filter(ScannerEvent.event_date >= start_date)
+        if end_date:
+            query = query.filter(ScannerEvent.event_date <= end_date)
+
+        rows = query.all()
+
+        total_events = (
+            db.query(ScannerEvent)
+            .filter(ScannerEvent.scanner_type == scanner_type)
+            .count()
+        )
+
+        by_regime: Dict[str, list] = defaultdict(list)
+        for summary, regime_label in rows:
+            if summary.is_complete:
+                by_regime[regime_label].append(summary)
+
+        breakdown = {}
+        for regime_label, summaries in by_regime.items():
+            n = len(summaries)
+            wins = [
+                s
+                for s in summaries
+                if s.eod_pct_change is not None and float(s.eod_pct_change) > 0
+            ]
+            mfe_vals = [float(s.mfe_pct) for s in summaries if s.mfe_pct is not None]
+            mae_vals = [float(s.mae_pct) for s in summaries if s.mae_pct is not None]
+            breakdown[regime_label] = {
+                "sample_size": n,
+                "win_rate_pct": round(len(wins) / n * 100, 2) if n else None,
+                "avg_mfe_pct": round(sum(mfe_vals) / len(mfe_vals), 4)
+                if mfe_vals
+                else None,
+                "avg_mae_pct": round(sum(mae_vals) / len(mae_vals), 4)
+                if mae_vals
+                else None,
+            }
+
+        return {
+            "scanner_type": scanner_type,
+            "total_events": total_events,
+            "breakdown": breakdown,
         }
 
 

@@ -61,6 +61,27 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
     }
   };
 
+  const getRegimeStyle = (regime: string | null | undefined): string => {
+    switch (regime) {
+      case 'risk_on':         return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'risk_off':        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'high_volatility': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'low_vol_drift':   return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      default:                return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getRegimeLabel = (regime: string | null | undefined): string => {
+    switch (regime) {
+      case 'risk_on':         return 'risk-on';
+      case 'risk_off':        return 'risk-off';
+      case 'high_volatility': return 'high-vol';
+      case 'low_vol_drift':   return 'low-vol';
+      case 'transition':      return 'trans';
+      default:                return regime ?? '—';
+    }
+  };
+
   const renderIndicator = (key: string, val: unknown) => {
     if (typeof val === 'number') {
       if (key.includes('pct')) return `${val > 0 ? '+' : ''}${val.toFixed(2)}%`;
@@ -280,6 +301,14 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border shadow-sm ${getSeverityStyle(event.severity)}`}>
                       {event.severity}
                     </span>
+                    {event.regime !== undefined && (
+                      <span
+                        className={`ml-1 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border shadow-sm ${getRegimeStyle(event.regime)}`}
+                        title={event.regime ?? 'unknown regime'}
+                      >
+                        {getRegimeLabel(event.regime)}
+                      </span>
+                    )}
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
                     <ScoreQualityBadge

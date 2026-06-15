@@ -36,13 +36,13 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When adding a `field_validator` to `Settings` in `config.py`, add a matching `os.environ.setdefault("FIELD_NAME", valid_value)` at the top of `backend/tests/conftest.py` (before app imports) — otherwise bare `Settings()` calls in existing tests will hit the new validator with the default value and fail. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
 
-- [PATTERN] Test a pydantic-settings validator by passing the invalid value as an init kwarg — `Settings(JWT_SECRET_KEY="")` — since init kwargs override env vars. This gives a clean, deterministic test without manipulating environment state. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
-
 ## Backend: Migrations
 
-- [FIX] If `alembic revision --autogenerate` produces an empty migration (no `op.` calls in the body), verify that the model is imported in `backend/app/models/__init__.py` and that `Base` is the same `DeclarativeBase` instance as in `backend/app/core/database.py`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
-
 - [FIX] When a migration backfills a FK column (e.g. `UPDATE scanner_configs SET universe_id = 1`), ensure the referenced row exists BEFORE the UPDATE by inserting it with `ON CONFLICT (id) DO NOTHING` — CI databases start empty (no seed SQL applied), so the FK constraint will fail if the parent row is absent. See migration `c7d8e9f0a1b2` for the pattern. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+## Backend: Redis / Caching
+
+- [PATTERN] Always call `db.commit()` before writing to Redis in functions that persist a DB row then cache it — if the commit fails, the Redis entry must not exist or it will expose a version that was never persisted. Also clear any process-level date-keyed dicts (`_foo_cache.clear()`) immediately after a successful commit so that in-process cache entries for stale data are evicted on retrain. See `regime_service.train_and_persist`. <!-- issue:#106 date:2026-06-15 expires:2026-12-15 source:implement -->
 
 ## Backend: Circuit Breakers
 
@@ -82,7 +82,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] CSRF_EXEMPT_PREFIXES and AUTH EXEMPT_PREFIXES serve different concerns and must remain separate tuples in `main.py`. Do not merge them — CSRF exempts pre-authentication paths; auth exempts docs/health/metrics paths that are unrelated to CSRF. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
 
-- [PATTERN] Keep `/metrics` in `EXEMPT_PREFIXES` (no bearer-token auth) and rely on Caddyfile `handle /metrics { respond 404 }` as defense-in-depth — Prometheus scrapes `backend:8000/metrics` on the internal Docker network (Caddy doesn't proxy `/metrics`), and adding app-level auth would break Prometheus scraping since it cannot send JWT cookies. <!-- issue:#369 date:2026-06-13 expires:2026-12-13 source:implement -->
 
 
 ## Backend: Prometheus SLO Metrics
