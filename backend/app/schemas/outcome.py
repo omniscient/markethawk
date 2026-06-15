@@ -73,6 +73,8 @@ class ScorecardResponse(BaseModel):
     follow_through_rate_pct: Optional[float] = None
     edge_decay: List[EdgeDecayPoint] = []
     interval_breakdown: Dict[str, IntervalBreakdown] = {}
+    gate_filter: str = "trusted"
+    gate_status: Optional[Dict[str, int]] = None
 
 
 class ReadinessCoverage(BaseModel):
@@ -119,6 +121,7 @@ class SignalListItem(BaseModel):
     event_date: date
     severity: Optional[str] = None
     summary: Optional[str] = None
+    gate_tier: Optional[str] = None
     opening_price: Optional[float] = None
     previous_close: Optional[float] = None
     closing_price: Optional[float] = None
