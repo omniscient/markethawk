@@ -5,7 +5,7 @@ Outcomes router — scanner signal quality and outcome tracking endpoints.
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -134,7 +134,7 @@ def get_signals(
     severity: Optional[str] = None,
     sort_by: str = "event_date",
     sort_order: str = "desc",
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=200),
     offset: int = 0,
     db: Session = Depends(get_db),
 ):

@@ -335,7 +335,7 @@ async def scan_run_websocket(
 
 @router.get("/history", response_model=List[ScannerRunResponse])
 def get_scanner_history(
-    limit: int = 20,
+    limit: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     """Get recent scanner runs."""
@@ -359,15 +359,26 @@ def get_scanner_history(
     ]
 
 
+# Explicit sort allowlist — replaces a reflective getattr(ScannerEvent, ...)
+# lookup that widened the attack surface to arbitrary attributes (CWE-915).
+SCANNER_RESULTS_SORT_COLUMNS = {
+    "signal_quality_score": ScannerEvent.signal_quality_score,
+    "event_date": ScannerEvent.event_date,
+    "ticker": ScannerEvent.ticker,
+    "severity": ScannerEvent.severity,
+    "created_at": ScannerEvent.created_at,
+}
+
+
 @router.get("/results", response_model=List[ScannerEventResponse])
 def get_scanner_results(
     ticker: Optional[str] = None,
     scanner_type: Optional[str] = None,
     event_type: Optional[str] = None,  # Alias for backward compat
     universe_id: Optional[int] = None,
-    sort_by: Optional[str] = "signal_quality_score",
+    sort_by: str = "signal_quality_score",
     sort_order: Optional[str] = "desc",
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=200),
     offset: int = 0,
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
@@ -404,21 +415,15 @@ def get_scanner_results(
     if end_date:
         query = query.filter(ScannerEvent.event_date <= end_date)
 
-    # Sorting logic
-    try:
-        if sort_by:
-            sort_attr = getattr(ScannerEvent, sort_by, ScannerEvent.created_at)
-            if sort_order.lower() == "desc":
-                order_expr = sort_attr.desc().nulls_last()
-            else:
-                order_expr = sort_attr.asc().nulls_last()
-            query = query.order_by(order_expr)
-        else:
-            query = query.order_by(
-                ScannerEvent.signal_quality_score.desc().nulls_last()
-            )
-    except Exception:
-        query = query.order_by(ScannerEvent.created_at.desc())
+    # Sorting — validate against an explicit allowlist (no reflective getattr)
+    sort_attr = SCANNER_RESULTS_SORT_COLUMNS.get(sort_by)
+    if sort_attr is None:
+        raise HTTPException(status_code=422, detail=f"Invalid sort field: {sort_by}")
+    if (sort_order or "desc").lower() == "desc":
+        order_expr = sort_attr.desc().nulls_last()
+    else:
+        order_expr = sort_attr.asc().nulls_last()
+    query = query.order_by(order_expr)
 
     results = query.limit(limit).offset(offset).all()
 

@@ -83,6 +83,33 @@ def test_results_empty_when_no_events(db: Session):
 
 
 # ---------------------------------------------------------------------------
+# GET /api/scanner/results — input hardening (F-INPUT-01)
+# ---------------------------------------------------------------------------
+
+
+def test_results_rejects_oversized_limit(db: Session):
+    # CWE-770: limit must be capped before any DB query runs
+    response = client.get("/api/v1/scanner/results?limit=10000000")
+
+    assert response.status_code == 422
+
+
+def test_results_rejects_invalid_sort_by(db: Session):
+    # CWE-915: reflective getattr replaced by an explicit allowlist
+    response = client.get("/api/v1/scanner/results?sort_by=__class__")
+
+    assert response.status_code == 422
+
+
+def test_results_accepts_allowlisted_sort_by(db: Session):
+    seed_scanner_events(db)
+
+    response = client.get("/api/v1/scanner/results?sort_by=ticker")
+
+    assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # GET /api/scanner/configs
 # ---------------------------------------------------------------------------
 
@@ -158,6 +185,13 @@ def test_history_respects_limit(db: Session):
 
     assert response.status_code == 200
     assert len(response.json()) == 2
+
+
+def test_history_rejects_oversized_limit(db: Session):
+    # CWE-770: history limit must be capped
+    response = client.get("/api/v1/scanner/history?limit=10000000")
+
+    assert response.status_code == 422
 
 
 def test_history_empty_when_no_runs(db: Session):
