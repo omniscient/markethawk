@@ -26,7 +26,7 @@ Files with blast score ≥ 5.0  (42 found)
      9.0  backend/app/routers/auto_trading.py  (1d / 16t)  365 loc
      9.0  backend/app/routers/universe.py  (1d / 16t)  446 loc
      9.0  frontend/src/components/ui/MetricCard.tsx  (6d / 6t)  71 loc
-     8.5  backend/app/routers/outcomes.py  (1d / 15t)  309 loc
+     8.5  backend/app/routers/outcomes.py  (1d / 15t)  329 loc
      8.5  frontend/src/utils/url.ts  (3d / 11t)  36 loc
      8.0  frontend/src/hooks/useScorecard.ts  (5d / 6t)  98 loc
      8.0  frontend/src/pages/AutoTrading/components.tsx  (5d / 6t)  294 loc
