@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Extension Point Registries (issue #441)
+
+- [PATTERN] Each extension point (providers, scanners, alert channels, broker adapters) owns its own per-domain `BaseRegistry[T]` instance. The shared `BaseRegistry` primitive from #439 is instantiated separately per subsystem — not as a global multi-type singleton keyed by `(type, name)`. This matches the existing pattern: `_REGISTRY` in `scan_orchestrator.py`, `_SCREENER_REGISTRY` in `discovery_service.py`. <!-- issue:#441 date:2026-06-15 expires:2026-12-15 source:refine -->
+- [AVOID] Do not introduce a global namespaced extension registry that holds all extension types under a single shared instance. Per-domain registries keep subsystems decoupled and are consistent with the codebase's existing small-registry convention. <!-- issue:#441 date:2026-06-15 expires:2026-12-15 source:refine -->
+- [PATTERN] When migrating a self-describing object registry (like `DataProviderFactory._providers`) to wrap `BaseRegistry`, use composition over inheritance: keep the domain-specific class with its classmethods and project provider-specific fields (`is_available`, `supported_asset_classes`) inside those methods. Extending `BaseRegistry` directly would require overriding most methods and force provider concepts into the generic primitive. <!-- issue:#441 date:2026-06-15 expires:2026-12-15 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
