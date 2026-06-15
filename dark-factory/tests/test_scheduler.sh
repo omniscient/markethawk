@@ -757,13 +757,13 @@ _N_DEP201_STATE=""
 # gh stub: routes by issue number; body call → _N_BODY; state call → per-dep state var
 gh() {
   echo "gh $*" >> "$STUB_LOG"
-  if echo "$*" | grep -qE "view 100"; then
+  if echo "$*" | grep -qE "view 100( |$)"; then
     printf '%s\n' "$_N_BODY"; return 0
   fi
-  if echo "$*" | grep -qE "view 201"; then
+  if echo "$*" | grep -qE "view 201( |$)"; then
     printf '%s\n' "$_N_DEP201_STATE"; return 0
   fi
-  if echo "$*" | grep -qE "view 200"; then
+  if echo "$*" | grep -qE "view 200( |$)"; then
     printf '%s\n' "$_N_DEP200_STATE"; return $_N_DEP200_GH_EXIT
   fi
   return 0

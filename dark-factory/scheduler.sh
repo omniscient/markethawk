@@ -585,12 +585,17 @@ dependencies_met() {
     if [ -z "$dep_status" ]; then
       # Dep not found on board (archived or beyond fetch window) — fall back to issue state
       local dep_state
-      dep_state=$(gh issue view "$dep_num" --repo "${OWNER}/markethawk" --json state -q '.state' 2>/dev/null || true)
+      local dep_gh_exit=0
+      dep_state=$(gh issue view "$dep_num" --repo "${OWNER}/markethawk" --json state -q '.state' 2>/dev/null) || dep_gh_exit=$?
       if [ "$dep_state" = "CLOSED" ]; then
         echo "[$(date -u +%FT%TZ)] dep_gate issue=#${issue_num} dep=#${dep_num} resolved=closed_off_board"
         continue
       fi
-      echo "[$(date -u +%FT%TZ)] dep_gate issue=#${issue_num} blocked_by=#${dep_num} dep_status=off_board"
+      if [ "$dep_gh_exit" -ne 0 ] || [ -z "$dep_state" ]; then
+        echo "[$(date -u +%FT%TZ)] dep_gate issue=#${issue_num} dep=#${dep_num} blocked_by=#${dep_num} dep_status=unknown"
+      else
+        echo "[$(date -u +%FT%TZ)] dep_gate issue=#${issue_num} dep=#${dep_num} blocked_by=#${dep_num} dep_status=off_board"
+      fi
       return 1
     fi
     if [ "$dep_status" != "Done" ]; then
