@@ -167,6 +167,58 @@ def test_train_and_persist_returns_active_regime_model(db):
     mock_redis.setex.assert_called_once()
 
 
+def test_train_and_persist_redis_write_happens_after_commit(db):
+    """Redis setex must not be called before db.commit() — a failed commit must not pollute cache."""
+    rng = np.random.default_rng(7)
+    closes = [100.0 + i * 0.4 + rng.normal(0, 0.3) for i in range(600)]
+    spy_df = pd.DataFrame({"close": closes, "date": ["2024-01-01"] * 600})
+    call_order = []
+    mock_redis = MagicMock()
+    mock_redis.setex.side_effect = lambda *a, **kw: call_order.append("redis")
+    original_commit = db.commit
+
+    def tracked_commit():
+        call_order.append("commit")
+        original_commit()
+
+    db.commit = tracked_commit
+    with (
+        patch.object(RegimeService, "_fetch_spy_bars", return_value=spy_df),
+        patch("app.services.regime_service.redis.from_url", return_value=mock_redis),
+    ):
+        RegimeService.train_and_persist(db)
+    assert call_order.index("commit") < call_order.index("redis"), (
+        "db.commit() must happen before redis.setex()"
+    )
+
+
+def test_get_regime_at_date_memoizes_result(db):
+    """Second call for the same date must not re-query the DB or re-run the HMM."""
+    import app.services.regime_service as rs_mod
+
+    rs_mod._regime_date_cache.clear()
+    with (
+        patch.object(
+            RegimeService,
+            "get_current_regime",
+            return_value=None,
+        ),
+        patch.object(
+            db.__class__,
+            "query",
+            wraps=db.query,
+        ) as mock_query,
+    ):
+        with patch.object(
+            RegimeService, "get_regime_at_date", wraps=RegimeService.get_regime_at_date
+        ):
+            rs_mod._regime_date_cache["2025-03-15"] = "risk_on"
+            result = RegimeService.get_regime_at_date(db, date(2025, 3, 15))
+            assert result == "risk_on"
+            mock_query.assert_not_called()
+    rs_mod._regime_date_cache.clear()
+
+
 # ── get_current_regime / get_regime_at_date tests ────────────────────────────
 
 

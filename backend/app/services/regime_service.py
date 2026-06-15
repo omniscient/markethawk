@@ -24,6 +24,10 @@ REDIS_KEY = "regime:current"
 REDIS_TTL = 90000  # 25 hours in seconds
 FEATURE_SET: List[str] = ["daily_return", "rolling_vol_20d", "rolling_skew_20d"]
 
+# Per-date in-process cache — avoids repeated 730-day SPY fetch + HMM predict
+# for the same date within a single scanner run. Cleared on model retrain.
+_regime_date_cache: Dict[str, Optional[str]] = {}
+
 
 class RegimeService:
     @staticmethod
@@ -204,6 +208,18 @@ class RegimeService:
 
         last_state = int(model.predict(X)[-1])
         current_regime = state_label_mapping.get(str(last_state), "unknown")
+
+        db.commit()
+        logger.info(
+            "train_and_persist: n_states=%d BIC=%.2f regime=%s version=%d",
+            n_states,
+            bic,
+            current_regime,
+            next_version,
+        )
+
+        _regime_date_cache.clear()
+
         cache_payload = json.dumps(
             {
                 "regime": current_regime,
@@ -217,14 +233,6 @@ class RegimeService:
         except Exception as exc:
             logger.warning("train_and_persist: Redis cache write failed: %s", exc)
 
-        db.commit()
-        logger.info(
-            "train_and_persist: n_states=%d BIC=%.2f regime=%s version=%d",
-            n_states,
-            bic,
-            current_regime,
-            next_version,
-        )
         return new_model
 
     @staticmethod
@@ -246,14 +254,21 @@ class RegimeService:
 
         For today: tries Redis cache first, then falls back to DB prediction.
         For historical dates: loads active model from DB, predicts on SPY bars up to that date.
+        Results are memoized per date in _regime_date_cache to avoid repeated expensive
+        730-day SPY queries + HMM predictions within the same scanner run.
         """
         today = datetime.now(timezone.utc).date()
         if isinstance(target_date, datetime):
             target_date = target_date.date()
 
+        cache_key = str(target_date)
+        if cache_key in _regime_date_cache:
+            return _regime_date_cache[cache_key]
+
         if target_date == today:
             cached = RegimeService.get_current_regime()
             if cached:
+                _regime_date_cache[cache_key] = cached
                 return cached
 
         active_row = (
@@ -298,7 +313,9 @@ class RegimeService:
         X, _ = result
         try:
             states = model.predict(X)
-            return state_label_mapping.get(str(int(states[-1])))
+            regime = state_label_mapping.get(str(int(states[-1])))
+            _regime_date_cache[cache_key] = regime
+            return regime
         except Exception as exc:
             logger.error("get_regime_at_date: prediction failed: %s", exc)
             return None
