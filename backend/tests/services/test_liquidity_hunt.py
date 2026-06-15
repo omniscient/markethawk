@@ -776,3 +776,40 @@ def test_liquidity_hunt_observes_slo_metrics():
     mock_ratio.labels.assert_called_with(scanner_type="liquidity_hunt")
     mock_ratio_lbl.set.assert_called_once()
     assert 0.0 <= mock_ratio_lbl.set.call_args[0][0] <= 1.0
+
+
+def test_liquidity_hunt_total_failure_does_not_mark_success():
+    """Every ticker-day errors -> no last-success bump; duration still observed."""
+    import asyncio
+    from datetime import date
+    from unittest.mock import MagicMock, patch
+
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch("app.services.liquidity_hunt.scanner_events_total"),
+        patch("app.services.liquidity_hunt.scan_duration_seconds") as mock_dur,
+        patch("app.services.liquidity_hunt.scan_last_success_timestamp") as mock_ts,
+        patch("app.services.liquidity_hunt.scan_failed_tickers_ratio") as mock_ratio,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio.labels.return_value = MagicMock()
+        mock_dur_lbl = MagicMock()
+        mock_dur.labels.return_value = mock_dur_lbl
+
+        from app.services.liquidity_hunt import run_liquidity_hunt_scan
+
+        asyncio.run(
+            run_liquidity_hunt_scan(
+                ["AAA"],
+                db=MagicMock(),
+                start_date=date(2026, 1, 15),
+                end_date=date(2026, 1, 15),
+            )
+        )
+
+    mock_ts_lbl.set.assert_not_called()
+    mock_dur_lbl.observe.assert_called_once()

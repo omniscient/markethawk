@@ -279,109 +279,114 @@ async def run_trend_pullback_scan(
       4. Persist ScannerEvent if all pass.
     """
     _perf_start = _time.monotonic()
+    try:
+        if start_date is None and end_date is None:
+            start_date = end_date = get_market_today()
+        elif start_date is None:
+            start_date = end_date
+        elif end_date is None:
+            end_date = start_date
 
-    if start_date is None and end_date is None:
-        start_date = end_date = get_market_today()
-    elif start_date is None:
-        start_date = end_date
-    elif end_date is None:
-        end_date = start_date
+        cfg: dict[str, Any] = {**DEFAULT_CONFIG, **(config or {})}
 
-    cfg: dict[str, Any] = {**DEFAULT_CONFIG, **(config or {})}
+        results: list[dict[str, Any]] = []
+        counts = {
+            "no_bars": 0,
+            "insufficient_history": 0,
+            "evaluated": 0,
+            "fired": 0,
+            "errors": 0,
+        }
 
-    results: list[dict[str, Any]] = []
-    counts = {
-        "no_bars": 0,
-        "insufficient_history": 0,
-        "evaluated": 0,
-        "fired": 0,
-        "errors": 0,
-    }
+        trading_days = [
+            start_date + timedelta(days=i)
+            for i in range((end_date - start_date).days + 1)
+            if (start_date + timedelta(days=i)).weekday() < 5
+        ]
 
-    trading_days = [
-        start_date + timedelta(days=i)
-        for i in range((end_date - start_date).days + 1)
-        if (start_date + timedelta(days=i)).weekday() < 5
-    ]
+        for event_date in trading_days:
+            for ticker in tickers:
+                try:
+                    bars = _get_daily_bars(db, ticker, event_date, _LOOKBACK_DAYS)
+                    if not bars:
+                        counts["no_bars"] += 1
+                        continue
 
-    for event_date in trading_days:
-        for ticker in tickers:
-            try:
-                bars = _get_daily_bars(db, ticker, event_date, _LOOKBACK_DAYS)
-                if not bars:
-                    counts["no_bars"] += 1
-                    continue
+                    result = _evaluate_ticker(ticker, event_date, bars, cfg)
+                    if result is None:
+                        counts["insufficient_history"] += 1
+                        continue
 
-                result = _evaluate_ticker(ticker, event_date, bars, cfg)
-                if result is None:
-                    counts["insufficient_history"] += 1
-                    continue
+                    counts["evaluated"] += 1
 
-                counts["evaluated"] += 1
+                    if not result["fired"]:
+                        continue
 
-                if not result["fired"]:
-                    continue
+                    close_today = result["close"]
+                    indicators = result["indicators"]
+                    criteria_met = result["criteria_met"]
 
-                close_today = result["close"]
-                indicators = result["indicators"]
-                criteria_met = result["criteria_met"]
+                    event_dict = _save_event(
+                        db=db,
+                        ticker=ticker,
+                        event_date=event_date,
+                        scanner_type="trend_pullback",
+                        indicators=indicators,
+                        criteria_met=criteria_met,
+                        enrichment={},
+                        previous_close=None,
+                        closing_price=close_today,
+                    )
+                    results.append(event_dict)
+                    counts["fired"] += 1
+                    scanner_events_total.labels(scanner_type="trend_pullback").inc()
 
-                event_dict = _save_event(
-                    db=db,
-                    ticker=ticker,
-                    event_date=event_date,
-                    scanner_type="trend_pullback",
-                    indicators=indicators,
-                    criteria_met=criteria_met,
-                    enrichment={},
-                    previous_close=None,
-                    closing_price=close_today,
-                )
-                results.append(event_dict)
-                counts["fired"] += 1
-                scanner_events_total.labels(scanner_type="trend_pullback").inc()
+                except Exception:
+                    counts["errors"] += 1
+                    _LOG.exception(
+                        "Error in trend_pullback scan for %s on %s", ticker, event_date
+                    )
 
-            except Exception:
-                counts["errors"] += 1
-                _LOG.exception(
-                    "Error in trend_pullback scan for %s on %s", ticker, event_date
-                )
-
-    _LOG.info(
-        "trend_pullback scan complete: tickers=%d days=%d "
-        "no_bars=%d insufficient_history=%d evaluated=%d fired=%d errors=%d",
-        len(tickers),
-        len(trading_days),
-        counts["no_bars"],
-        counts["insufficient_history"],
-        counts["evaluated"],
-        counts["fired"],
-        counts["errors"],
-    )
-
-    if diagnostics_out is not None:
-        diagnostics_out.update(
-            {
-                "tickers": len(tickers),
-                "days": len(trading_days),
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "no_bars": counts["no_bars"],
-                "insufficient_history": counts["insufficient_history"],
-                "evaluated": counts["evaluated"],
-                "fired": counts["fired"],
-                "errors": counts["errors"],
-            }
+        _LOG.info(
+            "trend_pullback scan complete: tickers=%d days=%d "
+            "no_bars=%d insufficient_history=%d evaluated=%d fired=%d errors=%d",
+            len(tickers),
+            len(trading_days),
+            counts["no_bars"],
+            counts["insufficient_history"],
+            counts["evaluated"],
+            counts["fired"],
+            counts["errors"],
         )
 
-    scan_last_success_timestamp.labels(scanner_type="trend_pullback").set(_time.time())
-    scan_failed_tickers_ratio.labels(scanner_type="trend_pullback").set(
-        counts["errors"] / max(1, len(tickers) * len(trading_days))
-    )
-    scan_duration_seconds.labels(scanner_type="trend_pullback").observe(
-        _time.monotonic() - _perf_start
-    )
-    return results
+        if diagnostics_out is not None:
+            diagnostics_out.update(
+                {
+                    "tickers": len(tickers),
+                    "days": len(trading_days),
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "no_bars": counts["no_bars"],
+                    "insufficient_history": counts["insufficient_history"],
+                    "evaluated": counts["evaluated"],
+                    "fired": counts["fired"],
+                    "errors": counts["errors"],
+                }
+            )
+
+        _total_units = len(tickers) * len(trading_days)
+        if _total_units == 0 or counts["errors"] < _total_units:
+            scan_last_success_timestamp.labels(scanner_type="trend_pullback").set(
+                _time.time()
+            )
+        scan_failed_tickers_ratio.labels(scanner_type="trend_pullback").set(
+            counts["errors"] / max(1, len(tickers) * len(trading_days))
+        )
+        return results
+    finally:
+        scan_duration_seconds.labels(scanner_type="trend_pullback").observe(
+            _time.monotonic() - _perf_start
+        )
 
 
 async def run_trend_pullback_scan_for_date(

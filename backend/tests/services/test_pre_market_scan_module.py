@@ -280,3 +280,76 @@ def test_pre_market_scan_observes_slo_metrics(db):
     mock_dtd_lbl.observe.assert_called_once()
     dtd_arg = mock_dtd_lbl.observe.call_args[0][0]
     assert dtd_arg >= 0
+
+
+def test_pre_market_scan_total_failure_does_not_mark_success(db):
+    """A total ticker failure (every ticker errors) must NOT advance
+    scan_last_success_timestamp — otherwise the missed-slot staleness alert can
+    never fire on a full outage. Duration is still recorded; ratio is 1.0."""
+    from app.exceptions import ScanError
+
+    ticker = "FAILALL"
+    event_date = date(2025, 3, 10)
+
+    with (
+        patch.object(
+            ScannerService,
+            "_get_batch_enrichment_data",
+            return_value=({"FAILALL": {}}, {}, {}),
+        ),
+        patch("app.services.pre_market_scan._detect", side_effect=ScanError("boom")),
+        patch("app.services.pre_market_scan.scan_last_success_timestamp") as mock_ts,
+        patch("app.services.pre_market_scan.scan_failed_tickers_ratio") as mock_ratio,
+        patch("app.services.pre_market_scan.scan_duration_seconds") as mock_dur,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio_lbl = MagicMock()
+        mock_ratio.labels.return_value = mock_ratio_lbl
+        mock_dur_lbl = MagicMock()
+        mock_dur.labels.return_value = mock_dur_lbl
+
+        from app.services.pre_market_scan import run_pre_market_scan
+
+        results = asyncio.run(run_pre_market_scan([ticker], db, event_date=event_date))
+
+    assert results == []
+    # last-success must NOT advance on a total failure
+    mock_ts_lbl.set.assert_not_called()
+    # every ticker failed -> ratio 1.0, still observed
+    mock_ratio_lbl.set.assert_called_once()
+    assert mock_ratio_lbl.set.call_args[0][0] == 1.0
+    # duration is always recorded
+    mock_dur_lbl.observe.assert_called_once()
+
+
+def test_pre_market_scan_records_duration_when_persist_raises(db):
+    """If _persist raises, scan_duration_seconds must still be observed (try/finally)
+    and last-success must NOT be marked."""
+    import pytest
+
+    with (
+        patch.object(
+            ScannerService, "_get_batch_enrichment_data", return_value=({}, {}, {})
+        ),
+        patch(
+            "app.services.pre_market_scan._persist",
+            side_effect=RuntimeError("db down"),
+        ),
+        patch("app.services.pre_market_scan.scan_last_success_timestamp") as mock_ts,
+        patch("app.services.pre_market_scan.scan_duration_seconds") as mock_dur,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_dur_lbl = MagicMock()
+        mock_dur.labels.return_value = mock_dur_lbl
+
+        from app.services.pre_market_scan import run_pre_market_scan
+
+        with pytest.raises(RuntimeError):
+            asyncio.run(run_pre_market_scan([], db))
+
+    # duration recorded despite the exception
+    mock_dur_lbl.observe.assert_called_once()
+    # a failed run must not be marked successful
+    mock_ts_lbl.set.assert_not_called()

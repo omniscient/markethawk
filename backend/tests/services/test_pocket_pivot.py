@@ -406,3 +406,34 @@ def test_pocket_pivot_observes_slo_metrics():
     mock_ratio.labels.assert_called_with(scanner_type="pocket_pivot")
     mock_ratio_lbl.set.assert_called_once()
     assert 0.0 <= mock_ratio_lbl.set.call_args[0][0] <= 1.0
+
+
+def test_pocket_pivot_total_failure_does_not_mark_success():
+    """When every ticker-day errors, scan_last_success_timestamp must NOT be set;
+    duration is still observed."""
+    with (
+        patch(
+            "app.services.pocket_pivot._get_today_bar",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch("app.services.pocket_pivot.scanner_events_total"),
+        patch("app.services.pocket_pivot.scan_duration_seconds") as mock_dur,
+        patch("app.services.pocket_pivot.scan_last_success_timestamp") as mock_ts,
+        patch("app.services.pocket_pivot.scan_failed_tickers_ratio") as mock_ratio,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio.labels.return_value = MagicMock()
+        mock_dur_lbl = MagicMock()
+        mock_dur.labels.return_value = mock_dur_lbl
+
+        from app.services.pocket_pivot import run_pocket_pivot_scan
+
+        asyncio.run(
+            run_pocket_pivot_scan(
+                ["AAA"], db=MagicMock(), start_date=_EVENT_DATE, end_date=_EVENT_DATE
+            )
+        )
+
+    mock_ts_lbl.set.assert_not_called()
+    mock_dur_lbl.observe.assert_called_once()

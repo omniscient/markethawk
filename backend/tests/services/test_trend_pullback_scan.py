@@ -361,3 +361,37 @@ def test_trend_pullback_observes_slo_metrics():
     mock_ratio.labels.assert_called_with(scanner_type="trend_pullback")
     mock_ratio_lbl.set.assert_called_once()
     assert 0.0 <= mock_ratio_lbl.set.call_args[0][0] <= 1.0
+
+
+def test_trend_pullback_total_failure_does_not_mark_success():
+    """Every ticker-day errors -> no last-success bump; duration still observed."""
+    with (
+        patch(
+            "app.services.trend_pullback_scan._get_daily_bars",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch("app.services.trend_pullback_scan.scanner_events_total"),
+        patch("app.services.trend_pullback_scan.scan_duration_seconds") as mock_dur,
+        patch(
+            "app.services.trend_pullback_scan.scan_last_success_timestamp"
+        ) as mock_ts,
+        patch(
+            "app.services.trend_pullback_scan.scan_failed_tickers_ratio"
+        ) as mock_ratio,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio.labels.return_value = MagicMock()
+        mock_dur_lbl = MagicMock()
+        mock_dur.labels.return_value = mock_dur_lbl
+
+        from app.services.trend_pullback_scan import run_trend_pullback_scan
+
+        asyncio.run(
+            run_trend_pullback_scan(
+                ["AAA"], db=MagicMock(), start_date=_EVENT_DATE, end_date=_EVENT_DATE
+            )
+        )
+
+    mock_ts_lbl.set.assert_not_called()
+    mock_dur_lbl.observe.assert_called_once()

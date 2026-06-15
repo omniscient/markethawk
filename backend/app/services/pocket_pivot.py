@@ -182,196 +182,201 @@ async def run_pocket_pivot_scan(
       6. Persist ScannerEvent if all criteria pass.
     """
     _perf_start = _time.monotonic()
+    try:
+        if start_date is None and end_date is None:
+            start_date = end_date = get_market_today()
+        elif start_date is None:
+            start_date = end_date
+        elif end_date is None:
+            end_date = start_date
 
-    if start_date is None and end_date is None:
-        start_date = end_date = get_market_today()
-    elif start_date is None:
-        start_date = end_date
-    elif end_date is None:
-        end_date = start_date
+        cfg: dict[str, Any] = {**DEFAULT_CONFIG, **(config or {})}
+        lookback_days: int = int(cfg["lookback_days"])
+        min_lookback_days: int = int(cfg["min_lookback_days"])
+        price_floor: float = float(cfg["price_floor"])
+        volume_floor: int = int(cfg["volume_floor"])
 
-    cfg: dict[str, Any] = {**DEFAULT_CONFIG, **(config or {})}
-    lookback_days: int = int(cfg["lookback_days"])
-    min_lookback_days: int = int(cfg["min_lookback_days"])
-    price_floor: float = float(cfg["price_floor"])
-    volume_floor: int = int(cfg["volume_floor"])
+        results: list[dict[str, Any]] = []
+        counts = {
+            "no_today_bar": 0,
+            "no_prior_close": 0,
+            "no_baseline": 0,
+            "no_down_days": 0,
+            "evaluated": 0,
+            "fired": 0,
+            "errors": 0,
+        }
 
-    results: list[dict[str, Any]] = []
-    counts = {
-        "no_today_bar": 0,
-        "no_prior_close": 0,
-        "no_baseline": 0,
-        "no_down_days": 0,
-        "evaluated": 0,
-        "fired": 0,
-        "errors": 0,
-    }
+        trading_days = [
+            start_date + timedelta(days=i)
+            for i in range((end_date - start_date).days + 1)
+            if (start_date + timedelta(days=i)).weekday() < 5
+        ]
 
-    trading_days = [
-        start_date + timedelta(days=i)
-        for i in range((end_date - start_date).days + 1)
-        if (start_date + timedelta(days=i)).weekday() < 5
-    ]
-
-    for event_date in trading_days:
-        for ticker in tickers:
-            try:
-                today = _get_today_bar(db, ticker, event_date)
-                if today is None:
-                    counts["no_today_bar"] += 1
-                    continue
-
-                prior_close = _get_prior_close(db, ticker, event_date)
-                if prior_close is None:
-                    counts["no_prior_close"] += 1
-                    continue
-
-                # Up-day check
-                if today["close"] < prior_close:
-                    continue
-
-                # Lookback bars: need min_lookback_days classifiable bars (+1 context)
-                lookback_bars = _get_lookback_bars(
-                    db, ticker, event_date, lookback_days
-                )
-                if len(lookback_bars) < min_lookback_days + 1:
-                    counts["no_baseline"] += 1
-                    continue
-
-                down_volumes = _classify_down_days(lookback_bars, lookback_days)
-                if not down_volumes:
-                    counts["no_down_days"] += 1
-                    continue
-
-                # All required data confirmed — count as evaluated before criteria checks
-                counts["evaluated"] += 1
-
-                max_down_day_vol = max(down_volumes)
-
-                # Volume criterion (strict) and materiality floors
-                if today["volume"] <= max_down_day_vol:
-                    continue
-                if today["close"] < price_floor:
-                    continue
-                if today["volume"] < volume_floor:
-                    continue
-
+        for event_date in trading_days:
+            for ticker in tickers:
                 try:
-                    enrichment = _get_enrichment(db, ticker, event_date)
-                except Exception:
-                    _LOG.warning(
-                        "Enrichment failed for %s on %s; proceeding with empty enrichment",
-                        ticker,
-                        event_date,
-                        exc_info=True,
+                    today = _get_today_bar(db, ticker, event_date)
+                    if today is None:
+                        counts["no_today_bar"] += 1
+                        continue
+
+                    prior_close = _get_prior_close(db, ticker, event_date)
+                    if prior_close is None:
+                        counts["no_prior_close"] += 1
+                        continue
+
+                    # Up-day check
+                    if today["close"] < prior_close:
+                        continue
+
+                    # Lookback bars: need min_lookback_days classifiable bars (+1 context)
+                    lookback_bars = _get_lookback_bars(
+                        db, ticker, event_date, lookback_days
                     )
-                    enrichment = {
-                        "market_cap": None,
-                        "outstanding_shares": None,
-                        "recent_split_date": None,
-                        "catalyst_tags": [],
-                        "catalyst_summary": None,
+                    if len(lookback_bars) < min_lookback_days + 1:
+                        counts["no_baseline"] += 1
+                        continue
+
+                    down_volumes = _classify_down_days(lookback_bars, lookback_days)
+                    if not down_volumes:
+                        counts["no_down_days"] += 1
+                        continue
+
+                    # All required data confirmed — count as evaluated before criteria checks
+                    counts["evaluated"] += 1
+
+                    max_down_day_vol = max(down_volumes)
+
+                    # Volume criterion (strict) and materiality floors
+                    if today["volume"] <= max_down_day_vol:
+                        continue
+                    if today["close"] < price_floor:
+                        continue
+                    if today["volume"] < volume_floor:
+                        continue
+
+                    try:
+                        enrichment = _get_enrichment(db, ticker, event_date)
+                    except Exception:
+                        _LOG.warning(
+                            "Enrichment failed for %s on %s; proceeding with empty enrichment",
+                            ticker,
+                            event_date,
+                            exc_info=True,
+                        )
+                        enrichment = {
+                            "market_cap": None,
+                            "outstanding_shares": None,
+                            "recent_split_date": None,
+                            "catalyst_tags": [],
+                            "catalyst_summary": None,
+                        }
+
+                    lookback_days_available = min(len(lookback_bars) - 1, lookback_days)
+
+                    split_in_lookback = False
+                    if enrichment.get("recent_split_date"):
+                        split_dt = date.fromisoformat(enrichment["recent_split_date"])
+                        if (event_date - split_dt).days <= 28:
+                            split_in_lookback = True
+
+                    up_day_pct = (
+                        round((today["close"] - prior_close) / prior_close, 4)
+                        if prior_close > 0
+                        else 0.0
+                    )
+                    volume_over_max_down_pct = round(
+                        today["volume"] / max_down_day_vol - 1.0, 4
+                    )
+
+                    indicators: dict[str, Any] = {
+                        "today_close": today["close"],
+                        "prior_close": prior_close,
+                        "up_day_pct": up_day_pct,
+                        "today_volume": today["volume"],
+                        "max_down_day_vol": max_down_day_vol,
+                        "volume_over_max_down_pct": volume_over_max_down_pct,
+                        "down_days_in_lookback": len(down_volumes),
+                        "lookback_days_available": lookback_days_available,
+                        "volume_floor": volume_floor,
+                        "price_floor": price_floor,
+                        "split_in_lookback": split_in_lookback,
                     }
 
-                lookback_days_available = min(len(lookback_bars) - 1, lookback_days)
+                    criteria_met: dict[str, bool] = {
+                        "up_day": True,
+                        "volume_over_max_down": True,
+                        "price_floor": True,
+                        "volume_floor": True,
+                    }
 
-                split_in_lookback = False
-                if enrichment.get("recent_split_date"):
-                    split_dt = date.fromisoformat(enrichment["recent_split_date"])
-                    if (event_date - split_dt).days <= 28:
-                        split_in_lookback = True
+                    event_dict = _save_event(
+                        db=db,
+                        ticker=ticker,
+                        event_date=event_date,
+                        scanner_type="pocket_pivot",
+                        indicators=indicators,
+                        criteria_met=criteria_met,
+                        enrichment=enrichment,
+                        previous_close=prior_close,
+                        closing_price=today["close"],
+                    )
+                    results.append(event_dict)
+                    counts["fired"] += 1
+                    scanner_events_total.labels(scanner_type="pocket_pivot").inc()
 
-                up_day_pct = (
-                    round((today["close"] - prior_close) / prior_close, 4)
-                    if prior_close > 0
-                    else 0.0
-                )
-                volume_over_max_down_pct = round(
-                    today["volume"] / max_down_day_vol - 1.0, 4
-                )
+                except Exception:
+                    counts["errors"] += 1
+                    _LOG.exception(
+                        "Error in pocket_pivot scan for %s on %s", ticker, event_date
+                    )
 
-                indicators: dict[str, Any] = {
-                    "today_close": today["close"],
-                    "prior_close": prior_close,
-                    "up_day_pct": up_day_pct,
-                    "today_volume": today["volume"],
-                    "max_down_day_vol": max_down_day_vol,
-                    "volume_over_max_down_pct": volume_over_max_down_pct,
-                    "down_days_in_lookback": len(down_volumes),
-                    "lookback_days_available": lookback_days_available,
-                    "volume_floor": volume_floor,
-                    "price_floor": price_floor,
-                    "split_in_lookback": split_in_lookback,
-                }
-
-                criteria_met: dict[str, bool] = {
-                    "up_day": True,
-                    "volume_over_max_down": True,
-                    "price_floor": True,
-                    "volume_floor": True,
-                }
-
-                event_dict = _save_event(
-                    db=db,
-                    ticker=ticker,
-                    event_date=event_date,
-                    scanner_type="pocket_pivot",
-                    indicators=indicators,
-                    criteria_met=criteria_met,
-                    enrichment=enrichment,
-                    previous_close=prior_close,
-                    closing_price=today["close"],
-                )
-                results.append(event_dict)
-                counts["fired"] += 1
-                scanner_events_total.labels(scanner_type="pocket_pivot").inc()
-
-            except Exception:
-                counts["errors"] += 1
-                _LOG.exception(
-                    "Error in pocket_pivot scan for %s on %s", ticker, event_date
-                )
-
-    _LOG.info(
-        "pocket_pivot scan complete: tickers=%d days=%d "
-        "dropped=(no_today_bar:%d no_prior_close:%d no_baseline:%d no_down_days:%d) "
-        "evaluated=%d fired=%d errors=%d",
-        len(tickers),
-        len(trading_days),
-        counts["no_today_bar"],
-        counts["no_prior_close"],
-        counts["no_baseline"],
-        counts["no_down_days"],
-        counts["evaluated"],
-        counts["fired"],
-        counts["errors"],
-    )
-
-    if diagnostics_out is not None:
-        diagnostics_out.update(
-            {
-                "tickers": len(tickers),
-                "days": len(trading_days),
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "no_today_bar": counts["no_today_bar"],
-                "no_prior_close": counts["no_prior_close"],
-                "no_baseline": counts["no_baseline"],
-                "no_down_days": counts["no_down_days"],
-                "evaluated": counts["evaluated"],
-                "fired": counts["fired"],
-                "errors": counts["errors"],
-            }
+        _LOG.info(
+            "pocket_pivot scan complete: tickers=%d days=%d "
+            "dropped=(no_today_bar:%d no_prior_close:%d no_baseline:%d no_down_days:%d) "
+            "evaluated=%d fired=%d errors=%d",
+            len(tickers),
+            len(trading_days),
+            counts["no_today_bar"],
+            counts["no_prior_close"],
+            counts["no_baseline"],
+            counts["no_down_days"],
+            counts["evaluated"],
+            counts["fired"],
+            counts["errors"],
         )
 
-    scan_last_success_timestamp.labels(scanner_type="pocket_pivot").set(_time.time())
-    scan_failed_tickers_ratio.labels(scanner_type="pocket_pivot").set(
-        counts["errors"] / max(1, len(tickers) * len(trading_days))
-    )
-    scan_duration_seconds.labels(scanner_type="pocket_pivot").observe(
-        _time.monotonic() - _perf_start
-    )
-    return results
+        if diagnostics_out is not None:
+            diagnostics_out.update(
+                {
+                    "tickers": len(tickers),
+                    "days": len(trading_days),
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "no_today_bar": counts["no_today_bar"],
+                    "no_prior_close": counts["no_prior_close"],
+                    "no_baseline": counts["no_baseline"],
+                    "no_down_days": counts["no_down_days"],
+                    "evaluated": counts["evaluated"],
+                    "fired": counts["fired"],
+                    "errors": counts["errors"],
+                }
+            )
+
+        _total_units = len(tickers) * len(trading_days)
+        if _total_units == 0 or counts["errors"] < _total_units:
+            scan_last_success_timestamp.labels(scanner_type="pocket_pivot").set(
+                _time.time()
+            )
+        scan_failed_tickers_ratio.labels(scanner_type="pocket_pivot").set(
+            counts["errors"] / max(1, len(tickers) * len(trading_days))
+        )
+        return results
+    finally:
+        scan_duration_seconds.labels(scanner_type="pocket_pivot").observe(
+            _time.monotonic() - _perf_start
+        )
 
 
 async def run_pocket_pivot_scan_for_date(
