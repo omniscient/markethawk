@@ -530,6 +530,9 @@ All custom metrics are registered in `app/core/metrics.py` and exported at `GET 
 | `http_request_duration_seconds` | Histogram | `method`, `handler` | `main.py` middleware |
 | `scanner_events_total` | Counter | `scanner_type` | `scanner.py`, `liquidity_hunt.py` |
 | `scan_duration_seconds` | Histogram | `scanner_type` | `scanner.py`, `liquidity_hunt.py` |
+| `scan_last_success_timestamp` | Gauge (`livemax`) | `scanner_type` | all scanner services |
+| `scan_data_to_detection_seconds` | Histogram | `scanner_type` | `pre_market_scan.py` |
+| `scan_failed_tickers_ratio` | Gauge (`livemax`) | `scanner_type` | all scanner services |
 | `polygon_api_calls_total` | Counter | `endpoint` | `providers/massive.py` |
 | `ibkr_connection_status` | Gauge | — | `providers/ibkr.py` |
 | `celery_tasks_total` | Counter | `task_name`, `status` | all task files |
@@ -544,7 +547,7 @@ All custom metrics are registered in `app/core/metrics.py` and exported at `GET 
 Four pre-provisioned dashboards load automatically from the `grafana/provisioning/` directory:
 
 - **API Overview** — request rate, error rate, P95 latency, WebSocket connections, DB pool
-- **Scanner Performance** — events/min per scanner type, scan durations, Polygon API call rate, IBKR status
+- **Scanner Performance** — events/min per scanner type, scan durations, Polygon API call rate, IBKR status; p95 duration vs. 120s SLO line, last-success age, bar-to-signal latency p50
 - **Celery Tasks** — success/failure rates and P95 duration per task
 - **Infrastructure** — IBKR status, DB pool utilization, WebSocket count
 

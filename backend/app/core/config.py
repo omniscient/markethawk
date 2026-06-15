@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     # Must be a mailto: or https: URL identifying the push sender
     VAPID_CLAIMS_EMAIL: str = "mailto:admin@example.com"
 
+    # Scanner SLO thresholds — documented in ENV_VARIABLES.md
+    SCAN_DURATION_SLO_SECONDS: int = 120
+    SCAN_STALENESS_SLO_SECONDS: int = 900
+
     # ── WebSocket resource limits ──────────────────────────────────────────
     # Single-process in-memory counters (see app/core/ws_limits.py).
     # For multi-replica deployments, migrate counters to Redis.

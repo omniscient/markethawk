@@ -5,7 +5,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Backend: Models
 
-- [INVALID: app uses synchronous SQLAlchemy (Session/psycopg2), not AsyncSession — ADR-0004] Never use synchronous SQLAlchemy patterns (`session.query()`, sync `relationship()` lazy loads) — the app uses `AsyncSession` throughout. All queries use `select()` + `await session.execute()`. Sync lazy-loading raises `MissingGreenlet` in asyncpg. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
+- [PATTERN] Guard `func.max(Model.timestamp).scalar()` results with `isinstance(result, datetime)` before calling `.tzinfo` — mock DBs and SQLite return int/str instead of datetime, causing `AttributeError: 'int' object has no attribute 'tzinfo'`. PostgreSQL returns datetime correctly; the guard is a no-op in production. <!-- issue:#391 date:2026-06-14 expires:2026-12-14 source:implement -->
+
 
 ## Backend: API Routes
 
@@ -83,6 +84,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Keep `/metrics` in `EXEMPT_PREFIXES` (no bearer-token auth) and rely on Caddyfile `handle /metrics { respond 404 }` as defense-in-depth — Prometheus scrapes `backend:8000/metrics` on the internal Docker network (Caddy doesn't proxy `/metrics`), and adding app-level auth would break Prometheus scraping since it cannot send JWT cookies. <!-- issue:#369 date:2026-06-13 expires:2026-12-13 source:implement -->
 
+
+## Backend: Prometheus SLO Metrics
+
+- [PATTERN] Gate `scan_last_success_timestamp.set(time.time())` on non-total-failure: `if not tickers or len(failed) < len(tickers)`. A run where every ticker fails still "completes", but should not advance last-success — otherwise the missed-slot staleness alert never fires on total outage, defeating the acceptance criterion. An empty universe counts as success. <!-- issue:#391 date:2026-06-15 expires:2026-12-15 source:implement -->
+
+- [PATTERN] Wrap the scanner body in `try/finally` and call `scan_duration_seconds.observe()` in the `finally` block — not after the work. If `_persist` or any post-scan query raises, the observation is skipped and p95 is biased low (slow-then-crashing runs silently drop out). Applies to all scanner entry points in `backend/app/services/`. <!-- issue:#391 date:2026-06-15 expires:2026-12-15 source:implement -->
 
 ## Backend: Backtest / Simulation
 

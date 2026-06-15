@@ -26,6 +26,27 @@ scan_duration_seconds = Histogram(
     buckets=[0.5, 1, 2, 5, 10, 30, 60, 120, 300],
 )
 
+scan_last_success_timestamp = Gauge(
+    "scan_last_success_timestamp",
+    "Unix timestamp of the last successful scan completion",
+    ["scanner_type"],
+    multiprocess_mode="livemax",
+)
+
+scan_data_to_detection_seconds = Histogram(
+    "scan_data_to_detection_seconds",
+    "Seconds between the freshest bar used and ScannerEvent creation time",
+    ["scanner_type"],
+    buckets=[30, 60, 120, 300, 600, 900, 1800, 3600],
+)
+
+scan_failed_tickers_ratio = Gauge(
+    "scan_failed_tickers_ratio",
+    "Fraction of tickers that failed in the most recent scan run (0.0–1.0)",
+    ["scanner_type"],
+    multiprocess_mode="livemax",
+)
+
 polygon_api_calls_total = Counter(
     "polygon_api_calls_total",
     "Total calls made to the Polygon.io API",

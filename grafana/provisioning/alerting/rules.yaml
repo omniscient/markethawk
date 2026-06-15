@@ -140,3 +140,94 @@ groups:
             model:
               type: math
               expression: $B < 1
+
+      - uid: scan-missed-slot-pre-market
+        title: Pre-Market Scan Missed Slot
+        condition: C
+        for: 0m
+        annotations:
+          summary: >
+            pre_market_volume_spike has not completed successfully for >15 min
+            during the pre-market window (04:00–09:30 ET). Check Celery worker health.
+        labels:
+          severity: critical
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              # Time since last successful scan. SCAN_STALENESS_SLO_SECONDS default: 900
+              expr: time() - scan_last_success_timestamp{scanner_type="pre_market_volume_spike"}
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              # Gate to 08:00–15:00 UTC via Grafana alert rule "Active time range"
+              # (weekdays, 08:00–15:00 UTC) in the Grafana UI after provisioning.
+              expression: $B > 900
+
+      - uid: scan-duration-slo-breach
+        title: Scanner p95 Duration Exceeds SLO
+        condition: C
+        for: 5m
+        annotations:
+          summary: >
+            {{ $labels.scanner_type }} p95 scan duration exceeds the 120-second SLO.
+            Tune threshold via SCAN_DURATION_SLO_SECONDS env var.
+        labels:
+          severity: warning
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              # SCAN_DURATION_SLO_SECONDS default: 120
+              expr: >
+                histogram_quantile(0.95,
+                  sum(rate(scan_duration_seconds_bucket[15m])) by (le, scanner_type)
+                )
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B > 120
+
+      - uid: scan-high-failed-ticker-ratio
+        title: Scanner High Failed-Ticker Ratio
+        condition: C
+        for: 0m
+        annotations:
+          summary: >
+            {{ $labels.scanner_type }} had >10% failed tickers on the last run.
+            Check provider connectivity (Polygon/IBKR) or universe health.
+        labels:
+          severity: warning
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: scan_failed_tickers_ratio
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B > 0.1
