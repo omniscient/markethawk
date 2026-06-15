@@ -7,7 +7,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Guard `func.max(Model.timestamp).scalar()` results with `isinstance(result, datetime)` before calling `.tzinfo` — mock DBs and SQLite return int/str instead of datetime, causing `AttributeError: 'int' object has no attribute 'tzinfo'`. PostgreSQL returns datetime correctly; the guard is a no-op in production. <!-- issue:#391 date:2026-06-14 expires:2026-12-14 source:implement -->
 
-- [INVALID: app uses synchronous SQLAlchemy (Session/psycopg2), not AsyncSession — ADR-0004] Never use synchronous SQLAlchemy patterns (`session.query()`, sync `relationship()` lazy loads) — the app uses `AsyncSession` throughout. All queries use `select()` + `await session.execute()`. Sync lazy-loading raises `MissingGreenlet` in asyncpg. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 ## Backend: API Routes
 
@@ -25,7 +24,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When importing a symbol inside a Celery task function body (e.g. `from app.utils.session import get_market_today`), patch it at its source module (`app.utils.session.get_market_today`), not at `app.tasks.scanning.get_market_today` — the latter name doesn't exist at module level and `patch()` will raise `AttributeError`. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
-- [PATTERN] When adding a NOT NULL FK column to a table that already has rows: (1) add nullable, (2) UPDATE to backfill default, (3) ALTER to NOT NULL — all in the same Alembic migration. The universe_id migration (c7d8e9f0a1b2) demonstrates this three-step pattern for `scanner_configs`. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
 ## Backend: Cookie Security
 
@@ -40,8 +38,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] Test a pydantic-settings validator by passing the invalid value as an init kwarg — `Settings(JWT_SECRET_KEY="")` — since init kwargs override env vars. This gives a clean, deterministic test without manipulating environment state. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 ## Backend: Migrations
-
-- [FIX] If `alembic revision --autogenerate` produces an empty migration (no `op.` calls in the body), verify that the model is imported in `backend/app/models/__init__.py` and that `Base` is the same `DeclarativeBase` instance as in `backend/app/core/database.py`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
 
 - [FIX] When a migration backfills a FK column (e.g. `UPDATE scanner_configs SET universe_id = 1`), ensure the referenced row exists BEFORE the UPDATE by inserting it with `ON CONFLICT (id) DO NOTHING` — CI databases start empty (no seed SQL applied), so the FK constraint will fail if the parent row is absent. See migration `c7d8e9f0a1b2` for the pattern. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
@@ -59,7 +55,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Backend: Utilities
 
-- [PATTERN] For aggregate stats functions (count/sum of a model column split by condition), use a single `db.query(func.count(), func.count(case((Model.col > 0, 1))), func.coalesce(func.sum(case((Model.col > 0, Model.col))), 0)).one()` query instead of a full-table `db.query(Model).all()`. Wrap numeric results in `Decimal(str(row.value))` to handle the psycopg2 Numeric bridge. See `journal_service.get_trade_stats()` for the reference implementation. <!-- issue:#291 date:2026-06-12 expires:2026-12-12 source:implement -->
 
 - [PATTERN] Use `from app.utils.time import utc_now, to_utc_naive` for any naive-UTC datetime need: `utc_now()` replaces `datetime.now(timezone.utc).replace(tzinfo=None)`, `to_utc_naive(dt)` replaces `.astimezone(timezone.utc).replace(tzinfo=None)`. Column defaults use the callable ref (`default=utc_now`), inline expressions call it (`utc_now()`). <!-- issue:#286 date:2026-06-11 expires:2026-12-11 source:implement -->
 
@@ -85,6 +80,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Keep `/metrics` in `EXEMPT_PREFIXES` (no bearer-token auth) and rely on Caddyfile `handle /metrics { respond 404 }` as defense-in-depth — Prometheus scrapes `backend:8000/metrics` on the internal Docker network (Caddy doesn't proxy `/metrics`), and adding app-level auth would break Prometheus scraping since it cannot send JWT cookies. <!-- issue:#369 date:2026-06-13 expires:2026-12-13 source:implement -->
 
+
+## Backend: Prometheus SLO Metrics
+
+- [PATTERN] Gate `scan_last_success_timestamp.set(time.time())` on non-total-failure: `if not tickers or len(failed) < len(tickers)`. A run where every ticker fails still "completes", but should not advance last-success — otherwise the missed-slot staleness alert never fires on total outage, defeating the acceptance criterion. An empty universe counts as success. <!-- issue:#391 date:2026-06-15 expires:2026-12-15 source:implement -->
+
+- [PATTERN] Wrap the scanner body in `try/finally` and call `scan_duration_seconds.observe()` in the `finally` block — not after the work. If `_persist` or any post-scan query raises, the observation is skipped and p95 is biased low (slow-then-crashing runs silently drop out). Applies to all scanner entry points in `backend/app/services/`. <!-- issue:#391 date:2026-06-15 expires:2026-12-15 source:implement -->
 
 ## Backend: Backtest / Simulation
 
