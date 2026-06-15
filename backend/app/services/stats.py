@@ -6,12 +6,31 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import sqlalchemy as sa
-from sqlalchemy import and_, cast, desc, extract, func
+from sqlalchemy import and_, cast, desc, extract, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+
+# JSONB path to the gate tier: metadata_["quality_gate"]["tier"]
+_GATE_TIER = ScannerEvent.metadata_["quality_gate"]["tier"].astext
+
+
+def _build_trust_filter(include_warnings: bool = False, include_all: bool = False):
+    """Return a SQLAlchemy filter expression for the quality-gate trust level.
+
+    - include_all=True  → no filter (all tiers visible)
+    - include_warnings  → trusted + warning (exclude blocked/skipped)
+    - default           → trusted only (NULL tier treated as trusted for legacy events)
+    """
+    if include_all:
+        return None
+    if include_warnings:
+        # Allowlist: keep NULL (legacy trusted) and explicitly trusted/warning tiers
+        return or_(_GATE_TIER.is_(None), _GATE_TIER.in_(["trusted", "warning"]))
+    # Default: only events explicitly trusted or without a gate record
+    return or_(_GATE_TIER.is_(None), _GATE_TIER == "trusted")
 
 
 class StatsService:
@@ -132,22 +151,59 @@ class StatsService:
         start_date=None,
         end_date=None,
         severity: Optional[str] = None,
+        include_warnings: bool = False,
+        include_all: bool = False,
     ) -> Dict[str, Any]:
+        base_filters = [ScannerEvent.scanner_type == scanner_type]
+        if start_date:
+            base_filters.append(ScannerEvent.event_date >= start_date)
+        if end_date:
+            base_filters.append(ScannerEvent.event_date <= end_date)
+        if severity:
+            base_filters.append(ScannerEvent.severity == severity)
+
+        # Gate status counts — query ScannerEvent directly so events without a
+        # summary (no inner join) are still reflected in the tier counts.
+        tier_count_rows = (
+            db.query(_GATE_TIER.label("tier"), func.count().label("n"))
+            .filter(*base_filters)
+            .group_by(_GATE_TIER)
+            .all()
+        )
+        gate_status: Dict[str, int] = {
+            "trusted": 0,
+            "warning": 0,
+            "blocked": 0,
+            "skipped": 0,
+            "unknown": 0,
+        }
+        for row in tier_count_rows:
+            key = row.tier if row.tier in gate_status else "unknown"
+            gate_status[key] += int(row.n)
+
+        # Determine gate_filter label for response
+        if include_all:
+            gate_filter = "all"
+        elif include_warnings:
+            gate_filter = "trusted+warning"
+        else:
+            gate_filter = "trusted"
+
         query = (
             db.query(ScannerOutcomeSummary)
             .join(
                 ScannerEvent, ScannerEvent.id == ScannerOutcomeSummary.scanner_event_id
             )
-            .filter(ScannerEvent.scanner_type == scanner_type)
+            .filter(*base_filters)
         )
-        if start_date:
-            query = query.filter(ScannerEvent.event_date >= start_date)
-        if end_date:
-            query = query.filter(ScannerEvent.event_date <= end_date)
-        if severity:
-            query = query.filter(ScannerEvent.severity == severity)
+        trust_filter = _build_trust_filter(
+            include_warnings=include_warnings, include_all=include_all
+        )
+        if trust_filter is not None:
+            query = query.filter(trust_filter)
 
         summaries = query.all()
+        # trust-filtered total (see gate_status for all-tier counts)
         total = len(summaries)
         complete = [s for s in summaries if s.is_complete]
         complete_count = len(complete)
@@ -168,6 +224,8 @@ class StatsService:
                 "follow_through_rate_pct": None,
                 "edge_decay": [],
                 "interval_breakdown": {},
+                "gate_status": gate_status,
+                "gate_filter": gate_filter,
             }
 
         wins = [
@@ -241,6 +299,8 @@ class StatsService:
             "follow_through_rate_pct": ft_rate,
             "edge_decay": [],
             "interval_breakdown": {},
+            "gate_status": gate_status,
+            "gate_filter": gate_filter,
         }
 
     @staticmethod
@@ -474,6 +534,7 @@ class StatsService:
 
         signals = []
         for event, summary in rows:
+            gate_meta = (event.metadata_ or {}).get("quality_gate") or {}
             signals.append(
                 {
                     "id": event.id,
@@ -481,6 +542,10 @@ class StatsService:
                     "event_date": event.event_date.isoformat(),
                     "severity": event.severity,
                     "summary": event.summary,
+                    # gate_tier is label-only; trust filtering is intentionally left
+                    # to the client (UI filters client-side). If server-side exclusion
+                    # is needed in future, add include_warnings/include_all params here.
+                    "gate_tier": gate_meta.get("tier"),
                     "opening_price": float(event.opening_price)
                     if event.opening_price
                     else None,

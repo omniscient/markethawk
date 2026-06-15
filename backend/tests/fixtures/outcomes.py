@@ -119,3 +119,63 @@ def seed_outcomes(db: Session) -> dict:
     db.flush()
 
     return {"events": events, "snapshots": snapshots, "summaries": summaries}
+
+
+def _make_gate_meta(tier: str) -> dict:
+    return {"quality_gate": {"tier": tier, "warnings": []}}
+
+
+def seed_outcomes_with_gate_tiers(db: Session) -> dict:
+    """
+    Creates 4 ScannerEvents with explicit quality_gate tiers:
+      - AAPL: trusted  (with complete summary)
+      - MSFT: warning  (with complete summary)
+      - NVDA: blocked  (with complete summary)
+      - AMD:  skipped  (with complete summary)
+    All events for scanner_type='pre_market_volume_spike'.
+    Returns {"events": [...], "summaries": [...]}.
+    """
+    today = date.today()
+    tiers = [
+        ("AAPL", "trusted"),
+        ("MSFT", "warning"),
+        ("NVDA", "blocked"),
+        ("AMD", "skipped"),
+    ]
+
+    events = []
+    for ticker, tier in tiers:
+        ev = ScannerEvent(
+            ticker=ticker,
+            event_date=today,
+            scanner_type="pre_market_volume_spike",
+            summary=f"{ticker} {tier} gate tier",
+            severity="medium",
+            indicators={"volume_spike_ratio": 5.0},
+            criteria_met={"volume_threshold": True},
+            metadata_=_make_gate_meta(tier),
+        )
+        db.add(ev)
+        events.append(ev)
+    db.flush()
+
+    ref_price = Decimal("100.00")
+    summaries = []
+    for ev in events:
+        sm = ScannerOutcomeSummary(
+            scanner_event_id=ev.id,
+            reference_price=ref_price,
+            mfe_pct=Decimal("2.00"),
+            mae_pct=Decimal("0.50"),
+            mfe_mae_ratio=Decimal("4.00"),
+            r_multiple=Decimal("3.00"),
+            eod_pct_change=Decimal("1.50"),
+            follow_through=True,
+            gap_filled=False,
+            is_complete=True,
+        )
+        db.add(sm)
+        summaries.append(sm)
+    db.flush()
+
+    return {"events": events, "summaries": summaries}
