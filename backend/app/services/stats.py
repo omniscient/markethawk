@@ -27,8 +27,8 @@ def _build_trust_filter(include_warnings: bool = False, include_all: bool = Fals
     if include_all:
         return None
     if include_warnings:
-        # Exclude blocked and skipped; keep NULL (legacy trusted) and trusted/warning
-        return or_(_GATE_TIER.is_(None), ~_GATE_TIER.in_(["blocked", "skipped"]))
+        # Allowlist: keep NULL (legacy trusted) and explicitly trusted/warning tiers
+        return or_(_GATE_TIER.is_(None), _GATE_TIER.in_(["trusted", "warning"]))
     # Default: only events explicitly trusted or without a gate record
     return or_(_GATE_TIER.is_(None), _GATE_TIER == "trusted")
 
@@ -162,13 +162,10 @@ class StatsService:
         if severity:
             base_filters.append(ScannerEvent.severity == severity)
 
-        # Gate status counts (all tiers, before trust filter)
+        # Gate status counts — query ScannerEvent directly so events without a
+        # summary (no inner join) are still reflected in the tier counts.
         tier_count_rows = (
             db.query(_GATE_TIER.label("tier"), func.count().label("n"))
-            .join(
-                ScannerOutcomeSummary,
-                ScannerOutcomeSummary.scanner_event_id == ScannerEvent.id,
-            )
             .filter(*base_filters)
             .group_by(_GATE_TIER)
             .all()
@@ -178,9 +175,10 @@ class StatsService:
             "warning": 0,
             "blocked": 0,
             "skipped": 0,
+            "unknown": 0,
         }
         for row in tier_count_rows:
-            key = row.tier if row.tier in gate_status else "trusted"
+            key = row.tier if row.tier in gate_status else "unknown"
             gate_status[key] += int(row.n)
 
         # Determine gate_filter label for response
@@ -205,6 +203,7 @@ class StatsService:
             query = query.filter(trust_filter)
 
         summaries = query.all()
+        # trust-filtered total (see gate_status for all-tier counts)
         total = len(summaries)
         complete = [s for s in summaries if s.is_complete]
         complete_count = len(complete)
@@ -543,6 +542,9 @@ class StatsService:
                     "event_date": event.event_date.isoformat(),
                     "severity": event.severity,
                     "summary": event.summary,
+                    # gate_tier is label-only; trust filtering is intentionally left
+                    # to the client (UI filters client-side). If server-side exclusion
+                    # is needed in future, add include_warnings/include_all params here.
                     "gate_tier": gate_meta.get("tier"),
                     "opening_price": float(event.opening_price)
                     if event.opening_price
