@@ -17,6 +17,13 @@ repos:
         pass_filenames: false
         files: '\.(ts|tsx|js|jsx)$'
 
+      - id: check-preview-creds
+        name: Block preview credentials outside allowlisted compose file
+        language: system
+        entry: bash dark-factory/scripts/check_preview_creds.sh
+        pass_filenames: false
+        files: 'docker-compose.*\.yml$'
+
       - id: codeindex-blast
         name: codeindex blast-radius warning
         language: system
