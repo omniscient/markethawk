@@ -35,6 +35,7 @@ graph TD
         proxyscheduler["docker-socket-proxy-scheduler :2375"]
         darkfactory["dark-factory (factory profile)"]
         scheduler["backlog-scheduler (scheduler profile)"]
+        buildkit["buildkit :1234 (factory/scheduler profiles)"]
     end
 
     dockersock[/"Docker socket\n/var/run/docker.sock"\]
@@ -77,6 +78,7 @@ graph TD
     proxyfactory -->|":ro"| dockersock
     proxyscheduler -->|":ro"| dockersock
     darkfactory -->|"tcp :2375"| proxyfactory
+    darkfactory -->|"buildx tcp :1234"| buildkit
     scheduler -->|"tcp :2375"| proxyscheduler
 
     seqgelf -->|"GELF → HTTP"| seq
