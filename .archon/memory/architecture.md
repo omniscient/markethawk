@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Scanner Explainability Services (issue #453)
+
+- [PATTERN] Explanation-related service modules live under `backend/app/services/explanations/` (subpackage with `__init__.py`), not as flat files in `backend/app/services/`. The subpackage was established in issue #453 to group the builder, data-quality warning integration (#454), backfill job (#458), and any future explanation helpers. <!-- issue:#453 date:2026-06-15 expires:2026-12-15 source:refine -->
+
+- [AVOID] Do not place `ExplanationBuilder` or related explanation helpers as flat files directly in `backend/app/services/` — use the `explanations/` subpackage established for issues #453–#458. Placing them flat would require a later rename/move that churns imports across the orchestrator, scanners, and tests. <!-- issue:#453 date:2026-06-15 expires:2026-12-15 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
