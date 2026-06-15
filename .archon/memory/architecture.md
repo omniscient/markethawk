@@ -22,6 +22,14 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Extension Point Adapter Selection (issue #443)
+
+- [PATTERN] Use `SystemConfig["<ADAPTER_KEY>"]` (default hardcoded key) for system-wide runtime broker/adapter selection in the auto-trading pipeline. `SystemConfig` is the established no-migration toggle store (already used for `AUTO_TRADING_ENABLED`, `PAPER_ACCOUNT_SIZE`); it works at all call sites including account-display and polling tasks that have no `TradingStrategy` in scope. A `resolve_adapter(db)` helper reads SystemConfig and dispatches through the extension registry. <!-- issue:#443 date:2026-06-15 expires:2026-12-15 source:refine -->
+
+- [AVOID] Do not use `TradingStrategy.parameters` JSONB as the primary adapter selection key for system-level operations (account lookup, fill polling) — these call sites have no strategy object in scope (`get_account()` takes no args; `_poll_live_orders` operates across all orders). Per-strategy adapter selection requires layering parameters on top of a system-wide default, not replacing it. <!-- issue:#443 date:2026-06-15 expires:2026-12-15 source:refine -->
+
+- [PATTERN] When a provider extension point wraps a natively-async implementation (e.g. `IBKROrderManager`), make the `BaseAdapter` interface async (`async def` methods) even though `BaseDataProvider` is sync — the key differentiator is whether the wrapped implementation is sync (HTTP SDK → sync base) or async (ib_insync → async base). Callers manage event loops as they do today (`asyncio.new_event_loop()`). <!-- issue:#443 date:2026-06-15 expires:2026-12-15 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
