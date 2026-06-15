@@ -164,6 +164,15 @@ curl http://localhost:8000/health
 
 ---
 
+## Scanner SLO
+
+| Variable | Default | Description |
+|---|---|---|
+| `SCAN_DURATION_SLO_SECONDS` | `120` | p95 scan duration threshold in seconds above which the SLO-breach alert fires (Grafana alert `scan-duration-slo-breach`). |
+| `SCAN_STALENESS_SLO_SECONDS` | `900` | Seconds since last successful scan completion before the missed-slot alert fires, when within the 08:00–15:00 UTC pre-market window (Grafana alert `scan-missed-slot-pre-market`). |
+
+---
+
 ## Adding a New Variable
 
 1. Add it to `.env.example` with a placeholder value and a comment.

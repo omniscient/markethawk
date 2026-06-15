@@ -30,6 +30,7 @@ from app.routers import (
     alerts_router,
     auth_router,
     auto_trading_router,
+    backtest_router,
     futures_router,
     health_router,
     journal_router,
@@ -431,6 +432,7 @@ def create_app() -> FastAPI:
     app.include_router(auto_trading_router)
     app.include_router(outcomes_router)
     app.include_router(tweets_router)
+    app.include_router(backtest_router)
 
     # Populate scan_orchestrator registry — must be after router includes.
     # importlib avoids the local variable `app` shadowing the package name.

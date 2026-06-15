@@ -68,6 +68,22 @@ jobs:
               sys.exit(1)
           print('DAG trigger_rule check passed.')
 
+          # when: expression lint: reject parentheses and mixed &&/|| operators.
+          # Catches the class of regression from PR #359 (issue #397/403).
+          from check_workflow_when import check as when_check
+          when_errors = []
+          for path in sorted(glob.glob('.archon/workflows/*.yaml')):
+              when_errors.extend(when_check(path))
+          if when_errors:
+              print('Archon workflow when: expression lint failed:')
+              for e in when_errors:
+                  print(f'  {e}')
+              sys.exit(1)
+          print('when: expression lint passed for all workflow file(s).')
+
+      - name: Check preview credentials not leaked to non-preview compose files
+        run: bash dark-factory/scripts/check_preview_creds.sh
+
       - name: Dependency audit
         run: |
           pip install pip-audit
@@ -171,3 +187,21 @@ jobs:
           JWT_SECRET_KEY: ci-test-only-not-secret-0123456789abcdef
           REDIS_PASSWORD: ci-redis-dummy-password-0123456789abcdef
         run: python -m alembic check
+
+  factory-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test deps
+        run: pip install pytest pytest-mock pyyaml
+
+      - name: Run factory_core tests
+        run: python -m pytest dark-factory/tests/ -v
+        env:
+          PYTHONPATH: dark-factory/scripts

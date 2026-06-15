@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from tests.fixtures.outcomes import seed_outcomes
+from tests.fixtures.outcomes import seed_outcomes, seed_outcomes_with_gate_tiers
 
 client = TestClient(app)
 
@@ -395,3 +395,80 @@ def test_readiness_returns_correct_shape(db: Session):
     assert data["ticker"] == "AAPL"
     assert data["scanner_type"] == "pre_market_volume_spike"
     assert isinstance(data["coverages"], list)
+
+
+# ---------------------------------------------------------------------------
+# Trust filter — quality gate tier exclusion from Scorecard
+# ---------------------------------------------------------------------------
+
+
+def test_scorecard_default_excludes_blocked_and_skipped(db: Session):
+    seed_outcomes_with_gate_tiers(db)  # 1 trusted, 1 warning, 1 blocked, 1 skipped
+
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    assert response.status_code == 200
+    data = response.json()
+    # Default: only the trusted event is counted
+    assert data["complete_signals"] == 1
+    assert data["gate_filter"] == "trusted"
+
+
+def test_scorecard_include_warnings_adds_warning_tier(db: Session):
+    seed_outcomes_with_gate_tiers(db)
+
+    response = client.get(
+        "/api/v1/outcomes/scorecard/pre_market_volume_spike?include_warnings=true"
+    )
+
+    data = response.json()
+    # trusted + warning = 2 events
+    assert data["complete_signals"] == 2
+    assert data["gate_filter"] == "trusted+warning"
+
+
+def test_scorecard_include_all_returns_all_events(db: Session):
+    seed_outcomes_with_gate_tiers(db)
+
+    response = client.get(
+        "/api/v1/outcomes/scorecard/pre_market_volume_spike?include_all=true"
+    )
+
+    data = response.json()
+    # All 4 events (trusted, warning, blocked, skipped)
+    assert data["complete_signals"] == 4
+    assert data["gate_filter"] == "all"
+
+
+def test_scorecard_gate_status_counts_all_tiers(db: Session):
+    seed_outcomes_with_gate_tiers(db)
+
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    data = response.json()
+    gs = data["gate_status"]
+    assert gs["trusted"] == 1
+    assert gs["warning"] == 1
+    assert gs["blocked"] == 1
+    assert gs["skipped"] == 1
+
+
+def test_scorecard_legacy_events_treated_as_trusted(db: Session):
+    seed_outcomes(db)  # legacy events: metadata_={}, no quality_gate key
+
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    data = response.json()
+    # 3 legacy trusted events should all be included in default trusted filter
+    assert data["complete_signals"] == 3
+    assert data["gate_status"]["trusted"] == 3
+
+
+def test_signals_response_includes_gate_tier_field(db: Session):
+    seed_outcomes_with_gate_tiers(db)
+
+    response = client.get("/api/v1/outcomes/signals/pre_market_volume_spike")
+
+    assert response.status_code == 200
+    for signal in response.json()["signals"]:
+        assert "gate_tier" in signal, "gate_tier missing from signal item"

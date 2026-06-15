@@ -70,14 +70,19 @@ def get_recent_news(ticker: str = None, db: Session = Depends(get_db)):
 
 
 import asyncio  # noqa: E402
+import logging  # noqa: E402
+import time  # noqa: E402
 
 import redis.asyncio as aioredis  # noqa: E402
 from fastapi import Depends, WebSocket, WebSocketDisconnect  # noqa: E402
 
-from app.core.auth import ws_get_current_user  # noqa: E402
+from app.core.auth import verify_ws_origin, ws_get_current_user  # noqa: E402
 from app.core.config import settings  # noqa: E402
 from app.core.rate_limits import limiter  # noqa: E402
+from app.core.ws_limits import ws_connection_slot  # noqa: E402
 from app.models.user import User  # noqa: E402
+
+_news_logger = logging.getLogger(__name__)
 
 
 @router.post("/refresh")
@@ -94,25 +99,38 @@ def trigger_news_refresh():
 async def news_websocket(
     websocket: WebSocket,
     _user: User = Depends(ws_get_current_user),
+    _origin: None = Depends(verify_ws_origin),
 ):
-    await websocket.accept()
-    # Connect to redis using async redis client
-    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    pubsub = redis_client.pubsub()
-    await pubsub.subscribe("news_updates")
+    async with ws_connection_slot(str(_user.id)):
+        await websocket.accept()
+        redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe("news_updates")
 
-    try:
-        while True:
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True, timeout=1.0
-            )
-            if message:
-                await websocket.send_text(message["data"])
-            await asyncio.sleep(0.1)  # prevent busy looping
-    except WebSocketDisconnect:
-        pass
-    except Exception as e:
-        print(f"WS Exception: {e}")
-    finally:
-        await pubsub.unsubscribe("news_updates")
-        await redis_client.close()
+        deadline = time.monotonic() + settings.WS_MAX_LIFETIME_SECONDS
+        idle_timeout = settings.WS_IDLE_TIMEOUT_SECONDS
+        last_message_at = time.monotonic()
+
+        try:
+            while True:
+                now = time.monotonic()
+                if now >= deadline:
+                    await websocket.close(1001)
+                    break
+                if now - last_message_at >= idle_timeout:
+                    await websocket.close(1000)
+                    break
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=1.0
+                )
+                if message:
+                    last_message_at = time.monotonic()
+                    await websocket.send_text(message["data"])
+                await asyncio.sleep(0.1)
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            _news_logger.error(f"News WS error: {e}")
+        finally:
+            await pubsub.unsubscribe("news_updates")
+            await redis_client.aclose()

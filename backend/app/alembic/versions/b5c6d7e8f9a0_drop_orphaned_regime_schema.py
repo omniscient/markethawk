@@ -48,15 +48,15 @@ def downgrade() -> None:
         sa.Column("bic_score", sa.Float(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=True),
         sa.Column("model_b64", sa.Text(), nullable=False),
-        sa.Column(
-            "feature_set", postgresql.JSONB(astext_type=sa.Text()), nullable=False
-        ),
+        sa.Column("feature_set", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("data_start_date", sa.Date(), nullable=False),
         sa.Column("data_end_date", sa.Date(), nullable=False),
         sa.Column("trained_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_regime_models_id"), "regime_models", ["id"], unique=False)
+    op.create_index(
+        op.f("ix_regime_models_id"), "regime_models", ["id"], unique=False
+    )
     op.create_index(
         "ix_regime_models_status_version",
         "regime_models",

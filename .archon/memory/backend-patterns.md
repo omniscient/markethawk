@@ -5,7 +5,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Backend: Models
 
-- [INVALID: app uses synchronous SQLAlchemy (Session/psycopg2), not AsyncSession — ADR-0004] Never use synchronous SQLAlchemy patterns (`session.query()`, sync `relationship()` lazy loads) — the app uses `AsyncSession` throughout. All queries use `select()` + `await session.execute()`. Sync lazy-loading raises `MissingGreenlet` in asyncpg. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
+- [PATTERN] Guard `func.max(Model.timestamp).scalar()` results with `isinstance(result, datetime)` before calling `.tzinfo` — mock DBs and SQLite return int/str instead of datetime, causing `AttributeError: 'int' object has no attribute 'tzinfo'`. PostgreSQL returns datetime correctly; the guard is a no-op in production. <!-- issue:#391 date:2026-06-14 expires:2026-12-14 source:implement -->
+
 
 ## Backend: API Routes
 
@@ -35,13 +36,13 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When adding a `field_validator` to `Settings` in `config.py`, add a matching `os.environ.setdefault("FIELD_NAME", valid_value)` at the top of `backend/tests/conftest.py` (before app imports) — otherwise bare `Settings()` calls in existing tests will hit the new validator with the default value and fail. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
 
-- [PATTERN] Test a pydantic-settings validator by passing the invalid value as an init kwarg — `Settings(JWT_SECRET_KEY="")` — since init kwargs override env vars. This gives a clean, deterministic test without manipulating environment state. <!-- issue:#190 date:2026-06-05 expires:2026-12-05 source:implement -->
-
 ## Backend: Migrations
 
-- [FIX] If `alembic revision --autogenerate` produces an empty migration (no `op.` calls in the body), verify that the model is imported in `backend/app/models/__init__.py` and that `Base` is the same `DeclarativeBase` instance as in `backend/app/core/database.py`. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:implement -->
-
 - [FIX] When a migration backfills a FK column (e.g. `UPDATE scanner_configs SET universe_id = 1`), ensure the referenced row exists BEFORE the UPDATE by inserting it with `ON CONFLICT (id) DO NOTHING` — CI databases start empty (no seed SQL applied), so the FK constraint will fail if the parent row is absent. See migration `c7d8e9f0a1b2` for the pattern. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
+
+## Backend: Redis / Caching
+
+- [PATTERN] Always call `db.commit()` before writing to Redis in functions that persist a DB row then cache it — if the commit fails, the Redis entry must not exist or it will expose a version that was never persisted. Also clear any process-level date-keyed dicts (`_foo_cache.clear()`) immediately after a successful commit so that in-process cache entries for stale data are evicted on retrain. See `regime_service.train_and_persist`. <!-- issue:#106 date:2026-06-15 expires:2026-12-15 source:implement -->
 
 ## Backend: Circuit Breakers
 
@@ -63,6 +64,12 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Use `from app.utils.db import get_or_404` to replace Shape A 404 boilerplate (`db.query(Model).filter(Model.id==id).first(); if not obj: raise HTTPException(404)`). Call without storing the result (`get_or_404(db, Model, id, "Name")`) when the result isn't used downstream. <!-- issue:#286 date:2026-06-11 expires:2026-12-11 source:implement -->
 
+## Backend: JSONB / Schema Validation
+
+- [PATTERN] Validate JSONB dict fields before persisting with a coarse `json.dumps()` probe (`_validate_jsonb_dict` in `alert_service.py`) — catches `datetime`, `Decimal`, callables at write time rather than serialization time. Prefer this over per-scanner-type Pydantic schemas when the key set varies by scanner type; use a concrete Pydantic model with `extra="forbid"` only when the shape is fixed (e.g. `ChannelConfig` in `schemas/alerts.py`). <!-- issue:#292 date:2026-06-13 expires:2026-12-13 source:implement -->
+
+- [PATTERN] Use `EmailStr`/`HttpUrl` in Pydantic schemas to validate format (not just presence) for email and URL fields. Validate-only pattern: call `Model.model_validate(raw)` and discard the result; store the raw dict (not `model_dump()`) to avoid pydantic v2's `Url` objects being persisted as non-strings in JSONB columns. `HttpUrl` enforces http/https scheme; `AnyUrl` accepts any scheme — prefer `HttpUrl` for delivery webhook fields. <!-- issue:#292 date:2026-06-13 expires:2026-12-13 source:implement -->
+
 ## Backend: Scanner Pipeline Decomposition
 
 - [PATTERN] Decompose monolithic scanner functions into three private stages: `_detect(ticker, prefetched_bars, ...) -> RawSignal | None` (pure, no DB), `_enrich(raw_signals, ..., db) -> tuple[list[EnrichedSignal], list[dict]]` (batch with per-ticker try/except — bad ticker logs + appends to failed list, returns both enriched and newly-failed), `_persist(enriched, failed, db, ...) -> list[dict]` (all DB writes + `try: db.commit() except: db.rollback(); raise`). Use `@dataclass(frozen=True) RawSignal` and `@dataclass EnrichedSignal` as stage boundaries; parameterize all list/dict fields (e.g. `list[StockAggregate]`, `dict[str, bool]`). Orchestrator unpacks `_enrich` result: `enriched, enrich_failed = _enrich(...); failed.extend(enrich_failed)`. See `backend/app/services/pre_market_scan.py` for the reference implementation. <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:implement -->
@@ -75,14 +82,22 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] CSRF_EXEMPT_PREFIXES and AUTH EXEMPT_PREFIXES serve different concerns and must remain separate tuples in `main.py`. Do not merge them — CSRF exempts pre-authentication paths; auth exempts docs/health/metrics paths that are unrelated to CSRF. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
 
-- [PATTERN] Keep `/metrics` in `EXEMPT_PREFIXES` (no bearer-token auth) and rely on Caddyfile `handle /metrics { respond 404 }` as defense-in-depth — Prometheus scrapes `backend:8000/metrics` on the internal Docker network (Caddy doesn't proxy `/metrics`), and adding app-level auth would break Prometheus scraping since it cannot send JWT cookies. <!-- issue:#369 date:2026-06-13 expires:2026-12-13 source:implement -->
 
-- [AVOID] EnrichedSignal must carry raw:RawSignal and day_metrics:dict stage-boundary fields per spec; omitting them severs the seam contract and blocks recovery of the original signal from enriched output <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:conformance path:backend/app/services/ -->
-- [AVOID] Stage functions (especially _enrich_one / per-ticker helpers) must stay under ~80 lines; when a helper grows large, extract the indicator-building body into a named _build_indicators() sub-helper rather than leaving it inline <!-- issue:#288 date:2026-06-12 expires:2026-12-12 source:conformance path:backend/app/services/ -->
-- [AVOID] [AVOID] For backend-derived Celery services, pass REDIS_PASSWORD as an env var and use a pydantic model_validator to build REDIS_URL rather than hardcoding the authenticated URL form directly in every docker-compose environment block <!-- issue:#370 date:2026-06-13 expires:2026-12-13 source:conformance path:backend/app/core/ -->
-- [AVOID] [AVOID] Leaving Celery task_serializer and accept_content at their implicit defaults; always add celery_app.conf.update(task_serializer='json', result_serializer='json', accept_content=['json']) to prevent future pickle regression <!-- issue:#370 date:2026-06-13 expires:2026-12-13 source:conformance path:backend/app/core/ -->
+
+## Backend: Prometheus SLO Metrics
+
+- [PATTERN] Gate `scan_last_success_timestamp.set(time.time())` on non-total-failure: `if not tickers or len(failed) < len(tickers)`. A run where every ticker fails still "completes", but should not advance last-success — otherwise the missed-slot staleness alert never fires on total outage, defeating the acceptance criterion. An empty universe counts as success. <!-- issue:#391 date:2026-06-15 expires:2026-12-15 source:implement -->
+
+- [PATTERN] Wrap the scanner body in `try/finally` and call `scan_duration_seconds.observe()` in the `finally` block — not after the work. If `_persist` or any post-scan query raises, the observation is skipped and p95 is biased low (slow-then-crashing runs silently drop out). Applies to all scanner entry points in `backend/app/services/`. <!-- issue:#391 date:2026-06-15 expires:2026-12-15 source:implement -->
+
+## Backend: Backtest / Simulation
+
+- [AVOID] Never write generated backtest signals to `scanner_events` — the `UniqueConstraint(ticker, event_date, scanner_type)` causes IntegrityErrors on any overlap with real events, and `scanner_events` is operational history consumed by alerts/clusters/reviews. Keep replay signals in-memory only; store a nullable `source_event_id` FK for signals that already exist in DB. See `backtest_service.py`. <!-- issue:#301 date:2026-06-13 expires:2026-12-13 source:implement -->
+- [PATTERN] When a sync function calls `run_until_complete()` inside a loop (e.g. day-walk in `backtest_service.py`), create the event loop once before the loop via `asyncio.new_event_loop()`, pass it as a parameter to callee functions, and close it in a `finally:` block — creating a new loop per iteration wastes resources and misses reuse opportunities. <!-- issue:#301 date:2026-06-14 expires:2026-12-14 source:implement -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+- [PROVISIONAL] `WebSocketException(code=1008)` raised inside the route handler body (not only from a FastAPI Dependency) is caught by Starlette and closes the connection before `websocket.accept()` returns to the client — so an `async with ws_connection_slot(user_id):` context manager in the handler body (before `await websocket.accept()`) correctly delivers 1008 without needing a separate Dependency. <!-- evidence:test-output issue:#377 date:2026-06-14 expires:2026-12-14 source:implement -->

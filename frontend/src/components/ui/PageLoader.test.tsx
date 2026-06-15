@@ -1,15 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { PageLoader } from './PageLoader';
 
 describe('PageLoader', () => {
-  it('renders without crashing', () => {
+  it('renders an accessible loading status element', () => {
     render(<PageLoader />);
-  });
-
-  it('renders a spinning element', () => {
-    const { container } = render(<PageLoader />);
-    const spinner = container.querySelector('.animate-spin');
-    expect(spinner).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
   });
 });

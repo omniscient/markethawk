@@ -75,11 +75,25 @@ assert_eq "bare key independent"        "1" "$(get_retry_count "42")"
 assert_eq ":refine unaffected by bare"  "0" "$(get_retry_count "42:refine")"
 
 # ==========================================
-# B: trip_to_blocked (fails until Task 5)
+# B: trip_to_blocked (thin adapter → breaker-trip CLI)
 # ==========================================
+# scheduler.sh's trip_to_blocked is a thin adapter that delegates to
+# `factory_core/cli.py breaker-trip`. The board-move + needs-discussion/
+# factory-regression labels + comment side effects live in factory_core/breaker.py
+# and are covered by test_factory_core_breaker.py (they run in a python subprocess
+# the bash stubs can't observe). Here we verify the adapter delegates with the right
+# issue/phase and that the retry counter is reset.
 echo ""
 echo "--- B: trip_to_blocked ---"
 echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+
+# Tee python3 invocations into STUB_LOG while still running the real interpreter (so
+# the real breaker-trip resets the counter on the temp state file). Capture the real
+# path BEFORE defining the wrapper, and export both so command-substitution subshells
+# (e.g. get_retry_count) resolve them.
+export _REAL_PY3="$(command -v python3)"
+python3() { echo "python3 $*" >> "$STUB_LOG"; "$_REAL_PY3" "$@"; }
+export -f python3
 
 increment_retry "99:plan"
 increment_retry "99:plan"
@@ -87,14 +101,8 @@ increment_retry "99:plan"
 
 trip_to_blocked "99" "plan" "test reason"
 
-assert_eq "set_board_status called" \
-  "1" "$(grep -c 'set_board_status 99' "$STUB_LOG" || echo 0)"
-assert_eq "gh issue edit adds needs-discussion" \
-  "1" "$(grep -c 'issue edit 99.*needs-discussion' "$STUB_LOG" || echo 0)"
-assert_eq "gh issue comment posted" \
-  "1" "$(grep -c 'issue comment 99' "$STUB_LOG" || echo 0)"
-assert_eq "gh issue edit adds factory-regression" \
-  "1" "$(grep -c 'issue edit 99.*factory-regression' "$STUB_LOG" || echo 0)"
+assert_eq "delegates to breaker-trip CLI (issue+phase)" \
+  "1" "$(grep -c 'breaker-trip --issue 99 --phase plan' "$STUB_LOG" || echo 0)"
 assert_eq ":plan counter reset after trip" \
   "0" "$(get_retry_count "99:plan")"
 
@@ -107,6 +115,8 @@ echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
 increment_retry "77"
 trip_to_blocked "77" "implement" "test"
 assert_eq "bare implement counter reset" "0" "$(get_retry_count "77")"
+
+unset -f python3
 
 # ==========================================
 # C: dispatch() exit-code capture (fails until Task 3)
@@ -617,18 +627,25 @@ assert_eq "K8: increment_retry recorded after CONFLICTING dispatch" \
 
 > "$STUB_LOG"; DISPATCHED=""
 
-# K9: P1.5-5 — trip_to_blocked called at MAX_RETRIES
+# K9: P1.5-5 — trip_to_blocked delegates to breaker-trip at MAX_RETRIES
 echo "{\"60:resolve\": $MAX_RETRIES}" > "$STATE_FILE"
 
 ISSUE=$(get_issue_number "$_ITEM_REVIEW_A")
 RETRIES=$(get_retry_count "${ISSUE}:resolve")
+
+# Tee python3 so we can observe the breaker-trip delegation (the board-move to
+# Blocked itself runs in breaker.py and is covered by test_factory_core_breaker.py).
+export _REAL_PY3="$(command -v python3)"
+python3() { echo "python3 $*" >> "$STUB_LOG"; "$_REAL_PY3" "$@"; }
+export -f python3
 if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
   trip_to_blocked "$ISSUE" "resolve" "retry limit of ${MAX_RETRIES} reached for conflict resolution"
 else
   dispatch "Deconflict issue #${ISSUE}" || true
 fi
-assert_eq "K9: set_board_status Blocked logged" \
-  "1" "$(grep -c "set_board_status 60 ${STATUS_BLOCKED}" "$STUB_LOG" || echo 0)"
+unset -f python3
+assert_eq "K9: delegates to breaker-trip CLI (resolve)" \
+  "1" "$(grep -c 'breaker-trip --issue 60 --phase resolve' "$STUB_LOG" || echo 0)"
 assert_eq "K9: no dispatch on trip" \
   "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
 assert_eq "K9: retry counter reset to 0" \
@@ -740,6 +757,126 @@ MAIN_RED_RECHECK_ENABLED=true
 is_recheck_running() { return 1; }
 dispatch() { echo "dispatch $*" >> "$STUB_LOG"; return 0; }
 export -f is_recheck_running dispatch
+
+# ==========================================
+# N: dependencies_met() — off-board fallback
+# ==========================================
+echo ""
+echo "--- N: dependencies_met ---"
+> "$STUB_LOG"
+
+# Shared stub variables for this section
+_N_BODY=""
+_N_DEP200_STATE=""
+_N_DEP200_GH_EXIT=0
+_N_DEP201_STATE=""
+
+# gh stub: routes by issue number; body call → _N_BODY; state call → per-dep state var
+gh() {
+  echo "gh $*" >> "$STUB_LOG"
+  if echo "$*" | grep -qE "view 100( |$)"; then
+    printf '%s\n' "$_N_BODY"; return 0
+  fi
+  if echo "$*" | grep -qE "view 201( |$)"; then
+    printf '%s\n' "$_N_DEP201_STATE"; return 0
+  fi
+  if echo "$*" | grep -qE "view 200( |$)"; then
+    printf '%s\n' "$_N_DEP200_STATE"; return $_N_DEP200_GH_EXIT
+  fi
+  return 0
+}
+export -f gh
+
+_BOARD_EMPTY='{"items":[]}'
+_BOARD_200_DONE='{"items":[{"content":{"number":200},"status":"Done"}]}'
+_BOARD_200_WIP='{"items":[{"content":{"number":200},"status":"In Progress"}]}'
+_BOARD_200_DONE_201_ABSENT='{"items":[{"content":{"number":200},"status":"Done"}]}'
+
+# N1: no deps in body → returns 0
+_N_BODY="No dependencies here"
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_EMPTY" && _N_RET=0 || _N_RET=1
+assert_eq "N1: no deps → returns 0" "0" "$_N_RET"
+
+# N2: dep Done on board → returns 0, no dep_gate log
+_N_BODY="Depends on: #200"
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_200_DONE" && _N_RET=0 || _N_RET=1
+assert_eq "N2: dep Done on board → returns 0" "0" "$_N_RET"
+assert_eq "N2: Done dep is silent (no dep_gate log)" \
+  "0" "$(grep -c 'dep_gate' "$STUB_LOG" || true)"
+
+# N3: dep non-Done on board → returns 1, logs dep_gate
+_N_BODY="Depends on: #200"
+> "$STUB_LOG"
+_N_OUTPUT=$(dependencies_met "100" "$_BOARD_200_WIP" 2>&1) && _N_RET=0 || _N_RET=1
+assert_eq "N3: non-Done dep → returns 1" "1" "$_N_RET"
+assert_eq "N3: non-Done dep → dep_gate logged" \
+  "1" "$(echo "$_N_OUTPUT" | grep -c 'dep_gate' || true)"
+
+# N4: dep off-board, gh state=CLOSED → returns 0, logs resolved=closed_off_board
+_N_BODY="Depends on: #200"
+_N_DEP200_STATE="CLOSED"
+_N_DEP200_GH_EXIT=0
+> "$STUB_LOG"
+_N_OUTPUT=$(dependencies_met "100" "$_BOARD_EMPTY" 2>&1) && _N_RET=0 || _N_RET=1
+assert_eq "N4: off-board CLOSED dep → returns 0" "0" "$_N_RET"
+assert_eq "N4: off-board CLOSED → logs resolved=closed_off_board" \
+  "1" "$(echo "$_N_OUTPUT" | grep -c 'resolved=closed_off_board' || true)"
+
+# N5: dep off-board, gh state=OPEN → returns 1, logs dep_status=off_board
+_N_BODY="Depends on: #200"
+_N_DEP200_STATE="OPEN"
+_N_DEP200_GH_EXIT=0
+> "$STUB_LOG"
+_N_OUTPUT=$(dependencies_met "100" "$_BOARD_EMPTY" 2>&1) && _N_RET=0 || _N_RET=1
+assert_eq "N5: off-board OPEN dep → returns 1" "1" "$_N_RET"
+assert_eq "N5: off-board OPEN → logs dep_status=off_board" \
+  "1" "$(echo "$_N_OUTPUT" | grep -c 'dep_status=off_board' || true)"
+
+# N6: dep off-board, gh state call fails/empty → returns 1 (safe direction)
+_N_BODY="Depends on: #200"
+_N_DEP200_STATE=""
+_N_DEP200_GH_EXIT=1
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_EMPTY" && _N_RET=0 || _N_RET=1
+assert_eq "N6: off-board gh-failure dep → returns 1 (safe)" "1" "$_N_RET"
+
+# N7: two deps — first Done on board, second off-board OPEN → returns 1
+_N_BODY="$(printf 'Depends on: #200\nDepends on: #201')"
+_N_DEP200_STATE=""
+_N_DEP200_GH_EXIT=0
+_N_DEP201_STATE="OPEN"
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_200_DONE_201_ABSENT" && _N_RET=0 || _N_RET=1
+assert_eq "N7: two deps, second off-board OPEN → returns 1" "1" "$_N_RET"
+
+# N8: two deps — first Done on board, second off-board CLOSED → returns 0
+_N_BODY="$(printf 'Depends on: #200\nDepends on: #201')"
+_N_DEP200_STATE=""
+_N_DEP200_GH_EXIT=0
+_N_DEP201_STATE="CLOSED"
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_200_DONE_201_ABSENT" && _N_RET=0 || _N_RET=1
+assert_eq "N8: two deps, second off-board CLOSED → returns 0" "0" "$_N_RET"
+
+# N9: body fetch fails → returns 0 (pre-existing behaviour)
+# Override gh so body call for issue 100 returns non-zero
+gh() {
+  echo "gh $*" >> "$STUB_LOG"
+  if echo "$*" | grep -qE "view 100"; then
+    return 1
+  fi
+  return 0
+}
+export -f gh
+> "$STUB_LOG"
+dependencies_met "100" "$_BOARD_EMPTY" && _N_RET=0 || _N_RET=1
+assert_eq "N9: body fetch fails → returns 0" "0" "$_N_RET"
+
+# Restore global gh stub
+gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
+export -f gh
 
 # ==========================================
 # Cleanup

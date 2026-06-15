@@ -1,14 +1,16 @@
 import asyncio
 import json
 import logging
+import time
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
-from app.core.auth import ws_get_current_user
+from app.core.auth import verify_ws_origin, ws_get_current_user
 from app.core.config import settings
 from app.core.metrics import active_websocket_connections
 from app.core.rate_limits import limiter
+from app.core.ws_limits import ws_connection_slot
 from app.models.user import User
 from app.services.websocket_manager import websocket_manager
 
@@ -24,53 +26,51 @@ async def stock_live_websocket(
     ticker: str,
     resolution: str,
     _user: User = Depends(ws_get_current_user),
+    _origin: None = Depends(verify_ws_origin),
 ):
-    """
-    WebSocket endpoint for live stock updates with specific resolution (minute/second).
-    Subscribes to Redis channel for the given ticker and resolution.
-    """
+    """Live stock updates for a specific ticker and resolution via shared fan-out."""
     ticker = ticker.upper()
     resolution = resolution.lower()
     if resolution not in ["minute", "second"]:
         resolution = "minute"
 
-    await websocket.accept()
-    active_websocket_connections.inc()
-
-    # Ensure backend is connected to Polygon and subscribed to this ticker
-    websocket_manager.subscribe(ticker)
-
-    # Connect to Redis for this specific client request
-    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    pubsub = redis_client.pubsub()
     channel = f"stock_updates:{ticker}:{resolution}"
-    await pubsub.subscribe(channel)
 
-    logger.info(f"Client connected to {resolution} updates for {ticker}")
+    async with ws_connection_slot(str(_user.id)):
+        await websocket.accept()
+        active_websocket_connections.inc()
+        websocket_manager.subscribe(ticker)
+        queue = await websocket_manager.register(channel)
 
-    try:
-        while True:
-            # Check for messages from Redis
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True, timeout=1.0
-            )
-            if message:
-                await websocket.send_text(message["data"])
+        logger.info(f"Client connected to {resolution} updates for {ticker}")
 
-            # Keep-alive / check if client is still there
-            # (get_message timeout handles the yield to event loop)
-            await asyncio.sleep(0.01)
+        deadline = time.monotonic() + settings.WS_MAX_LIFETIME_SECONDS
+        idle_timeout = settings.WS_IDLE_TIMEOUT_SECONDS
 
-    except WebSocketDisconnect:
-        logger.info(f"Client disconnected from live updates for {ticker}")
-    except Exception as e:
-        logger.error(f"WebSocket error for {ticker}: {e}")
-    finally:
-        active_websocket_connections.dec()
-        await pubsub.unsubscribe(channel)
-        await redis_client.close()
-        # Optionally tell manager to check if anyone else is watching this ticker
-        # (simplified: we keep it subscribed in the manager for now)
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    await websocket.close(1001)
+                    break
+                wait = min(idle_timeout, remaining)
+                try:
+                    message = await asyncio.wait_for(queue.get(), timeout=wait)
+                    await websocket.send_text(message)
+                except asyncio.TimeoutError:
+                    if time.monotonic() >= deadline:
+                        await websocket.close(1001)
+                    else:
+                        # Idle timeout exceeded
+                        await websocket.close(1000)
+                    break
+        except WebSocketDisconnect:
+            logger.info(f"Client disconnected from live updates for {ticker}")
+        except Exception as e:
+            logger.error(f"WebSocket error for {ticker}: {e}")
+        finally:
+            active_websocket_connections.dec()
+            websocket_manager.unregister(channel, queue)
 
 
 @router.websocket("/ws/watchlist")
@@ -78,40 +78,58 @@ async def stock_live_websocket(
 async def watchlist_live_websocket(
     websocket: WebSocket,
     _user: User = Depends(ws_get_current_user),
+    _origin: None = Depends(verify_ws_origin),
 ):
-    """
-    WebSocket endpoint that streams live tick data and alerts for all
-    symbols currently in the active watchlist.
+    """Live tick data and alerts for all watchlist symbols via shared fan-out."""
+    async with ws_connection_slot(str(_user.id)):
+        await websocket.accept()
+        active_websocket_connections.inc()
 
-    Publishes two types of messages:
-      - tick / minute_bar  (from live_scanner via 'watchlist:live_data' channel)
-      - alert              (from live_scanner via 'watchlist:alerts' channel)
-    """
-    await websocket.accept()
-    active_websocket_connections.inc()
+        # Register on both watchlist channels
+        live_queue = await websocket_manager.register("watchlist:live_data")
+        alert_queue = await websocket_manager.register("watchlist:alerts")
 
-    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    pubsub = redis_client.pubsub()
-    await pubsub.subscribe("watchlist:live_data", "watchlist:alerts")
+        logger.info("Client connected to watchlist live stream")
 
-    logger.info("Client connected to watchlist live stream")
+        deadline = time.monotonic() + settings.WS_MAX_LIFETIME_SECONDS
+        idle_timeout = settings.WS_IDLE_TIMEOUT_SECONDS
+        last_message_at = time.monotonic()
 
-    try:
-        while True:
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True, timeout=1.0
-            )
-            if message:
-                await websocket.send_text(message["data"])
-            await asyncio.sleep(0.01)
-    except WebSocketDisconnect:
-        logger.info("Client disconnected from watchlist live stream")
-    except Exception as e:
-        logger.error(f"Watchlist WebSocket error: {e}")
-    finally:
-        active_websocket_connections.dec()
-        await pubsub.unsubscribe("watchlist:live_data", "watchlist:alerts")
-        await redis_client.close()
+        try:
+            while True:
+                now = time.monotonic()
+                if now >= deadline:
+                    await websocket.close(1001)
+                    break
+                if now - last_message_at >= idle_timeout:
+                    await websocket.close(1000)
+                    break
+
+                sent = False
+                try:
+                    message = live_queue.get_nowait()
+                    await websocket.send_text(message)
+                    last_message_at = time.monotonic()
+                    sent = True
+                except asyncio.QueueEmpty:
+                    pass
+                try:
+                    message = alert_queue.get_nowait()
+                    await websocket.send_text(message)
+                    last_message_at = time.monotonic()
+                    sent = True
+                except asyncio.QueueEmpty:
+                    pass
+                if not sent:
+                    await asyncio.sleep(0.05)
+        except WebSocketDisconnect:
+            logger.info("Client disconnected from watchlist live stream")
+        except Exception as e:
+            logger.error(f"Watchlist WebSocket error: {e}")
+        finally:
+            active_websocket_connections.dec()
+            websocket_manager.unregister("watchlist:live_data", live_queue)
+            websocket_manager.unregister("watchlist:alerts", alert_queue)
 
 
 @router.websocket("/ws/scan-task/{task_id}")
@@ -120,41 +138,52 @@ async def scan_task_websocket(
     websocket: WebSocket,
     task_id: str,
     _user: User = Depends(ws_get_current_user),
+    _origin: None = Depends(verify_ws_origin),
 ):
-    """
-    WebSocket endpoint that streams Celery task progress for a range scan.
-    Subscribes to Redis channel scan_task:{task_id} and forwards messages to the client.
-    """
-    await websocket.accept()
-    active_websocket_connections.inc()
+    """Stream Celery task progress for a range scan."""
+    async with ws_connection_slot(str(_user.id)):
+        await websocket.accept()
+        active_websocket_connections.inc()
 
-    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    pubsub = redis_client.pubsub()
-    channel = f"scan_task:{task_id}"
-    await pubsub.subscribe(channel)
+        redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        pubsub = redis_client.pubsub()
+        channel = f"scan_task:{task_id}"
+        await pubsub.subscribe(channel)
 
-    logger.info(f"Client connected to scan task: {task_id}")
+        logger.info(f"Client connected to scan task: {task_id}")
 
-    try:
-        while True:
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True, timeout=1.0
-            )
-            if message:
-                await websocket.send_text(message["data"])
-                # Unsubscribe once the terminal state is delivered
-                try:
-                    parsed = json.loads(message["data"])
-                    if parsed.get("status") in ("completed", "failed"):
-                        break
-                except Exception:
-                    pass
-            await asyncio.sleep(0.01)
-    except WebSocketDisconnect:
-        logger.info(f"Client disconnected from scan task: {task_id}")
-    except Exception as e:
-        logger.error(f"Scan task WebSocket error for {task_id}: {e}")
-    finally:
-        active_websocket_connections.dec()
-        await pubsub.unsubscribe(channel)
-        await redis_client.aclose()
+        deadline = time.monotonic() + settings.WS_MAX_LIFETIME_SECONDS
+        idle_timeout = settings.WS_SCAN_TASK_IDLE_TIMEOUT_SECONDS
+        last_message_at = time.monotonic()
+
+        try:
+            while True:
+                now = time.monotonic()
+                if now >= deadline:
+                    await websocket.close(1001)
+                    break
+                if now - last_message_at >= idle_timeout:
+                    await websocket.close(1000)
+                    break
+
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=1.0
+                )
+                if message:
+                    last_message_at = time.monotonic()
+                    await websocket.send_text(message["data"])
+                    try:
+                        parsed = json.loads(message["data"])
+                        if parsed.get("status") in ("completed", "failed"):
+                            break
+                    except Exception:
+                        pass
+                await asyncio.sleep(0.01)
+        except WebSocketDisconnect:
+            logger.info(f"Client disconnected from scan task: {task_id}")
+        except Exception as e:
+            logger.error(f"Scan task WebSocket error for {task_id}: {e}")
+        finally:
+            active_websocket_connections.dec()
+            await pubsub.unsubscribe(channel)
+            await redis_client.aclose()

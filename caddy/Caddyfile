@@ -2,6 +2,12 @@
     # HSTS: instruct browsers to use HTTPS for this domain for 1 year
     header Strict-Transport-Security "max-age=31536000; includeSubDomains" always
 
+    # Content Security Policy — defence-in-depth against XSS and open-redirect
+    # img-src https: allows news thumbnails from external CDNs (publishers are not enumerable)
+    # style-src 'unsafe-inline' required by Tailwind v4 and Recharts runtime inline styles
+    # connect-src wss: allows the live data WebSocket
+    header Content-Security-Policy "default-src 'self'; img-src 'self' https: data:; connect-src 'self' wss:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'" always
+
     # Block external access to the Prometheus metrics endpoint.
     # /metrics is accessible on the internal Docker network only (Prometheus scrapes backend:8000/metrics).
     handle /metrics {

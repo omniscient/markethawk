@@ -43,6 +43,7 @@ const ScorecardOverview: React.FC = () => {
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
+              aria-pressed={period === p.value}
               className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider rounded transition-all ${
                 period === p.value
                   ? 'bg-financial-blue text-white shadow-lg'

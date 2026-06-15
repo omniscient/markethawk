@@ -12,9 +12,15 @@ os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
 
 
 @pytest.fixture(autouse=True)
-def clear_settings_cache():
+def clear_settings_cache(monkeypatch):
     from app.core.config import get_settings
 
+    # Strip the local-dev container overrides (docker-compose.override.yml sets
+    # DOCS_ENABLED=true / COOKIE_SECURE=false for http dev) so the default-asserting
+    # test sees the secure code default regardless of ambient env. Tests that need a
+    # specific value set it explicitly (monkeypatch.setenv / Settings kwarg) afterwards.
+    monkeypatch.delenv("DOCS_ENABLED", raising=False)
+    monkeypatch.delenv("COOKIE_SECURE", raising=False)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

@@ -37,8 +37,32 @@ def _make_lookback(closes: list[float], volumes: list[int]) -> list[MagicMock]:
 # 11-bar fixture: bars[0] = context, bars[1..10] = 10 lookback days.
 # Down days: bars[2]=280K, bars[4]=240K, bars[6]=260K, bars[9]=200K -> max=280K
 _STANDARD_LOOKBACK = _make_lookback(
-    closes=[10.00, 10.50, 10.20, 10.40, 10.10, 10.30, 10.00, 10.20, 10.40, 10.30, 10.50],
-    volumes=[150_000, 150_000, 280_000, 170_000, 240_000, 180_000, 260_000, 150_000, 130_000, 200_000, 160_000],
+    closes=[
+        10.00,
+        10.50,
+        10.20,
+        10.40,
+        10.10,
+        10.30,
+        10.00,
+        10.20,
+        10.40,
+        10.30,
+        10.50,
+    ],
+    volumes=[
+        150_000,
+        150_000,
+        280_000,
+        170_000,
+        240_000,
+        180_000,
+        260_000,
+        150_000,
+        130_000,
+        200_000,
+        160_000,
+    ],
 )
 
 
@@ -61,9 +85,13 @@ def _run_scan(
     with (
         patch("app.services.pocket_pivot._get_today_bar", return_value=today_bar),
         patch("app.services.pocket_pivot._get_prior_close", return_value=prior_close),
-        patch("app.services.pocket_pivot._get_lookback_bars", return_value=lookback_bars),
+        patch(
+            "app.services.pocket_pivot._get_lookback_bars", return_value=lookback_bars
+        ),
         patch("app.services.pocket_pivot._get_enrichment", return_value=enrichment),
-        patch("app.services.pocket_pivot._save_event", return_value=save_return) as mock_save,
+        patch(
+            "app.services.pocket_pivot._save_event", return_value=save_return
+        ) as mock_save,
         patch("app.services.pocket_pivot.scanner_events_total"),
     ):
         results = asyncio.run(
@@ -84,7 +112,9 @@ def _run_scan(
 # ---------------------------------------------------------------------------
 def test_clean_pocket_pivot_fires():
     today = {"close": 14.72, "volume": 350_000}  # 350K > 280K (max down-day)
-    results, diag, mock_save = _run_scan(today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK)
+    results, diag, mock_save = _run_scan(
+        today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK
+    )
     assert len(results) == 1
     assert diag["fired"] == 1
     indicators = mock_save.call_args.kwargs["indicators"]
@@ -104,7 +134,9 @@ def test_clean_pocket_pivot_fires():
 # ---------------------------------------------------------------------------
 def test_down_day_does_not_fire():
     today = {"close": 13.50, "volume": 350_000}  # 13.50 < prior_close=14.15 -> down day
-    results, diag, _ = _run_scan(today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK)
+    results, diag, _ = _run_scan(
+        today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK
+    )
     assert len(results) == 0
     assert diag["fired"] == 0
     assert diag["evaluated"] == 0
@@ -115,7 +147,9 @@ def test_down_day_does_not_fire():
 # ---------------------------------------------------------------------------
 def test_volume_below_max_down_day_does_not_fire():
     today = {"close": 14.72, "volume": 200_000}  # 200K < 280K (max down-day)
-    results, diag, _ = _run_scan(today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK)
+    results, diag, _ = _run_scan(
+        today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK
+    )
     assert len(results) == 0
     assert diag["fired"] == 0
 
@@ -125,7 +159,9 @@ def test_volume_below_max_down_day_does_not_fire():
 # ---------------------------------------------------------------------------
 def test_volume_equals_max_down_day_does_not_fire():
     today = {"close": 14.72, "volume": 280_000}  # 280K == 280K — strict > fails
-    results, diag, _ = _run_scan(today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK)
+    results, diag, _ = _run_scan(
+        today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK
+    )
     assert len(results) == 0
     assert diag["fired"] == 0
 
@@ -135,7 +171,9 @@ def test_volume_equals_max_down_day_does_not_fire():
 # ---------------------------------------------------------------------------
 def test_below_price_floor_does_not_fire():
     today = {"close": 4.50, "volume": 350_000}  # up day but below price floor
-    results, diag, _ = _run_scan(today, prior_close=4.20, lookback_bars=_STANDARD_LOOKBACK)
+    results, diag, _ = _run_scan(
+        today, prior_close=4.20, lookback_bars=_STANDARD_LOOKBACK
+    )
     assert len(results) == 0
     assert diag["fired"] == 0
 
@@ -145,10 +183,37 @@ def test_below_price_floor_does_not_fire():
 # ---------------------------------------------------------------------------
 def test_below_volume_floor_does_not_fire():
     lookback = _make_lookback(
-        closes=[10.00, 10.50, 10.20, 10.40, 10.10, 10.30, 10.00, 10.20, 10.40, 10.30, 10.50],
-        volumes=[50_000, 50_000, 60_000, 50_000, 60_000, 50_000, 55_000, 50_000, 50_000, 55_000, 50_000],
+        closes=[
+            10.00,
+            10.50,
+            10.20,
+            10.40,
+            10.10,
+            10.30,
+            10.00,
+            10.20,
+            10.40,
+            10.30,
+            10.50,
+        ],
+        volumes=[
+            50_000,
+            50_000,
+            60_000,
+            50_000,
+            60_000,
+            50_000,
+            55_000,
+            50_000,
+            50_000,
+            55_000,
+            50_000,
+        ],
     )
-    today = {"close": 14.72, "volume": 80_000}  # 80K > 60K (volume criterion passes), 80K < 100K (floor fails)
+    today = {
+        "close": 14.72,
+        "volume": 80_000,
+    }  # 80K > 60K (volume criterion passes), 80K < 100K (floor fails)
     results, diag, _ = _run_scan(today, prior_close=14.15, lookback_bars=lookback)
     assert len(results) == 0
     assert diag["fired"] == 0
@@ -173,7 +238,19 @@ def test_insufficient_lookback_days_does_not_fire():
 # ---------------------------------------------------------------------------
 def test_no_down_days_does_not_fire():
     all_up = _make_lookback(
-        closes=[10.00, 10.10, 10.20, 10.30, 10.40, 10.50, 10.60, 10.70, 10.80, 10.90, 11.00],
+        closes=[
+            10.00,
+            10.10,
+            10.20,
+            10.30,
+            10.40,
+            10.50,
+            10.60,
+            10.70,
+            10.80,
+            10.90,
+            11.00,
+        ],
         volumes=[200_000] * 11,
     )
     today = {"close": 11.20, "volume": 350_000}
@@ -192,7 +269,10 @@ def test_split_in_lookback_fires_with_flag():
     }
     today = {"close": 14.72, "volume": 350_000}
     results, diag, mock_save = _run_scan(
-        today, prior_close=14.15, lookback_bars=_STANDARD_LOOKBACK, enrichment=enrichment
+        today,
+        prior_close=14.15,
+        lookback_bars=_STANDARD_LOOKBACK,
+        enrichment=enrichment,
     )
     assert len(results) == 1
     indicators = mock_save.call_args.kwargs["indicators"]
@@ -208,7 +288,9 @@ def test_near_ipo_with_5_days_fires():
         volumes=[150_000, 150_000, 280_000, 180_000, 240_000, 160_000],
     )
     today = {"close": 14.72, "volume": 350_000}  # 350K > 280K
-    results, diag, mock_save = _run_scan(today, prior_close=14.15, lookback_bars=ipo_lookback)
+    results, diag, mock_save = _run_scan(
+        today, prior_close=14.15, lookback_bars=ipo_lookback
+    )
     assert len(results) == 1
     indicators = mock_save.call_args.kwargs["indicators"]
     assert indicators["lookback_days_available"] == 5
@@ -235,7 +317,10 @@ def test_diagnostics_populated_correctly():
 
     def today_bar_per_ticker(db, ticker, event_date):
         if ticker == "GOOG":
-            return {"close": 14.72, "volume": 280_000}  # == max_down_day -> strict > fails
+            return {
+                "close": 14.72,
+                "volume": 280_000,
+            }  # == max_down_day -> strict > fails
         return {"close": 14.72, "volume": 350_000}
 
     def prior_close_side_effect(db, ticker, event_date):
@@ -250,10 +335,21 @@ def test_diagnostics_populated_correctly():
     diagnostics: dict[str, Any] = {}
 
     with (
-        patch("app.services.pocket_pivot._get_today_bar", side_effect=today_bar_per_ticker),
-        patch("app.services.pocket_pivot._get_prior_close", side_effect=prior_close_side_effect),
-        patch("app.services.pocket_pivot._get_lookback_bars", side_effect=lookback_side_effect),
-        patch("app.services.pocket_pivot._get_enrichment", side_effect=enrichment_side_effect),
+        patch(
+            "app.services.pocket_pivot._get_today_bar", side_effect=today_bar_per_ticker
+        ),
+        patch(
+            "app.services.pocket_pivot._get_prior_close",
+            side_effect=prior_close_side_effect,
+        ),
+        patch(
+            "app.services.pocket_pivot._get_lookback_bars",
+            side_effect=lookback_side_effect,
+        ),
+        patch(
+            "app.services.pocket_pivot._get_enrichment",
+            side_effect=enrichment_side_effect,
+        ),
         patch("app.services.pocket_pivot._save_event", return_value={"ticker": "X"}),
         patch("app.services.pocket_pivot.scanner_events_total"),
     ):
@@ -269,6 +365,75 @@ def test_diagnostics_populated_correctly():
 
     assert len(results) == 2
     assert diagnostics["evaluated"] == 3  # all 3 had data and were up days
-    assert diagnostics["fired"] == 2      # GOOG fails volume criterion
+    assert diagnostics["fired"] == 2  # GOOG fails volume criterion
     assert diagnostics["tickers"] == 3
     assert diagnostics["days"] == 1
+
+
+def test_pocket_pivot_observes_slo_metrics():
+    """scan_last_success_timestamp and scan_failed_tickers_ratio are set after a run."""
+    import asyncio
+    import time
+    from unittest.mock import MagicMock, patch
+
+    with (
+        patch("app.services.pocket_pivot._get_today_bar", return_value=None),
+        patch("app.services.pocket_pivot._get_prior_close", return_value=None),
+        patch("app.services.pocket_pivot._get_lookback_bars", return_value=[]),
+        patch("app.services.pocket_pivot._get_enrichment", return_value={}),
+        patch("app.services.pocket_pivot._save_event", return_value={}),
+        patch("app.services.pocket_pivot.scanner_events_total"),
+        patch("app.services.pocket_pivot.scan_duration_seconds"),
+        patch("app.services.pocket_pivot.scan_last_success_timestamp") as mock_ts,
+        patch("app.services.pocket_pivot.scan_failed_tickers_ratio") as mock_ratio,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio_lbl = MagicMock()
+        mock_ratio.labels.return_value = mock_ratio_lbl
+
+        from app.services.pocket_pivot import run_pocket_pivot_scan
+
+        asyncio.run(
+            run_pocket_pivot_scan(
+                [], db=MagicMock(), start_date=_EVENT_DATE, end_date=_EVENT_DATE
+            )
+        )
+
+    mock_ts.labels.assert_called_with(scanner_type="pocket_pivot")
+    mock_ts_lbl.set.assert_called_once()
+    assert abs(mock_ts_lbl.set.call_args[0][0] - time.time()) < 30
+    mock_ratio.labels.assert_called_with(scanner_type="pocket_pivot")
+    mock_ratio_lbl.set.assert_called_once()
+    assert 0.0 <= mock_ratio_lbl.set.call_args[0][0] <= 1.0
+
+
+def test_pocket_pivot_total_failure_does_not_mark_success():
+    """When every ticker-day errors, scan_last_success_timestamp must NOT be set;
+    duration is still observed."""
+    with (
+        patch(
+            "app.services.pocket_pivot._get_today_bar",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch("app.services.pocket_pivot.scanner_events_total"),
+        patch("app.services.pocket_pivot.scan_duration_seconds") as mock_dur,
+        patch("app.services.pocket_pivot.scan_last_success_timestamp") as mock_ts,
+        patch("app.services.pocket_pivot.scan_failed_tickers_ratio") as mock_ratio,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio.labels.return_value = MagicMock()
+        mock_dur_lbl = MagicMock()
+        mock_dur.labels.return_value = mock_dur_lbl
+
+        from app.services.pocket_pivot import run_pocket_pivot_scan
+
+        asyncio.run(
+            run_pocket_pivot_scan(
+                ["AAA"], db=MagicMock(), start_date=_EVENT_DATE, end_date=_EVENT_DATE
+            )
+        )
+
+    mock_ts_lbl.set.assert_not_called()
+    mock_dur_lbl.observe.assert_called_once()

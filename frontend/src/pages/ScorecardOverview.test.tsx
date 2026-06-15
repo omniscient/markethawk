@@ -18,10 +18,6 @@ vi.mock('../components/scorecard/ScannerSummaryCard', () => ({
 }));
 
 describe('ScorecardOverview', () => {
-  it('renders without crashing', () => {
-    renderWithQuery(<ScorecardOverview />);
-  });
-
   it('shows SCANNER SCORECARD heading', () => {
     renderWithQuery(<ScorecardOverview />);
     expect(screen.getByText(/Scanner Scorecard/i)).toBeInTheDocument();
@@ -72,11 +68,11 @@ describe('ScorecardOverview', () => {
     cards.forEach((card) => expect(card).toHaveAttribute('data-loading', 'true'));
   });
 
-  it('changes active period button styling when clicked', () => {
+  it('marks active period button with aria-pressed when clicked', () => {
     renderWithQuery(<ScorecardOverview />);
     fireEvent.click(screen.getByRole('button', { name: /7D/i }));
-    const sevenDayBtn = screen.getByRole('button', { name: /7D/i });
-    expect(sevenDayBtn.className).toContain('bg-financial-blue');
+    expect(screen.getByRole('button', { name: /7D/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /30D/i })).toHaveAttribute('aria-pressed', 'false');
   });
 });
 

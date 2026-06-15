@@ -6,6 +6,8 @@ from app.models.active_watchlist import ActiveWatchlist
 from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.auto_trade_order import AutoTradeOrder
+from app.models.backtest_run import BacktestRun
+from app.models.backtest_trade import BacktestTrade
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.futures_contract import FuturesContract
 from app.models.futures_rollover import FuturesRollover
@@ -15,6 +17,7 @@ from app.models.monitored_stock import MonitoredStock
 from app.models.news_article import NewsArticle
 from app.models.news_preference import NewsPreference
 from app.models.push_subscription import PushSubscription
+from app.models.regime_model import RegimeModel
 from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
@@ -37,6 +40,8 @@ from app.models.universe_quality_report import UniverseQualityReport
 from app.models.user import User
 
 __all__ = [
+    "BacktestRun",
+    "BacktestTrade",
     "StockUniverse",
     "MonitoredStock",
     "ScannerEvent",
@@ -72,4 +77,5 @@ __all__ = [
     "MonitoredAccount",
     "TweetSignal",
     "User",
+    "RegimeModel",
 ]

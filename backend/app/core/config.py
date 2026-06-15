@@ -116,6 +116,22 @@ class Settings(BaseSettings):
     # Must be a mailto: or https: URL identifying the push sender
     VAPID_CLAIMS_EMAIL: str = "mailto:admin@example.com"
 
+    # Scanner SLO thresholds — documented in ENV_VARIABLES.md
+    SCAN_DURATION_SLO_SECONDS: int = 120
+    SCAN_STALENESS_SLO_SECONDS: int = 900
+
+    # ── WebSocket resource limits ──────────────────────────────────────────
+    # Single-process in-memory counters (see app/core/ws_limits.py).
+    # For multi-replica deployments, migrate counters to Redis.
+    WS_MAX_CONNECTIONS_PER_USER: int = 10
+    WS_MAX_CONNECTIONS_GLOBAL: int = 100
+    # Idle timeout for all WS endpoints except scan-task (seconds).
+    WS_IDLE_TIMEOUT_SECONDS: int = 300
+    # Idle timeout for the scan-task WS (seconds); scan tasks produce no events for extended periods.
+    WS_SCAN_TASK_IDLE_TIMEOUT_SECONDS: int = 1800
+    # Absolute lifetime cap for all WS connections (seconds).
+    WS_MAX_LIFETIME_SECONDS: int = 28800
+
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:

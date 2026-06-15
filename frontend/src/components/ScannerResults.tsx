@@ -11,6 +11,9 @@ import Card from './ui/Card';
 import Ticker from './Ticker';
 import ReviewControls from './ReviewControls';
 import { ScannerEvent, ScannerDiagnostics } from '../api/scanner';
+import { safeExternalUrl } from '../utils/url';
+
+const TWEET_HOSTS = ['twitter.com', 'x.com', 't.co'];
 
 interface ScannerResultsProps {
   results: {
@@ -55,6 +58,27 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
       default:
         return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getRegimeStyle = (regime: string | null | undefined): string => {
+    switch (regime) {
+      case 'risk_on':         return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'risk_off':        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'high_volatility': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'low_vol_drift':   return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      default:                return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getRegimeLabel = (regime: string | null | undefined): string => {
+    switch (regime) {
+      case 'risk_on':         return 'risk-on';
+      case 'risk_off':        return 'risk-off';
+      case 'high_volatility': return 'high-vol';
+      case 'low_vol_drift':   return 'low-vol';
+      case 'transition':      return 'trans';
+      default:                return regime ?? '—';
     }
   };
 
@@ -237,17 +261,23 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                       <span className="text-[10px] font-bold text-gray-500 uppercase border border-gray-700 px-1.5 py-0.5 rounded-md bg-gray-900/50">
                         {event.scanner_type.replace(/_/g, ' ')}
                       </span>
-                      {event.scanner_type === 'social_callout' && Boolean(event.metadata?.tweet_url) && (
-                        <a
-                          href={event.metadata.tweet_url as string}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-financial-blue hover:underline truncate max-w-[120px]"
-                          title={`@${(event.metadata?.source_account as string) ?? ''}`}
-                        >
-                          @{(event.metadata?.source_account as string) ?? 'unknown'}
-                        </a>
-                      )}
+                      {event.scanner_type === 'social_callout' && Boolean(event.metadata?.tweet_url) && (() => {
+                        const safeTweetUrl = safeExternalUrl(event.metadata.tweet_url as string, { allowedHosts: TWEET_HOSTS });
+                        const label = `@${(event.metadata?.source_account as string) ?? 'unknown'}`;
+                        return safeTweetUrl ? (
+                          <a
+                            href={safeTweetUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-financial-blue hover:underline truncate max-w-[120px]"
+                            title={label}
+                          >
+                            {label}
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 truncate max-w-[120px]">{label}</span>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td className="py-4 px-4 bg-gray-800 max-w-xs">
@@ -271,6 +301,14 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border shadow-sm ${getSeverityStyle(event.severity)}`}>
                       {event.severity}
                     </span>
+                    {event.regime !== undefined && (
+                      <span
+                        className={`ml-1 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border shadow-sm ${getRegimeStyle(event.regime)}`}
+                        title={event.regime ?? 'unknown regime'}
+                      >
+                        {getRegimeLabel(event.regime)}
+                      </span>
+                    )}
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
                     <ScoreQualityBadge
