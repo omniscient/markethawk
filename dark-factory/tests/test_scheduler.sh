@@ -75,11 +75,25 @@ assert_eq "bare key independent"        "1" "$(get_retry_count "42")"
 assert_eq ":refine unaffected by bare"  "0" "$(get_retry_count "42:refine")"
 
 # ==========================================
-# B: trip_to_blocked (fails until Task 5)
+# B: trip_to_blocked (thin adapter → breaker-trip CLI)
 # ==========================================
+# scheduler.sh's trip_to_blocked is a thin adapter that delegates to
+# `factory_core/cli.py breaker-trip`. The board-move + needs-discussion/
+# factory-regression labels + comment side effects live in factory_core/breaker.py
+# and are covered by test_factory_core_breaker.py (they run in a python subprocess
+# the bash stubs can't observe). Here we verify the adapter delegates with the right
+# issue/phase and that the retry counter is reset.
 echo ""
 echo "--- B: trip_to_blocked ---"
 echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
+
+# Tee python3 invocations into STUB_LOG while still running the real interpreter (so
+# the real breaker-trip resets the counter on the temp state file). Capture the real
+# path BEFORE defining the wrapper, and export both so command-substitution subshells
+# (e.g. get_retry_count) resolve them.
+export _REAL_PY3="$(command -v python3)"
+python3() { echo "python3 $*" >> "$STUB_LOG"; "$_REAL_PY3" "$@"; }
+export -f python3
 
 increment_retry "99:plan"
 increment_retry "99:plan"
@@ -87,14 +101,8 @@ increment_retry "99:plan"
 
 trip_to_blocked "99" "plan" "test reason"
 
-assert_eq "set_board_status called" \
-  "1" "$(grep -c 'set_board_status 99' "$STUB_LOG" || echo 0)"
-assert_eq "gh issue edit adds needs-discussion" \
-  "1" "$(grep -c 'issue edit 99.*needs-discussion' "$STUB_LOG" || echo 0)"
-assert_eq "gh issue comment posted" \
-  "1" "$(grep -c 'issue comment 99' "$STUB_LOG" || echo 0)"
-assert_eq "gh issue edit adds factory-regression" \
-  "1" "$(grep -c 'issue edit 99.*factory-regression' "$STUB_LOG" || echo 0)"
+assert_eq "delegates to breaker-trip CLI (issue+phase)" \
+  "1" "$(grep -c 'breaker-trip --issue 99 --phase plan' "$STUB_LOG" || echo 0)"
 assert_eq ":plan counter reset after trip" \
   "0" "$(get_retry_count "99:plan")"
 
@@ -107,6 +115,8 @@ echo '{}' > "$STATE_FILE"; > "$STUB_LOG"
 increment_retry "77"
 trip_to_blocked "77" "implement" "test"
 assert_eq "bare implement counter reset" "0" "$(get_retry_count "77")"
+
+unset -f python3
 
 # ==========================================
 # C: dispatch() exit-code capture (fails until Task 3)
@@ -617,18 +627,25 @@ assert_eq "K8: increment_retry recorded after CONFLICTING dispatch" \
 
 > "$STUB_LOG"; DISPATCHED=""
 
-# K9: P1.5-5 — trip_to_blocked called at MAX_RETRIES
+# K9: P1.5-5 — trip_to_blocked delegates to breaker-trip at MAX_RETRIES
 echo "{\"60:resolve\": $MAX_RETRIES}" > "$STATE_FILE"
 
 ISSUE=$(get_issue_number "$_ITEM_REVIEW_A")
 RETRIES=$(get_retry_count "${ISSUE}:resolve")
+
+# Tee python3 so we can observe the breaker-trip delegation (the board-move to
+# Blocked itself runs in breaker.py and is covered by test_factory_core_breaker.py).
+export _REAL_PY3="$(command -v python3)"
+python3() { echo "python3 $*" >> "$STUB_LOG"; "$_REAL_PY3" "$@"; }
+export -f python3
 if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
   trip_to_blocked "$ISSUE" "resolve" "retry limit of ${MAX_RETRIES} reached for conflict resolution"
 else
   dispatch "Deconflict issue #${ISSUE}" || true
 fi
-assert_eq "K9: set_board_status Blocked logged" \
-  "1" "$(grep -c "set_board_status 60 ${STATUS_BLOCKED}" "$STUB_LOG" || echo 0)"
+unset -f python3
+assert_eq "K9: delegates to breaker-trip CLI (resolve)" \
+  "1" "$(grep -c 'breaker-trip --issue 60 --phase resolve' "$STUB_LOG" || echo 0)"
 assert_eq "K9: no dispatch on trip" \
   "0" "$(grep -c 'dispatch' "$STUB_LOG" || true)"
 assert_eq "K9: retry counter reset to 0" \

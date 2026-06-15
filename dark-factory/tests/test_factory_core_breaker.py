@@ -4,8 +4,6 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from factory_core.breaker import (
     get_retry_count, increment_retry, reset_retry, trip_to_blocked,
@@ -101,3 +99,27 @@ def test_trip_to_blocked_posts_comment(tmp_path, monkeypatch):
     with patch("factory_core.board.set_board_status"):
         trip_to_blocked(42, "plan", "retry limit reached", sf)
     assert any("comment" in " ".join(c) for c in calls)
+
+
+def test_trip_to_blocked_moves_to_blocked(tmp_path, monkeypatch):
+    from factory_core.board import STATUS_BLOCKED
+
+    sf = tmp_path / "state.json"
+    monkeypatch.setattr(subprocess, "run",
+        lambda cmd, **kw: subprocess.CompletedProcess([], 0, stdout="", stderr=""))
+    with patch("factory_core.board.set_board_status") as mock_sbs:
+        trip_to_blocked(42, "implement", "test reason", sf)
+    mock_sbs.assert_called_once_with(42, STATUS_BLOCKED)
+
+
+def test_trip_to_blocked_adds_both_labels(tmp_path, monkeypatch):
+    sf = tmp_path / "state.json"
+    calls = []
+    monkeypatch.setattr(subprocess, "run",
+        lambda cmd, **kw: (calls.append(cmd),
+                           subprocess.CompletedProcess([], 0, stdout="", stderr=""))[1])
+    with patch("factory_core.board.set_board_status"):
+        trip_to_blocked(42, "plan", "retry limit reached", sf)
+    edit_cmds = [" ".join(c) for c in calls if "issue" in c and "edit" in c]
+    assert any("needs-discussion" in c for c in edit_cmds)
+    assert any("factory-regression" in c for c in edit_cmds)
