@@ -7,16 +7,18 @@ REST:      GET /api/tweets/recent  — returns recent tweet signals from DB
 
 import asyncio
 import logging
+import time
 from typing import Optional
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
-from app.core.auth import ws_get_current_user
+from app.core.auth import verify_ws_origin, ws_get_current_user
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.rate_limits import limiter
+from app.core.ws_limits import ws_connection_slot
 from app.models.monitored_account import MonitoredAccount
 from app.models.tweet_signal import TweetSignal
 from app.models.user import User
@@ -31,27 +33,41 @@ router = APIRouter(prefix="/api/v1/tweets", tags=["tweets"])
 async def tweet_feed_websocket(
     websocket: WebSocket,
     _user: User = Depends(ws_get_current_user),
+    _origin: None = Depends(verify_ws_origin),
 ):
     """WebSocket: streams real-time tweet signals from Redis channel tweet_signals:all."""
-    await websocket.accept()
+    async with ws_connection_slot(str(_user.id)):
+        await websocket.accept()
 
-    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
-    pubsub = redis_client.pubsub()
-    await pubsub.subscribe("tweet_signals:all")
+        redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe("tweet_signals:all")
 
-    try:
-        while True:
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True, timeout=1.0
-            )
-            if message:
-                await websocket.send_text(message["data"])
-            await asyncio.sleep(0.01)
-    except WebSocketDisconnect:
-        logger.info("Client disconnected from tweet feed")
-    finally:
-        await pubsub.unsubscribe("tweet_signals:all")
-        await redis_client.aclose()
+        deadline = time.monotonic() + settings.WS_MAX_LIFETIME_SECONDS
+        idle_timeout = settings.WS_IDLE_TIMEOUT_SECONDS
+        last_message_at = time.monotonic()
+
+        try:
+            while True:
+                now = time.monotonic()
+                if now >= deadline:
+                    await websocket.close(1001)
+                    break
+                if now - last_message_at >= idle_timeout:
+                    await websocket.close(1000)
+                    break
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=1.0
+                )
+                if message:
+                    last_message_at = time.monotonic()
+                    await websocket.send_text(message["data"])
+                await asyncio.sleep(0.01)
+        except WebSocketDisconnect:
+            logger.info("Client disconnected from tweet feed")
+        finally:
+            await pubsub.unsubscribe("tweet_signals:all")
+            await redis_client.aclose()
 
 
 @router.get("/recent")

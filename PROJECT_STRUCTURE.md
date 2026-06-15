@@ -20,6 +20,7 @@ MarketHawk/
 │   │   │   ├── celery_app.py
 │   │   │   ├── error_tracking.py
 │   │   │   ├── cache.py
+│   │   │   ├── ws_limits.py
 │   │   │   └── tracing.py
 │   │   ├── models/
 │   │   │   ├── backtest_run.py
