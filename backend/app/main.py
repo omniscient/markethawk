@@ -185,6 +185,12 @@ def create_app() -> FastAPI:
     )
     logging.getLogger().addFilter(OtelTraceIdFilter())
 
+    # Redact known-secret patterns from every log record before it reaches Seq (F-LOG-01).
+    # Local import mirrors the instrument_fastapi pattern below — avoids a circular import.
+    from app.core.log_filters import install_redacting_filter
+
+    install_redacting_filter()
+
     # Centralized SQL Logging
     # Centralized SQL Logging
     if settings.LOG_LEVEL == "DEBUG":

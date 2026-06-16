@@ -2,7 +2,12 @@ import os
 
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import worker_process_shutdown, worker_ready
+from celery.signals import (
+    after_setup_logger,
+    after_setup_task_logger,
+    worker_process_shutdown,
+    worker_ready,
+)
 
 from app.core.config import settings
 
@@ -12,6 +17,16 @@ celery_app = Celery(
     backend=settings.REDIS_URL,
     include=["app.tasks"],
 )
+
+
+@after_setup_logger.connect
+@after_setup_task_logger.connect
+def _install_log_redaction(logger, **kwargs):
+    # Re-install after Celery resets the root logger, so secrets stay redacted
+    # in worker/beat logs too (F-LOG-01).
+    from app.core.log_filters import install_redacting_filter
+
+    install_redacting_filter()
 
 celery_app.conf.update(
     task_serializer="json",
