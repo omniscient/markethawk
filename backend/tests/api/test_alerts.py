@@ -412,3 +412,17 @@ def test_create_rule_rejects_non_url_webhook(db: Session):
 
     assert response.status_code == 422
     assert "channel_config" in response.json()["detail"]
+
+
+def test_create_rule_rejects_http_webhook(db: Session):
+    """F-INPUT-02: webhook URLs must be https, not http (returns 422, not 500)."""
+    payload = {
+        "name": "Insecure Webhook Rule",
+        "channels": ["webhook"],
+        "channel_config": {"webhook_url": "http://evil.example.com/hook"},
+    }
+
+    response = client.post("/api/v1/alerts/rules", json=payload)
+
+    assert response.status_code == 422
+    assert "channel_config" in response.json()["detail"]

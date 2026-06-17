@@ -2,15 +2,19 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.common import InteractiveDateRange, Ticker
 
 
 class ScannerRunRequest(BaseModel):
     """Schema for scanner run requests."""
 
+    model_config = ConfigDict(extra="forbid")
+
     universe_id: Optional[int] = None
-    tickers: Optional[List[str]] = None
-    scanner_type: str = "pre_market_volume"
+    tickers: Optional[List[Ticker]] = None
+    scanner_type: str = Field(default="pre_market_volume", max_length=50)
     dry_run: bool = False
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -161,13 +165,17 @@ class ClearEventsResponse(BaseModel):
     deleted_count: int
 
 
-class ScannerRangeRequest(BaseModel):
-    """Schema for a date-range scanner run against a single ticker."""
+class ScannerRangeRequest(InteractiveDateRange):
+    """Schema for a date-range scanner run against a single ticker.
 
-    ticker: str
+    Inherits start_date/end_date plus the 366-day interactive range cap from
+    InteractiveDateRange (F-INPUT-02).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ticker: Ticker
     scanner_types: List[str]
-    start_date: date
-    end_date: date
     fetch_missing_data: bool = True
 
     @field_validator("scanner_types")

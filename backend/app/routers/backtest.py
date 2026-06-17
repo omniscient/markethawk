@@ -64,9 +64,6 @@ def create_backtest_run(
             status_code=404, detail=f"StockUniverse id={payload.universe_id} not found"
         )
 
-    if payload.start_date > payload.end_date:
-        raise HTTPException(status_code=422, detail="start_date must be <= end_date")
-
     run = BacktestRun(
         uuid=_uuid.uuid4(),
         scanner_type=payload.scanner_type,

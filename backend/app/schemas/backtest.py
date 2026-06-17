@@ -6,17 +6,21 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.common import BatchDateRange, BoundedDict
 
 
-class BacktestRunRequest(BaseModel):
+class BacktestRunRequest(BatchDateRange):
+    """Inherits start_date/end_date plus the 1830-day batch range cap (F-INPUT-02)."""
+
+    model_config = ConfigDict(extra="forbid")
+
     scanner_type: str
     strategy_id: int
     universe_id: int
-    start_date: date
-    end_date: date
     max_hold_sessions: int = Field(default=10, ge=1, le=252)
-    scanner_config_params: Optional[Dict[str, Any]] = None
+    scanner_config_params: Optional[BoundedDict] = None
 
 
 class BacktestTradeResponse(BaseModel):

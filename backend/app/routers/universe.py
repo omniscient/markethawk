@@ -5,7 +5,7 @@ Universe router - CRUD operations for stock universes.
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.core.cache import get_cached, invalidate
@@ -21,6 +21,7 @@ from app.schemas import (
     StockUniverseUpdate,
     UniverseSummary,
 )
+from app.schemas.common import Ticker
 from app.services import universe_export, universe_orchestrator
 from app.services.discovery_service import DiscoveryService
 from app.services.universe_stats import UniverseStatsService
@@ -31,7 +32,9 @@ router = APIRouter(prefix="/api/v1/universe", tags=["universe"])
 
 
 class ExportAggregatesRequest(BaseModel):
-    tickers: List[str]
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[Ticker]
     timespan: str = "day"
     multiplier: int = 1
     from_date: Optional[str] = None
@@ -40,14 +43,18 @@ class ExportAggregatesRequest(BaseModel):
 
 
 class DeleteAggregatesRequest(BaseModel):
-    ticker: str
+    model_config = ConfigDict(extra="forbid")
+
+    ticker: Ticker
     asset_class: str  # "stocks" | "futures"
     timespan: Optional[str] = None
     multiplier: Optional[int] = None
 
 
 class NormalizeRequest(BaseModel):
-    target_tickers: Optional[List[str]] = None
+    model_config = ConfigDict(extra="forbid")
+
+    target_tickers: Optional[List[Ticker]] = None
 
 
 @router.post("/create", response_model=StockUniverseResponse)
