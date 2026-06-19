@@ -16,6 +16,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not introduce a vector database, embedding model, or semantic search service for memory retrieval. At the scale of this codebase (< 200 memory entries) flat file reading is faster and more predictable than a retrieval pipeline. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Embedding Storage (issue #477)
+
+- [PATTERN] Store embedding vectors as `ARRAY(sa.Float)` in PostgreSQL on `postgres:15-alpine`; compute cosine similarity in Python (numpy) on the filtered candidate set. At thousands-of-records scale Python-side similarity is fast enough, and B-tree indexes on `source_type`/`source_id` pre-filter candidates in SQL. <!-- issue:#477 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not introduce the pgvector extension for the embedding foundation at current scale. pgvector requires switching from `postgres:15-alpine` to `pgvector/pgvector:pg15` or a custom image, adding infra complexity and upgrade risk; IVFFLAT indexing is only faster than an exact scan above ~1 M rows. Migrate when scale demands it — the `ARRAY(Float)` column can be replaced in a single `ALTER TABLE` migration. <!-- issue:#477 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ## Agent Memory Design (issue #149)
 
 - [PATTERN] Agent memory is stored as plain markdown files in `.archon/memory/`, committed to the repo. Files are read at Phase 1 load time and updated post-run. This keeps memory human-readable, version-controlled, and accessible to all agents without any extra tooling. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
