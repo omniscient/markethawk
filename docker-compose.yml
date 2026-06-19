@@ -356,10 +356,13 @@ services:
         case "$$pg" in
           ""|change_me*) ERRORS="$$ERRORS\n  - PGADMIN_DEFAULT_PASSWORD: empty or change_me_* placeholder" ;;
         esac
-        case "$$SEQ_ADMIN_PASSWORD_HASH" in
-          '$$2a$$'*|'$$2b$$'*|'$$2y$$'*) : ;;
-          *) ERRORS="$$ERRORS\n  - SEQ_ADMIN_PASSWORD_HASH: empty or not a bcrypt hash (generate: echo 'YourPassword' | docker run --rm -i datalust/seq config hash)" ;;
-        esac
+        seqlower=$$(printf '%s' "$$SEQ_ADMIN_PASSWORD_HASH" | tr 'A-Z' 'a-z')
+        seqbad=""
+        case "$$seqlower" in ""|change_me*) seqbad=1 ;; esac
+        if [ -z "$$seqbad" ] && [ "$${#SEQ_ADMIN_PASSWORD_HASH}" -lt 40 ]; then seqbad=1; fi
+        if [ -n "$$seqbad" ]; then
+          ERRORS="$$ERRORS\n  - SEQ_ADMIN_PASSWORD_HASH: empty, placeholder, or not a real hash (generate: echo 'YourPassword' | docker run --rm -i datalust/seq config hash — emits a ~108-char PBKDF2 hash, not bcrypt)"
+        fi
         fpass=$$(printf '%s' "$$FLOWER_BASIC_AUTH" | cut -s -d: -f2-)
         fpass=$$(printf '%s' "$$fpass" | tr 'A-Z' 'a-z')
         case "$$fpass" in
