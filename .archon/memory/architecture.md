@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Scanner Explanation Contract — Backfill Reconstruction (issue #461)
+
+- [PATTERN] Each scanner migration (issues in Epic #448) must implement a scanner-specific `_build_explanation_from_stored_event(event: ScannerEvent) -> dict` callable that is registered with the generic backfill service from #458. A flat declarative criterion→indicator mapping is insufficient because compound criteria (e.g. `uptrend` = three sub-checks) and conditional severity logic cannot be expressed as a registry key. The callable registers using the same self-registration pattern as the orchestrator's `register(ScannerDescriptor(...))`. <!-- issue:#461 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not use a declarative field-mapping config to register a scanner with #458's explanation backfill service when that scanner's criteria have compound sub-checks (multiple indicator comparisons per criterion) or conditional pass/fail logic — the generic engine cannot infer threshold associations or severity rules from a flat map. Write a scanner-specific reconstruction callable instead. <!-- issue:#461 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
