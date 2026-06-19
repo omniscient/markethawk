@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Run-Scoped Data (issue #495)
+
+- [PATTERN] Embed small, synchronously-produced, run-scoped data (e.g. quality gate assessment, diagnostics) directly in `ScannerRunResponse` as optional JSONB fields — not as a separate GET endpoint. Run-scoped data is always wanted alongside the run, already materialized on the row, and cheap; a separate fetch would cause N+1 problems on the history list (up to 200 runs). The existing `diagnostics?` field on `ScannerRunResponse` is the reference pattern. <!-- issue:#495 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not create a separate GET endpoint for small, run-scoped artefacts (like the quality gate verdict) that are produced synchronously during the run and stored on the `ScannerRun` row. Reserve separate async-report endpoints only for heavyweight, independently-triggered analyses (like `UniverseQualityReport`) that have their own table, their own Celery task, and need independent polling. <!-- issue:#495 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
