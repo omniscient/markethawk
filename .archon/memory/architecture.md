@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## LLM Alert Enrichment (issue #475)
+
+- [PATTERN] Enrich alert notifications with LLM-generated content (e.g. `ai_alert_copy`) inside `_evaluate_scanner_alerts_logic` in `tasks/scanning.py`, at the top before `get_matching_rules`, wrapped in an isolated `try/except`. This guarantees the copy is ready before `NotificationDispatcher.dispatch()` runs without blocking the scanner hot path (`save_event`). <!-- issue:#475 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not enqueue a separate Celery task for LLM alert copy generation alongside `trigger_scanner_alert`. Both tasks land on the broker at the same instant; `evaluate_scanner_alerts` dispatches notifications in under 100ms while the LLM call takes 2-5s — the race means AI copy almost never reaches the notification channels. <!-- issue:#475 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
