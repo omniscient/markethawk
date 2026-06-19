@@ -527,8 +527,12 @@ services:
       CONTAINERS: 1
       IMAGES: 1
       POST: 1
-      NETWORKS: 0
-      VOLUMES: 0
+      # `docker compose run dark-factory` (dispatch) must look up the service's
+      # networks (factory-network, stockscanner-network) and its scheduler_state
+      # volume before creating the container — both were 0, which 403'd every
+      # dispatch after a proxy recreate. BUILD/EXEC stay 0 (run never builds/execs).
+      NETWORKS: 1
+      VOLUMES: 1
       BUILD: 0
       SERVICES: 0
       EXEC: 0
