@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## API Schema Design — Versioned vs. Unversioned JSONB (issue #456)
+
+- [PATTERN] When a JSONB field is a versioned, cross-scanner contract (e.g. `scanner_explanation.v1`), use a shallow typed Pydantic wrapper with `extra="allow"` rather than `Dict[str, Any]`. The wrapper types the stable top-level envelope (`schema_version`, `why`, `criteria_passed`, etc.) while leaving inner structures as `Dict[str, Any]`. This documents the contract in OpenAPI for all consumers without constraining scanner-specific inner fields. <!-- issue:#456 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not use `Dict[str, Any]` (matching the `indicators`/`criteria_met`/`metadata_` pattern) for JSONB fields that are versioned cross-scanner contracts. Those existing unversioned blobs are scanner-private; versioned contracts with stable top-level schemas deserve typed representation in the API layer. The distinction: scanner-private (no OpenAPI schema needed) vs. versioned cross-scanner contract (OpenAPI schema is the point). <!-- issue:#456 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
