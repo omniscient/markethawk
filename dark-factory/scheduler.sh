@@ -482,30 +482,42 @@ failing_checks_for_pr() {
 
 # --- Board state ---
 fetch_board_items() {
-  local raw
-  raw=$(gh api graphql -f query='
-    query {
-      node(id: "'"$PROJECT_ID"'") {
-        ... on ProjectV2 {
-          items(first: 50) {
-            nodes {
-              fieldValueByName(name: "Status") {
-                ... on ProjectV2ItemFieldSingleSelectValue { name }
-              }
-              content {
-                ... on Issue {
-                  number
-                  title
-                  labels(first: 10) { nodes { name } }
+  local cursor="" has_next="true" nodes="[]"
+  while [ "$has_next" = "true" ]; do
+    local after_arg="" raw
+    [ -n "$cursor" ] && after_arg=', after: "'"$cursor"'"'
+    raw=$(gh api graphql -f query='
+      query {
+        node(id: "'"$PROJECT_ID"'") {
+          ... on ProjectV2 {
+            items(first: 100'"$after_arg"') {
+              pageInfo { hasNextPage endCursor }
+              nodes {
+                fieldValueByName(name: "Status") {
+                  ... on ProjectV2ItemFieldSingleSelectValue { name }
+                }
+                content {
+                  ... on Issue {
+                    number
+                    title
+                    labels(first: 10) { nodes { name } }
+                  }
                 }
               }
             }
           }
         }
       }
-    }
-  ')
-  echo "$raw" | jq '{items: [.data.node.items.nodes[]
+    ')
+    nodes=$(echo "$raw" | jq -c --argjson nodes "$nodes" '$nodes + (.data.node.items.nodes // [])')
+    has_next=$(echo "$raw" | jq -r '.data.node.items.pageInfo.hasNextPage // false')
+    cursor=$(echo "$raw" | jq -r '.data.node.items.pageInfo.endCursor // ""')
+    if [ "$has_next" = "true" ] && [ -z "$cursor" ]; then
+      echo "ERROR: GitHub ProjectV2 pageInfo indicated another page but returned no cursor" >&2
+      return 1
+    fi
+  done
+  echo "$nodes" | jq '{items: [.[]
     | select(.content.number != null)
     | {content: {number: .content.number, title: .content.title, type: "Issue"},
        labels: [.content.labels.nodes[].name],
