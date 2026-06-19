@@ -94,6 +94,11 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Never write generated backtest signals to `scanner_events` — the `UniqueConstraint(ticker, event_date, scanner_type)` causes IntegrityErrors on any overlap with real events, and `scanner_events` is operational history consumed by alerts/clusters/reviews. Keep replay signals in-memory only; store a nullable `source_event_id` FK for signals that already exist in DB. See `backtest_service.py`. <!-- issue:#301 date:2026-06-13 expires:2026-12-13 source:implement -->
 - [PATTERN] When a sync function calls `run_until_complete()` inside a loop (e.g. day-walk in `backtest_service.py`), create the event loop once before the loop via `asyncio.new_event_loop()`, pass it as a parameter to callee functions, and close it in a `finally:` block — creating a new loop per iteration wastes resources and misses reuse opportunities. <!-- issue:#301 date:2026-06-14 expires:2026-12-14 source:implement -->
+
+## Backend: Data Quality / Gate Evidence
+
+- [PATTERN] `ScannerConfig.data_requirements` uses the `timespans[]` shape: `{"timespans": [{"timespan": "minute", "multiplier": 1, "lookback_days": 10, "min_bars": 260}]}`. `min_bars` is optional and drives `insufficient_lookback` gate issues; `lookback_days` drives `missing_bars` coverage checks. `DataReadinessService.check()` only reads `timespans[].lookback_days` — add `min_bars` to any new timespan entry when indicator bar counts need checking. <!-- issue:#498 date:2026-06-19 expires:2026-12-19 source:refine -->
+- [AVOID] Do not use the flat `{"timespan": "day", "min_bars": 260}` shape for `data_requirements` — it is a dead outlier in the trend_pullback seed that nothing currently reads. The canonical shape is `{"timespans": [...]}`. The trend_pullback seed migration (`normalize_data_requirements`) converts it to the standard form. <!-- issue:#498 date:2026-06-19 expires:2026-12-19 source:refine -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
