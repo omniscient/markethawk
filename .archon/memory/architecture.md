@@ -22,6 +22,18 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Per-Event Analytical Data (issue #464)
+
+- [PATTERN] Expose per-event analytical data (outcomes, analogs, briefs) as standalone lazy REST endpoints rather than embedding them in the scanner event response. Follow the precedent of `GET /api/v1/outcomes/event/{event_id}` — analogs and similar derived data should live at `GET /api/v1/scanner/events/{event_id}/analogs`. The scanner results list returns many events; analog computation requires secondary DB queries and joins that must not run for every list row. <!-- issue:#464 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not fold per-event analytical payloads (analogs, signal briefs, outcome details) into the `ScannerEventResponse` object. Embedding them inflates list-view payloads and forces analog/brief computation on every scan fetch. Service-layer consumers (e.g., AI signal brief) call the service class in-process; only UI-initiated drill-downs hit the standalone endpoint. <!-- issue:#464 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+## Historical Analog Search (issue #464)
+
+- [PATTERN] For deterministic analog search, use `ScannerOutcomeSummary.is_complete == True` as a hard pre-filter — not a scoring dimension. Candidates without completed outcomes cannot contribute to the outcome summary (median MFE, follow-through rate), so including them in ranking would mislead the aggregate stats. Surface the excluded-incomplete count as context in the response rather than as a score penalty. <!-- issue:#464 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not treat "outcome availability" as a weight in the analog similarity score. If a candidate event's `ScannerOutcomeSummary.is_complete` is False, exclude it before scoring rather than penalizing it with a lower score. Mixed pools (some with outcomes, some without) produce aggregate stats that are silently biased toward the subset that has outcomes. <!-- issue:#464 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
