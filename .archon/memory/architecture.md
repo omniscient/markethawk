@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## LLM Provider Abstraction (issue #472)
+
+- [PATTERN] LLM providers extend `BaseLLMProvider` ABC in `backend/app/providers/llm_base.py`, mirroring the `BaseDataProvider` / `DataProviderFactory` pattern. LLM config lives entirely in env vars in `Settings` (`LLM_ENABLED`, `LLM_PROVIDER`, `LLM_MODEL`, guardrail fields, per-feature-area bools). Provider is selected by `LLM_PROVIDER` config value — no vendor hardcoded. Call sites check `settings.llm_feature_enabled(area)` before any LLM call. <!-- issue:#472 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not wire an LLM circuit breaker or pull in concrete provider SDK dependencies in the config/guardrails layer. Circuit-breaker wiring belongs alongside the first actual LLM call site (Epic 3 ticket 2 — narrative generation), mirroring how `POLYGON_BREAKER` and `IBKR_BREAKER` in `circuit_breakers.py` live with their respective providers rather than in the config layer. <!-- issue:#472 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
