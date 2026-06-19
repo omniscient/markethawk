@@ -879,6 +879,35 @@ gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
 export -f gh
 
 # ==========================================
+# O: fetch_board_items paginates project items
+# ==========================================
+echo ""
+echo "--- O: fetch_board_items pagination ---"
+
+gh() {
+  echo "gh $*" >> "$STUB_LOG"
+  if echo "$*" | grep -q 'after: "CUR1"'; then
+    cat <<'JSON'
+{"data":{"node":{"items":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[{"fieldValueByName":{"name":"Backlog"},"content":{"number":102,"title":"second page issue","labels":{"nodes":[{"name":"ready-for-agent"}]}}}]}}}}
+JSON
+  else
+    cat <<'JSON'
+{"data":{"node":{"items":{"pageInfo":{"hasNextPage":true,"endCursor":"CUR1"},"nodes":[{"fieldValueByName":{"name":"Backlog"},"content":{"number":101,"title":"first page issue","labels":{"nodes":[{"name":"ready-for-agent"}]}}}]}}}}
+JSON
+  fi
+}
+export -f gh
+> "$STUB_LOG"
+
+_BOARD_PAGE_RESULT=$(fetch_board_items)
+assert_eq "fetch_board_items returns both pages" "2" "$(echo "$_BOARD_PAGE_RESULT" | jq '.items | length')"
+assert_eq "fetch_board_items requests first: 100 on both pages" "2" "$(grep -c 'items(first: 100' "$STUB_LOG" || true)"
+assert_eq "fetch_board_items requests the cursor page" "1" "$(grep -c 'after: "CUR1"' "$STUB_LOG" || true)"
+
+gh() { echo "gh $*" >> "$STUB_LOG"; return 0; }
+export -f gh
+
+# ==========================================
 # Cleanup
 # ==========================================
 rm -f "$STATE_FILE" "$STUB_LOG"
