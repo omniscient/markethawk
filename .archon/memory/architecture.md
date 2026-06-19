@@ -4,6 +4,10 @@ This file is maintained automatically by the dark factory refine agent. Do not e
 Entries represent design-time decisions (source:refine). Implement agents may treat source:implement
 entries as higher-confidence than source:refine entries when the two conflict.
 
+## Caching — Trust / Gate Endpoints
+
+- [AVOID] Do not cache data quality gate assessment responses (`POST /api/v1/data-quality/gate`) with a TTL-only Redis strategy — a stale "trusted" verdict surviving a quality-report recompute could greenlight auto-trading actions on degraded data. The operation is cheap (single indexed UniverseQualityReport read). If caching becomes necessary, key on `(universe_id, report.generated_at)` and invalidate from `tasks/quality.py` on each recompute. <!-- issue:#493 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ## State Storage
 
 - [PATTERN] Use PostgreSQL for all durable application state — scanner events, memory, configs. The existing `AsyncSession` infrastructure handles connection pooling, migrations, and transactional safety. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
