@@ -16,6 +16,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not introduce a vector database, embedding model, or semantic search service for memory retrieval. At the scale of this codebase (< 200 memory entries) flat file reading is faster and more predictable than a retrieval pipeline. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Scanner Explanation / Data Quality Services (issue #454)
+
+- [AVOID] Do not extend `ScannerConfig.data_requirements` JSONB to carry a semantic timespan→explanation-input mapping (e.g. an `"affects"` list per timespan entry). `data_requirements` is an acquisition config (which timespans to fetch, how far back); embedding semantic mappings there invites drift between config and criteria code, requires a migration to backfill existing rows, and risks breaking existing callers. Keep the mapping as a static in-code registry keyed by scanner type (e.g. `SCANNER_INPUT_REGISTRY` in `data_warnings.py`). <!-- issue:#454 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [PATTERN] For event-scoped session window filtering on `StockAggregate`, use the stored `is_pre_market` / `is_after_market` boolean flags rather than hard-coding ET time boundaries. The flags are already computed and indexed by the sync pipeline, making session-scoped queries both simpler and more accurate across DST changes. <!-- issue:#454 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ## Agent Memory Design (issue #149)
 
 - [PATTERN] Agent memory is stored as plain markdown files in `.archon/memory/`, committed to the repo. Files are read at Phase 1 load time and updated post-run. This keeps memory human-readable, version-controlled, and accessible to all agents without any extra tooling. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
