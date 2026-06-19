@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## LLM Feature Integration (issue #480)
+
+- [PATTERN] When building an LLM feature that depends on upstream artifacts (briefs, embeddings, provenance enforcement) that are not yet implemented: define the target contract schema first (e.g. `ai_signal_brief.v1`), populate available fields from existing data, and declare unavailable slots explicitly as UNAVAILABLE in the LLM system prompt. This prevents hallucination of missing context and keeps the contract stable when real artifacts arrive — the builder becomes a thin pass-through and the field-mapping path is retired. See `analyst_qa.build_brief()` in issue #480. <!-- issue:#480 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not block an LLM feature on all upstream artifact blockers being complete before writing any code. Define the grounding contract (schema + UNAVAILABLE declarations) and build against it now. The grounding system prompt already handles missing slots safely, so partial data is better than indefinite delay. <!-- issue:#480 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
