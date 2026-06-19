@@ -3,6 +3,12 @@
 This file is maintained automatically by the dark factory implement agent. Do not edit manually.
 Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, follow those documents.
 
+## Backend: Session Classification
+
+- [PATTERN] For any DST-correct US-equity session classification, use `session_for_ts(ts)` from `app.utils.session` — it handles EST/EDT automatically via `ZoneInfo("America/New_York")` and returns `'pre' | 'regular' | 'post' | 'closed'`. Do not hand-roll UTC offset math; DST shifts the pre-market window by 1 hour (e.g., 04:00 ET = 09:00 UTC in winter vs. 08:00 UTC in summer). `classify_session()` in the same module is deprecated — use `session_for_ts()` instead. <!-- issue:#500 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not hand-roll UTC offset windows for session classification (e.g., "pre-market is 09:00–14:30 UTC") — this breaks on DST transitions. The canonical implementation is `session_for_ts()` in `backend/app/utils/session.py`. <!-- issue:#500 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ## Backend: Models
 
 - [PATTERN] Guard `func.max(Model.timestamp).scalar()` results with `isinstance(result, datetime)` before calling `.tzinfo` — mock DBs and SQLite return int/str instead of datetime, causing `AttributeError: 'int' object has no attribute 'tzinfo'`. PostgreSQL returns datetime correctly; the guard is a no-op in production. <!-- issue:#391 date:2026-06-14 expires:2026-12-14 source:implement -->

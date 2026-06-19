@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Data Quality Gate Evidence (issue #491 epic)
+
+- [PATTERN] Gate issue emitters belong in `backend/app/services/quality_gate_evidence.py` with the signature `(db: Session, universe_id: int, scanner_config: ScannerConfig | None, ticker: str | None = None) -> list[GateIssue]` — one function per stable issue code. This keeps evidence emission separate from `data_quality.py` (which owns universe-level Coverage/Integrity/Continuity scoring) and from the scanner pipeline (latency-sensitive). <!-- issue:#500 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not extend `DataQualityService.analyze_universe()` with gate issue codes — it is already 547+ lines and owns a different responsibility (universe scoring), not gate-issue emission. Mixing them couples two concerns that need independent testability and extension paths. <!-- issue:#500 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
