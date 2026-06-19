@@ -22,6 +22,14 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## LLM Artifact Storage (issue #473)
+
+- [PATTERN] Store LLM-generated artifacts (narratives, summaries) in a dedicated satellite table with FK → parent event (e.g. `scanner_event_narratives` → `scanner_events.id`), not as JSONB on the hot event table. This follows the `SignalReview` pattern: keeps the events table lean for paginated list queries, allows full provenance columns (`brief_hash`, `model`, `provider`, `version`, `generated_at`), and supports multi-version cache tracking. <!-- issue:#473 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not auto-generate LLM narratives (or any LLM output) for every ScannerEvent at creation time via Celery — scans produce events in bulk, most are never viewed, and eager generation burns LLM budget and breaks the cache-miss acceptance test path. Generate on demand (lazy cache-on-miss GET endpoint) only. <!-- issue:#473 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [PATTERN] LLM output cache staleness should be hash+config-version based, not TTL-based. Same brief + same provider + same model + same prompt-version always produce the same output, so a time-based TTL only forces unnecessary re-spend. Use `brief_hash` (SHA-256 of the input payload) + `provider`/`model`/`version` columns; staleness is a pure equality check against the current config. Invalidate by bumping the prompt `version` constant when a prompt improves. <!-- issue:#473 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
