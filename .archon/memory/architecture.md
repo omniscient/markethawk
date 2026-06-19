@@ -22,6 +22,14 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## LLM Narrative Safety (issue #474)
+
+- [PATTERN] Enforce forbidden-claim constraints with two layers: inject `forbidden_claims` from the `ai_signal_brief` into the generation prompt as explicit negative constraints, then run a case-insensitive substring check post-generation. The prompt injection prevents violations; the deterministic check is the backstop gate before persistence. This is more reliable and testable than a second LLM semantic-check round-trip. <!-- issue:#474 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not use a second LLM round-trip to semantically validate generated output against forbidden claims. It adds latency/cost, introduces nondeterminism to a gate that must be reliably testable, and is unnecessary when prompt injection steers the model away from violations at generation time. <!-- issue:#474 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [PATTERN] When an LLM generation attempt is rejected (forbidden claim detected or provenance missing), persist the rejection as a cache row with `status="rejected"`, `rejection_reason` (human-readable text), and `narrative_text=null`. Return the rejection status and reason in the API response alongside the deterministic payload so the user always has useful content. Do NOT silently fall back to the deterministic brief without surfacing the reason — the user needs to know a generation was attempted and blocked. <!-- issue:#474 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
