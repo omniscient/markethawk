@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Data Quality Gate Integration (issue #494)
+
+- [PATTERN] Evaluate the quality gate once at scan start (before the day-walk loop in `_run_universe_scan_logic`) and thread the minimal assessment `{tier, warnings, schema_version}` to `save_event()` via a new optional `gate_metadata` parameter. This mirrors the existing `ranker_config` threading pattern and keeps all events in a run carrying a single, consistent gate verdict. <!-- issue:#494 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not call the quality gate inside `save_event()` per-event — `save_event()` has no universe context, and repeating the gate N×(events) times for an assessment that is universe-scoped (not per-ticker) is wasteful and produces inconsistent verdicts if the underlying data changes mid-scan. <!-- issue:#494 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
