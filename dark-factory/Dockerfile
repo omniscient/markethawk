@@ -18,9 +18,15 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Node.js 22.x
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
+# Node.js 22.x — pinned-keyring APT repo instead of `curl … setup_22.x | bash`.
+# apt cryptographically verifies every package against the pinned NodeSource
+# signing key, so no remote script is piped to a shell. Mirrors the gh/docker
+# installs below.
+RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+    | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" \
+    > /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update && apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # Python 3.12 (ships with Ubuntu 24.04)
@@ -37,8 +43,24 @@ RUN apt-get update && apt-get install -y \
 # pre-commit for the codeindex-blast warn-only hook
 RUN pip install --quiet "git+https://github.com/scheidydude/codeindex.git" pre-commit
 
-# Bun — install to /opt/bun so it is accessible to non-root users
-RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/opt/bun bash
+# Bun — pinned release artifact verified against a hardcoded sha256 instead of
+# `curl … bun.sh/install | bash`. The expected hash lives in git, so a tampered
+# download (or tampered checksum file) is rejected at build time. Installed to
+# /opt/bun so it is accessible to non-root users.
+ENV BUN_VERSION=1.3.14
+RUN case "$(dpkg --print-architecture)" in \
+      amd64) BUN_ARCH=x64;     BUN_SHA=951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f ;; \
+      arm64) BUN_ARCH=aarch64; BUN_SHA=a27ffb63a8310375836e0d6f668ae17fa8d8d18b88c37c821c65331973a19a3b ;; \
+      *) echo "unsupported architecture for bun: $(dpkg --print-architecture)" >&2; exit 1 ;; \
+    esac && \
+    cd /tmp && \
+    curl -fsSL -o bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${BUN_ARCH}.zip" && \
+    echo "${BUN_SHA}  bun.zip" | sha256sum -c - && \
+    unzip -q bun.zip && \
+    mkdir -p /opt/bun/bin && \
+    mv "bun-linux-${BUN_ARCH}/bun" /opt/bun/bin/bun && \
+    chmod +x /opt/bun/bin/bun && \
+    rm -rf bun.zip "bun-linux-${BUN_ARCH}"
 ENV PATH="/opt/bun/bin:${PATH}"
 
 # GitHub CLI
@@ -66,13 +88,18 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
 RUN npm install -g @anthropic-ai/claude-code
 
 # Archon CLI (from fork — includes workflow cost tracking).
+# Pinned to an immutable commit on feat/workflow-cost-tracking instead of the
+# moving branch tip, so a rebuild always fetches the reviewed code. Bump the SHA
+# deliberately to pick up Archon updates.
 # Deliberately NOT `bun link`: its shim lands in the invoking user's ~/.bun/bin
 # (root → /root/.bun/bin), which is off PATH and unreadable for the factory
 # user. Cached layers masked this for months; any --no-cache rebuild lost
 # `archon` (exit 127 in entrypoint). cli.ts carries a `#!/usr/bin/env bun`
 # shebang, so a plain symlink on PATH is all that's needed.
-RUN git clone -b feat/workflow-cost-tracking https://github.com/omniscient/Archon.git /opt/archon && \
-    cd /opt/archon && bun install && \
+RUN git clone https://github.com/omniscient/Archon.git /opt/archon && \
+    cd /opt/archon && \
+    git checkout ee55cfc5d347a38f531fdfba2bee42ab33316ef6 && \
+    bun install && \
     chmod +x /opt/archon/packages/cli/src/cli.ts && \
     ln -sf /opt/archon/packages/cli/src/cli.ts /usr/local/bin/archon
 
