@@ -16,6 +16,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not introduce a vector database, embedding model, or semantic search service for memory retrieval. At the scale of this codebase (< 200 memory entries) flat file reading is faster and more predictable than a retrieval pipeline. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Read-Projection Endpoints (issue #467)
+
+- [PATTERN] Event-level projection payloads (like `ai_signal_brief.v1`) that aggregate multiple DB sources (ScannerEvent, ScannerOutcomeSummary, analogs, archetypes) should be computed on-demand and fronted by `get_cached(f"mh:scanner:brief:{uuid}", ttl=120, fn=...)` — not stored in a separate table. Inputs have independent update schedules; a stored copy would require invalidation hooks across 4+ services. <!-- issue:#467 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not create a `signal_briefs` table (or equivalent per-event projection table) to store computed read projections. These payloads are pure aggregations of durable source rows; denormalizing them creates invalidation debt when any upstream source (outcome backfill, archetype clustering, analog recomputation) changes. Redis `get_cached` with a short TTL is the correct cache layer. <!-- issue:#467 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ## Agent Memory Design (issue #149)
 
 - [PATTERN] Agent memory is stored as plain markdown files in `.archon/memory/`, committed to the repo. Files are read at Phase 1 load time and updated post-run. This keeps memory human-readable, version-controlled, and accessible to all agents without any extra tooling. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->

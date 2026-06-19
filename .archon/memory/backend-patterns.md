@@ -10,6 +10,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Backend: API Routes
 
+- [PATTERN] Scanner event sub-resource endpoints use UUID (not integer id) as the path parameter: `GET|POST /api/v1/scanner/events/{event_uuid}/...`. Parse with `uuid.UUID(event_uuid)`, raise HTTP 400 on `ValueError`, then look up via `ScannerEvent.uuid`. UUID is stable for external/LLM callers and consistent with `POST /events/{event_uuid}/review` (scanner.py:621-637). Use integer IDs only for internal pagination/filtering. <!-- issue:#467 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 - [AVOID] Never use `joinedload()` with paginated queries (`LIMIT/OFFSET`) on one-to-many relationships — it produces a JOIN that row-multiplies the parent before LIMIT is applied, so paginated pages return fewer rows than `limit` when children exist. Use `selectinload()` instead, which issues a separate `SELECT … WHERE id IN (…)` after the paginated parent query. See `routers/scanner.py` `joinedload(ScannerEvent.reviews)` → `selectinload` fix. <!-- issue:#291 date:2026-06-12 expires:2026-12-12 source:implement -->
 
 - [PATTERN] `AuthMiddleware` in `main.py` short-circuits for non-HTTP scopes — WebSocket routes are NOT covered. Protect WS endpoints by adding `_user: User = Depends(ws_get_current_user)` from `app.core.auth`; this raises `WebSocketException(code=1008)` before `accept()` if the cookie is absent or invalid. <!-- issue:#191 date:2026-06-05 expires:2026-12-05 source:implement -->
