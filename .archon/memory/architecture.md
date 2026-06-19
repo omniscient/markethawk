@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Scanner Explanation Criterion IDs (Epic #448 / issues #459+)
+
+- [PATTERN] Scanner explanation criterion IDs use the **scanner-family namespace**, not the literal `scanner_type` string — e.g. `liquidity_hunt.session_volume_ratio` covers both `liquidity_hunt_pre` and `liquidity_hunt_post`, because both variants share the same criteria struct. The foundation spec example `premarket.relative_volume` sets this precedent: the prefix is the data/session scope, not the emitted event type. <!-- issue:#459 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not create separate criterion ID namespaces per scanner sub-type (e.g. `liquidity_hunt_pre.volume_ratio` and `liquidity_hunt_post.volume_ratio`) when the two types share identical criteria. Separate namespaces force trait analysis to reconcile parallel keys that represent the same concept, and make backfill reconstruction maintain two ID maps instead of one. <!-- issue:#459 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
