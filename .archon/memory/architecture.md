@@ -22,6 +22,16 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Event Detail UI (issue #471)
+
+- [PATTERN] Use a single unified `/signal_brief` endpoint (`ai_signal_brief.v1`) as the sole data source for an event detail drawer — it already embeds `historical_analogs[]`, `outcome_context{}`, and `archetype{}` in one call. Splitting into separate `/analogs` + `/signal_brief` calls adds a second failure mode and timing divergence for no user benefit. <!-- issue:#471 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not fetch analogs and the signal brief as two separate calls when rendering an event detail drawer — the brief already bundles analogs. Use the dedicated `/analogs` endpoint only for pagination past the brief's top-N or for lightweight widgets that do not need the full brief payload. <!-- issue:#471 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [PATTERN] Shared slide-over drawer (right-side, 480px) is the correct pattern for event detail that overlays a data table or list — it preserves the originating row context in view, unlike a centered modal which covers the list. Follow existing Modal.tsx accessibility conventions (Escape key, backdrop click, scroll lock). <!-- issue:#471 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not build separate detail components for each UI surface (Scanner table vs. Stock Detail list) when both surfaces operate on the same data type keyed by `uuid` — a single shared component wired at the parent level keeps the detail experience consistent and eliminates duplication. <!-- issue:#471 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
