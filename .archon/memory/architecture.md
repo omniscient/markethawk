@@ -22,6 +22,14 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Explanation Feature Extraction (Epic 2, issue #463)
+
+- [PATTERN] `extract_features(events: list[ScannerEvent]) -> pd.DataFrame` in `explanation_features.py` is in-memory: it replaces the inline JSONB-flattening loop in `analyze_signal_features` and feeds into the existing `build_feature_matrix()` cleaner. No new `signal_features` table is persisted — `SignalAnalysisRun`/`SignalCluster` already store analysis outputs. <!-- issue:#463 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not add a persistent `signal_features` table for the Epic 2 extraction path — no consumer beyond `analyze_signal_features` exists at this stage, and adding one introduces a migration and upsert pattern for no current gain. Revisit only if a feature-store UI or replay-from-frozen-features requirement emerges. <!-- issue:#463 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [PATTERN] For legacy `ScannerEvent` rows where `explanation` is NULL, reconstruct an approximate `scanner_explanation.v1` dict from `indicators` + `criteria_met` + `signal_quality_score`, set `evidence.reconstructed = True`, and emit `is_reconstructed = 1` on the feature row. Reserve true "missing" (skip + log) only for events where both `explanation` and reconstruction inputs are absent. <!-- issue:#463 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
