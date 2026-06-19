@@ -330,6 +330,53 @@ services:
         limits:
           memory: 256M
 
+  # ── Admin credential fail-fast (F-ADMIN-01, #371) ──────────────────────────
+  # One-shot gate: exits 0 only when all four admin-tool credentials are real —
+  # non-empty, not a change_me_* placeholder, not a known-weak default, and (for
+  # Seq) a bcrypt hash. flower/pgadmin/seq/grafana depend_on this completing
+  # successfully, so the stack refuses to expose an admin UI with unset or
+  # placeholder credentials. Ephemeral: no ports, no volumes, runs once.
+  # Values are passed via environment (not interpolated into the command) so
+  # they never appear in `docker inspect`/`ps` output. `$$` is the Compose
+  # escape for a literal `$` reaching the shell.
+  admin-env-check:
+    image: alpine:3
+    container_name: markethawk-admin-env-check
+    restart: "no"
+    environment:
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-}
+      SEQ_ADMIN_PASSWORD_HASH: ${SEQ_ADMIN_PASSWORD_HASH:-}
+      FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH:-}
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ERRORS=""
+        pg=$$(printf '%s' "$$PGADMIN_DEFAULT_PASSWORD" | tr 'A-Z' 'a-z')
+        case "$$pg" in
+          ""|change_me*) ERRORS="$$ERRORS\n  - PGADMIN_DEFAULT_PASSWORD: empty or change_me_* placeholder" ;;
+        esac
+        case "$$SEQ_ADMIN_PASSWORD_HASH" in
+          '$$2a$$'*|'$$2b$$'*|'$$2y$$'*) : ;;
+          *) ERRORS="$$ERRORS\n  - SEQ_ADMIN_PASSWORD_HASH: empty or not a bcrypt hash (generate: echo 'YourPassword' | docker run --rm -i datalust/seq config hash)" ;;
+        esac
+        fpass=$$(printf '%s' "$$FLOWER_BASIC_AUTH" | cut -s -d: -f2-)
+        fpass=$$(printf '%s' "$$fpass" | tr 'A-Z' 'a-z')
+        case "$$fpass" in
+          ""|change_me*) ERRORS="$$ERRORS\n  - FLOWER_BASIC_AUTH: password portion empty or change_me_* placeholder (format user:password)" ;;
+        esac
+        gf=$$(printf '%s' "$$GRAFANA_ADMIN_PASSWORD" | tr 'A-Z' 'a-z')
+        case "$$gf" in
+          ""|admin|changeme|change_me*) ERRORS="$$ERRORS\n  - GRAFANA_ADMIN_PASSWORD: empty, 'admin', 'changeme', or change_me_* placeholder" ;;
+        esac
+        if [ -n "$$ERRORS" ]; then
+          printf 'ERROR: Admin credential validation failed.\nThe following admin credentials are empty, placeholder, or known-weak:\n%b\n\nUpdate your .env before starting the stack (see .env.example).\n' "$$ERRORS"
+          exit 1
+        fi
+        echo "Admin credential check passed."
+    networks:
+      - stockscanner-network
+
   # Flower for Celery monitoring
   flower:
     image: ghcr.io/omniscient/markethawk-backend:${IMAGE_TAG:-latest}
@@ -351,6 +398,8 @@ services:
     ports:
       - "127.0.0.1:5555:5555"
     depends_on:
+      admin-env-check:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       celery-worker:
@@ -375,6 +424,8 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
+      admin-env-check:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     networks:
@@ -396,6 +447,9 @@ services:
       - "127.0.0.1:5341:5341"      # Ingestion Port (API)
     volumes:
       - seq_data:/data
+    depends_on:
+      admin-env-check:
+        condition: service_completed_successfully
     networks:
       - stockscanner-network
     deploy:
@@ -448,12 +502,15 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
-      - prometheus
+      admin-env-check:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started
     networks:
       - stockscanner-network
     restart: unless-stopped
