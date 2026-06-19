@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Auto-Trade Guard Chain (issue #496)
+
+- [AVOID] Do not write a rejected AutoTradeOrder row when the quality gate refuses an automated trade — the unique constraint `uq_auto_trade_symbol_strategy_date(symbol, trading_strategy_id, event_date)` would block a legitimate order the same day if data quality recovers. All pre-creation guards in `maybe_execute()` use structured log + `return None`; the gate guard must follow the same pattern. <!-- issue:#496 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [PATTERN] When the auto-trade path re-evaluates data quality, call the gate service with `policy=strict` rather than trusting the advisory-mode blob stamped by the scanner run (#494). Advisory mode does not escalate blocker-severity issues to `blocked` verdict; re-calling under strict policy is required to get the correct verdict. <!-- issue:#496 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
