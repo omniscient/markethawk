@@ -24,11 +24,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] When importing a symbol inside a Celery task function body (e.g. `from app.utils.session import get_market_today`), patch it at its source module (`app.utils.session.get_market_today`), not at `app.tasks.scanning.get_market_today` — the latter name doesn't exist at module level and `patch()` will raise `AttributeError`. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
-- [PATTERN] When adding a NOT NULL FK column to a table that already has rows: (1) add nullable, (2) UPDATE to backfill default, (3) ALTER to NOT NULL — all in the same Alembic migration. The universe_id migration (c7d8e9f0a1b2) demonstrates this three-step pattern for `scanner_configs`. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
 ## Backend: Cookie Security
 
-- [PATTERN] Use a dedicated `COOKIE_SECURE: bool = True` field in `Settings` rather than deriving the secure flag from `ENVIRONMENT == "production"` — the dedicated field is overridable independently, defaults secure-by-default, and avoids a regression if `ENVIRONMENT` is not set. Add `COOKIE_SECURE: "false"` to the `backend` service in `docker-compose.override.yml` so local HTTP dev works automatically. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 - [PATTERN] Set `SameSite=Lax` on the `access_token` cookie and `SameSite=Strict` on the `refresh_token` cookie — Strict on the access cookie breaks top-level inbound navigation to the SPA (user lands logged-out), while the refresh token's narrow `/api/auth/refresh` path makes Strict safe there. <!-- issue:#202 date:2026-06-07 expires:2026-12-07 source:implement -->
 
@@ -94,6 +92,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Never write generated backtest signals to `scanner_events` — the `UniqueConstraint(ticker, event_date, scanner_type)` causes IntegrityErrors on any overlap with real events, and `scanner_events` is operational history consumed by alerts/clusters/reviews. Keep replay signals in-memory only; store a nullable `source_event_id` FK for signals that already exist in DB. See `backtest_service.py`. <!-- issue:#301 date:2026-06-13 expires:2026-12-13 source:implement -->
 - [PATTERN] When a sync function calls `run_until_complete()` inside a loop (e.g. day-walk in `backtest_service.py`), create the event loop once before the loop via `asyncio.new_event_loop()`, pass it as a parameter to callee functions, and close it in a `finally:` block — creating a new loop per iteration wastes resources and misses reuse opportunities. <!-- issue:#301 date:2026-06-14 expires:2026-12-14 source:implement -->
+## Backend: Test Infrastructure
+
+- [PATTERN] When writing integration tests for `tests/conftest.py` wiring (e.g. `_testcontainers_url()`), import private helpers directly (`from tests.conftest import _testcontainers_url`) and patch names on the `tests.conftest` namespace — not at their source module. `_testcontainers_url` resolves `probe_running_postgres` and `PostgresContainer` as module-level names in `tests.conftest`; patching the source module (`tests.utils.pg_discovery.probe_running_postgres`) will not intercept calls made through the conftest. <!-- issue:#503 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
