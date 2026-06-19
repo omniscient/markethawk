@@ -16,6 +16,18 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not introduce a vector database, embedding model, or semantic search service for memory retrieval. At the scale of this codebase (< 200 memory entries) flat file reading is faster and more predictable than a retrieval pipeline. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Schema Design — Versioned Contracts vs. Internal Reports (issue #492)
+
+- [PATTERN] Use Pydantic `BaseModel` in `backend/app/schemas/` for any output that will be serialized over HTTP or pinned with a `schema_version` field. Use Python `@dataclass` only for internal-only analysis results that are never exposed as API responses. The distinction: `DataReadinessService` uses `@dataclass` (internal); `QualityGateAssessment` uses `Pydantic` because future sub-issues will expose it via preflight API. Add `ConfigDict(extra="forbid")` to catch contract drift. <!-- issue:#492 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not use `@dataclass` for versioned, machine-readable contracts that will be serialized over HTTP — callers lose Pydantic's schema validation, `extra="forbid"` drift detection, and automatic JSON serialization. The presence of a `schema_version` field is a reliable signal that a shape needs Pydantic. <!-- issue:#492 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+## Service Design — Producer/Consumer Split (issue #492)
+
+- [PATTERN] When a new service *consumes* output from an existing service, put it in a separate file rather than extending the producer. `quality_gate_service.py` consumes `UniverseQualityReport.report_data` produced by `data_quality.py` — keeping them separate preserves one-directional dependency (consumer imports producer, never reverse) and avoids bloating the producer. This mirrors the existing `data_readiness.py` split from `data_quality.py`. <!-- issue:#492 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [PATTERN] For services that apply policy logic to pre-fetched data, split into a pure inner function `_build_assessment(data, scope, policy)` (no Session, no I/O) plus a thin DB-aware wrapper `ServiceClass.assess(db, id, ...)`. The pure function becomes the unit-testable core; the wrapper does only I/O. This pattern is required when acceptance criteria include "unit tests cover policy behavior" — the pure function enables testing with plain dicts without DB mocking. <!-- issue:#492 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ## Agent Memory Design (issue #149)
 
 - [PATTERN] Agent memory is stored as plain markdown files in `.archon/memory/`, committed to the repo. Files are read at Phase 1 load time and updated post-run. This keeps memory human-readable, version-controlled, and accessible to all agents without any extra tooling. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
