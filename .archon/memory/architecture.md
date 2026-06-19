@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Analytics Aggregation Pattern (issue #465)
+
+- [PATTERN] Use query-time SQLAlchemy aggregations for all analytics endpoints (scorecard, edge-stats, edge-decay, trait-performance). The existing `StatsService` in `backend/app/services/stats.py` demonstrates this with `func.count`, `func.avg`, and `join(ScannerOutcomeSummary)`. Add new analytics as static methods on `StatsService` using the same pattern. <!-- issue:#465 date:2026-06-19 expires:2026-12-19 source:refine -->
+
+- [AVOID] Do not pre-compute analytics results into a cache table or PostgreSQL materialized view without profiling evidence that query-time aggregation is insufficient. No such infrastructure exists in the codebase, and adding it for the first analytics feature introduces operational overhead (new model, migration, Celery schedule) without demonstrated need. <!-- issue:#465 date:2026-06-19 expires:2026-12-19 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
