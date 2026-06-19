@@ -472,3 +472,12 @@ def test_signals_response_includes_gate_tier_field(db: Session):
     assert response.status_code == 200
     for signal in response.json()["signals"]:
         assert "gate_tier" in signal, "gate_tier missing from signal item"
+
+
+def test_signals_rejects_oversized_limit(db: Session):
+    # CWE-770: signals limit must be capped before any DB query runs
+    response = client.get(
+        "/api/v1/outcomes/signals/pre_market_volume_spike?limit=10000000"
+    )
+
+    assert response.status_code == 422

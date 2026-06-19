@@ -5,7 +5,8 @@ Outcomes router — scanner signal quality and outcome tracking endpoints.
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -22,6 +23,7 @@ from app.schemas.analysis import (
     FeatureWeight,
     LatestAnalysisResponse,
 )
+from app.schemas.common import OutcomeDateRange
 from app.schemas.outcome import (
     BackfillRequest,
     BackfillResponse,
@@ -38,11 +40,30 @@ from app.utils.db import get_or_404
 router = APIRouter(prefix="/api/v1/outcomes", tags=["outcomes"])
 
 
+def get_outcome_date_range(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> OutcomeDateRange:
+    """Validate the shared outcomes date-range query params (366-day cap, F-INPUT-02).
+
+    A bare ``Depends(OutcomeDateRange)`` would surface a Pydantic ValidationError as
+    a 500; building the model here lets us return the correct 422 instead.
+    """
+    try:
+        return OutcomeDateRange(start_date=start_date, end_date=end_date)
+    except ValidationError as exc:
+        # Only the message strings are JSON-serializable; the raw error dicts
+        # carry the originating ValueError in ctx, which would 500 on render.
+        raise HTTPException(
+            status_code=422,
+            detail="; ".join(e["msg"] for e in exc.errors()),
+        ) from exc
+
+
 @router.get("/scorecard")
 def get_scorecard(
     scanner_type: Optional[str] = None,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
     severity: Optional[str] = None,
     regime: Optional[str] = None,
     include_warnings: bool = False,
@@ -54,8 +75,8 @@ def get_scorecard(
     return StatsService.get_scorecard(
         db,
         scanner_type,
-        start_date,
-        end_date,
+        date_range.start_date,
+        date_range.end_date,
         severity,
         regime=regime,
         include_warnings=include_warnings,
@@ -66,8 +87,7 @@ def get_scorecard(
 @router.get("/scorecard/{scanner_type}")
 def get_scorecard_by_type(
     scanner_type: str,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
     severity: Optional[str] = None,
     regime: Optional[str] = None,
     include_warnings: bool = False,
@@ -77,8 +97,8 @@ def get_scorecard_by_type(
     return StatsService.get_scorecard(
         db,
         scanner_type,
-        start_date,
-        end_date,
+        date_range.start_date,
+        date_range.end_date,
         severity,
         regime=regime,
         include_warnings=include_warnings,
@@ -89,11 +109,12 @@ def get_scorecard_by_type(
 @router.get("/regime-breakdown/{scanner_type}", response_model=RegimeBreakdownResponse)
 def get_regime_breakdown(
     scanner_type: str,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
     db: Session = Depends(get_db),
 ):
-    result = StatsService.get_regime_breakdown(db, scanner_type, start_date, end_date)
+    result = StatsService.get_regime_breakdown(
+        db, scanner_type, date_range.start_date, date_range.end_date
+    )
     return RegimeBreakdownResponse(**result)
 
 
@@ -118,31 +139,31 @@ def get_distribution(
 @router.get("/edge-decay/{scanner_type}")
 def get_edge_decay(
     scanner_type: str,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
     period: str = "weekly",
     db: Session = Depends(get_db),
 ):
-    return StatsService.get_edge_decay(db, scanner_type, start_date, end_date, period)
+    return StatsService.get_edge_decay(
+        db, scanner_type, date_range.start_date, date_range.end_date, period
+    )
 
 
 @router.get("/signals/{scanner_type}", response_model=SignalListResponse)
 def get_signals(
     scanner_type: str,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
     severity: Optional[str] = None,
     sort_by: str = "event_date",
     sort_order: str = "desc",
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=200),
     offset: int = 0,
     db: Session = Depends(get_db),
 ):
     return StatsService.get_signals(
         db,
         scanner_type,
-        start_date,
-        end_date,
+        date_range.start_date,
+        date_range.end_date,
         severity,
         sort_by,
         sort_order,

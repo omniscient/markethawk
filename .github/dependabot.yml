@@ -1,0 +1,37 @@
+# Dependabot keeps the pinned base images and GitHub Actions current.
+# Image FROM lines and compose images are pinned to @sha256 digests (F-SUPPLY-01);
+# Dependabot opens PRs to bump those digests under review so security patches
+# still land instead of the image freezing on a stale, vulnerable layer.
+version: 2
+updates:
+  # Docker base images (Dockerfiles) and docker-compose image references.
+  - package-ecosystem: "docker"
+    directories:
+      - "/"                       # docker-compose.yml
+      - "/backend"                # Dockerfile + Dockerfile.forecast
+      - "/frontend"
+      - "/grafana"
+      - "/monitoring/prometheus"
+      - "/services/tweet-monitor"
+      - "/docker"                 # Dockerfile.backup
+      - "/dark-factory"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "security"
+      - "dependencies"
+    commit-message:
+      prefix: "deps(docker)"
+
+  # GitHub Actions (pinned to commit SHAs — see F-CI-01 / #378).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "security"
+      - "dependencies"
+    commit-message:
+      prefix: "deps(actions)"

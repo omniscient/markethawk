@@ -4,6 +4,11 @@ on:
   pull_request:
     branches: [main]
 
+# Least-privilege default token for all jobs (F-CI-01). No job here writes;
+# a compromised test/build step gets a read-only token.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,10 +28,10 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
           cache: pip
@@ -98,7 +103,7 @@ jobs:
         run: python -m pytest
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-xml
           path: backend/coverage.xml
@@ -106,10 +111,10 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
           cache: npm
@@ -154,10 +159,10 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
           cache: pip
@@ -191,10 +196,10 @@ jobs:
   factory-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -205,3 +210,28 @@ jobs:
         run: python -m pytest dark-factory/tests/ -v
         env:
           PYTHONPATH: dark-factory/scripts
+
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Install bandit
+        run: pip install bandit
+
+      # Advisory: surface MEDIUM+ findings in the log without failing the build.
+      # The 5 known mediums (0.0.0.0 dev-runner bind, trusted-source pickle.loads,
+      # reviewed migration seed SQL) are tracked for separate triage.
+      - name: Bandit (advisory, medium+)
+        continue-on-error: true
+        run: bandit -r backend/app --severity-level medium --confidence-level all
+
+      # Gate: fail CI on any HIGH-severity finding. CodeQL (codeql.yml) provides
+      # the deeper analysis that feeds the Security tab.
+      - name: Bandit gate (HIGH severity)
+        run: bandit -r backend/app --severity-level high --confidence-level all

@@ -3,6 +3,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.common import BatchDateRange
+
 
 class OutcomeSnapshotResponse(BaseModel):
     id: int
@@ -95,10 +97,12 @@ class ReadinessResponse(BaseModel):
     missing_summary: str
 
 
-class BackfillRequest(BaseModel):
+class BackfillRequest(BatchDateRange):
+    """Inherits start_date/end_date plus the 1830-day batch range cap (F-INPUT-02)."""
+
+    model_config = ConfigDict(extra="forbid")
+
     scanner_type: str
-    start_date: date
-    end_date: date
 
 
 class BackfillResponse(BaseModel):

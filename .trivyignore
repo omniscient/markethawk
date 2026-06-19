@@ -3,3 +3,10 @@
 # across all images; path patterns suppress findings in specific layers.
 # Entries here are still reported in the SARIF Security-tab upload.
 # Document WHY each entry is accepted before adding it.
+
+# pyasn1 0.4.8 ReDoS (transitive via python-jose 3.4.0 -> rsa). The fix (pyasn1
+# 0.6.3) is uninstallable: python-jose 3.4.0 hard-pins pyasn1<0.5.0. Not
+# reachable in practice — pyasn1 only parses our trusted, configured JWT keys,
+# never attacker-controlled input. Already accepted in pip-audit (ci.yml). Drop
+# this when we migrate off python-jose. Tracked alongside #531.
+CVE-2026-30922

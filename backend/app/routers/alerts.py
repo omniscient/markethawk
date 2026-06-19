@@ -33,9 +33,17 @@ def _parse_channel_config(payload: Dict[str, Any]) -> None:
     try:
         ChannelConfig.model_validate(raw)
     except pydantic.ValidationError as exc:
+        # Strip to JSON-serializable fields: custom validators (e.g. the
+        # https-only check) put the originating ValueError in ctx, which would
+        # 500 on response render if passed through verbatim.
         raise HTTPException(
             status_code=422,
-            detail={"channel_config": exc.errors()},
+            detail={
+                "channel_config": [
+                    {"loc": list(e["loc"]), "msg": e["msg"], "type": e["type"]}
+                    for e in exc.errors()
+                ]
+            },
         )
 
 

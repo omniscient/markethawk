@@ -330,6 +330,56 @@ services:
         limits:
           memory: 256M
 
+  # ── Admin credential fail-fast (F-ADMIN-01, #371) ──────────────────────────
+  # One-shot gate: exits 0 only when all four admin-tool credentials are real —
+  # non-empty, not a change_me_* placeholder, not a known-weak default, and (for
+  # Seq) a bcrypt hash. flower/pgadmin/seq/grafana depend_on this completing
+  # successfully, so the stack refuses to expose an admin UI with unset or
+  # placeholder credentials. Ephemeral: no ports, no volumes, runs once.
+  # Values are passed via environment (not interpolated into the command) so
+  # they never appear in `docker inspect`/`ps` output. `$$` is the Compose
+  # escape for a literal `$` reaching the shell.
+  admin-env-check:
+    image: alpine:3
+    container_name: markethawk-admin-env-check
+    restart: "no"
+    environment:
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-}
+      SEQ_ADMIN_PASSWORD_HASH: ${SEQ_ADMIN_PASSWORD_HASH:-}
+      FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH:-}
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ERRORS=""
+        pg=$$(printf '%s' "$$PGADMIN_DEFAULT_PASSWORD" | tr 'A-Z' 'a-z')
+        case "$$pg" in
+          ""|change_me*) ERRORS="$$ERRORS\n  - PGADMIN_DEFAULT_PASSWORD: empty or change_me_* placeholder" ;;
+        esac
+        seqlower=$$(printf '%s' "$$SEQ_ADMIN_PASSWORD_HASH" | tr 'A-Z' 'a-z')
+        seqbad=""
+        case "$$seqlower" in ""|change_me*) seqbad=1 ;; esac
+        if [ -z "$$seqbad" ] && [ "$${#SEQ_ADMIN_PASSWORD_HASH}" -lt 40 ]; then seqbad=1; fi
+        if [ -n "$$seqbad" ]; then
+          ERRORS="$$ERRORS\n  - SEQ_ADMIN_PASSWORD_HASH: empty, placeholder, or not a real hash (generate: echo 'YourPassword' | docker run --rm -i datalust/seq config hash — emits a ~108-char PBKDF2 hash, not bcrypt)"
+        fi
+        fpass=$$(printf '%s' "$$FLOWER_BASIC_AUTH" | cut -s -d: -f2-)
+        fpass=$$(printf '%s' "$$fpass" | tr 'A-Z' 'a-z')
+        case "$$fpass" in
+          ""|change_me*) ERRORS="$$ERRORS\n  - FLOWER_BASIC_AUTH: password portion empty or change_me_* placeholder (format user:password)" ;;
+        esac
+        gf=$$(printf '%s' "$$GRAFANA_ADMIN_PASSWORD" | tr 'A-Z' 'a-z')
+        case "$$gf" in
+          ""|admin|changeme|change_me*) ERRORS="$$ERRORS\n  - GRAFANA_ADMIN_PASSWORD: empty, 'admin', 'changeme', or change_me_* placeholder" ;;
+        esac
+        if [ -n "$$ERRORS" ]; then
+          printf 'ERROR: Admin credential validation failed.\nThe following admin credentials are empty, placeholder, or known-weak:\n%b\n\nUpdate your .env before starting the stack (see .env.example).\n' "$$ERRORS"
+          exit 1
+        fi
+        echo "Admin credential check passed."
+    networks:
+      - stockscanner-network
+
   # Flower for Celery monitoring
   flower:
     image: ghcr.io/omniscient/markethawk-backend:${IMAGE_TAG:-latest}
@@ -351,6 +401,8 @@ services:
     ports:
       - "127.0.0.1:5555:5555"
     depends_on:
+      admin-env-check:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       celery-worker:
@@ -364,7 +416,7 @@ services:
 
   # pgAdmin for PostgreSQL management
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:9.16@sha256:40fa840c5bb7c8463957f1255b01283732c2d8c9396a956d180f8e6c296753b3
     container_name: stockscanner-pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
@@ -375,6 +427,8 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
+      admin-env-check:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
     networks:
@@ -386,7 +440,7 @@ services:
 
   # Seq for centralized structured error logging
   seq:
-    image: datalust/seq:latest
+    image: datalust/seq:2025.2@sha256:868a12e93ec0b8c993767a7dd4cd6c8ebc441511c79e4cfac66c911f62d4db65
     container_name: stockscanner-seq
     environment:
       ACCEPT_EULA: Y
@@ -396,6 +450,9 @@ services:
       - "127.0.0.1:5341:5341"      # Ingestion Port (API)
     volumes:
       - seq_data:/data
+    depends_on:
+      admin-env-check:
+        condition: service_completed_successfully
     networks:
       - stockscanner-network
     deploy:
@@ -405,7 +462,7 @@ services:
 
   # GELF input sidecar — receives GELF from Docker log driver and forwards to Seq
   seq-gelf:
-    image: datalust/seq-input-gelf:latest
+    image: datalust/seq-input-gelf:4.0@sha256:38d92d99e98f01206223c84337ca7bc1961128440803b8d71da929d49743b368
     container_name: stockscanner-seq-gelf
     environment:
       SEQ_ADDRESS: "http://seq:5341"
@@ -448,19 +505,22 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
-      - prometheus
+      admin-env-check:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started
     networks:
       - stockscanner-network
     restart: unless-stopped
 
   # Docker Socket Proxy (scheduler) — allows container lifecycle ops (create/run/stop/delete) via POST+CONTAINERS for `docker compose run`; BUILD/EXEC/NETWORKS/VOLUMES are denied
   docker-socket-proxy-scheduler:
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
     container_name: markethawk-docker-socket-proxy-scheduler
     restart: unless-stopped
     environment:
@@ -481,7 +541,7 @@ services:
 
   # Docker Socket Proxy (factory) — full verbs for dark-factory: build/exec/networks/volumes + EXEC fixes postgres-probe
   docker-socket-proxy-factory:
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
     container_name: markethawk-docker-socket-proxy-factory
     restart: unless-stopped
     environment:
@@ -508,7 +568,7 @@ services:
   # the result into dockerd via POST /images/load (allowed: POST:1, IMAGES:1). No host port
   # is published — it is reachable only from inside factory-network.
   buildkit:
-    image: moby/buildkit:latest
+    image: moby/buildkit:v0.31.0@sha256:a095b3d11ce1a9a05b6064ef515dfca0291ec5bcf2ea8178da8f6461924294e1
     container_name: markethawk-buildkit
     restart: unless-stopped
     privileged: true            # buildkitd needs runc + overlayfs

@@ -15,10 +15,15 @@ from app.models.active_watchlist import WATCHLIST_SOFT_LIMIT, ActiveWatchlist
 
 client = TestClient(app)
 
+# uuid4().hex is 0-9a-f; map the digits onto letters so generated symbols are
+# valid letters-only tickers (F-INPUT-02 Ticker pattern rejects digits).
+_HEX_TO_ALPHA = str.maketrans("0123456789abcdef", "GHIJKLMNOPABCDEF")
+
 
 def _sym(prefix="T"):
-    """Generate a unique ≤5-char symbol to avoid unique-constraint conflicts."""
-    return (prefix + uuid.uuid4().hex[:4]).upper()[:5]
+    """Generate a unique letters-only ≤5-char symbol to avoid unique-constraint conflicts."""
+    body = uuid.uuid4().hex.translate(_HEX_TO_ALPHA)
+    return (prefix + body).upper()[:5]
 
 
 def _post(symbol, security_type="STK"):

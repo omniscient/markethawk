@@ -5,7 +5,7 @@ Application configuration using pydantic-settings.
 from functools import lru_cache
 from urllib.parse import quote
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,10 +15,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
     # Database - REQUIRED
-    DATABASE_URL: str
+    DATABASE_URL: str = Field(repr=False)
 
     # Polygon.io API - REQUIRED
-    POLYGON_API_KEY: str
+    POLYGON_API_KEY: str = Field(repr=False)
     POLYGON_DELAYED: bool = True
     LIVE_WEBSOCKET_ENABLED: bool = True
 
@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3333"]
 
     # Auth
-    JWT_SECRET_KEY: str = ""
+    JWT_SECRET_KEY: str = Field(default="", repr=False)
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -106,13 +106,13 @@ class Settings(BaseSettings):
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
+    SMTP_PASSWORD: str = Field(default="", repr=False)
     SMTP_FROM_EMAIL: str = "MarketHawk Alerts <noreply@example.com>"
 
     # ── Web Push / VAPID (Browser Push Notifications) ─────────────────────
     # Generate a key pair once with: python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print('PRIV:', v.private_pem().decode()); print('PUB:', v.public_key)"
     # Or use the /api/alerts/push/generate-keys endpoint on first run.
-    VAPID_PRIVATE_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = Field(default="", repr=False)
     VAPID_PUBLIC_KEY: str = ""
     # Must be a mailto: or https: URL identifying the push sender
     VAPID_CLAIMS_EMAIL: str = "mailto:admin@example.com"
