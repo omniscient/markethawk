@@ -13,22 +13,47 @@ on:
         default: 'true'
         type: boolean
 
+# Deploy runs over SSH and uses no GITHUB_TOKEN API scopes.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      # Validate the free-text image_tag before it can reach the remote shell.
+      # The charset ^[a-z0-9._-]+$ excludes every shell metacharacter, so the value
+      # cannot break out of the SSH script (command injection). Read via env (not
+      # ${{ }}) so this gate step is itself injection-safe.
+      - name: Validate image_tag input
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          case "$IMAGE_TAG" in
+            '' ) echo "image_tag must not be empty" >&2; exit 1 ;;
+            *[!a-z0-9._-]* ) echo "Invalid image_tag '$IMAGE_TAG' (allowed: ^[a-z0-9._-]+\$)" >&2; exit 1 ;;
+          esac
+          echo "image_tag '$IMAGE_TAG' is valid."
+
       - name: Deploy via SSH
         # Requires secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
         # These are scaffolded here — add them in GitHub repository settings
         # once a deployment server is provisioned.
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          RUN_MIGRATIONS: ${{ inputs.run_migrations }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Forward the validated inputs as remote env vars instead of interpolating
+          # ${{ }} into the script — no untrusted text reaches the remote shell.
+          envs: IMAGE_TAG,RUN_MIGRATIONS
           script: |
             set -e
-            export IMAGE_TAG="${{ inputs.image_tag }}"
+            # IMAGE_TAG / RUN_MIGRATIONS arrive via envs above (image_tag validated
+            # upstream). docker compose reads IMAGE_TAG from the environment.
 
             # Pull updated images for all deployed services
             docker compose pull \
@@ -40,7 +65,7 @@ jobs:
             # Run migrations before starting services so the backend never briefly serves
             # traffic against a stale schema. Uses run --rm (not exec) so this works even
             # when the backend is not yet running. Postgres must be up (service_healthy).
-            if [ "${{ inputs.run_migrations }}" = "true" ]; then
+            if [ "$RUN_MIGRATIONS" = "true" ]; then
               docker compose run --rm backend python -m alembic upgrade head
             fi
 

@@ -482,8 +482,12 @@ def create_app() -> FastAPI:
                 traceback.format_exception(type(exc), exc, exc.__traceback__)
             )
 
-            # Hash traceback to generate deterministic Error ID
-            error_hash = hashlib.md5(tb_string.encode("utf-8")).hexdigest()[:8]
+            # Hash traceback to generate a deterministic Error ID. Non-cryptographic
+            # use (error fingerprint only) — usedforsecurity=False keeps it legal
+            # under FIPS and documents intent for SAST.
+            error_hash = hashlib.md5(
+                tb_string.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()[:8]
             error_id = f"ERR-{error_hash}"
 
             # Send to Tracking System (Seq) - handled internally as background task
