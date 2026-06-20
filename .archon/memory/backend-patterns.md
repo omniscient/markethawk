@@ -98,7 +98,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Backend: Data Quality / Gate Evidence
 
 - [PATTERN] `ScannerConfig.data_requirements` uses the `timespans[]` shape: `{"timespans": [{"timespan": "minute", "multiplier": 1, "lookback_days": 10, "min_bars": 260}]}`. `min_bars` is optional and drives `insufficient_lookback` gate issues; `lookback_days` drives `missing_bars` coverage checks. `DataReadinessService.check()` only reads `timespans[].lookback_days` — add `min_bars` to any new timespan entry when indicator bar counts need checking. <!-- issue:#498 date:2026-06-19 expires:2026-12-19 source:refine -->
-- [AVOID] Do not use the flat `{"timespan": "day", "min_bars": 260}` shape for `data_requirements` — it is a dead outlier in the trend_pullback seed that nothing currently reads. The canonical shape is `{"timespans": [...]}`. The trend_pullback seed migration (`normalize_data_requirements`) converts it to the standard form. <!-- issue:#498 date:2026-06-19 expires:2026-12-19 source:refine -->
+- [AVOID] Do not use the flat `{"timespan": "day", "min_bars": 260}` shape for `data_requirements` — it is a dead outlier in the trend_pullback seed that nothing currently reads. The canonical shape is `{"timespans": [...]}`. All evidence generators and DataReadinessService use `.get("timespans", [])` so the flat shape silently yields no issues; converting the trend_pullback seed is a separate deferred ticket. <!-- issue:#498 date:2026-06-20 expires:2026-12-20 source:refine -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
