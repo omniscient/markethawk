@@ -72,6 +72,11 @@ def _run_record(args):
     run_record.main()
 
 
+def _epic_autopilot(args):
+    from factory_core.epic_autopilot import main_once
+    main_once()
+
+
 def main():
     parser = argparse.ArgumentParser(prog="factory-core")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -108,6 +113,10 @@ def main():
     rr = sub.add_parser("run-record")
     rr.add_argument("run_record_args", nargs=argparse.REMAINDER)
     rr.set_defaults(func=_run_record)
+
+    ea = sub.add_parser("epic-autopilot")
+    ea.add_argument("--once", action="store_true")
+    ea.set_defaults(func=_epic_autopilot)
 
     parsed = parser.parse_args()
     parsed.func(parsed)
