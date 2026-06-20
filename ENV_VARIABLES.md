@@ -164,6 +164,15 @@ curl http://localhost:8000/health
 
 ---
 
+## System Notifications
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPS_ALERT_EMAIL` | `` (empty) | Recipient address for system-level email notifications sent via `notify_system()`. When unset the email channel is silently skipped; browser push still runs. |
+| `INTERNAL_API_TOKEN` | `` (empty) | Shared secret required by `POST /api/v1/alerts/system`. When unset the endpoint returns 503 (fail-closed). Generate with: `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+
+---
+
 ## Scanner SLO
 
 | Variable | Default | Description |

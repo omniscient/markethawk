@@ -107,6 +107,7 @@ MarketHawk/
 │   │   │   ├── signal_ranker.py
 │   │   │   ├── universe_orchestrator.py
 │   │   │   ├── universe_export.py
+│   │   │   ├── system_notifier.py  (notify_system — generic email/push for non-scanner events; dedupe via AlertDeliveryLog)
 │   │   │   └── __init__.py
 │   │   ├── providers/
 │   │   │   ├── base.py
