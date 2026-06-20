@@ -7,6 +7,7 @@ docs/superpowers/specs/2026-06-20-epic-autopilot-design.md.
 
 The pure functions below take/return plain data so they unit-test with no IO.
 """
+import hashlib
 import json
 import re
 
@@ -98,3 +99,34 @@ def should_advance(verdict: dict, confidence_floor: float) -> bool:
     return (verdict.get("decision") == "ADVANCE"
             and verdict.get("risk") == "low"
             and float(verdict.get("confidence", 0.0)) >= confidence_floor)
+
+
+# ── Daily cap + verdict cache (state is a plain dict; orchestrator persists JSON) ──
+
+def spec_hash(spec_text: str) -> str:
+    return hashlib.sha256((spec_text or "").encode("utf-8")).hexdigest()[:16]
+
+
+def daily_remaining(state: dict, cap: int, today: str) -> int:
+    d = state.get("daily") or {}
+    used = d.get("count", 0) if d.get("date") == today else 0
+    return max(0, cap - used)
+
+
+def record_advance(state: dict, today: str) -> None:
+    d = state.get("daily") or {}
+    if d.get("date") != today:
+        d = {"date": today, "count": 0}
+    d["count"] = d.get("count", 0) + 1
+    state["daily"] = d
+
+
+def cached_verdict(state: dict, issue: int, spec_hash_: str):
+    entry = (state.get("verdicts") or {}).get(str(issue))
+    if entry and entry.get("spec_hash") == spec_hash_:
+        return entry.get("verdict")
+    return None
+
+
+def record_verdict(state: dict, issue: int, spec_hash_: str, verdict: str) -> None:
+    state.setdefault("verdicts", {})[str(issue)] = {"spec_hash": spec_hash_, "verdict": verdict}

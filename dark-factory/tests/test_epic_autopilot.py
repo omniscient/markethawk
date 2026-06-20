@@ -120,3 +120,25 @@ def test_should_advance_only_on_low_and_floor():
     assert not ap.should_advance({"decision": "ADVANCE", "risk": "medium", "confidence": 0.9}, 0.7)
     assert not ap.should_advance({"decision": "ADVANCE", "risk": "low", "confidence": 0.6}, 0.7)
     assert not ap.should_advance({"decision": "HOLD", "risk": "low", "confidence": 0.99}, 0.7)
+
+
+# ── Task 4: daily cap + verdict cache ───────────────────────────────────────
+
+def test_daily_cap_counts_and_resets():
+    st = {}
+    assert ap.daily_remaining(st, 5, "2026-06-20") == 5
+    ap.record_advance(st, "2026-06-20")
+    ap.record_advance(st, "2026-06-20")
+    assert ap.daily_remaining(st, 5, "2026-06-20") == 3
+    # next UTC day resets the counter
+    assert ap.daily_remaining(st, 5, "2026-06-21") == 5
+
+
+def test_verdict_cache_roundtrip_and_hash_invalidation():
+    st = {}
+    h1 = ap.spec_hash("spec A")
+    assert ap.cached_verdict(st, 402, h1) is None
+    ap.record_verdict(st, 402, h1, "HOLD")
+    assert ap.cached_verdict(st, 402, h1) == "HOLD"
+    # regenerated spec → different hash → cache miss (re-review)
+    assert ap.cached_verdict(st, 402, ap.spec_hash("spec A v2")) is None
