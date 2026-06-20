@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Dispatch Ceiling Configuration
+
+- [PATTERN] To change `ABOVE_CEILING_KEYWORDS` via PR, target `.claude/skills/refinement/config.yaml` (`dispatch_ceiling.keywords`). This is the canonical source that `scheduler.sh` reads at startup via `_set_cfg`. `.archon/.env` env-var overrides take precedence if present, but `.archon/.env` is gitignored and cannot be modified via PR. <!-- issue:#574 date:2026-06-20 expires:2026-12-20 source:refine -->
+
+- [AVOID] Do not specify `.archon/.env` as the PR target for `ABOVE_CEILING_KEYWORDS` changes — the file is gitignored and cannot carry a commit. Original #355 spec incorrectly cited this path. <!-- issue:#574 date:2026-06-20 expires:2026-12-20 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
