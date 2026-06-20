@@ -13,3 +13,4 @@
 {"issue":429,"title":"enhance(pg_discovery): guard isinstance(containers, list) on Docker API response","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T03:14:29Z"}
 {"issue":516,"title":"docs(architecture): ARCHITECTURE.md buildkit subgraph should be tracked as in-scope doc for #436","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T03:16:52Z"}
 {"issue":516,"title":"docs(architecture): ARCHITECTURE.md buildkit subgraph should be tracked as in-scope doc for #436","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T03:17:04Z"}
+{"issue":303,"title":"Outcome dashboard: per-scanner ScannerOutcomeSummary aggregates in UI","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T03:19:19Z"}
