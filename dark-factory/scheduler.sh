@@ -402,7 +402,7 @@ has_new_comment_after_report() {
   # posts pipeline-status comments — none are feedback, so re-running the spec on them
   # loops the pipeline (issue #124: cost report -> spurious second spec). Match on
   # footer/marker, NOT author: every comment is authored by the same PAT account.
-  local bot_re="Posted by MarketHawk Refinement Pipeline|Posted by MarketHawk Backlog Scheduler|Posted by MarketHawk Dark Factory|Updated by MarketHawk Dark Factory|dark-factory-cost-report"
+  local bot_re="Posted by MarketHawk Refinement Pipeline|Posted by MarketHawk Backlog Scheduler|Posted by MarketHawk Dark Factory|Updated by MarketHawk Dark Factory|dark-factory-cost-report|Posted by MarketHawk Epic Autopilot"
 
   local has_human
   has_human=$(echo "$comments" | jq --arg marker "$report_marker" --arg bot "$bot_re" '
