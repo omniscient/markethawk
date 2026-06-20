@@ -130,3 +130,77 @@ def cached_verdict(state: dict, issue: int, spec_hash_: str):
 
 def record_verdict(state: dict, issue: int, spec_hash_: str, verdict: str) -> None:
     state.setdefault("verdicts", {})[str(issue)] = {"spec_hash": spec_hash_, "verdict": verdict}
+
+
+# ── Orchestrator (pure control flow; all IO injected via `io`) ──────────────
+
+def build_review_prompt(c: dict) -> str:
+    return f"""You are a cautious senior engineer deciding whether a refined ticket is safe to
+implement and merge AUTONOMOUSLY (adding the direct-to-pr label means it flows
+spec->plan->implement->PR with NO further human gate before the PR opens).
+
+Reply with ONLY a JSON object:
+{{"decision":"ADVANCE|HOLD","risk":"low|medium|high","confidence":0.0-1.0,
+  "reasons":[...],"concerns":[...]}}
+
+ADVANCE only if the work is genuinely low-risk: small, well-scoped, reversible, good test
+coverage in the spec/plan, low blast radius, and NOT touching automated trading,
+authentication/authorization, or the factory/scheduler itself. If the spec is vague, an
+empty-branch/no-op risk, or you are unsure -- choose HOLD.
+
+Ticket #{c['number']}: {c['title']}
+Labels: {', '.join(c.get('labels', []))}   Size: {c.get('size')}
+Declared target files: {', '.join(c.get('target_paths') or []) or '(none declared)'}
+
+--- SPEC/PLAN ---
+{(c.get('spec_text') or '')[:8000]}
+"""
+
+
+def run_once(cfg: dict, io, state: dict, today: str) -> dict:
+    """One starved-cycle pass. Returns {outcome, issue, reason}. Never raises for IO
+    that the injected `io` swallows; pure-logic errors propagate to the caller."""
+    if daily_remaining(state, cfg["daily_cap"], today) <= 0:
+        io.notify("Epic autopilot — daily cap reached",
+                  f"Hit the daily cap of {cfg['daily_cap']} autonomous advances; paused until UTC reset. Review the backlog.",
+                  "warning", "autopilot-cap")
+        return {"outcome": "daily_cap_reached", "issue": None, "reason": "cap"}
+
+    candidates = []
+    for cand in io.fetch_candidates():
+        ok, _ = is_eligible(cand, cfg["opt_out_label"], cfg["ceiling_keywords"])
+        if not ok:
+            continue
+        excluded, _ = hard_excluded(cand, cfg["exclude_paths"])
+        if excluded:
+            continue
+        if cached_verdict(state, cand["number"], spec_hash(cand.get("spec_text", ""))) == "HOLD":
+            continue
+        candidates.append(cand)
+
+    if not candidates:
+        io.notify("Epic autopilot — idle, nothing safe to advance",
+                  "The factory is starved and the autopilot has no eligible low-risk ticket to advance. Human input needed.",
+                  "warning", "autopilot-stuck")
+        return {"outcome": "no_candidates", "issue": None, "reason": "empty"}
+
+    cand = candidates[0]
+    verdict = parse_verdict(io.review(build_review_prompt(cand), cfg["model"]))
+    h = spec_hash(cand.get("spec_text", ""))
+    if should_advance(verdict, cfg["confidence_floor"]):
+        io.advance(cand["number"])
+        reason = "; ".join(verdict.get("reasons", [])) or "low-risk"
+        io.comment(cand["number"],
+                   f"\U0001f916 **Epic Autopilot** — advancing (risk={verdict['risk']}, conf={verdict['confidence']}). "
+                   f"Reason: {reason}\n\n---\n*Posted by MarketHawk Epic Autopilot*")
+        io.notify(f"Autopilot advancing #{cand['number']}",
+                  f"{cand['title']} — risk=low: {reason}", "info", None)
+        record_advance(state, today)
+        record_verdict(state, cand["number"], h, "ADVANCE")
+        return {"outcome": "advanced", "issue": cand["number"], "reason": reason}
+
+    concerns = "; ".join(verdict.get("concerns", [])) or "not low-risk / low confidence"
+    io.comment(cand["number"],
+               f"\U0001f916 **Epic Autopilot** — parked (HOLD). {concerns}\n\n---\n*Posted by MarketHawk Epic Autopilot*")
+    record_verdict(state, cand["number"], h, "HOLD")
+    return {"outcome": "hold", "issue": cand["number"], "reason": concerns}

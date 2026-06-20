@@ -142,3 +142,77 @@ def test_verdict_cache_roundtrip_and_hash_invalidation():
     assert ap.cached_verdict(st, 402, h1) == "HOLD"
     # regenerated spec → different hash → cache miss (re-review)
     assert ap.cached_verdict(st, 402, ap.spec_hash("spec A v2")) is None
+
+
+# ── Task 5: orchestrator with injected IO ───────────────────────────────────
+
+class FakeIO:
+    def __init__(self, candidates, review_text):
+        self._cands = candidates
+        self._review = review_text
+        self.advanced = []
+        self.comments = []
+        self.notes = []
+
+    def fetch_candidates(self):
+        return self._cands
+
+    def review(self, prompt, model):
+        return self._review
+
+    def advance(self, issue):
+        self.advanced.append(issue)
+
+    def comment(self, issue, body):
+        self.comments.append((issue, body))
+
+    def notify(self, title, body, severity, dedupe_key):
+        self.notes.append((severity, dedupe_key))
+
+
+CFG = dict(exclude_paths=["app/core/auth", "dark-factory/"], opt_out_label="no-autopilot",
+           ceiling_keywords=CEIL, confidence_floor=0.7, daily_cap=5, model="claude-opus-4-8")
+
+
+def test_run_advances_low_risk():
+    io = FakeIO([c(number=402)], '{"decision":"ADVANCE","risk":"low","confidence":0.9,"reasons":["safe"],"concerns":[]}')
+    st = {}
+    out = ap.run_once(CFG, io, st, "2026-06-20")
+    assert out["outcome"] == "advanced" and out["issue"] == 402
+    assert io.advanced == [402]
+    assert any(sev == "info" for sev, _ in io.notes)          # advance notice
+    assert ap.daily_remaining(st, 5, "2026-06-20") == 4
+
+
+def test_run_holds_medium_risk():
+    io = FakeIO([c(number=402)], '{"decision":"ADVANCE","risk":"medium","confidence":0.9,"reasons":[],"concerns":["risky"]}')
+    st = {}
+    out = ap.run_once(CFG, io, st, "2026-06-20")
+    assert out["outcome"] == "hold" and io.advanced == []
+    assert ap.cached_verdict(st, 402, ap.spec_hash(c(number=402)["spec_text"])) == "HOLD"
+
+
+def test_run_no_candidates_notifies_stuck():
+    io = FakeIO([c(number=402, labels=["no-autopilot", "ready-for-agent"])], "x")
+    out = ap.run_once(CFG, io, {}, "2026-06-20")
+    assert out["outcome"] == "no_candidates"
+    assert any(sev == "warning" and key == "autopilot-stuck" for sev, key in io.notes)
+
+
+def test_run_daily_cap_reached_notifies():
+    io = FakeIO([c(number=402)], "x")
+    st = {"daily": {"date": "2026-06-20", "count": 5}}
+    out = ap.run_once(CFG, io, st, "2026-06-20")
+    assert out["outcome"] == "daily_cap_reached"
+    assert io.advanced == []
+    assert any(key == "autopilot-cap" for _, key in io.notes)
+
+
+def test_run_skips_cached_hold():
+    cand = c(number=402)
+    st = {}
+    ap.record_verdict(st, 402, ap.spec_hash(cand["spec_text"]), "HOLD")
+    io = FakeIO([cand], '{"decision":"ADVANCE","risk":"low","confidence":0.9}')
+    out = ap.run_once(CFG, io, st, "2026-06-20")
+    assert out["outcome"] == "no_candidates"   # only candidate is cache-suppressed
+    assert io.advanced == []
