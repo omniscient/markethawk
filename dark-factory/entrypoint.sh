@@ -68,7 +68,7 @@ _entrypoint_cfg_apply() {
 
 # --- Parse arguments ---
 ARGUMENTS="${*}"
-if [ -z "$ARGUMENTS" ]; then
+if [ -z "$ARGUMENTS" ] && [ "${ENTRYPOINT_SOURCE_ONLY:-0}" != "1" ]; then
   echo "Usage: docker compose --profile factory run --rm dark-factory \"Fix issue #3\""
   echo "       docker compose --profile factory run --rm dark-factory \"Continue issue #3\""
   echo "       docker compose --profile factory run --rm dark-factory \"Close issue #3\""
@@ -82,7 +82,7 @@ fi
 # "Recheck main" carries no "#N" — the || true keeps the no-match grep (exit 1)
 # from killing the script under set -euo pipefail.
 ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1 || true)
-INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict|recheck)' | head -1 | tr '[:upper:]' '[:lower:]')
+INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict|recheck)' | head -1 | tr '[:upper:]' '[:lower:]' || true)
 INTENT=${INTENT:-fix}
 
 # --- Canonical run identity and artifact directory ---
@@ -425,6 +425,11 @@ _resolve_merge_conflicts() {
   python3 "$CLONE_DIR/dark-factory/scripts/factory_core/cli.py" \
     deconflict --issue "$ISSUE_NUM" || return $?
 }
+
+# Guard: allow sourcing for unit tests without running the main execution block.
+# Set ENTRYPOINT_SOURCE_ONLY=1 before sourcing. External commands (git, gh, docker,
+# claude) must be stubbed by the test to prevent real side effects.
+[ "${ENTRYPOINT_SOURCE_ONLY:-0}" = "1" ] && return 0
 
 # --- Clone the repo ---
 echo "Cloning markethawk..."
