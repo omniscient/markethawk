@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Archon DAG Engine — Node State Semantics (issue #402)
+
+- [PATTERN] An unparseable `when:` expression in the DAG engine must mark the node as `failed` (not `skipped`). This sets `nodeCounts.failed++`, `anyFailed=true`, and triggers `failWorkflowRun`. No new state is needed — `failed` is the correct semantic: the node could not be evaluated, which is indistinguishable from a crashed node from the downstream `all_success` trigger-rule perspective. <!-- issue:#402 date:2026-06-20 expires:2026-12-20 source:refine -->
+
+- [AVOID] Do NOT mark nodes with unparseable `when:` expressions as `skipped` fail-closed — `skipped` does not increment `nodeCounts.failed`, so `anyFailed` stays false and the workflow reports success even though no real work was done. This caused the #397 outage: 10 Max-window runs burned on identical no-op cycles, each exiting 0 while discarding their feature branch. The change is in `dag-executor.ts` `!conditionParsed` branch: emit `node_failed`, persist `node_failed`, return `{ state: 'failed', error: parseErrMsg }`. <!-- issue:#402 date:2026-06-20 expires:2026-12-20 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
