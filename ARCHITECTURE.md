@@ -88,6 +88,15 @@ graph TD
     dbbackup -->|"failure events"| seq
 ```
 
+### Container Users
+
+| Image | Services | Runtime user | Notes |
+|---|---|---|---|
+| `markethawk-backend` | `backend`, `celery-worker`, `celery-beat`, `live-scanner`, `tweet-monitor`, `flower` | `appuser` (uid 1000) | Non-root; created in `backend/Dockerfile` |
+| `markethawk-frontend` | `frontend` | `node` | Non-root; default node image user |
+| `markethawk-dark-factory` | `dark-factory`, `backlog-scheduler` | `factory` (uid 1000) | Non-root; created in `dark-factory/Dockerfile` |
+| `markethawk-forecast` | `forecast-worker` | `root` | Exception: HuggingFace model weights (~800 MB) cached at `/root/.cache/huggingface` via `timesfm_cache` named volume; converting to non-root requires relocating the cache path (tracked as a separate follow-up) |
+
 ## Scan Execution Flow
 
 A full pre-market scan proceeds as follows:
