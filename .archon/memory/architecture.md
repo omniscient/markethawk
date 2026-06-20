@@ -22,6 +22,14 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Live Trading Safety Controls (issue #368)
+
+- [PATTERN] `place_bracket_order` in `providers/ibkr_orders.py` is the single non-bypassable chokepoint for live IBKR order placement — anything that reaches it is real money. All security controls that must not be API-bypassed (kill switch, arming flag, hard notional/qty caps) belong at the top of this function, below all DB-settable flags and below the executor guard chain in `maybe_execute`. Do not rely on upstream controls alone — add the guard here. <!-- issue:#368 date:2026-06-20 expires:2026-12-20 source:refine -->
+
+- [PATTERN] Use two independent live-trading gates at different layers: `AUTO_TRADING_ENABLED` (DB/SystemConfig, API-settable) in `maybe_execute` as the operator's day-to-day toggle, AND `LIVE_TRADING_ARMED` (Settings/env-only, not API-settable) in `place_bracket_order` as the deployment-level arming switch. Both must be true for live orders to reach IBKR. This is explicit two-factor deployment-level control: API compromise alone cannot enable live trading. <!-- issue:#368 date:2026-06-20 expires:2026-12-20 source:refine -->
+
+- [AVOID] Do not implement a runtime daily-loss auto-halt in the same ticket as per-order hard caps — no daily realized-P&L aggregation exists (no intraday rollup, no trading-day boundary logic). Scope to a separate ticket. The manual `TRADING_KILL_SWITCH` env flag is the immediate halt mechanism. <!-- issue:#368 date:2026-06-20 expires:2026-12-20 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
