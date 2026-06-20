@@ -79,6 +79,11 @@ read_config() {
   _set_cfg DISPATCH_CEILING_ENABLED   '.dispatch_ceiling.enabled'
   _set_cfg ABOVE_CEILING_LABEL        '.dispatch_ceiling.label'
   _set_cfg ABOVE_CEILING_KEYWORDS     '.dispatch_ceiling.keywords'
+  _set_cfg EPIC_AUTOPILOT_ENABLED          '.epic_autopilot.enabled'
+  _set_cfg EPIC_AUTOPILOT_MODEL            '.epic_autopilot.model'
+  _set_cfg EPIC_AUTOPILOT_DAILY_CAP        '.epic_autopilot.daily_cap'
+  _set_cfg EPIC_AUTOPILOT_CONFIDENCE_FLOOR '.epic_autopilot.confidence_floor'
+  _set_cfg EPIC_AUTOPILOT_OPT_OUT_LABEL    '.epic_autopilot.opt_out_label'
 
   echo "[config] loaded from ${cfg}"
 }

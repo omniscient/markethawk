@@ -67,3 +67,22 @@ dispatch_ceiling:
   # M tickets lose the plan-pending-review grace-window auto-advance. S is unaffected.
   # See docs/superpowers/specs/2026-06-12-size-type-aware-dispatch-ceiling-design.md
   # Revisit: 2026-09-12
+
+epic_autopilot:
+  enabled: false              # kill-switch — ship OFF. env: EPIC_AUTOPILOT_ENABLED overrides
+  model: claude-opus-4-8      # reviewer model. env: EPIC_AUTOPILOT_MODEL overrides
+  daily_cap: 5                # max autonomous advances / UTC day. env: EPIC_AUTOPILOT_DAILY_CAP overrides
+  confidence_floor: 0.7       # min Opus confidence to ADVANCE. env: EPIC_AUTOPILOT_CONFIDENCE_FLOOR overrides
+  opt_out_label: no-autopilot # per-ticket veto label. env: EPIC_AUTOPILOT_OPT_OUT_LABEL overrides
+  hard_exclude_paths:         # spec target paths matching any of these → excluded before Opus (fail-closed)
+    - "dark-factory/"
+    - ".archon/"
+    - "scheduler.sh"
+    - "factory_core/"
+    - "app/services/trading"
+    - "app/tasks/trading.py"
+    - "app/core/auth"
+    - "app/routers/auth"
+  # When starved (a poll dispatched nothing) and main is green, review the refined, below-ceiling
+  # children of in-progress epics with Opus and advance the low-risk ones via direct-to-pr.
+  # See docs/superpowers/specs/2026-06-20-epic-autopilot-design.md
