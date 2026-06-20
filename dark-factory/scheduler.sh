@@ -79,6 +79,11 @@ read_config() {
   _set_cfg DISPATCH_CEILING_ENABLED   '.dispatch_ceiling.enabled'
   _set_cfg ABOVE_CEILING_LABEL        '.dispatch_ceiling.label'
   _set_cfg ABOVE_CEILING_KEYWORDS     '.dispatch_ceiling.keywords'
+  _set_cfg EPIC_AUTOPILOT_ENABLED          '.epic_autopilot.enabled'
+  _set_cfg EPIC_AUTOPILOT_MODEL            '.epic_autopilot.model'
+  _set_cfg EPIC_AUTOPILOT_DAILY_CAP        '.epic_autopilot.daily_cap'
+  _set_cfg EPIC_AUTOPILOT_CONFIDENCE_FLOOR '.epic_autopilot.confidence_floor'
+  _set_cfg EPIC_AUTOPILOT_OPT_OUT_LABEL    '.epic_autopilot.opt_out_label'
 
   echo "[config] loaded from ${cfg}"
 }
@@ -1093,6 +1098,16 @@ To proceed:
       REFINE_RUNNING=$((REFINE_RUNNING + 1))
     fi
   done < <(echo "$BACKLOG" | jq -c '.[]')
+
+  # --- Priority 6: Epic Autopilot (starved self-unlock, #571) ---
+  # Runs ONLY when this cycle dispatched nothing (starved), main is green, and it is
+  # enabled. Reviews the refined, below-ceiling children of in-progress epics with Opus
+  # and advances the low-risk ones via direct-to-pr. Fail-soft: never abort the loop.
+  if [ -z "$DISPATCHED" ] && [ "$MAIN_IS_RED" = "false" ] && [ "${EPIC_AUTOPILOT_ENABLED:-false}" = "true" ]; then
+    AP_OUT=$(python3 "$FACTORY_CORE_CLI" epic-autopilot --once 2>&1) || true
+    echo "[$(date -u +%FT%TZ)] ${AP_OUT}"
+    case "$AP_OUT" in *"autopilot=advanced"*) DISPATCHED="$AP_OUT" ;; esac
+  fi
 
   # --- Log cycle summary ---
   BUDGET=$(gh api rate_limit --jq '.resources.graphql | "\(.used)/\(.limit)"' 2>/dev/null) || BUDGET="?"
