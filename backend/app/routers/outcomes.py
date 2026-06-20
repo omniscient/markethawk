@@ -68,6 +68,7 @@ def get_scorecard(
     regime: Optional[str] = None,
     include_warnings: bool = False,
     include_all: bool = False,
+    review_window_days: int = 90,
     db: Session = Depends(get_db),
 ):
     if not scanner_type:
@@ -81,6 +82,7 @@ def get_scorecard(
         regime=regime,
         include_warnings=include_warnings,
         include_all=include_all,
+        review_window_days=review_window_days,
     )
 
 
@@ -92,6 +94,7 @@ def get_scorecard_by_type(
     regime: Optional[str] = None,
     include_warnings: bool = False,
     include_all: bool = False,
+    review_window_days: int = 90,
     db: Session = Depends(get_db),
 ):
     return StatsService.get_scorecard(
@@ -103,6 +106,7 @@ def get_scorecard_by_type(
         regime=regime,
         include_warnings=include_warnings,
         include_all=include_all,
+        review_window_days=review_window_days,
     )
 
 

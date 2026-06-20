@@ -2,7 +2,7 @@
 Stats Service - Statistical aggregation and analysis for volume events.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import sqlalchemy as sa
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.signal_review import SignalReview
 
 # JSONB path to the gate tier: metadata_["quality_gate"]["tier"]
 _GATE_TIER = ScannerEvent.metadata_["quality_gate"]["tier"].astext
@@ -145,6 +146,69 @@ class StatsService:
         return {"events": data}
 
     @staticmethod
+    def _get_review_fields(
+        db: Session,
+        scanner_type: str,
+        total_signals: int,
+        review_window_days: int = 90,
+    ) -> Dict[str, Any]:
+        """Aggregate SignalReview rows for a scanner type within the trailing window.
+
+        Returns a dict of review-side fields that can be merged into any scorecard
+        response. All fields are null/empty when no reviews exist in the window.
+        precision_pct = confirmed / (confirmed + rejected) * 100 (null when denominator=0).
+        review_coverage_pct uses trust-filtered outcome total_signals as denominator.
+        """
+        cutoff = datetime.utcnow() - timedelta(days=review_window_days)
+        rows = (
+            db.query(
+                SignalReview.verdict,
+                SignalReview.reject_reason,
+                func.count(SignalReview.id).label("n"),
+            )
+            .join(ScannerEvent, ScannerEvent.id == SignalReview.scanner_event_id)
+            .filter(
+                ScannerEvent.scanner_type == scanner_type,
+                SignalReview.reviewed_at >= cutoff,
+            )
+            .group_by(SignalReview.verdict, SignalReview.reject_reason)
+            .all()
+        )
+
+        verdict_counts: Dict[str, int] = {"confirmed": 0, "rejected": 0, "enhanced": 0}
+        reject_reason_counts: Dict[str, int] = {}
+
+        for row in rows:
+            v = row.verdict
+            n = int(row.n)
+            if v in verdict_counts:
+                verdict_counts[v] += n
+            if v == "rejected" and row.reject_reason:
+                reject_reason_counts[row.reject_reason] = (
+                    reject_reason_counts.get(row.reject_reason, 0) + n
+                )
+
+        sample_n = verdict_counts["confirmed"] + verdict_counts["rejected"]
+        precision_pct = (
+            round(verdict_counts["confirmed"] / sample_n * 100, 1)
+            if sample_n > 0
+            else None
+        )
+        coverage_pct = (
+            round(sample_n / total_signals * 100, 1) if total_signals > 0 else None
+        )
+        top_reasons = sorted(reject_reason_counts.items(), key=lambda x: -x[1])[:3]
+        top_reject_reasons = [{"reject_reason": r, "count": c} for r, c in top_reasons]
+
+        return {
+            "precision_pct": precision_pct,
+            "review_coverage_pct": coverage_pct,
+            "verdict_counts": verdict_counts,
+            "top_reject_reasons": top_reject_reasons,
+            "review_sample_n": sample_n,
+        }
+
+    @staticmethod
     def get_scorecard(
         db: Session,
         scanner_type: str,
@@ -154,6 +218,7 @@ class StatsService:
         regime: Optional[str] = None,
         include_warnings: bool = False,
         include_all: bool = False,
+        review_window_days: int = 90,
     ) -> Dict[str, Any]:
         base_filters = [ScannerEvent.scanner_type == scanner_type]
         if start_date:
@@ -220,6 +285,10 @@ class StatsService:
         complete = [s for s in summaries if s.is_complete]
         complete_count = len(complete)
 
+        review_fields = StatsService._get_review_fields(
+            db, scanner_type, total, review_window_days
+        )
+
         if not complete:
             return {
                 "scanner_type": scanner_type,
@@ -238,6 +307,7 @@ class StatsService:
                 "interval_breakdown": {},
                 "gate_status": gate_status,
                 "gate_filter": gate_filter,
+                **review_fields,
             }
 
         wins = [
@@ -313,6 +383,7 @@ class StatsService:
             "interval_breakdown": {},
             "gate_status": gate_status,
             "gate_filter": gate_filter,
+            **review_fields,
         }
 
     @staticmethod

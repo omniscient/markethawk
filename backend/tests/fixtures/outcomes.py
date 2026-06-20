@@ -3,7 +3,7 @@ Outcomes seed helpers — scanner events, outcome snapshots, and outcome summari
 Each function inserts rows and flushes; the caller's transaction provides rollback.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.signal_review import SignalReview
 
 
 def seed_outcomes(db: Session) -> dict:
@@ -179,3 +180,35 @@ def seed_outcomes_with_gate_tiers(db: Session) -> dict:
     db.flush()
 
     return {"events": events, "summaries": summaries}
+
+
+def seed_reviews(db: Session, events: list) -> list:
+    """
+    Creates SignalReview rows on the first 3 events passed (expected to be
+    pre_market_volume_spike events from seed_outcomes).
+
+    Distribution: 2 confirmed, 1 rejected (reason='noise').
+    With seed_outcomes' 3 complete pre_market_volume_spike summaries (total_signals=3):
+      precision_pct = 2 / (2+1) * 100 = 66.67
+      review_sample_n = 3
+      review_coverage_pct = 3 / 3 * 100 = 100.0
+      top_reject_reasons = [{"reject_reason": "noise", "count": 1}]
+      verdict_counts = {"confirmed": 2, "rejected": 1, "enhanced": 0}
+    """
+    specs = [
+        ("confirmed", None),
+        ("confirmed", None),
+        ("rejected", "noise"),
+    ]
+    reviews = []
+    for event, (verdict, reason) in zip(events[:3], specs):
+        rv = SignalReview(
+            scanner_event_id=event.id,
+            verdict=verdict,
+            reject_reason=reason,
+            reviewed_at=datetime.utcnow(),
+        )
+        db.add(rv)
+        reviews.append(rv)
+    db.flush()
+    return reviews

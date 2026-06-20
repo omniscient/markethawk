@@ -60,6 +60,11 @@ class EdgeDecayPoint(BaseModel):
     sample_size: int
 
 
+class RejectReasonCount(BaseModel):
+    reject_reason: str
+    count: int
+
+
 class ScorecardResponse(BaseModel):
     scanner_type: str
     period: str
@@ -77,6 +82,12 @@ class ScorecardResponse(BaseModel):
     interval_breakdown: Dict[str, IntervalBreakdown] = {}
     gate_filter: str = "trusted"
     gate_status: Optional[Dict[str, int]] = None
+    # Review-side fields (issue #303) — all optional; null when no reviews in window
+    precision_pct: Optional[float] = None
+    review_coverage_pct: Optional[float] = None
+    verdict_counts: Optional[Dict[str, int]] = None
+    top_reject_reasons: List[RejectReasonCount] = []
+    review_sample_n: int = 0
 
 
 class ReadinessCoverage(BaseModel):
