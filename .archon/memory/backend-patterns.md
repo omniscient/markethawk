@@ -101,3 +101,5 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
 
 - [PROVISIONAL] `WebSocketException(code=1008)` raised inside the route handler body (not only from a FastAPI Dependency) is caught by Starlette and closes the connection before `websocket.accept()` returns to the client — so an `async with ws_connection_slot(user_id):` context manager in the handler body (before `await websocket.accept()`) correctly delivers 1008 without needing a separate Dependency. <!-- evidence:test-output issue:#377 date:2026-06-14 expires:2026-12-14 source:implement -->
+
+- [PROVISIONAL] `AlertDeliveryLog.ticker` is `VARCHAR(10)` — too short for arbitrary dedupe keys. Hash long keys with `hashlib.sha256(key.encode()).hexdigest()[:10]` before storing in `ticker`; the 10-char hex prefix gives ~10^12 distinct values (negligible collision risk for ops notifications). <!-- evidence:test-output issue:#570 date:2026-06-20 expires:2026-12-20 source:implement -->
