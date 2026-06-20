@@ -20,9 +20,7 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Backend: Celery Tasks
 
-- [AVOID] For `bind=True` Celery tasks in tests, never call `task.run(mock_self)` — `.run` is already partially bound to the task instance, so passing `mock_self` adds an extra positional arg and raises `TypeError`. Instead call `task.run()` (no args) and use `patch.object(task, 'retry', side_effect=...)` to control retry behavior. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
-- [PATTERN] When importing a symbol inside a Celery task function body (e.g. `from app.utils.session import get_market_today`), patch it at its source module (`app.utils.session.get_market_today`), not at `app.tasks.scanning.get_market_today` — the latter name doesn't exist at module level and `patch()` will raise `AttributeError`. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
 - [PATTERN] When adding a NOT NULL FK column to a table that already has rows: (1) add nullable, (2) UPDATE to backfill default, (3) ALTER to NOT NULL — all in the same Alembic migration. The universe_id migration (c7d8e9f0a1b2) demonstrates this three-step pattern for `scanner_configs`. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
 
@@ -94,6 +92,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Never write generated backtest signals to `scanner_events` — the `UniqueConstraint(ticker, event_date, scanner_type)` causes IntegrityErrors on any overlap with real events, and `scanner_events` is operational history consumed by alerts/clusters/reviews. Keep replay signals in-memory only; store a nullable `source_event_id` FK for signals that already exist in DB. See `backtest_service.py`. <!-- issue:#301 date:2026-06-13 expires:2026-12-13 source:implement -->
 - [PATTERN] When a sync function calls `run_until_complete()` inside a loop (e.g. day-walk in `backtest_service.py`), create the event loop once before the loop via `asyncio.new_event_loop()`, pass it as a parameter to callee functions, and close it in a `finally:` block — creating a new loop per iteration wastes resources and misses reuse opportunities. <!-- issue:#301 date:2026-06-14 expires:2026-12-14 source:implement -->
+
+- [PATTERN] When catching `requests.HTTPError` in a module where tests patch the entire `requests` module (via `patch("module.requests")`), import the exception class directly — `from requests.exceptions import HTTPError as _RequestsHTTPError` — and use `_RequestsHTTPError` in the `except` clause. Patching `requests` replaces the module object, so `except requests.HTTPError` evaluates to a MagicMock and raises `TypeError: catching classes that do not inherit from BaseException` when any exception is raised in the try block. See `backend/tests/utils/pg_discovery.py`. <!-- issue:#429 date:2026-06-20 expires:2026-12-20 source:implement -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
