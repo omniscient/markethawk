@@ -54,6 +54,11 @@ export interface EdgeDecayPoint {
   sample_size: number;
 }
 
+export interface RejectReasonCount {
+  reject_reason: string;
+  count: number;
+}
+
 export interface Scorecard {
   scanner_type: string;
   period: string;
@@ -69,6 +74,12 @@ export interface Scorecard {
   follow_through_rate_pct: number | null;
   edge_decay: EdgeDecayPoint[];
   interval_breakdown: Record<string, IntervalBreakdown>;
+  // Review-side fields (issue #303)
+  precision_pct?: number | null;
+  review_coverage_pct?: number | null;
+  verdict_counts?: Record<string, number> | null;
+  top_reject_reasons?: RejectReasonCount[];
+  review_sample_n?: number;
 }
 
 export interface ReadinessCoverage {

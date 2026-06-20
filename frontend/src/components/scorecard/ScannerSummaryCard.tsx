@@ -61,6 +61,23 @@ const ScannerSummaryCard: React.FC<ScannerSummaryCardProps> = ({
           : 'text-yellow-400'
       : 'text-financial-light';
 
+  const precisionPct = scorecard?.precision_pct ?? null;
+  const reviewCoveragePct = scorecard?.review_coverage_pct ?? null;
+  const reviewSampleN = scorecard?.review_sample_n ?? 0;
+  const lowCoverage = reviewCoveragePct !== null && reviewCoveragePct < 20;
+
+  const precisionColor =
+    precisionPct === null
+      ? 'text-gray-500'
+      : precisionPct >= 60
+        ? 'text-green-400'
+        : precisionPct >= 40
+          ? 'text-yellow-400'
+          : 'text-red-400';
+
+  const statGridClass =
+    scorecard && scorecard.complete_signals < 5 ? 'grid grid-cols-4 gap-3 mb-4 opacity-40' : 'grid grid-cols-4 gap-3 mb-4';
+
   return (
     <div
       onClick={() => navigate(`/scorecard/${scannerType}`)}
@@ -78,7 +95,7 @@ const ScannerSummaryCard: React.FC<ScannerSummaryCardProps> = ({
         )}
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className={statGridClass}>
         <div>
           <div className="text-[9px] uppercase tracking-wider text-gray-500 font-medium">Win Rate</div>
           <div className={`text-lg font-bold ${winRateColor}`}>{fmt(scorecard?.win_rate_pct ?? null)}</div>
@@ -104,6 +121,21 @@ const ScannerSummaryCard: React.FC<ScannerSummaryCardProps> = ({
           <div className="text-lg font-bold text-financial-light">{fmt(scorecard?.follow_through_rate_pct ?? null)}</div>
         </div>
       </div>
+
+      {scorecard && (
+        <div className={`flex items-center gap-2 mb-3 ${lowCoverage ? 'opacity-50' : ''}`}>
+          <span className={`text-xs font-semibold border rounded px-2 py-0.5 ${
+            lowCoverage
+              ? 'border-gray-600 text-gray-500'
+              : precisionColor.replace('text-', 'border-').replace('-400', '-500') + ' ' + precisionColor
+          }`}>
+            {precisionPct !== null ? `${precisionPct.toFixed(0)}% confirmed` : 'No reviews'}{reviewSampleN > 0 ? ` · n=${reviewSampleN} · 90d` : ''}
+          </span>
+          {lowCoverage && (
+            <span className="text-[9px] text-gray-500 italic">needs more reviews</span>
+          )}
+        </div>
+      )}
 
       {sparkData.length > 1 && (
         <>
