@@ -117,6 +117,14 @@ class Settings(BaseSettings):
     # Must be a mailto: or https: URL identifying the push sender
     VAPID_CLAIMS_EMAIL: str = "mailto:admin@example.com"
 
+    # ── System Notifications ───────────────────────────────────────────────
+    # OPS_ALERT_EMAIL: recipient for system-level email notifications.
+    # Empty (default) → email channel skipped; push still attempted.
+    OPS_ALERT_EMAIL: str = ""
+    # INTERNAL_API_TOKEN: shared secret for POST /api/alerts/system.
+    # Empty (default) → endpoint returns 503 (fail-closed).
+    INTERNAL_API_TOKEN: str = Field(default="", repr=False)
+
     # Scanner SLO thresholds — documented in ENV_VARIABLES.md
     SCAN_DURATION_SLO_SECONDS: int = 120
     SCAN_STALENESS_SLO_SECONDS: int = 900

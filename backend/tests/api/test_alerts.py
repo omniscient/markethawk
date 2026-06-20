@@ -426,3 +426,122 @@ def test_create_rule_rejects_http_webhook(db: Session):
 
     assert response.status_code == 422
     assert "channel_config" in response.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# POST /api/alerts/system
+# ---------------------------------------------------------------------------
+
+
+def test_system_notify_returns_503_when_token_unset(db):
+    """INTERNAL_API_TOKEN unset → 503 (fail-closed)."""
+    from app.core import config as cfg
+
+    original = cfg.settings.INTERNAL_API_TOKEN
+    cfg.settings.INTERNAL_API_TOKEN = ""
+    try:
+        response = client.post(
+            "/api/v1/alerts/system",
+            json={"title": "Test", "body": "body"},
+            headers={"X-Internal-Token": "anything"},
+        )
+    finally:
+        cfg.settings.INTERNAL_API_TOKEN = original
+
+    assert response.status_code == 503
+
+
+def test_system_notify_returns_401_when_token_missing(db):
+    """Missing X-Internal-Token header → 401."""
+    from app.core import config as cfg
+
+    original = cfg.settings.INTERNAL_API_TOKEN
+    cfg.settings.INTERNAL_API_TOKEN = "secret-token"
+    try:
+        response = client.post(
+            "/api/v1/alerts/system",
+            json={"title": "Test", "body": "body"},
+        )
+    finally:
+        cfg.settings.INTERNAL_API_TOKEN = original
+
+    assert response.status_code == 401
+
+
+def test_system_notify_returns_401_when_token_wrong(db):
+    """Wrong X-Internal-Token → 401."""
+    from app.core import config as cfg
+
+    original = cfg.settings.INTERNAL_API_TOKEN
+    cfg.settings.INTERNAL_API_TOKEN = "correct-token"
+    try:
+        response = client.post(
+            "/api/v1/alerts/system",
+            json={"title": "Test", "body": "body"},
+            headers={"X-Internal-Token": "wrong-token"},
+        )
+    finally:
+        cfg.settings.INTERNAL_API_TOKEN = original
+
+    assert response.status_code == 401
+
+
+def test_system_notify_returns_200_with_valid_token(db):
+    """Valid token → 200 with a per-channel summary dict."""
+    from app.core import config as cfg
+
+    original_token = cfg.settings.INTERNAL_API_TOKEN
+    original_email = cfg.settings.OPS_ALERT_EMAIL
+    cfg.settings.INTERNAL_API_TOKEN = "valid-secret"
+    cfg.settings.OPS_ALERT_EMAIL = ""  # email skipped
+    try:
+        response = client.post(
+            "/api/v1/alerts/system",
+            json={"title": "CI failed", "body": "main is red", "channels": ["email"]},
+            headers={"X-Internal-Token": "valid-secret"},
+        )
+    finally:
+        cfg.settings.INTERNAL_API_TOKEN = original_token
+        cfg.settings.OPS_ALERT_EMAIL = original_email
+
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "email" in data
+    assert data["email"] == "skipped"  # OPS_ALERT_EMAIL was empty
+
+
+def test_system_notify_delivers_email_when_configured(db):
+    """Valid token + OPS_ALERT_EMAIL set + SMTP mocked → email 'sent'."""
+    from unittest.mock import MagicMock, patch
+
+    from app.core import config as cfg
+
+    original_token = cfg.settings.INTERNAL_API_TOKEN
+    original_email = cfg.settings.OPS_ALERT_EMAIL
+    original_user = cfg.settings.SMTP_USER
+    cfg.settings.INTERNAL_API_TOKEN = "valid-secret"
+    cfg.settings.OPS_ALERT_EMAIL = "ops@example.com"
+    cfg.settings.SMTP_USER = "user@example.com"
+    cfg.settings.SMTP_PASSWORD = "pw"
+    try:
+        with patch("smtplib.SMTP") as mock_smtp_cls:
+            smtp_instance = MagicMock()
+            mock_smtp_cls.return_value.__enter__ = lambda s: smtp_instance
+            mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
+            response = client.post(
+                "/api/v1/alerts/system",
+                json={
+                    "title": "Deploy done",
+                    "body": "v1.2.3 live",
+                    "channels": ["email"],
+                },
+                headers={"X-Internal-Token": "valid-secret"},
+            )
+    finally:
+        cfg.settings.INTERNAL_API_TOKEN = original_token
+        cfg.settings.OPS_ALERT_EMAIL = original_email
+        cfg.settings.SMTP_USER = original_user
+
+    assert response.status_code == 200
+    assert response.json().get("email") == "sent"

@@ -5,10 +5,10 @@ Alerts router — CRUD for alert rules, delivery log, stats, and Web Push endpoi
 import json
 import logging
 from datetime import date, datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pydantic
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -420,3 +420,53 @@ def receive_infrastructure_alert(payload: Dict[str, Any]) -> Dict[str, str]:
         json.dumps(payload),
     )
     return {"status": "received"}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# System Notifications — server-to-server, shared-secret auth
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class _SystemNotifyRequest(pydantic.BaseModel):
+    title: str
+    body: str
+    severity: str = "info"
+    dedupe_key: Optional[str] = None
+    channels: Optional[List[str]] = None
+
+
+@router.post("/system", status_code=200)
+def send_system_notification(
+    payload: _SystemNotifyRequest,
+    x_internal_token: Optional[str] = Header(None, alias="X-Internal-Token"),
+    db: Session = Depends(get_db),
+) -> Dict[str, str]:
+    """
+    Deliver a system notification via email and/or browser push.
+
+    Requires the X-Internal-Token header matching INTERNAL_API_TOKEN.
+    Returns 503 if INTERNAL_API_TOKEN is not configured (fail-closed).
+    Returns 401 if the token is absent or incorrect.
+    """
+    from app.core.config import settings
+
+    if not settings.INTERNAL_API_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail="System notifications are not enabled. Set INTERNAL_API_TOKEN in .env.",
+        )
+    if not x_internal_token or x_internal_token != settings.INTERNAL_API_TOKEN:
+        raise HTTPException(
+            status_code=401, detail="Invalid or missing X-Internal-Token."
+        )
+
+    from app.services.system_notifier import notify_system
+
+    return notify_system(
+        title=payload.title,
+        body=payload.body,
+        severity=payload.severity,
+        dedupe_key=payload.dedupe_key,
+        channels=payload.channels,
+        db=db,
+    )

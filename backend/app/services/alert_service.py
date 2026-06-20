@@ -174,8 +174,14 @@ class NotificationDispatcher:
     # ── Browser Push ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def _send_browser_push(event: ScannerEvent, db: Session) -> None:
-        """Send a native browser push notification to all stored subscriptions."""
+    def _send_browser_push_generic(
+        title: str,
+        body: str,
+        db: Session,
+        urgency: str = "normal",
+        url: Optional[str] = None,
+    ) -> None:
+        """Send a browser push notification with an arbitrary title/body to all subscriptions."""
         try:
             from pywebpush import WebPushException, webpush  # noqa: F401
         except ImportError:
@@ -194,7 +200,10 @@ class NotificationDispatcher:
             logger.debug("No push subscriptions registered — skipping browser push.")
             return
 
-        data = json.dumps(NotificationDispatcher._build_push_payload(event))
+        payload: dict = {"title": title, "body": body}
+        if url:
+            payload["url"] = url
+        data = json.dumps(payload)
         vapid_claims = {"sub": settings.VAPID_CLAIMS_EMAIL}
         # Key is stored as raw base64url (43 chars, no PEM headers) — py_vapid from_string
         # only supports this format; PEM is not recognized in this version.
@@ -214,7 +223,6 @@ class NotificationDispatcher:
                 )
             except Exception as exc:
                 failed += 1
-                # 410 Gone = subscription expired; clean it up
                 err_str = str(exc)
                 if "410" in err_str or "404" in err_str:
                     logger.info(f"Removing expired push subscription id={sub.id}")
@@ -224,6 +232,17 @@ class NotificationDispatcher:
 
         if failed == len(subscriptions) and subscriptions:
             raise RuntimeError(f"All {failed} push deliveries failed.")
+
+    @staticmethod
+    def _send_browser_push(event: ScannerEvent, db: Session) -> None:
+        """Send a browser push notification for a scanner event (thin scanner wrapper)."""
+        payload = NotificationDispatcher._build_push_payload(event)
+        NotificationDispatcher._send_browser_push_generic(
+            title=payload["title"],
+            body=payload["body"],
+            db=db,
+            url=payload.get("url"),
+        )
 
     # ── Email ─────────────────────────────────────────────────────────────────
 
