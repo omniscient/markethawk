@@ -28,6 +28,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [PATTERN] When the auto-trade path re-evaluates data quality, call the gate service with `policy=strict` rather than trusting the advisory-mode blob stamped by the scanner run (#494). Advisory mode does not escalate blocker-severity issues to `blocked` verdict; re-calling under strict policy is required to get the correct verdict. <!-- issue:#496 date:2026-06-19 expires:2026-12-19 source:refine -->
 
+- [PATTERN] The quality gate guard in `maybe_execute()` must **fail-closed** when the gate service raises an exception — block the order, log the exception. An outage suppressing trades is loud and self-healing; fail-open silently defeats the gate's entire purpose. This applies to all future guard integrations of the quality gate. <!-- issue:#496 date:2026-06-20 expires:2026-12-20 source:refine -->
+
+- [PATTERN] `ScannerEvent` has no `scanner_run_id` FK in the current model. Issue #494 must add a nullable `scanner_run_id` FK to `scanner_events` as a prerequisite for #496 to resolve universe_id for the quality gate. Canonical path: `event.scanner_run_id → ScannerRun.universe_id`. If null, treat gate verdict as `skipped` (bypassable); never fall back to scanner_type → ScannerConfig because scanner_type is not unique across ScannerConfigs. <!-- issue:#496 date:2026-06-20 expires:2026-12-20 source:refine -->
+
+- [AVOID] Do not fall back to scanner_type → ScannerConfig for universe resolution in quality gate checks — `ScannerConfig.scanner_type` is not unique (multiple configs can share the same scanner_type across different universes), so the tiebreak would silently route events to the wrong universe's quality verdict. Use the `scanner_run_id` FK (added by #494); treat null as `skipped`. <!-- issue:#496 date:2026-06-20 expires:2026-12-20 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
