@@ -4,10 +4,14 @@ Locates a running PostgreSQL instance in environments where testcontainers
 exec is blocked (e.g. docker-socket-proxy with EXEC:0).
 """
 
+import logging
 import os
 
 import psycopg2
 import requests
+from requests.exceptions import HTTPError as _RequestsHTTPError
+
+logger = logging.getLogger(__name__)
 
 
 def probe_running_postgres() -> str | None:
@@ -33,15 +37,29 @@ def probe_running_postgres() -> str | None:
                 f"http://{docker_host[6:]}/containers/json",
                 timeout=3,
             )
-            for c in r.json():
-                if "postgres" not in c.get("Image", "").lower():
-                    continue
-                for net_info in (
-                    c.get("NetworkSettings", {}).get("Networks", {}).values()
-                ):
-                    ip = net_info.get("IPAddress", "")
-                    if ip:
-                        candidate_ips.append(ip)
+            r.raise_for_status()
+            containers = r.json()
+            if not isinstance(containers, list):
+                logger.debug(
+                    "Docker API returned non-list (%s), expected container array; falling through to hostname probing",
+                    type(containers).__name__,
+                )
+            else:
+                for c in containers:
+                    if "postgres" not in c.get("Image", "").lower():
+                        continue
+                    for net_info in (
+                        c.get("NetworkSettings", {}).get("Networks", {}).values()
+                    ):
+                        ip = net_info.get("IPAddress", "")
+                        if ip:
+                            candidate_ips.append(ip)
+        except _RequestsHTTPError as e:
+            logger.debug(
+                "Docker API probe failed (HTTP %s) for %s; falling through to hostname probing",
+                e.response.status_code,
+                docker_host[6:],
+            )
         except Exception:
             pass
 
@@ -67,4 +85,8 @@ def probe_running_postgres() -> str | None:
                 return f"postgresql://{user}:{pw}@{ip}:5432/{db}"
             except Exception:
                 pass
+    logger.debug(
+        "No reachable postgres found after trying %d candidate host(s)",
+        len(candidate_ips),
+    )
     return None
