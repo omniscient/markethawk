@@ -16,3 +16,4 @@
 {"issue":303,"title":"Outcome dashboard: per-scanner ScannerOutcomeSummary aggregates in UI","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T03:19:19Z"}
 {"issue":303,"title":"Outcome dashboard: per-scanner ScannerOutcomeSummary aggregates in UI","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T03:19:32Z"}
 {"issue":303,"title":"Outcome dashboard: per-scanner ScannerOutcomeSummary aggregates in UI","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T03:21:55Z"}
+{"issue":303,"title":"Outcome dashboard: per-scanner ScannerOutcomeSummary aggregates in UI","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T03:22:07Z"}
