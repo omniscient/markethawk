@@ -192,7 +192,7 @@ def seed_reviews(db: Session, events: list) -> list:
       precision_pct = 2 / (2+1) * 100 = 66.67
       review_sample_n = 3
       review_coverage_pct = 3 / 3 * 100 = 100.0
-      top_reject_reasons = [{"reject_reason": "noise", "count": 1}]
+      top_reject_reasons = [{"reason": "noise", "count": 1}]
       verdict_counts = {"confirmed": 2, "rejected": 1, "enhanced": 0}
     """
     specs = [
