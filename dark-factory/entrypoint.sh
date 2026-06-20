@@ -68,7 +68,7 @@ _entrypoint_cfg_apply() {
 
 # --- Parse arguments ---
 ARGUMENTS="${*}"
-if [ -z "$ARGUMENTS" ]; then
+if [ -z "$ARGUMENTS" ] && [ "${ENTRYPOINT_SOURCE_ONLY:-0}" != "1" ]; then
   echo "Usage: docker compose --profile factory run --rm dark-factory \"Fix issue #3\""
   echo "       docker compose --profile factory run --rm dark-factory \"Continue issue #3\""
   echo "       docker compose --profile factory run --rm dark-factory \"Close issue #3\""
@@ -82,7 +82,7 @@ fi
 # "Recheck main" carries no "#N" — the || true keeps the no-match grep (exit 1)
 # from killing the script under set -euo pipefail.
 ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1 || true)
-INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict|recheck)' | head -1 | tr '[:upper:]' '[:lower:]')
+INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict|recheck)' | head -1 | tr '[:upper:]' '[:lower:]' || true)
 INTENT=${INTENT:-fix}
 
 # --- Canonical run identity and artifact directory ---
@@ -230,23 +230,32 @@ ${post_mortem_text}
 ---
 *Posted by MarketHawk Dark Factory*" || true
 
-  # Append to eval corpus and commit
-  local JSONL_PATH="${CLONE_DIR}/dark-factory/evals/factory-failures.jsonl"
-  if [ -d "${CLONE_DIR}" ] && [ -f "$JSONL_PATH" ]; then
+  # Write failure telemetry to main via a temporary detached worktree.
+  # The feature-branch CLONE_DIR working tree and index are never touched,
+  # so factory-failures.jsonl can never appear in the feature-branch diff.
+  if [ -d "${CLONE_DIR}" ]; then
+    local JSONL_PATH="dark-factory/evals/factory-failures.jsonl"
     local excerpt
     excerpt=$(echo "$post_mortem_text" | head -c 500 | tr '\n' ' ')
-    printf '{"issue":%s,"title":"%s","phase":"%s","exit_code":%s,"postmortem":"%s","promoted_at":"%s"}\n' \
+    local record
+    record=$(printf '{"issue":%s,"title":"%s","phase":"%s","exit_code":%s,"postmortem":"%s","promoted_at":"%s"}\n' \
       "${ISSUE_NUM}" \
       "$(gh issue view "${ISSUE_NUM}" --repo "omniscient/markethawk" --json title --jq '.title' 2>/dev/null | sed 's/"/\\"/g' || echo "unknown")" \
       "${INTENT:-fix}" \
       "${exit_code}" \
       "$(echo "$excerpt" | sed 's/"/\\"/g')" \
-      "$PROMOTED_AT" \
-      >> "$JSONL_PATH" 2>/dev/null || true
-
-    (cd "${CLONE_DIR}" && git add dark-factory/evals/factory-failures.jsonl \
-      && git commit -m "eval: record factory failure for issue #${ISSUE_NUM}" \
-      && git push origin "$(git branch --show-current)" 2>/dev/null) 2>/dev/null || true
+      "$PROMOTED_AT")
+    (
+      git -C "${CLONE_DIR}" fetch origin main 2>/dev/null || true
+      WT=$(mktemp -d)
+      git -C "${CLONE_DIR}" worktree add --detach "$WT" origin/main 2>/dev/null
+      echo "$record" >> "${WT}/${JSONL_PATH}"
+      git -C "$WT" add "${JSONL_PATH}"
+      git -C "$WT" commit -m "eval: record factory failure for issue #${ISSUE_NUM}"
+      git -C "$WT" push origin HEAD:main 2>/dev/null
+      git -C "${CLONE_DIR}" worktree remove --force "$WT" 2>/dev/null || true
+      rm -rf "$WT" 2>/dev/null || true
+    ) 2>/dev/null || true
   fi
 }
 
@@ -425,6 +434,11 @@ _resolve_merge_conflicts() {
   python3 "$CLONE_DIR/dark-factory/scripts/factory_core/cli.py" \
     deconflict --issue "$ISSUE_NUM" || return $?
 }
+
+# Guard: allow sourcing for unit tests without running the main execution block.
+# Set ENTRYPOINT_SOURCE_ONLY=1 before sourcing. External commands (git, gh, docker,
+# claude) must be stubbed by the test to prevent real side effects.
+[ "${ENTRYPOINT_SOURCE_ONLY:-0}" = "1" ] && return 0
 
 # --- Clone the repo ---
 echo "Cloning markethawk..."
