@@ -61,7 +61,7 @@ class EdgeDecayPoint(BaseModel):
 
 
 class RejectReasonCount(BaseModel):
-    reject_reason: str
+    reason: str
     count: int
 
 

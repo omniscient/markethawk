@@ -198,7 +198,7 @@ class StatsService:
             round(sample_n / total_signals * 100, 1) if total_signals > 0 else None
         )
         top_reasons = sorted(reject_reason_counts.items(), key=lambda x: -x[1])[:3]
-        top_reject_reasons = [{"reject_reason": r, "count": c} for r, c in top_reasons]
+        top_reject_reasons = [{"reason": r, "count": c} for r, c in top_reasons]
 
         return {
             "precision_pct": precision_pct,

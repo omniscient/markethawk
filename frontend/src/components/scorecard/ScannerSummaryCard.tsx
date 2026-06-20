@@ -122,14 +122,14 @@ const ScannerSummaryCard: React.FC<ScannerSummaryCardProps> = ({
         </div>
       </div>
 
-      {scorecard && (
+      {scorecard && reviewSampleN > 0 && (
         <div className={`flex items-center gap-2 mb-3 ${lowCoverage ? 'opacity-50' : ''}`}>
           <span className={`text-xs font-semibold border rounded px-2 py-0.5 ${
             lowCoverage
               ? 'border-gray-600 text-gray-500'
               : precisionColor.replace('text-', 'border-').replace('-400', '-500') + ' ' + precisionColor
           }`}>
-            {precisionPct !== null ? `${precisionPct.toFixed(0)}% confirmed` : 'No reviews'}{reviewSampleN > 0 ? ` · n=${reviewSampleN} · 90d` : ''}
+            {precisionPct !== null ? `${precisionPct.toFixed(0)}% confirmed` : '0% confirmed'} · n={reviewSampleN} · 90d
           </span>
           {lowCoverage && (
             <span className="text-[9px] text-gray-500 italic">needs more reviews</span>

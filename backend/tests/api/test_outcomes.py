@@ -557,7 +557,7 @@ def test_scorecard_top_reject_reasons_correct(db: Session):
     data = response.json()
     reasons = data["top_reject_reasons"]
     assert len(reasons) == 1
-    assert reasons[0]["reject_reason"] == "noise"
+    assert reasons[0]["reason"] == "noise"
     assert reasons[0]["count"] == 1
 
 

@@ -55,7 +55,7 @@ export interface EdgeDecayPoint {
 }
 
 export interface RejectReasonCount {
-  reject_reason: string;
+  reason: string;
   count: number;
 }
 
