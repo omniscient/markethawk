@@ -122,6 +122,14 @@ class TestProbeRunningPostgres:
 
         assert result is not None
         assert "postgres" in result
+        mock_psycopg2.connect.assert_any_call(
+            host="postgres",
+            port=5432,
+            user="postgres",
+            password="postgres",
+            dbname="postgres",
+            connect_timeout=1,
+        )
 
     def test_all_fail_returns_none(self, monkeypatch):
         """Returns None when no postgres instance is reachable."""

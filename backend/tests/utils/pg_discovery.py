@@ -9,7 +9,7 @@ import os
 
 import psycopg2
 import requests
-from requests.exceptions import HTTPError as _RequestsHTTPError
+from requests.exceptions import HTTPError as RequestsHTTPError
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +54,10 @@ def probe_running_postgres() -> str | None:
                         ip = net_info.get("IPAddress", "")
                         if ip:
                             candidate_ips.append(ip)
-        except _RequestsHTTPError as e:
+        except RequestsHTTPError as e:
             logger.debug(
                 "Docker API probe failed (HTTP %s) for %s; falling through to hostname probing",
-                e.response.status_code,
+                getattr(e.response, "status_code", None),
                 docker_host[6:],
             )
         except Exception:
