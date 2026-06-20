@@ -24,3 +24,4 @@
 {"issue":302,"title":"Backtest comparison run: 5 scanners x representative strategies over 1+ year","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T04:24:47Z"}
 {"issue":302,"title":"Backtest comparison run: 5 scanners x representative strategies over 1+ year","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T04:25:00Z"}
 {"issue":302,"title":"Backtest comparison run: 5 scanners x representative strategies over 1+ year","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T04:27:06Z"}
+{"issue":302,"title":"Backtest comparison run: 5 scanners x representative strategies over 1+ year","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5am (UTC) ","promoted_at":"2026-06-20T04:27:22Z"}
