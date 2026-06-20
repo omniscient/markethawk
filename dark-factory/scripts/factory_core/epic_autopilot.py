@@ -7,6 +7,7 @@ docs/superpowers/specs/2026-06-20-epic-autopilot-design.md.
 
 The pure functions below take/return plain data so they unit-test with no IO.
 """
+import json
 import re
 
 _GATED_STATUSES = {"spec-pending-review", "plan-pending-review"}
@@ -59,3 +60,41 @@ def hard_excluded(c: dict, exclude_paths: list):
             if ex in p:
                 return True, ex
     return False, ""
+
+
+# ── Verdict parsing + decision rule ─────────────────────────────────────────
+
+_HOLD = {"decision": "HOLD", "risk": "high", "confidence": 0.0,
+         "reasons": ["unparseable"], "concerns": []}
+
+
+def parse_verdict(text: str) -> dict:
+    """Parse Opus's JSON verdict. Fail-closed to HOLD on any error/ambiguity."""
+    if not text or not text.strip():
+        return dict(_HOLD)
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end <= start:
+        return dict(_HOLD)
+    try:
+        v = json.loads(text[start:end + 1])
+    except Exception:
+        return dict(_HOLD)
+    if not isinstance(v, dict) or v.get("decision") not in ("ADVANCE", "HOLD"):
+        return dict(_HOLD)
+    v.setdefault("risk", "high")
+    v.setdefault("confidence", 0.0)
+    v.setdefault("reasons", [])
+    v.setdefault("concerns", [])
+    try:
+        v["confidence"] = float(v["confidence"])
+    except Exception:
+        return dict(_HOLD)
+    return v
+
+
+def should_advance(verdict: dict, confidence_floor: float) -> bool:
+    """ADVANCE only on decision=ADVANCE AND risk=low AND confidence>=floor."""
+    return (verdict.get("decision") == "ADVANCE"
+            and verdict.get("risk") == "low"
+            and float(verdict.get("confidence", 0.0)) >= confidence_floor)

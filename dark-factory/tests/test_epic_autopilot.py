@@ -88,3 +88,35 @@ def test_security_label_not_excluded():
         c(labels=["security", "ready-for-agent"], target_paths=["backend/app/services/redaction.py"]),
         ["app/core/auth", "app/services/trading"])
     assert not ex
+
+
+# ── Task 3: verdict parsing + decision rule ─────────────────────────────────
+
+def test_parse_clean_json():
+    v = ap.parse_verdict('{"decision":"ADVANCE","risk":"low","confidence":0.9,"reasons":["ok"],"concerns":[]}')
+    assert v["decision"] == "ADVANCE" and v["confidence"] == 0.9
+
+
+def test_parse_json_in_fence():
+    v = ap.parse_verdict('blah\n```json\n{"decision":"HOLD","risk":"medium","confidence":0.5,"reasons":[],"concerns":["x"]}\n```\n')
+    assert v["decision"] == "HOLD"
+
+
+def test_parse_garbage_fails_closed():
+    v = ap.parse_verdict("the model rambled with no json")
+    assert v["decision"] == "HOLD" and v["risk"] == "high"
+
+
+def test_parse_empty_fails_closed():
+    assert ap.parse_verdict("")["decision"] == "HOLD"
+
+
+def test_parse_bad_decision_value_fails_closed():
+    assert ap.parse_verdict('{"decision":"MAYBE","risk":"low","confidence":1.0}')["decision"] == "HOLD"
+
+
+def test_should_advance_only_on_low_and_floor():
+    assert ap.should_advance({"decision": "ADVANCE", "risk": "low", "confidence": 0.8}, 0.7)
+    assert not ap.should_advance({"decision": "ADVANCE", "risk": "medium", "confidence": 0.9}, 0.7)
+    assert not ap.should_advance({"decision": "ADVANCE", "risk": "low", "confidence": 0.6}, 0.7)
+    assert not ap.should_advance({"decision": "HOLD", "risk": "low", "confidence": 0.99}, 0.7)
