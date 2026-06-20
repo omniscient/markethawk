@@ -13,6 +13,7 @@ from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.signal_review import SignalReview
+from app.utils.time import utc_now
 
 # JSONB path to the gate tier: metadata_["quality_gate"]["tier"]
 _GATE_TIER = ScannerEvent.metadata_["quality_gate"]["tier"].astext
@@ -159,7 +160,7 @@ class StatsService:
         precision_pct = confirmed / (confirmed + rejected) * 100 (null when denominator=0).
         review_coverage_pct uses trust-filtered outcome total_signals as denominator.
         """
-        cutoff = datetime.utcnow() - timedelta(days=review_window_days)
+        cutoff = utc_now() - timedelta(days=review_window_days)
         rows = (
             db.query(
                 SignalReview.verdict,
@@ -194,8 +195,13 @@ class StatsService:
             if sample_n > 0
             else None
         )
+        # NOTE: review window and total_signals populations may differ (e.g. narrower
+        # date_range or regime/severity filter on the scorecard side), so coverage can
+        # theoretically exceed 100%. Clamp to 100.0 to keep the value meaningful.
         coverage_pct = (
-            round(sample_n / total_signals * 100, 1) if total_signals > 0 else None
+            min(round(sample_n / total_signals * 100, 1), 100.0)
+            if total_signals > 0
+            else None
         )
         top_reasons = sorted(reject_reason_counts.items(), key=lambda x: -x[1])[:3]
         top_reject_reasons = [{"reason": r, "count": c} for r, c in top_reasons]

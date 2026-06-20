@@ -61,19 +61,20 @@ const ScannerSummaryCard: React.FC<ScannerSummaryCardProps> = ({
           : 'text-yellow-400'
       : 'text-financial-light';
 
+  const reviewWindowDays = 90;
   const precisionPct = scorecard?.precision_pct ?? null;
   const reviewCoveragePct = scorecard?.review_coverage_pct ?? null;
   const reviewSampleN = scorecard?.review_sample_n ?? 0;
   const lowCoverage = reviewCoveragePct !== null && reviewCoveragePct < 20;
 
-  const precisionColor =
+  const precisionColors: { text: string; border: string } =
     precisionPct === null
-      ? 'text-gray-500'
+      ? { text: 'text-gray-500', border: 'border-gray-500' }
       : precisionPct >= 60
-        ? 'text-green-400'
+        ? { text: 'text-green-400', border: 'border-green-500' }
         : precisionPct >= 40
-          ? 'text-yellow-400'
-          : 'text-red-400';
+          ? { text: 'text-yellow-400', border: 'border-yellow-500' }
+          : { text: 'text-red-400', border: 'border-red-500' };
 
   const statGridClass =
     scorecard && scorecard.complete_signals < 5 ? 'grid grid-cols-4 gap-3 mb-4 opacity-40' : 'grid grid-cols-4 gap-3 mb-4';
@@ -127,9 +128,9 @@ const ScannerSummaryCard: React.FC<ScannerSummaryCardProps> = ({
           <span className={`text-xs font-semibold border rounded px-2 py-0.5 ${
             lowCoverage
               ? 'border-gray-600 text-gray-500'
-              : precisionColor.replace('text-', 'border-').replace('-400', '-500') + ' ' + precisionColor
+              : `${precisionColors.border} ${precisionColors.text}`
           }`}>
-            {precisionPct !== null ? `${precisionPct.toFixed(0)}% confirmed` : '0% confirmed'} · n={reviewSampleN} · 90d
+            {precisionPct !== null ? `${precisionPct.toFixed(0)}% confirmed` : '0% confirmed'} · n={reviewSampleN} · {reviewWindowDays}d
           </span>
           {lowCoverage && (
             <span className="text-[9px] text-gray-500 italic">needs more reviews</span>
