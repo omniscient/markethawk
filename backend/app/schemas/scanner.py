@@ -184,3 +184,26 @@ class ScannerRangeRequest(InteractiveDateRange):
         if not v:
             raise ValueError("At least one scanner type must be selected")
         return v
+
+
+class ScannerReplayDiffSchema(BaseModel):
+    """API response schema for a ScannerReplayDiff record."""
+
+    id: int
+    scanner_type: str
+    scan_date: date
+    status: str
+    has_drift: bool
+    live_count: int
+    replay_count: int
+    missing_in_replay_count: int
+    new_in_replay_count: int
+    matched_count: int
+    missing_in_replay: List[Any]
+    new_in_replay: List[Any]
+    metric_deltas: List[Any]
+    drift_kinds: List[Any]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

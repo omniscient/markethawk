@@ -23,6 +23,7 @@ from app.core.cache import cache_response, get_cached
 from app.core.database import get_db
 from app.core.rate_limits import SCANNER_LIMIT, limiter
 from app.models import MonitoredStock, ScannerConfig, ScannerEvent, ScannerRun
+from app.models.scanner_replay_diff import ScannerReplayDiff
 from app.models.signal_review import SignalReview
 from app.models.user import User
 from app.schemas import (
@@ -38,6 +39,7 @@ from app.schemas import (
     ScannerStatsResponse,
     ScannerStatusBlockResponse,
 )
+from app.schemas.scanner import ScannerReplayDiffSchema
 from app.schemas.signal_review import (
     SignalReviewRequest,
     SignalReviewResponse,
@@ -711,3 +713,18 @@ def get_review_stats(
         db, scanner_type=scanner_type, start_date=start_date, end_date=end_date
     )
     return SignalReviewStatsResponse(**data)
+
+
+@router.get("/replay-diffs", response_model=List[ScannerReplayDiffSchema])
+def get_replay_diffs(
+    scanner_type: Optional[str] = Query(None),
+    days: int = Query(default=30, ge=1, le=90),
+    db: Session = Depends(get_db),
+):
+    """Return replay-diff records for the last N days (default 30, max 90)."""
+    cutoff = date.today() - timedelta(days=days)
+    q = db.query(ScannerReplayDiff).filter(ScannerReplayDiff.scan_date >= cutoff)
+    if scanner_type:
+        q = q.filter(ScannerReplayDiff.scanner_type == scanner_type)
+    rows = q.order_by(ScannerReplayDiff.scan_date.desc()).all()
+    return rows

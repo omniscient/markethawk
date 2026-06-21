@@ -22,6 +22,7 @@ from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.scanner_replay_diff import ScannerReplayDiff
 from app.models.scanner_run import ScannerRun
 from app.models.signal_analysis_run import SignalAnalysisRun
 from app.models.signal_cluster import SignalCluster
@@ -69,6 +70,7 @@ __all__ = [
     "ActiveWatchlist",
     "TradingStrategy",
     "AutoTradeOrder",
+    "ScannerReplayDiff",
     "ScannerOutcomeSnapshot",
     "ScannerOutcomeSummary",
     "SignalAnalysisRun",

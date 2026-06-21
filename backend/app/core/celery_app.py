@@ -106,4 +106,9 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.check_aggregate_staleness",
         "schedule": crontab(minute="0", hour="3", day_of_week="1-5"),
     },
+    # Nightly replay-diff: 04:00 UTC weekdays (after sync + nightly scans complete)
+    "run-replay-diff-nightly": {
+        "task": "app.tasks.run_replay_diff_nightly",
+        "schedule": crontab(minute="0", hour="4", day_of_week="1-5"),
+    },
 }

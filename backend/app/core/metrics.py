@@ -95,3 +95,9 @@ aggregate_gap_days = Gauge(
     ["universe_id"],
     multiprocess_mode="livemax",
 )
+
+replay_drift_signals_total = Counter(
+    "markethawk_replay_drift_signals_total",
+    "Replay diff drift signals by kind",
+    ["scanner_type", "kind"],
+)
