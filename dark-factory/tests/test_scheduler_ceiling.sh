@@ -19,8 +19,8 @@ echo "$block" | grep -qE '^[[:space:]]*L\)[[:space:]]*return 0' \
 grep -qE 'S\|L\|""\)' <(awk '/^is_below_ceiling\(\)/{f=1} f{print} f&&/^}/{exit}' "$sched") \
   || { echo "FAIL: is_below_ceiling does not include L"; exit 1; }
 
-# Priority-6 must map epic_started → DISPATCHED
-grep -q 'autopilot=epic_started' "$sched" \
-  || { echo "FAIL: scheduler does not map epic_started to DISPATCHED"; exit 1; }
+# Priority-6 must map epic_started → DISPATCHED on the same line
+grep -qE 'autopilot=epic_started.*DISPATCHED|DISPATCHED.*autopilot=epic_started' "$sched" \
+  || { echo "FAIL: scheduler does not map epic_started to DISPATCHED on the same line"; exit 1; }
 
 echo "PASS"

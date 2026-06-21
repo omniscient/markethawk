@@ -240,7 +240,7 @@ get_size_label() {
   echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -oiE 'size: ?(xl|[sml])' | awk '{print toupper($NF)}' | head -1
 }
 
-# True (returns 0) if item is above the dispatch ceiling: size L always, or size M
+# True (returns 0) if item is above the dispatch ceiling: size XL always, or size M
 # when the title matches an ABOVE_CEILING_KEYWORDS pattern (escalation only — the
 # keyword heuristic never demotes).
 is_above_ceiling() {
@@ -259,7 +259,7 @@ has_above_ceiling_label() {
   echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -qi "^${ABOVE_CEILING_LABEL}$"
 }
 
-# True if item is S-size or has no size label (unlabelled is treated as S per spec)
+# True if item is S- or L-size, or has no size label (unlabelled is treated as S per spec)
 is_below_ceiling() {
   local size
   size=$(get_size_label "$1")
