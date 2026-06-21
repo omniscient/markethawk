@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Replay Engine UI (issue #489)
+
+- [PATTERN] The replay equity curve time-series (`{date, cumulative_r}` points) is served from `GET /api/v1/replay/runs/{id}/analytics` — cached in `replay_run.metrics` JSONB by `MetricsComputer` (#487), which already materializes it during max-drawdown computation. The UI calls the analytics endpoint once for all of View 1 and View 2 data. <!-- issue:#489 date:2026-06-21 expires:2026-12-21 source:refine -->
+
+- [AVOID] Do not use the existing `RegimeService` HMM state labels (`risk_on`, `risk_off`, `high_volatility`, `low_vol_drift`, `transition`) for the replay engine regime grid — those form a single-dimension classifier and cannot populate a 2D `trend × vol` grid. The replay engine uses the dedicated regime classifier from issue #486, which produces orthogonal trend (up/down/flat) and vol (high/low) axes giving a 3×2 = 6-cell grid. <!-- issue:#489 date:2026-06-21 expires:2026-12-21 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
