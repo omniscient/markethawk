@@ -62,7 +62,7 @@ def _build_assessment(
     issues: List[QualityGateIssue] = []
 
     if report_data is None:
-        sev: str = "blocker" if policy == QualityGatePolicy.strict else "warning"
+        sev = "blocker" if policy == QualityGatePolicy.strict else "warning"
         issues.append(
             QualityGateIssue(
                 code=QualityIssueCode.missing_bars,
@@ -87,7 +87,11 @@ def _build_assessment(
     grade: Optional[str] = report_data.get("overall_grade")
     tickers = report_data.get("tickers", [])
 
-    # missing_bars: gate on overall_score
+    # missing_bars: gate on overall_score.
+    # NOTE: missing_bars is intentionally overloaded here for coverage checks
+    # (no completed report vs. coverage below threshold). Both conditions signal
+    # that bar data is insufficient; callers should inspect the message/detail
+    # for the specific reason. This is a documented overload of the stable code.
     if score < 70:
         issues.append(
             QualityGateIssue(
@@ -147,6 +151,16 @@ def _build_assessment(
                     except (ValueError, TypeError):
                         pass
 
+            parse_failures = len(tickers) - len(first_bars)
+            if parse_failures > 0:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "quality_gate: %d ticker(s) had unparseable first_bar values"
+                    " and were excluded from lookback check",
+                    parse_failures,
+                )
+
             if not first_bars:
                 issues.append(
                     QualityGateIssue(
@@ -157,7 +171,7 @@ def _build_assessment(
                 )
             else:
                 earliest = min(first_bars)
-                today = utc_now().date()
+                today = now.date()
                 max_lookback = max(req.get("lookback_days", 0) for req in timespans)
                 required_from = today - timedelta(days=max_lookback)
                 if earliest > required_from:
@@ -201,7 +215,32 @@ class QualityGateService:
         from app.models.scanner_config import ScannerConfig
         from app.models.universe_quality_report import UniverseQualityReport
 
-        policy = QualityGatePolicy(request.policy)
+        try:
+            policy = QualityGatePolicy(request.policy)
+        except ValueError:
+            scope = QualityGateScope(
+                universe_id=request.universe_id,
+                ticker=getattr(request, "ticker", None),
+                scanner_type=getattr(request, "scanner_type", None),
+            )
+            now = utc_now()
+            return QualityGateAssessment(
+                policy=QualityGatePolicy.off,
+                verdict=QualityGateVerdict.blocked,
+                trusted=False,
+                scope=scope,
+                score=None,
+                grade=None,
+                issues=[
+                    QualityGateIssue(
+                        code=QualityIssueCode.missing_bars,
+                        severity="blocker",
+                        message=f"Unknown policy value: {request.policy!r}",
+                    )
+                ],
+                warnings=[],
+                generated_at=now,
+            )
         scope = QualityGateScope(
             universe_id=request.universe_id,
             ticker=getattr(request, "ticker", None),
@@ -226,5 +265,14 @@ class QualityGateService:
             )
             if config:
                 data_requirements = config.data_requirements
+
+        # If the caller supplied explicit requirements and the scanner_type lookup
+        # produced nothing, use the caller's requirements as a fallback so they
+        # are not silently ignored.
+        if (
+            data_requirements is None
+            and getattr(request, "requirements", None) is not None
+        ):
+            data_requirements = request.requirements.model_dump()
 
         return _build_assessment(report_data, data_requirements, scope, policy)
