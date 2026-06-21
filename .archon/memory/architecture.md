@@ -27,3 +27,8 @@ entries as higher-confidence than source:refine entries when the two conflict.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+## Replay Engine vs BacktestRun (issue #484)
+
+- [PATTERN] The Canonical Signal Replay Engine uses new `replay_runs`/`replay_trades` tables that coexist alongside `BacktestRun`/`BacktestTrade`. The replay engine is richer: full content-hashing (`data_hash`), frozen config+strategy+universe snapshots, per-trade MFE/MAE/regime fields, and nullable `trading_strategy_id` for scanner-only runs. <!-- issue:#484 date:2026-06-21 expires:2026-12-21 source:refine -->
+- [AVOID] Do not extend `BacktestRun`/`BacktestTrade` in-place for replay semantics — the backtest system is live (router, service, Celery task, schemas, tests all reference current column names). An in-place migration has large blast radius and the schemas differ enough to warrant separate tables. <!-- issue:#484 date:2026-06-21 expires:2026-12-21 source:refine -->
