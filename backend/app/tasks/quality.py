@@ -132,13 +132,12 @@ def compute_universe_data_health(db: Session, universe_id: int) -> dict:
         gaps = _detect_gaps(ts_list, "day", 1)
 
         for gap in gaps:
-            gap_days = (gap["to"].date() - gap["from"].date()).days
-            if (
-                _count_weekdays_between(gap["from"].date(), gap["to"].date())
-                >= gap_min_weekdays
-            ):
+            weekdays_in_gap = _count_weekdays_between(
+                gap["from"].date(), gap["to"].date()
+            )
+            if weekdays_in_gap >= gap_min_weekdays:
                 gapped_count += 1
-                worst_gap_days = max(worst_gap_days, gap_days)
+                worst_gap_days = max(worst_gap_days, weekdays_in_gap)
                 break  # one gap per ticker is enough to flag it
 
     n = len(ticker_list)

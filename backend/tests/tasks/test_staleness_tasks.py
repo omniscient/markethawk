@@ -186,12 +186,20 @@ class TestComputeDataDegraded:
     def test_fresh_report_grade_A_returns_false(self):
         from app.tasks.scanning import _compute_data_degraded
 
+        fresh_ts = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
         report = MagicMock()
         report.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         report.overall_grade = "A"
+        report.report_data = {
+            "tickers": [
+                {"ticker": "AAPL", "last_bar": fresh_ts, "gap_count": 0},
+                {"ticker": "MSFT", "last_bar": fresh_ts, "gap_count": 0},
+            ]
+        }
 
         db = MagicMock()
         db.query.return_value.filter.return_value.first.return_value = report
+        db.query.return_value.filter.return_value.all.return_value = []
 
         result = _compute_data_degraded(1, db)
         assert result is False
@@ -237,3 +245,108 @@ class TestComputeDataDegraded:
 
         result = _compute_data_degraded(1, db)
         assert result is True
+
+    def test_uses_affected_pct_not_overall_grade(self):
+        """degraded must be based on affected_pct > alert_pct from report_data.tickers,
+        not overall_grade. A grade-C report with 100% stale tickers should be degraded."""
+        from app.tasks.scanning import _compute_data_degraded
+
+        old_ts = (
+            datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=100)
+        ).isoformat()
+        report = MagicMock()
+        report.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        report.overall_grade = "C"  # current impl would return False for C
+        report.report_data = {
+            "tickers": [
+                {"ticker": "AAPL", "last_bar": old_ts, "gap_count": 0},
+                {"ticker": "MSFT", "last_bar": old_ts, "gap_count": 0},
+            ]
+        }
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = report
+        db.query.return_value.filter.return_value.all.return_value = []  # no SystemConfig
+
+        # 100% stale > 20% alert_pct → must be True
+        result = _compute_data_degraded(1, db)
+        assert result is True, (
+            "grade-C report with 100% stale tickers should be degraded"
+        )
+
+    def test_healthy_tickers_not_degraded_regardless_of_grade(self):
+        """A report with 0% stale/gapped tickers should not be degraded even if
+        the grade is low — affected_pct (0%) is below alert_pct (20%)."""
+        from app.tasks.scanning import _compute_data_degraded
+
+        fresh_ts = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+        report = MagicMock()
+        report.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        report.overall_grade = "D"  # old impl would return True for D
+        report.report_data = {
+            "tickers": [
+                {"ticker": "AAPL", "last_bar": fresh_ts, "gap_count": 0},
+                {"ticker": "MSFT", "last_bar": fresh_ts, "gap_count": 0},
+            ]
+        }
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = report
+        db.query.return_value.filter.return_value.all.return_value = []
+
+        # 0% affected < 20% alert_pct → should be False
+        result = _compute_data_degraded(1, db)
+        assert result is False, (
+            "0% stale/gapped should not be degraded regardless of grade"
+        )
+
+
+class TestWorstGapDaysIsWeekdays:
+    def test_worst_gap_days_counts_weekdays_not_calendar_days(self):
+        """aggregate_gap_days gauge must report weekday span, not calendar-day span.
+        Monday→next Monday = 7 calendar days but 5 weekdays."""
+        import app.tasks.quality as q
+
+        monday1 = datetime(2024, 1, 1, 0, 0, 0)  # Monday
+        tuesday = datetime(2024, 1, 2, 0, 0, 0)  # next day (no gap)
+        monday2 = datetime(
+            2024, 1, 8, 0, 0, 0
+        )  # Monday next week (7 cal, 5 weekday gap)
+
+        ticker_objs = [MagicMock(ticker="AAPL")]
+        db = MagicMock()
+
+        call_count = [0]
+
+        def _query_side(*args):
+            call_count[0] += 1
+            mock = MagicMock()
+            mock.filter.return_value.all.return_value = ticker_objs
+            # MAX timestamp returns monday2
+            mock.filter.return_value.scalar.return_value = monday2
+            # Gap timestamps: monday1, tuesday, then a big jump to monday2
+            ts_rows = [
+                MagicMock(timestamp=monday1),
+                MagicMock(timestamp=tuesday),
+                MagicMock(timestamp=monday2),
+            ]
+            mock.filter.return_value.order_by.return_value.limit.return_value.all.return_value = ts_rows
+            return mock
+
+        db.query.side_effect = _query_side
+
+        with patch(
+            "app.tasks.quality._load_quality_thresholds", return_value=(48, 2, 20)
+        ):
+            result = q.compute_universe_data_health(db, universe_id=1)
+
+        # The gap from tuesday (Jan 2) to monday2 (Jan 8) spans 5 weekdays (Wed-Thu-Fri + Mon)
+        # wait: Jan 2 (Tue) to Jan 8 (Mon): weekdays strictly between = Wed3,Thu4,Fri5 = 3 weekdays
+        # Actually _count_weekdays_between(Jan2, Jan8) counts strictly between:
+        # Jan3(Wed), Jan4(Thu), Jan5(Fri) = 3 weekdays
+        # Calendar days = 6 (Jan2 to Jan8)
+        # worst_gap_days should be 3 (weekdays), not 6 (calendar)
+        assert result["worst_gap_days"] < 6, (
+            f"worst_gap_days={result['worst_gap_days']} should be weekday count (<6), not calendar days"
+        )
+        assert result["worst_gap_days"] >= 1, "should detect at least 1 weekday in gap"
