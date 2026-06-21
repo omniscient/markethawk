@@ -5,6 +5,7 @@ import {
   fetchScannerHistory, handleApiError, fetchScanStatus,
   fetchScanStatusBlock,
 } from '../../api/scanner';
+import { getDataHealth } from '../../api/universe';
 import {
   useScannerState, ACTIVE_SCAN_LS_KEY, EMPTY_PROGRESS,
   type ActiveScanRef, type LiveProgress,
@@ -50,6 +51,13 @@ const Scanner: React.FC = () => {
       limit: 100,
     }),
     enabled: !!state.selectedUniverse && !!state.selectedConfig,
+  });
+
+  const { data: dataHealth } = useQuery({
+    queryKey: ['universeDataHealth', state.selectedUniverse],
+    queryFn: () => getDataHealth(state.selectedUniverse!),
+    enabled: !!state.selectedUniverse,
+    staleTime: 5 * 60 * 1000,
   });
 
   React.useEffect(() => {
@@ -158,6 +166,17 @@ const Scanner: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {dataHealth?.degraded && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500 dark:bg-amber-900/20 dark:text-amber-300">
+          <span className="mt-0.5 text-lg leading-none">⚠️</span>
+          <div className="flex-1 text-sm">
+            <span className="font-semibold">Data quality degraded</span> — this universe has stale or gapped aggregate data
+            (stale: {dataHealth.stale_pct}%, gaps: {dataHealth.gapped_pct}%, grade: {dataHealth.grade}).
+            Scan results may be unreliable.{' '}
+            <a href="/universes" className="underline hover:no-underline">View quality details →</a>
+          </div>
+        </div>
+      )}
       <ScanConfigPanel
         configs={configs ?? []} loadingConfigs={loadingConfigs}
         universes={universes ?? []} loadingUniverses={loadingUniverses}
