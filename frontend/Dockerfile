@@ -1,4 +1,4 @@
-FROM node:22-alpine@sha256:ab07539e0988b63558ff621f5fbe1077054c39d9809112974fb79993949d41cd
+FROM node:26-alpine@sha256:a2dc166a387cc6ca1e62d0c8e265e49ca985d6e60abc9fe6e6c3d6ce8e63f606
 
 # Upgrade npm to 11.x. node:22-alpine bundles npm 10.9.8, whose vendored
 # picomatch 4.0.3 carries a HIGH ReDoS (CVE-2026-33671); npm 11 drops that
