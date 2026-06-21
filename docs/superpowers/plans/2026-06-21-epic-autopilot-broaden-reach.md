@@ -597,8 +597,8 @@ Then add these two methods to the `LiveIO` class:
         return _ready_epics()
 
     def promote_epic(self, epic: int) -> None:
-        from factory_core.board import set_board_status
-        set_board_status(epic, "In progress")
+        from factory_core.board import set_board_status, STATUS_IN_PROGRESS
+        set_board_status(epic, STATUS_IN_PROGRESS)  # option-id, NOT the name "In progress"
         for child in _open_child_numbers(epic):
             subprocess.run(["gh", "issue", "edit", str(child), "--repo", OWNER,
                             "--add-label", "ready-for-agent"], check=False)
