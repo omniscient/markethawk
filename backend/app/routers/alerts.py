@@ -8,15 +8,17 @@ from datetime import date, datetime
 from typing import Any, Dict, List
 
 import pydantic
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.alert_delivery_log import AlertDeliveryLog
 from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
 from app.schemas.alerts import ChannelConfig
+from app.services.system_notifier import notify_system
 from app.utils.db import get_or_404
 from app.utils.time import utc_now
 
@@ -420,3 +422,36 @@ def receive_infrastructure_alert(payload: Dict[str, Any]) -> Dict[str, str]:
         json.dumps(payload),
     )
     return {"status": "received"}
+
+
+@router.post("/system", status_code=200)
+def send_system_notification(
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    x_internal_token: str = Header(default=None, alias="X-Internal-Token"),
+) -> Dict[str, Any]:
+    """Generic system notification (email + browser push). Server-to-server only.
+
+    Guarded by a shared secret (INTERNAL_API_TOKEN) rather than user JWT — this path
+    is exempt from the auth/CSRF middleware (see main.py). 503 if the token is unset
+    (fail-closed), 401 on mismatch.
+    """
+    if not settings.INTERNAL_API_TOKEN:
+        raise HTTPException(
+            status_code=503, detail="system notifications disabled (INTERNAL_API_TOKEN unset)"
+        )
+    if x_internal_token != settings.INTERNAL_API_TOKEN:
+        raise HTTPException(status_code=401, detail="invalid internal token")
+    title = payload.get("title")
+    body = payload.get("body")
+    if not title or not body:
+        raise HTTPException(status_code=422, detail="title and body are required")
+    channels = notify_system(
+        title=title,
+        body=body,
+        severity=payload.get("severity", "info"),
+        dedupe_key=payload.get("dedupe_key"),
+        channels=payload.get("channels"),
+        db=db,
+    )
+    return {"status": "dispatched", "channels": channels}

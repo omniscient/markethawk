@@ -57,6 +57,7 @@ MarketHawk/
 │   │   │   ├── auth.py
 │   │   │   ├── scanner.py
 │   │   │   ├── universe.py
+│   │   │   ├── data_quality.py  (preflight data-quality gate — POST /api/v1/data-quality/gate)
 │   │   │   ├── stocks.py
 │   │   │   ├── news.py
 │   │   │   ├── live_data.py
@@ -78,6 +79,7 @@ MarketHawk/
 │   │   │   ├── scan_orchestrator.py
 │   │   │   ├── scanner_query_service.py
 │   │   │   ├── system_service.py
+│   │   │   ├── system_notifier.py    (notify_system — generic email/push for non-scanner events; in-process dedupe)
 │   │   │   ├── auto_trade_service.py
 │   │   │   ├── pre_market_scan.py
 │   │   │   ├── oversold_bounce_scan.py
@@ -100,6 +102,8 @@ MarketHawk/
 │   │   │   ├── websocket_manager.py
 │   │   │   ├── normalization.py
 │   │   │   ├── data_quality.py
+│   │   │   ├── quality_helpers.py   (shared _detect_gaps/_count_weekdays_between; used by data_quality.py and check_aggregate_staleness task)
+│   │   │   ├── quality_gate.py      (QualityGateService — _build_assessment pure builder + DB wrapper; quality_gate.v1 assessments for scanner, backtest, auto-trading, UI)
 │   │   │   ├── stats.py
 │   │   │   ├── event_helpers.py
 │   │   │   ├── regime_service.py   (RegimeService — HMM train/persist/query; Redis regime cache)

@@ -21,10 +21,15 @@ Grade scale
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
+
+from app.services.quality_helpers import (  # noqa: F401
+    _count_weekdays_between,
+    _detect_gaps,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,17 +56,6 @@ def _grade_color(grade: str) -> str:
     return {"A": "green", "B": "green", "C": "yellow", "D": "orange", "F": "red"}.get(
         grade, "gray"
     )
-
-
-def _count_weekdays_between(d1, d2) -> int:
-    """Count weekdays (Mon–Fri) strictly between two dates."""
-    count = 0
-    current = d1 + timedelta(days=1)
-    while current < d2:
-        if current.weekday() < 5:
-            count += 1
-        current += timedelta(days=1)
-    return count
 
 
 def _estimate_expected_bars(
@@ -172,59 +166,6 @@ def _estimate_expected_bars(
     }
 
     return expected, detail
-
-
-def _detect_gaps(
-    timestamps: List[datetime], timespan: str, multiplier: int
-) -> List[Dict]:
-    """
-    Return a list of data gaps.
-
-    A gap is a consecutive-timestamp pair where:
-      • the elapsed time exceeds 5 × the expected bar interval, AND
-      • more than 1 weekday falls between the two timestamps
-        (this filters out weekends and single-day holidays naturally).
-    """
-    if len(timestamps) < 2:
-        return []
-
-    expected_seconds = {
-        "minute": 60,
-        "hour": 3600,
-        "day": 86400,
-        "week": 604800,
-        "month": 2592000,
-    }.get(timespan, 60) * multiplier
-
-    threshold_seconds = expected_seconds * 5
-
-    gaps = []
-    for i in range(1, len(timestamps)):
-        prev = timestamps[i - 1]
-        curr = timestamps[i]
-        diff_seconds = (curr - prev).total_seconds()
-
-        if diff_seconds < threshold_seconds:
-            continue
-
-        # Calendar-day span: if ≤ 3 it could be a weekend+holiday — check weekdays
-        calendar_days = (curr.date() - prev.date()).days
-        if calendar_days <= 3:
-            weekdays = _count_weekdays_between(prev.date(), curr.date())
-            if weekdays <= 1:
-                continue  # normal weekend / single holiday
-
-        missing_bars = max(0, int(diff_seconds / expected_seconds) - 1)
-        gaps.append(
-            {
-                "from": prev,
-                "to": curr,
-                "duration_hours": round(diff_seconds / 3600, 1),
-                "missing_bars": missing_bars,
-            }
-        )
-
-    return gaps
 
 
 # ── per-ticker analysis ───────────────────────────────────────────────────────

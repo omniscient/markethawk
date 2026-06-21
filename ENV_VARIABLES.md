@@ -53,6 +53,17 @@ These must be set before starting the stack. The application will start without 
 
 ---
 
+## System Notifications
+
+Generic (non-scanner) email + browser-push notifications via `notify_system()` and `POST /api/v1/alerts/system`. Used by server-to-server callers such as the dark-factory scheduler.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OPS_ALERT_EMAIL` | `` (empty) | Recipient address for system-level email notifications. When unset, the email channel is silently skipped (browser push still runs). |
+| `INTERNAL_API_TOKEN` | `` (empty) | Shared secret required by `POST /api/v1/alerts/system` (sent in the `X-Internal-Token` header). When unset the endpoint returns **503** (fail-closed); a mismatched token returns **401**. Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. |
+
+---
+
 ## Interactive Brokers (IB Gateway)
 
 These control the `ib-gateway` container and the backend's connection to it. All are optional if you do not use IBKR as a data provider.

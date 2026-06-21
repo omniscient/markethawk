@@ -232,6 +232,35 @@ nodes:
     when: "$parse-intent.output.intent == 'close'"
     timeout: 30000
 
+  - id: post-merge-update-codeindex
+    bash: |
+      if ! command -v codeindex &>/dev/null; then
+        echo "WARNING: codeindex not available — skipping post-merge hotspot update"
+        exit 0
+      fi
+      ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
+      echo "Refreshing codeindex hotspots on main (post-merge for issue #${ISSUE})..."
+      git fetch origin main
+      git checkout main
+      git reset --hard origin/main
+      codeindex analyze . 2>/dev/null || echo "WARNING: codeindex analyze failed"
+      codeindex symbols . --output symbolindex.json 2>/dev/null || echo "WARNING: codeindex symbols failed"
+      mkdir -p docs
+      codeindex high-blast 2>/dev/null > docs/codeindex-hotspots.md.tmp \
+        && mv docs/codeindex-hotspots.md.tmp docs/codeindex-hotspots.md \
+        || echo "WARNING: codeindex high-blast failed — hotspots file unchanged"
+      git add docs/codeindex-hotspots.md
+      if ! git diff --staged --quiet; then
+        git commit -m "chore: refresh codeindex hotspots (post-merge #${ISSUE})"
+        git push origin main \
+          || echo "WARNING: push to main failed — hotspots will be stale until next manual refresh"
+      else
+        echo "codeindex hotspots unchanged post-merge — no commit needed"
+      fi
+    depends_on: [close-preview]
+    when: "$parse-intent.output.intent == 'close'"
+    timeout: 120000
+
   - id: setup-branch
     bash: |
       ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
@@ -357,8 +386,10 @@ nodes:
 
   # Post-implement codeindex regeneration — refreshes the local index so the in-run MCP tools
   # (lookup_symbol / get_impact) see the final code. codeindex.json / symbolindex.json are
-  # gitignored (regenerated on demand, see #343); only docs/codeindex-hotspots.md is committed.
-  # Non-fatal: if codeindex is unavailable the run continues.
+  # gitignored (regenerated on demand, see #343). docs/codeindex-hotspots.md is generated
+  # locally for in-run use but NOT committed to the feature branch — post-merge refresh
+  # happens in the post-merge-update-codeindex node. Non-fatal: if codeindex is unavailable
+  # the run continues.
   - id: regen-codeindex
     bash: |
       if ! command -v codeindex &>/dev/null; then
@@ -367,17 +398,12 @@ nodes:
       fi
       echo "Regenerating codeindex (post-implement pass)..."
       codeindex analyze . 2>/dev/null || echo "WARNING: codeindex analyze failed"
-      codeindex symbols . --inline 2>/dev/null || echo "WARNING: codeindex symbols failed"
+      codeindex symbols . --output symbolindex.json 2>/dev/null || echo "WARNING: codeindex symbols failed"
       mkdir -p docs
-      codeindex high-blast 2>/dev/null > docs/codeindex-hotspots.md || true
-      # Commit only the small human-readable hotspots doc; the JSON indexes are gitignored.
-      git add docs/codeindex-hotspots.md 2>/dev/null || true
-      if ! git diff --staged --quiet 2>/dev/null; then
-        git commit -m "chore: update codeindex hotspots (post-implement)"
-        echo "codeindex hotspots committed"
-      else
-        echo "codeindex hotspots unchanged — no commit needed"
-      fi
+      codeindex high-blast 2>/dev/null > docs/codeindex-hotspots.md.tmp \
+        && mv docs/codeindex-hotspots.md.tmp docs/codeindex-hotspots.md \
+        || echo "WARNING: codeindex high-blast failed — hotspots file unchanged"
+      echo "codeindex hotspots generated locally (not committed — post-merge refresh via post-merge-update-codeindex)"
     depends_on: [implement]
     when: "$parse-intent.output.intent == 'new' || $parse-intent.output.intent == 'continue'"
     timeout: 120000
