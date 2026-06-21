@@ -1,14 +1,179 @@
 import logging
 import time as _time
+from datetime import datetime, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.celery_app import celery_app
 from app.core.database import SessionLocal
-from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
+from app.core.metrics import (
+    aggregate_gap_days,
+    aggregate_staleness_hours,
+    celery_task_duration_seconds,
+    celery_tasks_total,
+)
 from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
+
+# Fallback defaults for quality thresholds (overridable via SystemConfig)
+_DEFAULT_STALENESS_HOURS = 48
+_DEFAULT_GAP_MIN_WEEKDAYS = 2
+_DEFAULT_ALERT_PCT = 20
+
+
+def _load_quality_thresholds(db: Session) -> tuple[int, int, int]:
+    """Return (staleness_hours, gap_min_weekdays, alert_pct) from SystemConfig with fallbacks."""
+    from app.models.system_config import SystemConfig
+
+    keys = ["quality_staleness_hours", "quality_gap_min_weekdays", "quality_alert_pct"]
+    rows = db.query(SystemConfig).filter(SystemConfig.key.in_(keys)).all()
+    cfg = {r.key: r.value for r in rows}
+
+    try:
+        staleness_hours = int(
+            cfg.get("quality_staleness_hours", _DEFAULT_STALENESS_HOURS)
+        )
+    except (ValueError, TypeError):
+        staleness_hours = _DEFAULT_STALENESS_HOURS
+
+    try:
+        gap_min_weekdays = int(
+            cfg.get("quality_gap_min_weekdays", _DEFAULT_GAP_MIN_WEEKDAYS)
+        )
+    except (ValueError, TypeError):
+        gap_min_weekdays = _DEFAULT_GAP_MIN_WEEKDAYS
+
+    try:
+        alert_pct = int(cfg.get("quality_alert_pct", _DEFAULT_ALERT_PCT))
+    except (ValueError, TypeError):
+        alert_pct = _DEFAULT_ALERT_PCT
+
+    return staleness_hours, gap_min_weekdays, alert_pct
+
+
+def compute_universe_data_health(db: Session, universe_id: int) -> dict:
+    """
+    Lightweight health sweep for a single universe.
+
+    Queries MAX(timestamp) per ticker (day/1 timespan) and detects gaps using
+    quality_helpers. Returns a summary dict with staleness/gap metrics.
+    Does NOT write to UniverseQualityReport.
+    """
+    from app.models.stock_aggregate import StockAggregate
+    from app.models.stock_universe_ticker import StockUniverseTicker
+    from app.services.quality_helpers import _count_weekdays_between, _detect_gaps
+
+    staleness_hours_threshold, gap_min_weekdays, _ = _load_quality_thresholds(db)
+
+    tickers = (
+        db.query(StockUniverseTicker.ticker)
+        .filter(StockUniverseTicker.universe_id == universe_id)
+        .all()
+    )
+    ticker_list = [t.ticker for t in tickers]
+
+    if not ticker_list:
+        return {
+            "ticker_count": 0,
+            "stale_count": 0,
+            "gapped_count": 0,
+            "stale_pct": 0.0,
+            "gapped_pct": 0.0,
+            "worst_staleness_hours": 0.0,
+            "worst_gap_days": 0.0,
+            "degraded": False,
+            "grade": "A",
+        }
+
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    stale_count = 0
+    gapped_count = 0
+    worst_staleness_hours = 0.0
+    worst_gap_days = 0.0
+
+    for ticker in ticker_list:
+        # MAX(timestamp) staleness check — day bars only (lightweight)
+        result = (
+            db.query(func.max(StockAggregate.timestamp))
+            .filter(
+                StockAggregate.ticker == ticker,
+                StockAggregate.timespan == "day",
+                StockAggregate.multiplier == 1,
+            )
+            .scalar()
+        )
+
+        if not isinstance(result, datetime):
+            # No day bars for this ticker — treat as maximally stale
+            stale_count += 1
+            worst_staleness_hours = max(worst_staleness_hours, float("inf"))
+            continue
+
+        staleness_h = (now_utc - result).total_seconds() / 3600
+        worst_staleness_hours = max(worst_staleness_hours, staleness_h)
+        if staleness_h > staleness_hours_threshold:
+            stale_count += 1
+
+        # Gap detection — day bars
+        timestamps = (
+            db.query(StockAggregate.timestamp)
+            .filter(
+                StockAggregate.ticker == ticker,
+                StockAggregate.timespan == "day",
+                StockAggregate.multiplier == 1,
+            )
+            .order_by(StockAggregate.timestamp.asc())
+            .limit(2000)
+            .all()
+        )
+        ts_list = [r.timestamp for r in timestamps]
+        gaps = _detect_gaps(ts_list, "day", 1)
+
+        for gap in gaps:
+            gap_days = (gap["to"].date() - gap["from"].date()).days
+            if (
+                _count_weekdays_between(gap["from"].date(), gap["to"].date())
+                >= gap_min_weekdays
+            ):
+                gapped_count += 1
+                worst_gap_days = max(worst_gap_days, gap_days)
+                break  # one gap per ticker is enough to flag it
+
+    n = len(ticker_list)
+    stale_pct = round(stale_count / n * 100, 1) if n > 0 else 0.0
+    gapped_pct = round(gapped_count / n * 100, 1) if n > 0 else 0.0
+
+    _, _, alert_pct = _load_quality_thresholds(db)
+    degraded = stale_pct > alert_pct or gapped_pct > alert_pct
+
+    # Grade: A if healthy, B if minor, C if degraded, D/F if severely degraded
+    max_pct = max(stale_pct, gapped_pct)
+    if max_pct == 0:
+        grade = "A"
+    elif max_pct <= 5:
+        grade = "B"
+    elif max_pct <= alert_pct:
+        grade = "C"
+    elif max_pct <= 50:
+        grade = "D"
+    else:
+        grade = "F"
+
+    return {
+        "ticker_count": n,
+        "stale_count": stale_count,
+        "gapped_count": gapped_count,
+        "stale_pct": stale_pct,
+        "gapped_pct": gapped_pct,
+        "worst_staleness_hours": round(worst_staleness_hours, 1)
+        if worst_staleness_hours != float("inf")
+        else 9999.0,
+        "worst_gap_days": round(worst_gap_days, 1),
+        "degraded": degraded,
+        "grade": grade,
+    }
 
 
 @celery_app.task(bind=True, max_retries=0, name="app.tasks.analyze_universe_quality")
@@ -318,4 +483,90 @@ def analyze_signal_features(self, scanner_type: str | None = None, k: int = 6):
             pass
         raise
     finally:
+        db.close()
+
+
+@celery_app.task(bind=True, max_retries=0, name="app.tasks.check_aggregate_staleness")
+def check_aggregate_staleness(self):
+    """
+    Nightly lightweight sweep of all active universes for data staleness and gaps.
+
+    Emits:
+      - markethawk_aggregate_staleness_hours{universe_id} Prometheus gauge
+      - markethawk_aggregate_gap_days{universe_id} Prometheus gauge
+      - logger.warning Seq event when >quality_alert_pct% of tickers are stale/gapped
+    """
+    from app.models.stock_universe import StockUniverse
+
+    _task_name = "check_aggregate_staleness"
+    _start = _time.monotonic()
+    db: Session = SessionLocal()
+    try:
+        logger.info("🔍 Starting nightly aggregate staleness/gap sweep")
+
+        universes = (
+            db.query(StockUniverse).filter(StockUniverse.is_active.is_(True)).all()
+        )
+
+        _, _, alert_pct = _load_quality_thresholds(db)
+        total_universes = len(universes)
+        degraded_universes = 0
+
+        for universe in universes:
+            try:
+                health = compute_universe_data_health(db, universe.id)
+
+                uid_str = str(universe.id)
+                aggregate_staleness_hours.labels(universe_id=uid_str).set(
+                    health["worst_staleness_hours"]
+                )
+                aggregate_gap_days.labels(universe_id=uid_str).set(
+                    health["worst_gap_days"]
+                )
+
+                if health["degraded"]:
+                    degraded_universes += 1
+                    logger.warning(
+                        "⚠️ Data quality degraded for universe %s (id=%s): "
+                        "stale_pct=%.1f%% gapped_pct=%.1f%% "
+                        "worst_staleness_hours=%.1f worst_gap_days=%.1f grade=%s",
+                        universe.name,
+                        universe.id,
+                        health["stale_pct"],
+                        health["gapped_pct"],
+                        health["worst_staleness_hours"],
+                        health["worst_gap_days"],
+                        health["grade"],
+                    )
+                else:
+                    logger.info(
+                        "✅ Universe %s (id=%s) health OK: stale=%.1f%% gapped=%.1f%%",
+                        universe.name,
+                        universe.id,
+                        health["stale_pct"],
+                        health["gapped_pct"],
+                    )
+
+            except Exception as exc:
+                logger.error(
+                    "check_aggregate_staleness: error for universe %s: %s",
+                    universe.id,
+                    exc,
+                )
+
+        logger.info(
+            "✅ Aggregate staleness sweep complete: %d/%d universes degraded",
+            degraded_universes,
+            total_universes,
+        )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
+
+    except Exception as e:
+        logger.error("❌ check_aggregate_staleness failed: %s", e)
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
+        raise
+    finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
         db.close()
