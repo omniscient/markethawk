@@ -212,7 +212,8 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `journal_service.py` | Trade journal CRUD operations. |
 | `websocket_manager.py` | Polygon.io WebSocket manager (singleton). Maintains a live subscription to Polygon's feed; publishes updates to Redis pub/sub channels (`stock_updates:{ticker}:{resolution}`, `watchlist:live_data`). Also exposes an in-process fan-out registry (`register`/`unregister`/`fan_out`) used by the ticker and watchlist WS handlers to avoid per-connection Redis subscriptions. |
 | `normalization.py` | Data normalization helpers (price/volume units, split adjustments). |
-| `data_quality.py` | Quality checks and `UniverseQualityReport` generation. |
+| `data_quality.py` | Quality checks and `UniverseQualityReport` generation. Imports `_detect_gaps` and `_count_weekdays_between` from `quality_helpers.py` (re-exported for backward compat). |
+| `quality_helpers.py` | Shared pure helpers for gap/staleness analysis: `_detect_gaps(timestamps, timespan, multiplier)` and `_count_weekdays_between(d1, d2)`. Used by both `data_quality.py` and the `check_aggregate_staleness` Celery task. |
 | `auto_trade_service.py` | `AutoTradeExecutor` — full auto-trade lifecycle (guard checks, sizing, IBKR submission). `approve_order(order, strategy, db)` handles paper vs. live approval. `cancel_order(order, db)` cancels via IBKR or marks paper cancelled. `get_account()` fetches IBKR account summary with graceful fallback. `get_stats(db, days)` computes P&L, win rate, and status breakdown. |
 | `stats.py` | Aggregate statistics helpers for dashboard metrics. `StatsService.get_scorecard()` filters by quality-gate tier (`trusted` default; `include_warnings`/`include_all` opt-ins), returns `gate_status` tier counts, and joins `SignalReview` for a trailing `review_window_days` window to compute precision/coverage/verdict fields. `get_signals()` exposes per-event `gate_tier`. |
 | `event_helpers.py` | Utility functions for `ScannerEvent` construction and querying. |
@@ -235,7 +236,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 |------|-----------|
 | `auth.py` | `GET /api/auth/status` (bootstrap check), `POST /api/auth/register` (first-user only), `POST /api/auth/login` (sets HttpOnly JWT cookies), `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me` |
 | `scanner.py` | `/api/v1/scanner/run`, `/api/v1/scanner/results` (eager-loads reviews, default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/v1/scanner/history`, `/api/v1/scanner/signal-quality-distribution`, `POST /api/v1/scanner/events/{uuid}/review` (submit verdict), `GET /api/v1/scanner/events/reviews?scanner_type=` (list with `liquidity_hunt` alias), `GET /api/v1/scanner/reviews/stats` (coverage, acceptance rate, by-type breakdown) |
-| `universe.py` | `/api/v1/universe/*` — CRUD for stock universes and memberships |
+| `universe.py` | `/api/v1/universe/*` — CRUD for stock universes and memberships. `GET /api/v1/universe/{id}/data-health` — lightweight staleness/gap summary (5-min cache); returns `{degraded, stale_pct, gapped_pct, worst_staleness_hours, grade}`. |
 | `stocks.py` | `/api/v1/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/v1/news/*` — news articles and preferences |
 | `live_data.py` | `/api/v1/live/ws/{ticker}/{resolution}` — per-symbol WebSocket (shared fan-out via `websocket_manager`); `/api/v1/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts, shared fan-out); `/api/v1/live/ws/scan-task/{task_id}` — Celery task progress stream. All three endpoints enforce per-user/global connection caps, idle (5 min) and lifetime (8 h) timeouts, and Origin validation. |
@@ -255,7 +256,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | Model | Table | Purpose |
 |-------|-------|---------|
 | `ActiveWatchlist` | `active_watchlist` | Manually curated symbols under live observation. Soft limit: 50. Fields: `symbol`, `security_type` (STK/FUT), `exchange`, `notes`, `added_at`. |
-| `ScannerRun` | `scanner_runs` | One row per scan execution; stores timing, config snapshot, hit count |
+| `ScannerRun` | `scanner_runs` | One row per scan execution; stores timing, config snapshot, hit count. `data_degraded` (Boolean, nullable) — set at scan start from `UniverseQualityReport`; True when input data was stale/gapped. |
 | `ScannerEvent` | `scanner_events` | One row per ticker that passed all criteria in a run. Carries `signal_quality_score` (Float, indexed DESC NULLS LAST) computed at write time by `signal_ranker.py`. `regime` (String(30), nullable, indexed) — HMM regime label stamped at write time by `save_event()`. Also written by the live scanner. |
 | `RegimeModel` | `regime_models` | Persists serialised `GaussianHMM` artifacts from `RegimeService.train_and_persist()`. Fields: `version`, `status` (active\|archived), `n_states`, `model_b64` (base64+pickle), `feature_set`/`state_label_mapping` (JSONB), `data_start_date`/`data_end_date`, `bic_score`, `trained_at`. Composite index on `(status, version)`. |
 | `ScannerConfig` | `scanner_configs` | Saved scanner parameter sets. Carries `universe_id` FK (non-null, backfilled default 1) that drives scheduled beat tasks (`run_liquidity_hunt_scheduled`, `run_pocket_pivot_scheduled`); `parameters` JSONB holds scanner-specific knobs (lookback, price/volume floors). |
