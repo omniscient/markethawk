@@ -87,9 +87,8 @@ graph TD
     forecastworker --> redis
     dbbackup -->|"pg_dump"| postgres
     dbbackup -->|"failure events"| seq
-    dbrestoredrill -->|"read backups"| dbbackup
+    dbrestoredrill -->|"read backups :ro"| dbbackup
     dbrestoredrill -->|"drill events"| seq
-    dbrestoredrill -.->|"initdb+restore (isolated)"| dbbackup
 ```
 
 ### Container Users
