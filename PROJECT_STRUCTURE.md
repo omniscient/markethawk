@@ -101,6 +101,7 @@ MarketHawk/
 │   │   │   ├── websocket_manager.py
 │   │   │   ├── normalization.py
 │   │   │   ├── data_quality.py
+│   │   │   ├── quality_helpers.py   (shared _detect_gaps/_count_weekdays_between; used by data_quality.py and check_aggregate_staleness task)
 │   │   │   ├── stats.py
 │   │   │   ├── event_helpers.py
 │   │   │   ├── regime_service.py   (RegimeService — HMM train/persist/query; Redis regime cache)

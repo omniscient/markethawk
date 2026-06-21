@@ -28,6 +28,7 @@ def _install_log_redaction(logger, **kwargs):
 
     install_redacting_filter()
 
+
 celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
@@ -99,5 +100,10 @@ celery_app.conf.beat_schedule = {
     "update-regime-model-nightly": {
         "task": "app.tasks.update_regime_model",
         "schedule": crontab(minute="0", hour="21", day_of_week="1-5"),
+    },
+    # Aggregate staleness/gap sweep: 03:00 UTC weekdays (post-close + after nightly sync)
+    "check-aggregate-staleness-nightly": {
+        "task": "app.tasks.check_aggregate_staleness",
+        "schedule": crontab(minute="0", hour="3", day_of_week="1-5"),
     },
 }

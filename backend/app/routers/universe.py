@@ -22,6 +22,7 @@ from app.schemas import (
     UniverseSummary,
 )
 from app.schemas.common import Ticker
+from app.schemas.universe import DataHealthResponse
 from app.services import universe_export, universe_orchestrator
 from app.services.discovery_service import DiscoveryService
 from app.services.universe_stats import UniverseStatsService
@@ -121,7 +122,41 @@ def delete_stock_universe(
     universe.is_active = False
     db.commit()
     invalidate("mh:universe:list")
+    invalidate(f"mh:universe:{universe_id}:data-health")
+
+    # Remove gauge label series for this universe to avoid stale metrics
+    try:
+        from app.core.metrics import aggregate_gap_days, aggregate_staleness_hours
+
+        aggregate_staleness_hours.remove(str(universe_id))
+        aggregate_gap_days.remove(str(universe_id))
+    except Exception:
+        pass
+
     return {"message": "Universe deleted successfully"}
+
+
+@router.get("/{universe_id}/data-health", response_model=DataHealthResponse)
+def get_universe_data_health(
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Return a lightweight data-health summary for a universe.
+
+    Queries MAX(timestamp) per ticker and detects day-bar gaps.
+    Result is cached for 5 minutes. Use to drive the Scanner page degraded-data banner.
+    """
+    from app.tasks.quality import compute_universe_data_health
+
+    get_or_404(db, StockUniverse, universe_id, "Universe")
+
+    def _fetch():
+        health = compute_universe_data_health(db, universe_id)
+        return health
+
+    result = get_cached(f"mh:universe:{universe_id}:data-health", 300, _fetch)
+    return result
 
 
 @router.get("/list", response_model=List[StockUniverseResponse])

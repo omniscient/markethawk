@@ -81,3 +81,17 @@ db_pool_checked_out = Gauge(
     "db_pool_checked_out", "Connections currently checked out from pool"
 )
 db_pool_overflow = Gauge("db_pool_overflow", "Overflow connections beyond pool_size")
+
+aggregate_staleness_hours = Gauge(
+    "markethawk_aggregate_staleness_hours",
+    "Worst-case staleness (hours since last bar) across tickers in a universe",
+    ["universe_id"],
+    multiprocess_mode="livemax",
+)
+
+aggregate_gap_days = Gauge(
+    "markethawk_aggregate_gap_days",
+    "Worst-case gap span (weekdays) across tickers in a universe",
+    ["universe_id"],
+    multiprocess_mode="livemax",
+)
