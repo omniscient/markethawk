@@ -319,6 +319,38 @@ def _load_exclude_paths() -> list:
     return list(_DEFAULT_EXCLUDE)
 
 
+def _ready_epics() -> list:
+    """Ready-column epics as [{number, title, labels, board_order}], board order preserved."""
+    q = ('query { node(id: "%s") { ... on ProjectV2 { items(first:100) { nodes { '
+         'fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue { name } } '
+         'content { ... on Issue { number title labels(first:20){nodes{name}} } } } } } } }') % PROJECT_ID
+    data = _gh_json(["api", "graphql", "-f", "query=" + q])
+    if not data:
+        return []
+    out, order = [], 0
+    for n in data.get("data", {}).get("node", {}).get("items", {}).get("nodes", []):
+        content = n.get("content") or {}
+        status = (n.get("fieldValueByName") or {}).get("name")
+        labels = [x["name"] for x in (content.get("labels") or {}).get("nodes", [])]
+        if content.get("number") and status == "Ready" and "epic" in labels:
+            out.append({"number": content["number"], "title": content.get("title", ""),
+                        "labels": labels, "board_order": order})
+        order += 1
+    return out
+
+
+def _open_child_numbers(epic: int) -> list:
+    """All OPEN sub-issue numbers of an epic (any label)."""
+    q = ('query { repository(owner:"omniscient", name:"markethawk") { issue(number:%d) { '
+         'subIssues(first:50) { nodes { number state } } } } }') % epic
+    data = _gh_json(["api", "graphql", "-f", "query=" + q])
+    if not data:
+        return []
+    return [s["number"] for s in
+            data.get("data", {}).get("repository", {}).get("issue", {}).get("subIssues", {}).get("nodes", [])
+            if s.get("state") == "OPEN"]
+
+
 def _in_progress_epics() -> list:
     """Issue numbers of epics whose board Status is 'In progress'."""
     q = ('query { node(id: "%s") { ... on ProjectV2 { items(first:100) { nodes { '
@@ -415,6 +447,16 @@ class LiveIO:
     def comment(self, issue: int, body: str) -> None:
         subprocess.run(["gh", "issue", "comment", str(issue), "--repo", OWNER, "--body", body], check=False)
 
+    def fetch_ready_epics(self) -> list:
+        return _ready_epics()
+
+    def promote_epic(self, epic: int) -> None:
+        from factory_core.board import set_board_status
+        set_board_status(epic, "In progress")
+        for child in _open_child_numbers(epic):
+            subprocess.run(["gh", "issue", "edit", str(child), "--repo", OWNER,
+                            "--add-label", "ready-for-agent"], check=False)
+
     def notify(self, title: str, body: str, severity: str, dedupe_key) -> None:
         token = os.environ.get("INTERNAL_API_TOKEN", "")
         if not token:
@@ -446,12 +488,17 @@ def main_once() -> int:
     cfg = dict(
         exclude_paths=_load_exclude_paths(),
         opt_out_label=os.environ.get("EPIC_AUTOPILOT_OPT_OUT_LABEL", "no-autopilot"),
-        ceiling_keywords=os.environ.get("ABOVE_CEILING_KEYWORDS",
-                                        "migration|migrate|performance|perf|architectur|refactor"),
+        size_ceiling=os.environ.get("EPIC_AUTOPILOT_SIZE_CEILING", "XL"),
+        sensitive_keywords=os.environ.get(
+            "EPIC_AUTOPILOT_SENSITIVE_KEYWORDS",
+            r"trading|ibkr|live order|notional|authentication|authorization|authn|authz|jwt|oauth|rbac|/auth"),
+        hold_ttl_hours=float(os.environ.get("EPIC_AUTOPILOT_HOLD_TTL_HOURS", "24")),
+        start_epics=os.environ.get("EPIC_AUTOPILOT_START_EPICS", "true").lower() == "true",
         confidence_floor=float(os.environ.get("EPIC_AUTOPILOT_CONFIDENCE_FLOOR", "0.7")),
         daily_cap=int(os.environ.get("EPIC_AUTOPILOT_DAILY_CAP", "5")),
         model=os.environ.get("EPIC_AUTOPILOT_MODEL", "claude-opus-4-8"))
-    out = run_once(cfg, LiveIO(cfg["model"]), state, today)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    out = run_once(cfg, LiveIO(cfg["model"]), state, today, now_iso)
     try:
         with open(path, "w") as f:
             json.dump(state, f)
