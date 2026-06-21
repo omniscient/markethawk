@@ -187,7 +187,7 @@ Weekly revisit of the dispatch ceiling policy introduced in #339.
 *Filed automatically by MarketHawk weekly ceiling revisit agent*" \
   --label "enhancement" \
   --label "priority: should-have" \
-  --label "size: M" \
+  --label "size: S" \
   --label "Dark Factory" \
   --label "ready-for-agent"
 ```
