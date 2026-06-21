@@ -84,6 +84,10 @@ read_config() {
   _set_cfg EPIC_AUTOPILOT_DAILY_CAP        '.epic_autopilot.daily_cap'
   _set_cfg EPIC_AUTOPILOT_CONFIDENCE_FLOOR '.epic_autopilot.confidence_floor'
   _set_cfg EPIC_AUTOPILOT_OPT_OUT_LABEL    '.epic_autopilot.opt_out_label'
+  _set_cfg EPIC_AUTOPILOT_HOLD_TTL_HOURS    '.epic_autopilot.hold_ttl_hours'
+  _set_cfg EPIC_AUTOPILOT_SIZE_CEILING      '.epic_autopilot.size_ceiling'
+  _set_cfg EPIC_AUTOPILOT_START_EPICS       '.epic_autopilot.start_epics'
+  _set_cfg EPIC_AUTOPILOT_SENSITIVE_KEYWORDS '.epic_autopilot.sensitive_keywords'
 
   echo "[config] loaded from ${cfg}"
 }
@@ -233,10 +237,10 @@ has_direct_to_pr_label() {
 # --- Dispatch ceiling classification (#339) ---
 # Returns "S", "M", "L", or "" from the item's labels
 get_size_label() {
-  echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -oi 'size: [SML]' | awk '{print $2}' | head -1
+  echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -oiE 'size: ?(xl|[sml])' | awk '{print toupper($NF)}' | head -1
 }
 
-# True (returns 0) if item is above the dispatch ceiling: size L always, or size M
+# True (returns 0) if item is above the dispatch ceiling: size XL always, or size M
 # when the title matches an ABOVE_CEILING_KEYWORDS pattern (escalation only — the
 # keyword heuristic never demotes).
 is_above_ceiling() {
@@ -244,7 +248,7 @@ is_above_ceiling() {
   title=$(echo "$item" | jq -r '.content.title // ""' 2>/dev/null)
   size=$(get_size_label "$item")
   case "$size" in
-    L) return 0 ;;
+    XL) return 0 ;;
     M) echo "$title" | grep -qiE "${ABOVE_CEILING_KEYWORDS}" && return 0 || return 1 ;;
     *) return 1 ;;
   esac
@@ -255,11 +259,11 @@ has_above_ceiling_label() {
   echo "$1" | jq -r '.labels[]?' 2>/dev/null | grep -qi "^${ABOVE_CEILING_LABEL}$"
 }
 
-# True if item is S-size or has no size label (unlabelled is treated as S per spec)
+# True if item is S- or L-size, or has no size label (unlabelled is treated as S per spec)
 is_below_ceiling() {
   local size
   size=$(get_size_label "$1")
-  case "$size" in S|"") return 0 ;; *) return 1 ;; esac
+  case "$size" in S|L|"") return 0 ;; *) return 1 ;; esac
 }
 
 # Returns minutes elapsed since the last comment matching $marker_re on the given issue.
@@ -967,7 +971,7 @@ This issue was left in **In progress** with no running factory container — the
 "## Scheduler — Above Dispatch Ceiling
 
 This ticket has been classified as **above the autonomous dispatch ceiling** \
-(size: L, or size: M with a perf/architectural/migration title keyword).
+(size: XL, or size: M with a perf/architectural/migration title keyword).
 
 Spec and plan are complete. **A human must pair on implementation.**
 
@@ -1106,7 +1110,7 @@ To proceed:
   if [ -z "$DISPATCHED" ] && [ "$MAIN_IS_RED" = "false" ] && [ "${EPIC_AUTOPILOT_ENABLED:-false}" = "true" ]; then
     AP_OUT=$(python3 "$FACTORY_CORE_CLI" epic-autopilot --once 2>&1) || true
     echo "[$(date -u +%FT%TZ)] ${AP_OUT}"
-    case "$AP_OUT" in *"autopilot=advanced"*) DISPATCHED="$AP_OUT" ;; esac
+    case "$AP_OUT" in *"autopilot=advanced"*|*"autopilot=epic_started"*) DISPATCHED="$AP_OUT" ;; esac
   fi
 
   # --- Log cycle summary ---

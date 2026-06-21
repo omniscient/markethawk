@@ -35,7 +35,15 @@ def _size(c: dict):
     return s.upper() if s else None
 
 
-def is_eligible(c: dict, opt_out_label: str, ceiling_keywords: str):
+_SIZE_ORDER = {"S": 0, "M": 1, "L": 2, "XL": 3}
+
+
+def _size_rank(s: str) -> int:
+    """Rank a size token; unknown/blank ranks below S so it is never above ceiling."""
+    return _SIZE_ORDER.get((s or "").upper(), -1)
+
+
+def is_eligible(c: dict, opt_out_label: str, size_ceiling: str = "XL"):
     """Stage A — structural eligibility. Returns (ok: bool, reason: str)."""
     labels = [label.lower() for label in c.get("labels", [])]
     if c.get("status") not in _GATED_STATUSES:
@@ -44,22 +52,30 @@ def is_eligible(c: dict, opt_out_label: str, ceiling_keywords: str):
         if blk.lower() in labels:
             return False, f"label:{blk}"
     size = _size(c) or ""
-    if size in ("L", "XL"):
-        return False, f"above-ceiling:size={size}"
-    if size == "M" and re.search(ceiling_keywords, c.get("title", ""), re.I):
-        return False, "above-ceiling:M+keyword"
+    if _size_rank(size) >= _size_rank(size_ceiling):
+        return False, f"above-ceiling:size={size or '?'}"
     return True, ""
 
 
-def hard_excluded(c: dict, exclude_paths: list):
-    """Stage B — categorical exclusions (fail-closed). Returns (excluded: bool, reason: str)."""
+def hard_excluded(c: dict, exclude_paths: list, sensitive_keywords: str = ""):
+    """Stage B — categorical exclusions. Returns (excluded: bool, reason: str).
+
+    Trading/auth keywords in title/body hard-drop (fail-closed) even when scope is
+    undeclared. A declared path matching an exclude prefix hard-drops. No declared
+    paths is NOT a drop anymore — flag scope_undeclared so Opus is warned and leans HOLD.
+    """
+    if sensitive_keywords:
+        text = f"{c.get('title', '')} {c.get('body', '')}".lower()
+        if re.search(sensitive_keywords, text):
+            return True, "sensitive-keyword"
     paths = c.get("target_paths") or []
-    if not paths:
-        return True, "undeclared-scope"  # fail-closed: undeclared scope might be trading/auth
     for p in paths:
         for ex in exclude_paths:
             if ex in p:
                 return True, ex
+    if not paths:
+        c["scope_undeclared"] = True
+        return False, "undeclared-scope"
     return False, ""
 
 
@@ -121,20 +137,63 @@ def record_advance(state: dict, today: str) -> None:
     state["daily"] = d
 
 
-def cached_verdict(state: dict, issue: int, spec_hash_: str):
+def _age_hours(ts_iso: str, now_iso: str) -> float:
+    from datetime import datetime
+    try:
+        return (datetime.fromisoformat(now_iso) - datetime.fromisoformat(ts_iso)).total_seconds() / 3600.0
+    except Exception:
+        return 0.0
+
+
+def cached_verdict(state: dict, issue: int, spec_hash_: str, now_iso=None, ttl_hours=None):
     entry = (state.get("verdicts") or {}).get(str(issue))
-    if entry and entry.get("spec_hash") == spec_hash_:
-        return entry.get("verdict")
-    return None
+    if not entry or entry.get("spec_hash") != spec_hash_:
+        return None
+    if ttl_hours and now_iso and entry.get("ts") and _age_hours(entry["ts"], now_iso) >= ttl_hours:
+        return None
+    return entry.get("verdict")
 
 
-def record_verdict(state: dict, issue: int, spec_hash_: str, verdict: str) -> None:
-    state.setdefault("verdicts", {})[str(issue)] = {"spec_hash": spec_hash_, "verdict": verdict}
+def record_verdict(state: dict, issue: int, spec_hash_: str, verdict: str, now_iso=None) -> None:
+    entry = {"spec_hash": spec_hash_, "verdict": verdict}
+    if now_iso:
+        entry["ts"] = now_iso
+    state.setdefault("verdicts", {})[str(issue)] = entry
+
+
+# ── Epic selector (pure; used by epic-starter workflow) ──────────────────────
+
+_EPIC_EXCLUDE_RE = r"security|auth|authz|authn|trading|ibkr|dark.?factory|scheduler|factory.self"
+
+
+def _priority_rank(labels: list) -> int:
+    low = [label.lower() for label in labels]
+    if any("must-have" in label for label in low):
+        return 0
+    if any("should-have" in label for label in low):
+        return 1
+    return 2
+
+
+def _epic_excluded(e: dict, pattern: str) -> bool:
+    hay = (e.get("title", "") + " " + " ".join(e.get("labels", []))).lower()
+    return bool(re.search(pattern, hay))
+
+
+def pick_next_epic(epics: list, exclude_pattern: str = _EPIC_EXCLUDE_RE):
+    """Highest-priority unstarted epic, skipping hard-excluded categories. None if none."""
+    elig = [e for e in epics if not _epic_excluded(e, exclude_pattern)]
+    elig.sort(key=lambda e: (_priority_rank(e.get("labels", [])),
+                             e.get("board_order", 10 ** 9), e["number"]))
+    return elig[0]["number"] if elig else None
 
 
 # ── Orchestrator (pure control flow; all IO injected via `io`) ──────────────
 
 def build_review_prompt(c: dict) -> str:
+    scope = ", ".join(c.get("target_paths") or []) or "(none declared)"
+    warn = ("\nNOTE: file scope is UNDECLARED — treat trading/auth/factory-self risk as "
+            "possible and lean HOLD unless the spec is clearly safe." if c.get("scope_undeclared") else "")
     return f"""You are a cautious senior engineer deciding whether a refined ticket is safe to
 implement and merge AUTONOMOUSLY (adding the direct-to-pr label means it flows
 spec->plan->implement->PR with NO further human gate before the PR opens).
@@ -150,16 +209,15 @@ empty-branch/no-op risk, or you are unsure -- choose HOLD.
 
 Ticket #{c['number']}: {c['title']}
 Labels: {', '.join(c.get('labels', []))}   Size: {c.get('size')}
-Declared target files: {', '.join(c.get('target_paths') or []) or '(none declared)'}
+Declared target files: {scope}{warn}
 
 --- SPEC/PLAN ---
 {(c.get('spec_text') or '')[:8000]}
 """
 
 
-def run_once(cfg: dict, io, state: dict, today: str) -> dict:
-    """One starved-cycle pass. Returns {outcome, issue, reason}. Never raises for IO
-    that the injected `io` swallows; pure-logic errors propagate to the caller."""
+def run_once(cfg: dict, io, state: dict, today: str, now_iso=None) -> dict:
+    """One starved-cycle pass. Returns {outcome, issue, reason}."""
     if daily_remaining(state, cfg["daily_cap"], today) <= 0:
         io.notify("Epic autopilot — daily cap reached",
                   f"Hit the daily cap of {cfg['daily_cap']} autonomous advances; paused until UTC reset. Review the backlog.",
@@ -168,17 +226,29 @@ def run_once(cfg: dict, io, state: dict, today: str) -> dict:
 
     candidates = []
     for cand in io.fetch_candidates():
-        ok, _ = is_eligible(cand, cfg["opt_out_label"], cfg["ceiling_keywords"])
+        ok, _ = is_eligible(cand, cfg["opt_out_label"], cfg.get("size_ceiling", "XL"))
         if not ok:
             continue
-        excluded, _ = hard_excluded(cand, cfg["exclude_paths"])
+        excluded, _ = hard_excluded(cand, cfg["exclude_paths"], cfg.get("sensitive_keywords", ""))
         if excluded:
             continue
-        if cached_verdict(state, cand["number"], spec_hash(cand.get("spec_text", ""))) == "HOLD":
+        if cached_verdict(state, cand["number"], spec_hash(cand.get("spec_text", "")),
+                          now_iso, cfg.get("hold_ttl_hours")) == "HOLD":
             continue
         candidates.append(cand)
 
     if not candidates:
+        if cfg.get("start_epics") and hasattr(io, "fetch_ready_epics"):
+            epic_num = pick_next_epic(io.fetch_ready_epics())
+            if epic_num is not None:
+                io.promote_epic(epic_num)
+                io.comment(epic_num,
+                           "\U0001f916 **Epic Autopilot** — starting epic: promoted to In progress and "
+                           "marked its open children ready-for-agent.\n\n---\n*Posted by MarketHawk Epic Autopilot*")
+                io.notify(f"Autopilot starting epic #{epic_num}",
+                          "Promoted to In progress; children marked ready-for-agent.", "info", None)
+                record_advance(state, today)
+                return {"outcome": "epic_started", "issue": epic_num, "reason": "promote"}
         io.notify("Epic autopilot — idle, nothing safe to advance",
                   "The factory is starved and the autopilot has no eligible low-risk ticket to advance. Human input needed.",
                   "warning", "autopilot-stuck")
@@ -196,13 +266,13 @@ def run_once(cfg: dict, io, state: dict, today: str) -> dict:
         io.notify(f"Autopilot advancing #{cand['number']}",
                   f"{cand['title']} — risk=low: {reason}", "info", None)
         record_advance(state, today)
-        record_verdict(state, cand["number"], h, "ADVANCE")
+        record_verdict(state, cand["number"], h, "ADVANCE", now_iso)
         return {"outcome": "advanced", "issue": cand["number"], "reason": reason}
 
     concerns = "; ".join(verdict.get("concerns", [])) or "not low-risk / low confidence"
     io.comment(cand["number"],
                f"\U0001f916 **Epic Autopilot** — parked (HOLD). {concerns}\n\n---\n*Posted by MarketHawk Epic Autopilot*")
-    record_verdict(state, cand["number"], h, "HOLD")
+    record_verdict(state, cand["number"], h, "HOLD", now_iso)
     return {"outcome": "hold", "issue": cand["number"], "reason": concerns}
 
 
@@ -247,6 +317,38 @@ def _load_exclude_paths() -> list:
         except Exception:
             pass
     return list(_DEFAULT_EXCLUDE)
+
+
+def _ready_epics() -> list:
+    """Ready-column epics as [{number, title, labels, board_order}], board order preserved."""
+    q = ('query { node(id: "%s") { ... on ProjectV2 { items(first:100) { nodes { '
+         'fieldValueByName(name:"Status"){ ... on ProjectV2ItemFieldSingleSelectValue { name } } '
+         'content { ... on Issue { number title labels(first:20){nodes{name}} } } } } } } }') % PROJECT_ID
+    data = _gh_json(["api", "graphql", "-f", "query=" + q])
+    if not data:
+        return []
+    out, order = [], 0
+    for n in data.get("data", {}).get("node", {}).get("items", {}).get("nodes", []):
+        content = n.get("content") or {}
+        status = (n.get("fieldValueByName") or {}).get("name")
+        labels = [x["name"] for x in (content.get("labels") or {}).get("nodes", [])]
+        if content.get("number") and status == "Ready" and "epic" in labels:
+            out.append({"number": content["number"], "title": content.get("title", ""),
+                        "labels": labels, "board_order": order})
+        order += 1
+    return out
+
+
+def _open_child_numbers(epic: int) -> list:
+    """All OPEN sub-issue numbers of an epic (any label)."""
+    q = ('query { repository(owner:"omniscient", name:"markethawk") { issue(number:%d) { '
+         'subIssues(first:50) { nodes { number state } } } } }') % epic
+    data = _gh_json(["api", "graphql", "-f", "query=" + q])
+    if not data:
+        return []
+    return [s["number"] for s in
+            data.get("data", {}).get("repository", {}).get("issue", {}).get("subIssues", {}).get("nodes", [])
+            if s.get("state") == "OPEN"]
 
 
 def _in_progress_epics() -> list:
@@ -345,6 +447,16 @@ class LiveIO:
     def comment(self, issue: int, body: str) -> None:
         subprocess.run(["gh", "issue", "comment", str(issue), "--repo", OWNER, "--body", body], check=False)
 
+    def fetch_ready_epics(self) -> list:
+        return _ready_epics()
+
+    def promote_epic(self, epic: int) -> None:
+        from factory_core.board import set_board_status, STATUS_IN_PROGRESS
+        set_board_status(epic, STATUS_IN_PROGRESS)
+        for child in _open_child_numbers(epic):
+            subprocess.run(["gh", "issue", "edit", str(child), "--repo", OWNER,
+                            "--add-label", "ready-for-agent"], check=False)
+
     def notify(self, title: str, body: str, severity: str, dedupe_key) -> None:
         token = os.environ.get("INTERNAL_API_TOKEN", "")
         if not token:
@@ -376,12 +488,17 @@ def main_once() -> int:
     cfg = dict(
         exclude_paths=_load_exclude_paths(),
         opt_out_label=os.environ.get("EPIC_AUTOPILOT_OPT_OUT_LABEL", "no-autopilot"),
-        ceiling_keywords=os.environ.get("ABOVE_CEILING_KEYWORDS",
-                                        "migration|migrate|performance|perf|architectur|refactor"),
+        size_ceiling=os.environ.get("EPIC_AUTOPILOT_SIZE_CEILING", "XL"),
+        sensitive_keywords=os.environ.get(
+            "EPIC_AUTOPILOT_SENSITIVE_KEYWORDS",
+            r"trading|ibkr|live order|notional|authentication|authorization|authn|authz|jwt|oauth|rbac|/auth"),
+        hold_ttl_hours=float(os.environ.get("EPIC_AUTOPILOT_HOLD_TTL_HOURS", "24")),
+        start_epics=os.environ.get("EPIC_AUTOPILOT_START_EPICS", "true").lower() == "true",
         confidence_floor=float(os.environ.get("EPIC_AUTOPILOT_CONFIDENCE_FLOOR", "0.7")),
         daily_cap=int(os.environ.get("EPIC_AUTOPILOT_DAILY_CAP", "5")),
         model=os.environ.get("EPIC_AUTOPILOT_MODEL", "claude-opus-4-8"))
-    out = run_once(cfg, LiveIO(cfg["model"]), state, today)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    out = run_once(cfg, LiveIO(cfg["model"]), state, today, now_iso)
     try:
         with open(path, "w") as f:
             json.dump(state, f)

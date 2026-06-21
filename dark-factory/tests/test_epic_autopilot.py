@@ -20,43 +20,42 @@ def c(**kw):
 # ── Task 2: eligibility + hard-rule exclusions ──────────────────────────────
 
 def test_eligible_happy():
-    ok, why = ap.is_eligible(c(), "no-autopilot", CEIL)
+    ok, why = ap.is_eligible(c(), "no-autopilot")
     assert ok, why
 
 
 def test_ineligible_opt_out():
-    ok, _ = ap.is_eligible(c(labels=["ready-for-agent", "no-autopilot"]), "no-autopilot", CEIL)
+    ok, _ = ap.is_eligible(c(labels=["ready-for-agent", "no-autopilot"]), "no-autopilot")
     assert not ok
 
 
 def test_ineligible_already_direct_to_pr():
-    ok, _ = ap.is_eligible(c(labels=["direct-to-pr"]), "no-autopilot", CEIL)
+    ok, _ = ap.is_eligible(c(labels=["direct-to-pr"]), "no-autopilot")
     assert not ok
 
 
 def test_ineligible_wrong_status():
-    ok, _ = ap.is_eligible(c(status="Ready"), "no-autopilot", CEIL)
+    ok, _ = ap.is_eligible(c(status="Ready"), "no-autopilot")
     assert not ok
 
 
-def test_ineligible_above_ceiling_size_l():
-    ok, _ = ap.is_eligible(c(size="L"), "no-autopilot", CEIL)
-    assert not ok
-
-
-def test_ineligible_m_with_ceiling_keyword():
-    ok, _ = ap.is_eligible(c(size="M", title="perf refactor of scanner"), "no-autopilot", CEIL)
-    assert not ok
-
-
-def test_eligible_m_without_keyword():
-    ok, why = ap.is_eligible(c(size="M", title="add data quality preflight"), "no-autopilot", CEIL)
+def test_size_l_now_eligible():
+    ok, why = ap.is_eligible(c(size="L"), "no-autopilot")
     assert ok, why
 
 
-def test_size_from_label_prefix():
-    # size carried as a label "size: L" rather than the size field
-    ok, _ = ap.is_eligible(c(size=None, labels=["ready-for-agent", "size: L"]), "no-autopilot", CEIL)
+def test_size_m_with_keyword_now_eligible():
+    ok, why = ap.is_eligible(c(size="M", title="perf refactor of scanner"), "no-autopilot")
+    assert ok, why
+
+
+def test_size_xl_dropped():
+    ok, why = ap.is_eligible(c(size="XL"), "no-autopilot")
+    assert not ok and "above-ceiling" in why
+
+
+def test_size_xl_from_label_prefix():
+    ok, _ = ap.is_eligible(c(size=None, labels=["ready-for-agent", "size: XL"]), "no-autopilot")
     assert not ok
 
 
@@ -78,9 +77,18 @@ def test_hard_exclude_auth():
     assert ex
 
 
-def test_hard_exclude_undeclared_scope_fails_closed():
-    ex, why = ap.hard_excluded(c(target_paths=[]), ["app/core/auth"])
-    assert ex and why == "undeclared-scope"
+def test_undeclared_scope_is_soft_and_flags():
+    cand = c(target_paths=[])
+    ex, why = ap.hard_excluded(cand, ["app/core/auth"])
+    assert not ex and why == "undeclared-scope"
+    assert cand.get("scope_undeclared") is True
+
+
+def test_sensitive_keyword_hard_drops_even_without_paths():
+    cand = c(title="Live IBKR order path kill switch", body="", target_paths=[])
+    ex, why = ap.hard_excluded(cand, ["app/core/auth"],
+                               sensitive_keywords=r"trading|ibkr|order|jwt|/auth")
+    assert ex and why == "sensitive-keyword"
 
 
 def test_security_label_not_excluded():
@@ -216,3 +224,80 @@ def test_run_skips_cached_hold():
     out = ap.run_once(CFG, io, st, "2026-06-20")
     assert out["outcome"] == "no_candidates"   # only candidate is cache-suppressed
     assert io.advanced == []
+
+
+def test_hold_ttl_expires_and_reenables_review():
+    st = {}
+    h = ap.spec_hash("spec A")
+    ap.record_verdict(st, 402, h, "HOLD", now_iso="2026-06-20T00:00:00+00:00")
+    # within TTL → still cached
+    assert ap.cached_verdict(st, 402, h, "2026-06-20T10:00:00+00:00", 24) == "HOLD"
+    # past TTL → cache miss (re-review)
+    assert ap.cached_verdict(st, 402, h, "2026-06-21T01:00:00+00:00", 24) is None
+
+
+def test_cached_verdict_backward_compatible_without_timestamps():
+    st = {}
+    h = ap.spec_hash("spec A")
+    ap.record_verdict(st, 402, h, "HOLD")  # no now_iso
+    assert ap.cached_verdict(st, 402, h) == "HOLD"  # no ttl args → unconditional
+
+
+# ── Task 4: pick_next_epic selector ─────────────────────────────────────────
+
+def _e(number, title="epic", labels=None, board_order=0):
+    return {"number": number, "title": title, "labels": labels or [], "board_order": board_order}
+
+
+def test_pick_next_epic_skips_security_and_orders_by_priority():
+    epics = [
+        _e(373, "Authorization model", labels=["epic", "security", "should-have"], board_order=0),
+        _e(450, "LLM narrative", labels=["epic", "should-have"], board_order=2),
+        _e(483, "Signal replay engine", labels=["epic", "must-have"], board_order=1),
+    ]
+    assert ap.pick_next_epic(epics) == 483  # must-have, security #373 skipped
+
+
+def test_pick_next_epic_board_order_tiebreak():
+    epics = [
+        _e(449, labels=["epic", "must-have"], board_order=5),
+        _e(448, labels=["epic", "must-have"], board_order=3),
+    ]
+    assert ap.pick_next_epic(epics) == 448  # same priority → lower board_order wins
+
+
+def test_pick_next_epic_none_when_all_excluded():
+    epics = [_e(373, "auth", labels=["epic", "security"]),
+             _e(601, "trading kill switch", labels=["epic"])]
+    assert ap.pick_next_epic(epics) is None
+
+
+class FakeEpicIO(FakeIO):
+    def __init__(self, candidates, review_text, ready_epics):
+        super().__init__(candidates, review_text)
+        self._epics = ready_epics
+        self.promoted = []
+
+    def fetch_ready_epics(self):
+        return self._epics
+
+    def promote_epic(self, n):
+        self.promoted.append(n)
+
+
+def test_run_starts_epic_when_no_child_candidates():
+    io = FakeEpicIO([], "x", [_e(483, labels=["epic", "must-have"])])
+    cfg = dict(CFG, start_epics=True)
+    out = ap.run_once(cfg, io, {}, "2026-06-20", now_iso="2026-06-20T00:00:00+00:00")
+    assert out["outcome"] == "epic_started" and out["issue"] == 483
+    assert io.promoted == [483]
+    assert any(sev == "info" for sev, _ in io.notes)
+
+
+def test_run_stuck_when_no_children_and_no_eligible_epic():
+    io = FakeEpicIO([], "x", [_e(373, "auth", labels=["epic", "security"])])
+    cfg = dict(CFG, start_epics=True)
+    out = ap.run_once(cfg, io, {}, "2026-06-20")
+    assert out["outcome"] == "no_candidates"
+    assert io.promoted == []
+    assert any(key == "autopilot-stuck" for _, key in io.notes)

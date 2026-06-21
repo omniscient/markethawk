@@ -73,6 +73,10 @@ epic_autopilot:
   model: claude-opus-4-8      # reviewer model. env: EPIC_AUTOPILOT_MODEL overrides
   daily_cap: 5                # max autonomous advances / UTC day. env: EPIC_AUTOPILOT_DAILY_CAP overrides
   confidence_floor: 0.7       # min Opus confidence to ADVANCE. env: EPIC_AUTOPILOT_CONFIDENCE_FLOOR overrides
+  hold_ttl_hours: 24          # re-review a cached HOLD after this many hours. env EPIC_AUTOPILOT_HOLD_TTL_HOURS
+  size_ceiling: XL            # drop only at/above this size (L/M now eligible). env EPIC_AUTOPILOT_SIZE_CEILING
+  start_epics: true           # when no gated child is advanceable, promote the next Ready epic. env EPIC_AUTOPILOT_START_EPICS
+  sensitive_keywords: "trading|ibkr|live order|notional|authentication|authorization|authn|authz|jwt|oauth|rbac|/auth"
   opt_out_label: no-autopilot # per-ticket veto label. env: EPIC_AUTOPILOT_OPT_OUT_LABEL overrides
   hard_exclude_paths:         # spec target paths matching any of these → excluded before Opus (fail-closed)
     - "dark-factory/"
