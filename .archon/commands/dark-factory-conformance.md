@@ -178,7 +178,23 @@ fi
 
 This phase runs when the reviewer found `[OOS]` entries and `SCOPE_ENFORCEMENT=true`.
 
-For each `[OOS]` entry:
+### 3.6.0 — Documentation exemption (drop doc-file OOS entries first)
+
+The factory maintains documentation as **in-scope housekeeping**: the implement agent's
+Phase 4 DOCUMENT step is **required** to update the documentation map (`ARCHITECTURE.md`,
+`PROJECT_STRUCTURE.md`, `ENV_VARIABLES.md`, `README.md`, `CLAUDE.md`, files under `docs/`) so it
+tracks the files / endpoints / models the implementation added or changed. Those doc updates
+are **never** out-of-scope and must **never** be excised or filed as backlog tickets — doing so
+just churns the docs the implement agent correctly wrote (the exact failure that produced the
+`scope-spillover` doc tickets this rule removes).
+
+Before any excision (3.6.1) or ticketing (3.6.2), **drop every `[OOS]` entry whose file/area is
+a documentation file** — its file/area (the text before the `—` separator) matching `.md` or
+under `docs/`. Only non-doc (code / config / seed) OOS entries proceed to remediation. Log
+each dropped doc entry:
+`echo "scope-enforcement: doc change kept in-scope (not excised/ticketed): <entry>"`.
+
+For each remaining (non-doc) `[OOS]` entry:
 
 ### 3.6.1 — Attempt excision (if `EXCISE_OOS=true`)
 
@@ -214,7 +230,16 @@ set in Phase 3.1 step 5 and appended on each reconcile cycle):
 OOS_ENTRIES=()
 while IFS= read -r line; do
   stripped="${line#- }"
-  [[ "$stripped" == \[OOS\]* ]] && OOS_ENTRIES+=("$stripped")
+  [[ "$stripped" == \[OOS\]* ]] || continue
+  # Documentation exemption (3.6.0): the factory maintains docs in-scope (implement Phase 4
+  # DOCUMENT), so doc-map updates are never excised/ticketed. Match only the file/area
+  # (before the em-dash) so a code finding that merely *mentions* a doc isn't dropped.
+  area="${stripped%%—*}"
+  if printf '%s' "$area" | grep -qiE '\.md([^a-z0-9]|$)|(^|[^a-z])docs/'; then
+    echo "scope-enforcement: doc change kept in-scope (not excised/ticketed): $stripped"
+    continue
+  fi
+  OOS_ENTRIES+=("$stripped")
 done <<< "$CONFORMANCE_DIALOGUE"
 ```
 

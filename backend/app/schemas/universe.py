@@ -59,3 +59,13 @@ class UniverseSummary(BaseModel):
     name: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DataHealthResponse(BaseModel):
+    """Summary data-health response for a single universe."""
+
+    degraded: bool
+    stale_pct: float
+    gapped_pct: float
+    worst_staleness_hours: float
+    grade: str

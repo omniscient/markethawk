@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
-from tests.fixtures.outcomes import seed_outcomes, seed_outcomes_with_gate_tiers
+from tests.fixtures.outcomes import (
+    seed_outcomes,
+    seed_outcomes_with_gate_tiers,
+    seed_reviews,
+)
 
 client = TestClient(app)
 
@@ -481,3 +485,89 @@ def test_signals_rejects_oversized_limit(db: Session):
     )
 
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Scorecard review-side fields (issue #303)
+# ---------------------------------------------------------------------------
+
+
+def test_scorecard_review_fields_absent_when_no_reviews(db: Session):
+    seed_outcomes(db)
+
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    data = response.json()
+    assert response.status_code == 200
+    assert "precision_pct" in data
+    assert "review_coverage_pct" in data
+    assert "verdict_counts" in data
+    assert "top_reject_reasons" in data
+    assert "review_sample_n" in data
+    # No reviews seeded — all nullable fields should be None / zero
+    assert data["precision_pct"] is None
+    assert data["review_sample_n"] == 0
+    assert data["top_reject_reasons"] == []
+
+
+def test_scorecard_precision_pct_correct(db: Session):
+    seeded = seed_outcomes(db)
+    # seed_reviews: 2 confirmed, 1 rejected → precision = 66.67
+    seed_reviews(db, seeded["events"])
+
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    data = response.json()
+    assert data["precision_pct"] == pytest.approx(66.67, abs=0.1)
+    assert data["review_sample_n"] == 3
+
+
+def test_scorecard_review_coverage_pct_correct(db: Session):
+    seeded = seed_outcomes(db)
+    seed_reviews(db, seeded["events"])
+
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    data = response.json()
+    # total_signals = 3 (trust-filtered summaries for pre_market_volume_spike)
+    # review_sample_n = 3 (2 confirmed + 1 rejected)
+    # review_coverage_pct = 3 / 3 * 100 = 100.0
+    assert data["review_coverage_pct"] == pytest.approx(100.0, abs=0.1)
+
+
+def test_scorecard_verdict_counts_correct(db: Session):
+    seeded = seed_outcomes(db)
+    seed_reviews(db, seeded["events"])
+
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    data = response.json()
+    vc = data["verdict_counts"]
+    assert vc["confirmed"] == 2
+    assert vc["rejected"] == 1
+    assert vc["enhanced"] == 0
+
+
+def test_scorecard_top_reject_reasons_correct(db: Session):
+    seeded = seed_outcomes(db)
+    seed_reviews(db, seeded["events"])
+
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    data = response.json()
+    reasons = data["top_reject_reasons"]
+    assert len(reasons) == 1
+    assert reasons[0]["reason"] == "noise"
+    assert reasons[0]["count"] == 1
+
+
+def test_scorecard_review_fields_null_when_no_complete_signals(db: Session):
+    # Early-return path: no complete signals but reviews may exist
+    response = client.get("/api/v1/outcomes/scorecard/pre_market_volume_spike")
+
+    data = response.json()
+    assert response.status_code == 200
+    # Empty DB — all review fields still present and null/empty
+    assert data["precision_pct"] is None
+    assert data["review_sample_n"] == 0
+    assert data["top_reject_reasons"] == []

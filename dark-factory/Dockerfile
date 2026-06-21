@@ -98,7 +98,7 @@ RUN npm install -g @anthropic-ai/claude-code
 # shebang, so a plain symlink on PATH is all that's needed.
 RUN git clone https://github.com/omniscient/Archon.git /opt/archon && \
     cd /opt/archon && \
-    git checkout ee55cfc5d347a38f531fdfba2bee42ab33316ef6 && \
+    git checkout f83fb556a2a864014e12ecfe6f60c7a1d18928b9 && \
     bun install && \
     chmod +x /opt/archon/packages/cli/src/cli.ts && \
     ln -sf /opt/archon/packages/cli/src/cli.ts /usr/local/bin/archon
