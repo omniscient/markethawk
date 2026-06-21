@@ -6,6 +6,7 @@ from app.routers.alerts import router as alerts_router
 from app.routers.auth import router as auth_router
 from app.routers.auto_trading import router as auto_trading_router
 from app.routers.backtest import router as backtest_router
+from app.routers.data_quality import router as data_quality_router
 from app.routers.futures import router as futures_router
 from app.routers.health import router as health_router
 from app.routers.journal import router as journal_router
@@ -34,4 +35,5 @@ __all__ = [
     "auto_trading_router",
     "outcomes_router",
     "auth_router",
+    "data_quality_router",
 ]

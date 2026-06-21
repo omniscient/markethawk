@@ -10,6 +10,8 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Backend: API Routes
 
+- [AVOID] SlowAPI `@limiter.limit()` requires the `Request` parameter to be named exactly `request` (not `http_request` or any alias) — SlowAPI inspects the function signature by name and raises `Exception: No "request" or "websocket" argument on function` at decorator application time if the name doesn't match. All rate-limited handlers in `backend/app/routers/` use `request: Request` for this reason. <!-- issue:#493 date:2026-06-21 expires:2026-12-21 source:implement -->
+
 - [AVOID] Never use `joinedload()` with paginated queries (`LIMIT/OFFSET`) on one-to-many relationships — it produces a JOIN that row-multiplies the parent before LIMIT is applied, so paginated pages return fewer rows than `limit` when children exist. Use `selectinload()` instead, which issues a separate `SELECT … WHERE id IN (…)` after the paginated parent query. See `routers/scanner.py` `joinedload(ScannerEvent.reviews)` → `selectinload` fix. <!-- issue:#291 date:2026-06-12 expires:2026-12-12 source:implement -->
 
 - [PATTERN] `AuthMiddleware` in `main.py` short-circuits for non-HTTP scopes — WebSocket routes are NOT covered. Protect WS endpoints by adding `_user: User = Depends(ws_get_current_user)` from `app.core.auth`; this raises `WebSocketException(code=1008)` before `accept()` if the cookie is absent or invalid. <!-- issue:#191 date:2026-06-05 expires:2026-12-05 source:implement -->
@@ -91,7 +93,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 ## Backend: Backtest / Simulation
 
 - [AVOID] Never write generated backtest signals to `scanner_events` — the `UniqueConstraint(ticker, event_date, scanner_type)` causes IntegrityErrors on any overlap with real events, and `scanner_events` is operational history consumed by alerts/clusters/reviews. Keep replay signals in-memory only; store a nullable `source_event_id` FK for signals that already exist in DB. See `backtest_service.py`. <!-- issue:#301 date:2026-06-13 expires:2026-12-13 source:implement -->
-- [PATTERN] When a sync function calls `run_until_complete()` inside a loop (e.g. day-walk in `backtest_service.py`), create the event loop once before the loop via `asyncio.new_event_loop()`, pass it as a parameter to callee functions, and close it in a `finally:` block — creating a new loop per iteration wastes resources and misses reuse opportunities. <!-- issue:#301 date:2026-06-14 expires:2026-12-14 source:implement -->
 
 - [PATTERN] When catching `requests.HTTPError` in a module where tests patch the entire `requests` module (via `patch("module.requests")`), import the exception class directly — `from requests.exceptions import HTTPError as _RequestsHTTPError` — and use `_RequestsHTTPError` in the `except` clause. Patching `requests` replaces the module object, so `except requests.HTTPError` evaluates to a MagicMock and raises `TypeError: catching classes that do not inherit from BaseException` when any exception is raised in the try block. See `backend/tests/utils/pg_discovery.py`. <!-- issue:#429 date:2026-06-20 expires:2026-12-20 source:implement -->
 ---
