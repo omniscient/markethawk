@@ -22,6 +22,18 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Replay Engine Data Ingestion (issue #486)
+
+- [PATTERN] For replay benchmark ingestion (BenchmarkIngestor), use a gap-fill approach: query existing timestamps in stock_aggregates for the requested range, fetch only [min(missing), max(missing)] from Polygon in one call, dedup on insert. Do NOT delete-and-reinsert — benchmark history is deep (200+ days for SMA200 warm-up) and re-fetching it on every replay run wastes Polygon quota. Gap detection must cover interior holes, not just the trailing tail. <!-- issue:#486 date:2026-06-21 expires:2026-12-21 source:refine -->
+
+- [AVOID] Do not use the delete-and-reinsert pattern (sync_stock_aggregates task approach) for replay benchmark ingestion — it re-fetches years of daily bars that are already stored, violating the idempotency requirement and burning Polygon API quota. Use gap-fill (refresh_stock_data pattern) instead. <!-- issue:#486 date:2026-06-21 expires:2026-12-21 source:refine -->
+
+## Regime Classification (issue #486)
+
+- [PATTERN] The replay engine's regime classifier (RegimeClassifier in services/replay/classifier.py) must be fully separate from RegimeService (services/regime_service.py). RegimeService uses a rolling-retrain HMM — its labels for a historical date can change after each scheduled retrain, violating the replay engine's determinism requirement. The replay classifier is rule-based (SMA200 trend + realized-vol bucket) with no DB persistence, no Redis cache, and no ML dependency. <!-- issue:#486 date:2026-06-21 expires:2026-12-21 source:refine -->
+
+- [AVOID] Do not extend RegimeService or delegate to it from the replay RegimeClassifier. RegimeService is nondeterministic (rolling retrain changes historical labels), SPY-hardwired, and carries Redis/DB dependencies — all incompatible with replay's reproducibility and parameterized-benchmark requirements. <!-- issue:#486 date:2026-06-21 expires:2026-12-21 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
