@@ -154,6 +154,9 @@ services:
       OTEL_SERVICE_NAME: markethawk-backend
       # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      # System notifications (#570) — shared secret for POST /api/v1/alerts/system + ops recipient
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
+      OPS_ALERT_EMAIL: ${OPS_ALERT_EMAIL:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
