@@ -51,15 +51,25 @@ def is_eligible(c: dict, opt_out_label: str, ceiling_keywords: str):
     return True, ""
 
 
-def hard_excluded(c: dict, exclude_paths: list):
-    """Stage B — categorical exclusions (fail-closed). Returns (excluded: bool, reason: str)."""
+def hard_excluded(c: dict, exclude_paths: list, sensitive_keywords: str = ""):
+    """Stage B — categorical exclusions. Returns (excluded: bool, reason: str).
+
+    Trading/auth keywords in title/body hard-drop (fail-closed) even when scope is
+    undeclared. A declared path matching an exclude prefix hard-drops. No declared
+    paths is NOT a drop anymore — flag scope_undeclared so Opus is warned and leans HOLD.
+    """
+    if sensitive_keywords:
+        text = f"{c.get('title', '')} {c.get('body', '')}".lower()
+        if re.search(sensitive_keywords, text):
+            return True, "sensitive-keyword"
     paths = c.get("target_paths") or []
-    if not paths:
-        return True, "undeclared-scope"  # fail-closed: undeclared scope might be trading/auth
     for p in paths:
         for ex in exclude_paths:
             if ex in p:
                 return True, ex
+    if not paths:
+        c["scope_undeclared"] = True
+        return False, "undeclared-scope"
     return False, ""
 
 

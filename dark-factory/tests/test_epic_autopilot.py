@@ -78,9 +78,18 @@ def test_hard_exclude_auth():
     assert ex
 
 
-def test_hard_exclude_undeclared_scope_fails_closed():
-    ex, why = ap.hard_excluded(c(target_paths=[]), ["app/core/auth"])
-    assert ex and why == "undeclared-scope"
+def test_undeclared_scope_is_soft_and_flags():
+    cand = c(target_paths=[])
+    ex, why = ap.hard_excluded(cand, ["app/core/auth"])
+    assert not ex and why == "undeclared-scope"
+    assert cand.get("scope_undeclared") is True
+
+
+def test_sensitive_keyword_hard_drops_even_without_paths():
+    cand = c(title="Live IBKR order path kill switch", body="", target_paths=[])
+    ex, why = ap.hard_excluded(cand, ["app/core/auth"],
+                               sensitive_keywords=r"trading|ibkr|order|jwt|/auth")
+    assert ex and why == "sensitive-keyword"
 
 
 def test_security_label_not_excluded():
