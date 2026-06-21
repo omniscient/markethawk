@@ -278,6 +278,7 @@ services:
       IBKR_HOST: ib-gateway
       IBKR_PORT: 4004
       IBKR_CLIENT_ID: 5   # dedicated clientId — never shares with backend or Celery
+      LIVE_SCANNER_MOCK: "false"
       PYTHONDONTWRITEBYTECODE: "1"
       # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
