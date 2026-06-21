@@ -6,7 +6,7 @@ Files with blast score ≥ 5.0  (42 found)
     31.0  frontend/src/components/ui/Card.tsx  (21d / 20t)  44 loc
     28.5  frontend/src/api/scanner/types.ts  (5d / 47t)  272 loc
     28.5  frontend/src/components/ui/Button.tsx  (21d / 15t)  66 loc
-    28.0  backend/app/routers/scanner.py  (4d / 48t)  714 loc
+    28.0  backend/app/routers/scanner.py  (4d / 48t)  731 loc
     27.0  backend/app/routers/system.py  (2d / 50t)  141 loc
     27.0  services/tweet-monitor/app/main.py  (2d / 50t)  266 loc
     25.0  backend/app/routers/futures.py  (1d / 48t)  188 loc

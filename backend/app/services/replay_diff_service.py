@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 from sqlalchemy.orm import Session
 
+from app.core.database import SessionLocal
 from app.core.metrics import replay_drift_signals_total
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,19 @@ _DRIFT_METRIC_THRESHOLD = 0.05  # 5% relative delta
 
 # All module-level and class-level _save_event bindings that must be patched.
 # The order is irrelevant; ExitStack applies all simultaneously.
+#
+# MAINTENANCE NOTE: This list must stay in sync with every scanner that can be
+# invoked by run_replay_diff_for_scanner.  The four entries cover the currently
+# registered scanners as follows:
+#   - liquidity_hunt, pocket_pivot, trend_pullback_scan: each bind their own
+#     module-level _save_event directly and are patched here explicitly.
+#   - oversold_bounce_scan and pre_market_scan: call ScannerService._save_event
+#     transitively, so patching the class method covers them.
+#
+# RISK: if any scanner is later refactored to import save_event directly at the
+# module level under a name not listed here, replay will silently write real
+# ScannerEvent rows.  Add the new binding to this list whenever a scanner is
+# added or restructured.
 _SAVE_EVENT_PATCH_TARGETS = [
     "app.services.liquidity_hunt._save_event",
     "app.services.pocket_pivot._save_event",
@@ -101,17 +115,27 @@ def _run_replay(
 
     # Req #2: check for stored bars before running — if none, this is insufficient_data,
     # not a scanner regression.  Missing bars means we can't replay, but it is not drift.
+    #
+    # NOTE on timezone: StockAggregate.timestamp is stored as naive UTC.  The window
+    # [00:00, next 00:00) UTC is a coarse presence-only check — we are not trying to
+    # align exactly to the EST trading day (4:00 AM EST pre-market through post-market,
+    # which straddles the UTC date boundary).  This is intentional: we only need to
+    # know whether *any* bars were ingested for this calendar date before attempting a
+    # replay.  Precise session alignment is handled inside the scanner itself.
     day_start = datetime.combine(scan_date, _time.min)
     day_end = day_start + timedelta(days=1)
+    # Use limit(1) instead of filtering by ticker to avoid a potentially huge IN list
+    # when the universe is large, and because any bars for the date are sufficient as
+    # a presence gate.
     has_bars = (
         db.query(StockAggregate)
         .filter(
-            StockAggregate.ticker.in_(tickers),
             StockAggregate.timestamp >= day_start,
             StockAggregate.timestamp < day_end,
         )
-        .count()
-        > 0
+        .limit(1)
+        .first()
+        is not None
     )
     if not has_bars:
         return None
@@ -126,12 +150,23 @@ def _run_replay(
     captured: dict = {}
     stub = _make_capture_stub(captured)
 
-    with contextlib.ExitStack() as stack:
-        for target in _SAVE_EVENT_PATCH_TARGETS:
-            stack.enter_context(patch(target, stub))
-        asyncio.run(
-            _orchestrator.run(scanner_type, tickers, db=db, event_date=scan_date)
-        )
+    # Run the orchestrator in a separate, short-lived Session so that any incidental
+    # reads or flushes it triggers are fully isolated from the caller's `db` Session.
+    # This prevents replay execution from polluting the session that _upsert_diff
+    # will later commit.  The replay session is always rolled back and closed here.
+    replay_db = SessionLocal()
+    try:
+        with contextlib.ExitStack() as stack:
+            for target in _SAVE_EVENT_PATCH_TARGETS:
+                stack.enter_context(patch(target, stub))
+            asyncio.run(
+                _orchestrator.run(
+                    scanner_type, tickers, db=replay_db, event_date=scan_date
+                )
+            )
+        replay_db.rollback()
+    finally:
+        replay_db.close()
 
     return captured
 
@@ -184,6 +219,11 @@ def _compute_diff(live: dict, replay: dict) -> dict:
     if new_in_replay:
         drift_kinds.append("new_in_replay")
 
+    # NOTE: `new_in_replay` is recorded in drift_kinds (and emitted as a Prometheus
+    # counter) for observability, but intentionally does NOT set has_drift.  Per spec,
+    # only missing signals (signals that existed live but vanished in replay) and metric
+    # deltas are considered actionable drift worth alerting on.  A replay that surfaces
+    # extra signals beyond what ran live is informational, not a regression signal.
     has_drift = bool(missing_in_replay or metric_deltas)
 
     return {
@@ -340,7 +380,7 @@ def run_replay_diff_for_scanner(
         body = (
             f"Scanner {scanner_type!r} on {scan_date}: "
             f"{len(missing)} signal(s) missing in replay"
-            + (f", {delta_count} metric delta(s) >5%%" if delta_count else "")
+            + (f", {delta_count} metric delta(s) >5%" if delta_count else "")
             + f". Drift kinds: {', '.join(diff['drift_kinds'])}."
         )
         notify_system(
