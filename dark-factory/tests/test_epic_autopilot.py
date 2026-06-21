@@ -20,43 +20,42 @@ def c(**kw):
 # ── Task 2: eligibility + hard-rule exclusions ──────────────────────────────
 
 def test_eligible_happy():
-    ok, why = ap.is_eligible(c(), "no-autopilot", CEIL)
+    ok, why = ap.is_eligible(c(), "no-autopilot")
     assert ok, why
 
 
 def test_ineligible_opt_out():
-    ok, _ = ap.is_eligible(c(labels=["ready-for-agent", "no-autopilot"]), "no-autopilot", CEIL)
+    ok, _ = ap.is_eligible(c(labels=["ready-for-agent", "no-autopilot"]), "no-autopilot")
     assert not ok
 
 
 def test_ineligible_already_direct_to_pr():
-    ok, _ = ap.is_eligible(c(labels=["direct-to-pr"]), "no-autopilot", CEIL)
+    ok, _ = ap.is_eligible(c(labels=["direct-to-pr"]), "no-autopilot")
     assert not ok
 
 
 def test_ineligible_wrong_status():
-    ok, _ = ap.is_eligible(c(status="Ready"), "no-autopilot", CEIL)
+    ok, _ = ap.is_eligible(c(status="Ready"), "no-autopilot")
     assert not ok
 
 
-def test_ineligible_above_ceiling_size_l():
-    ok, _ = ap.is_eligible(c(size="L"), "no-autopilot", CEIL)
-    assert not ok
-
-
-def test_ineligible_m_with_ceiling_keyword():
-    ok, _ = ap.is_eligible(c(size="M", title="perf refactor of scanner"), "no-autopilot", CEIL)
-    assert not ok
-
-
-def test_eligible_m_without_keyword():
-    ok, why = ap.is_eligible(c(size="M", title="add data quality preflight"), "no-autopilot", CEIL)
+def test_size_l_now_eligible():
+    ok, why = ap.is_eligible(c(size="L"), "no-autopilot")
     assert ok, why
 
 
-def test_size_from_label_prefix():
-    # size carried as a label "size: L" rather than the size field
-    ok, _ = ap.is_eligible(c(size=None, labels=["ready-for-agent", "size: L"]), "no-autopilot", CEIL)
+def test_size_m_with_keyword_now_eligible():
+    ok, why = ap.is_eligible(c(size="M", title="perf refactor of scanner"), "no-autopilot")
+    assert ok, why
+
+
+def test_size_xl_dropped():
+    ok, why = ap.is_eligible(c(size="XL"), "no-autopilot")
+    assert not ok and "above-ceiling" in why
+
+
+def test_size_xl_from_label_prefix():
+    ok, _ = ap.is_eligible(c(size=None, labels=["ready-for-agent", "size: XL"]), "no-autopilot")
     assert not ok
 
 

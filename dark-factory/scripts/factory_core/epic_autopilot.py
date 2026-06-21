@@ -35,7 +35,15 @@ def _size(c: dict):
     return s.upper() if s else None
 
 
-def is_eligible(c: dict, opt_out_label: str, ceiling_keywords: str):
+_SIZE_ORDER = {"S": 0, "M": 1, "L": 2, "XL": 3}
+
+
+def _size_rank(s: str) -> int:
+    """Rank a size token; unknown/blank ranks below S so it is never above ceiling."""
+    return _SIZE_ORDER.get((s or "").upper(), -1)
+
+
+def is_eligible(c: dict, opt_out_label: str, size_ceiling: str = "XL"):
     """Stage A — structural eligibility. Returns (ok: bool, reason: str)."""
     labels = [label.lower() for label in c.get("labels", [])]
     if c.get("status") not in _GATED_STATUSES:
@@ -44,10 +52,8 @@ def is_eligible(c: dict, opt_out_label: str, ceiling_keywords: str):
         if blk.lower() in labels:
             return False, f"label:{blk}"
     size = _size(c) or ""
-    if size in ("L", "XL"):
-        return False, f"above-ceiling:size={size}"
-    if size == "M" and re.search(ceiling_keywords, c.get("title", ""), re.I):
-        return False, "above-ceiling:M+keyword"
+    if _size_rank(size) >= _size_rank(size_ceiling):
+        return False, f"above-ceiling:size={size or '?'}"
     return True, ""
 
 
@@ -178,7 +184,7 @@ def run_once(cfg: dict, io, state: dict, today: str) -> dict:
 
     candidates = []
     for cand in io.fetch_candidates():
-        ok, _ = is_eligible(cand, cfg["opt_out_label"], cfg["ceiling_keywords"])
+        ok, _ = is_eligible(cand, cfg["opt_out_label"], cfg.get("size_ceiling", "XL"))
         if not ok:
             continue
         excluded, _ = hard_excluded(cand, cfg["exclude_paths"])
