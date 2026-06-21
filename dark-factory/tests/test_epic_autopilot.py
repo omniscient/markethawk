@@ -241,3 +241,32 @@ def test_cached_verdict_backward_compatible_without_timestamps():
     h = ap.spec_hash("spec A")
     ap.record_verdict(st, 402, h, "HOLD")  # no now_iso
     assert ap.cached_verdict(st, 402, h) == "HOLD"  # no ttl args → unconditional
+
+
+# ── Task 4: pick_next_epic selector ─────────────────────────────────────────
+
+def _e(number, title="epic", labels=None, board_order=0):
+    return {"number": number, "title": title, "labels": labels or [], "board_order": board_order}
+
+
+def test_pick_next_epic_skips_security_and_orders_by_priority():
+    epics = [
+        _e(373, "Authorization model", labels=["epic", "security", "should-have"], board_order=0),
+        _e(450, "LLM narrative", labels=["epic", "should-have"], board_order=2),
+        _e(483, "Signal replay engine", labels=["epic", "must-have"], board_order=1),
+    ]
+    assert ap.pick_next_epic(epics) == 483  # must-have, security #373 skipped
+
+
+def test_pick_next_epic_board_order_tiebreak():
+    epics = [
+        _e(449, labels=["epic", "must-have"], board_order=5),
+        _e(448, labels=["epic", "must-have"], board_order=3),
+    ]
+    assert ap.pick_next_epic(epics) == 448  # same priority → lower board_order wins
+
+
+def test_pick_next_epic_none_when_all_excluded():
+    epics = [_e(373, "auth", labels=["epic", "security"]),
+             _e(601, "trading kill switch", labels=["epic"])]
+    assert ap.pick_next_epic(epics) is None

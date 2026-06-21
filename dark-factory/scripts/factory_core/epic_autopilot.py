@@ -161,6 +161,33 @@ def record_verdict(state: dict, issue: int, spec_hash_: str, verdict: str, now_i
     state.setdefault("verdicts", {})[str(issue)] = entry
 
 
+# ── Epic selector (pure; used by epic-starter workflow) ──────────────────────
+
+_EPIC_EXCLUDE_RE = r"security|auth|authz|authn|trading|ibkr|dark.?factory|scheduler|factory.self"
+
+
+def _priority_rank(labels: list) -> int:
+    low = [label.lower() for label in labels]
+    if any("must-have" in label for label in low):
+        return 0
+    if any("should-have" in label for label in low):
+        return 1
+    return 2
+
+
+def _epic_excluded(e: dict, pattern: str) -> bool:
+    hay = (e.get("title", "") + " " + " ".join(e.get("labels", []))).lower()
+    return bool(re.search(pattern, hay))
+
+
+def pick_next_epic(epics: list, exclude_pattern: str = _EPIC_EXCLUDE_RE):
+    """Highest-priority unstarted epic, skipping hard-excluded categories. None if none."""
+    elig = [e for e in epics if not _epic_excluded(e, exclude_pattern)]
+    elig.sort(key=lambda e: (_priority_rank(e.get("labels", [])),
+                             e.get("board_order", 10 ** 9), e["number"]))
+    return elig[0]["number"] if elig else None
+
+
 # ── Orchestrator (pure control flow; all IO injected via `io`) ──────────────
 
 def build_review_prompt(c: dict) -> str:
