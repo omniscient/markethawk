@@ -91,7 +91,7 @@ aggregate_staleness_hours = Gauge(
 
 aggregate_gap_days = Gauge(
     "markethawk_aggregate_gap_days",
-    "Worst-case gap span (calendar days) across tickers in a universe",
+    "Worst-case gap span (weekdays) across tickers in a universe",
     ["universe_id"],
     multiprocess_mode="livemax",
 )
