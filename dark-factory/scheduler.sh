@@ -971,7 +971,7 @@ This issue was left in **In progress** with no running factory container — the
 "## Scheduler — Above Dispatch Ceiling
 
 This ticket has been classified as **above the autonomous dispatch ceiling** \
-(size: L, or size: M with a perf/architectural/migration title keyword).
+(size: XL, or size: M with a perf/architectural/migration title keyword).
 
 Spec and plan are complete. **A human must pair on implementation.**
 
