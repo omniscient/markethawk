@@ -29,6 +29,7 @@ MarketHawk/
 │   │   │   ├── scanner_run.py
 │   │   │   ├── scanner_event.py
 │   │   │   ├── scanner_config.py
+│   │   │   ├── scanner_replay_diff.py  (ScannerReplayDiff — nightly replay-diff record per scanner_type+scan_date)
 │   │   │   ├── stock_universe.py
 │   │   │   ├── stock_universe_ticker.py
 │   │   │   ├── monitored_stock.py
@@ -108,6 +109,7 @@ MarketHawk/
 │   │   │   ├── event_helpers.py
 │   │   │   ├── regime_service.py   (RegimeService — HMM train/persist/query; Redis regime cache)
 │   │   │   ├── statistical_discovery.py
+│   │   │   ├── replay_diff_service.py  (nightly replay-diff pipeline — ExitStack patch, _compute_diff, upsert ScannerReplayDiff)
 │   │   │   ├── signal_ranker.py
 │   │   │   ├── universe_orchestrator.py
 │   │   │   ├── universe_export.py
