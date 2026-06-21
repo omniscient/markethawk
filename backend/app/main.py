@@ -31,6 +31,7 @@ from app.routers import (
     auth_router,
     auto_trading_router,
     backtest_router,
+    data_quality_router,
     futures_router,
     health_router,
     journal_router,
@@ -49,7 +50,11 @@ from app.services.websocket_manager import websocket_manager
 # CSRF header check — module-level so it is importable by the test suite without
 # triggering the full create_app() factory. Pure ASGI (not BaseHTTPMiddleware) to
 # avoid the chunked-gzip termination bug described at the AuthMiddleware comment below.
-CSRF_EXEMPT_PREFIXES = ("/api/auth/", "/api/v1/alerts/infrastructure", "/api/v1/alerts/system")
+CSRF_EXEMPT_PREFIXES = (
+    "/api/auth/",
+    "/api/v1/alerts/infrastructure",
+    "/api/v1/alerts/system",
+)
 CSRF_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
@@ -440,6 +445,7 @@ def create_app() -> FastAPI:
     app.include_router(outcomes_router)
     app.include_router(tweets_router)
     app.include_router(backtest_router)
+    app.include_router(data_quality_router)
 
     # Populate scan_orchestrator registry — must be after router includes.
     # importlib avoids the local variable `app` shadowing the package name.
