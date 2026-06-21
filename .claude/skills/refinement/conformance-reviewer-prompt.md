@@ -24,7 +24,7 @@ For each requirement or key decision in the spec, evaluate four dimensions:
 - **MINOR DEVIATION** — one or more deviations exist, but each is clearly documented/justified or cosmetic; no deviation changes *what gets built* relative to the spec.
 - **MATERIAL DIVERGENCE** — one or more deviations change *what gets built* relative to the spec (different approach chosen, requirement dropped or added, explicit constraint violated).
 
-A different file name, an extra helper function, or a split/merged task is not material unless it violates a spec constraint. Changes not named in the spec — including fixes to pre-existing, unrelated defects — are **out-of-scope deviations** and must be listed in the `## Out-of-Scope Changes` section even if they appear beneficial.
+A different file name, an extra helper function, or a split/merged task is not material unless it violates a spec constraint. Changes not named in the spec — including fixes to pre-existing, unrelated defects — are **out-of-scope deviations** and must be listed in the `## Out-of-Scope Changes` section even if they appear beneficial. (Exception: documentation-map updates that back the in-scope work are in-scope housekeeping — see the **Documentation exception** under Out-of-Scope Changes — never list those.)
 
 ## Output Format
 
@@ -59,6 +59,15 @@ whitespace rewraps, line-length splits, or isort import reorders in touched `.py
 These changes are non-actionable housekeeping — the formatter re-applies them on every
 commit. Only flag as `[OOS]` if the reformatting appears in a file with no spec-required
 changes.
+
+**Documentation exception:** Updates to the project's documentation map — `ARCHITECTURE.md`,
+`PROJECT_STRUCTURE.md`, `ENV_VARIABLES.md`, `README.md`, `CLAUDE.md`, and files under `docs/` —
+that document a file, model, router, service, endpoint, or env var **added or changed by the
+in-scope work** are category (b) supporting housekeeping and are **NOT** out-of-scope, even
+when the spec's file-change list does not name them. The dark factory's implement step is
+**required** (Phase 4 DOCUMENT) to make these updates, and excising them only churns work that
+must be redone. Do NOT emit an `[OOS]` bullet for them. Only flag a doc change as `[OOS]` if it
+documents something entirely unrelated to the in-scope work.
 
 - [OOS] <file or area> — <one-sentence description of the unrelated change>
 

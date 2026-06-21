@@ -143,6 +143,105 @@ def _run_range_scan_logic(
     return events_detected
 
 
+def _compute_data_degraded(universe_id: int, db: Session) -> bool:
+    """
+    Return True if the universe data is degraded at scan start time.
+
+    Reads the latest UniverseQualityReport; if missing or generated >staleness_hours ago,
+    treats as degraded. Otherwise counts stale/gapped tickers from report_data.tickers
+    and returns True if affected_pct > quality_alert_pct.
+    Non-blocking: any failure defaults to True (degraded) rather than aborting scan.
+    """
+    from datetime import datetime, timezone
+
+    from app.models.system_config import SystemConfig
+    from app.models.universe_quality_report import UniverseQualityReport
+
+    try:
+        keys = [
+            "quality_staleness_hours",
+            "quality_gap_min_weekdays",
+            "quality_alert_pct",
+        ]
+        cfg_rows = db.query(SystemConfig).filter(SystemConfig.key.in_(keys)).all()
+        cfg = {r.key: r.value for r in cfg_rows}
+
+        def _int(key, default):
+            try:
+                return int(cfg.get(key, default))
+            except (ValueError, TypeError):
+                return default
+
+        staleness_hours = _int("quality_staleness_hours", 48)
+        alert_pct = _int("quality_alert_pct", 20)
+
+        report = (
+            db.query(UniverseQualityReport)
+            .filter(UniverseQualityReport.universe_id == universe_id)
+            .first()
+        )
+        if not report or not report.generated_at:
+            return True
+
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        report_age_hours = (now_utc - report.generated_at).total_seconds() / 3600
+        if report_age_hours > staleness_hours:
+            return True
+
+        if not report.report_data:
+            return True
+
+        ticker_entries = report.report_data.get("tickers", [])
+        if not ticker_entries:
+            return True
+
+        # Count stale/gapped unique tickers from the per-ticker report entries.
+        # Each entry has: ticker, last_bar (ISO str or datetime), gap_count (int).
+        # A ticker is stale if last_bar is None or older than staleness_hours.
+        # A ticker is gapped if gap_count > 0 (gaps already filtered by _detect_gaps weekday check).
+        ticker_flags: dict = {}
+        for entry in ticker_entries:
+            sym = entry.get("ticker")
+            if not sym:
+                continue
+            if sym not in ticker_flags:
+                ticker_flags[sym] = {"stale": False, "gapped": False}
+
+            last_bar = entry.get("last_bar")
+            if last_bar is None:
+                ticker_flags[sym]["stale"] = True
+            elif not ticker_flags[sym]["stale"]:
+                if isinstance(last_bar, str):
+                    try:
+                        last_bar_dt = datetime.fromisoformat(
+                            last_bar.replace("Z", "+00:00")
+                        ).replace(tzinfo=None)
+                    except Exception:
+                        ticker_flags[sym]["stale"] = True
+                        continue
+                else:
+                    last_bar_dt = last_bar
+                if (now_utc - last_bar_dt).total_seconds() / 3600 > staleness_hours:
+                    ticker_flags[sym]["stale"] = True
+
+            if entry.get("gap_count", 0) > 0:
+                ticker_flags[sym]["gapped"] = True
+
+        total = len(ticker_flags)
+        if total == 0:
+            return True
+
+        stale_count = sum(1 for v in ticker_flags.values() if v["stale"])
+        gapped_count = sum(1 for v in ticker_flags.values() if v["gapped"])
+        affected_pct = max(stale_count, gapped_count) / total * 100
+
+        return affected_pct > alert_pct
+
+    except Exception as exc:
+        logger.warning("_compute_data_degraded: error reading quality report: %s", exc)
+        return True
+
+
 def _run_universe_scan_logic(
     scan_id: str,
     scanner_type: str,
@@ -197,6 +296,7 @@ def _run_universe_scan_logic(
     run.stocks_scanned = len(tickers)
     run.scan_start_date = start
     run.scan_end_date = end
+    run.data_degraded = _compute_data_degraded(universe_id, db)
     db.commit()
 
     started_at = utc_now()

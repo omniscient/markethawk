@@ -91,6 +91,18 @@ ${COST_FOOTER}" \
   "Looks good but rename the helper.")
 assert_eq "human comment after cost report IS feedback" "yes" "$(has_new_comment_after_report 124 "$REPORT_MARKER")"
 
+# Scenario C2 — Epic Autopilot HOLD comment after spec is NOT human feedback => "no".
+# Regression: the autopilot footer must be in bot_re, else its HOLD comment is mistaken
+# for human feedback and re-triggers refinement (churn loop on in-progress-epic children).
+MOCK_COMMENTS=$(mock_comments \
+  "## Refinement Pipeline — Spec Generated
+---
+${SPEC_FOOTER}" \
+  "🤖 **Epic Autopilot** — parked (HOLD). Too risky to autonomously advance.
+---
+*Posted by MarketHawk Epic Autopilot*")
+assert_eq "Epic Autopilot HOLD comment after spec is NOT human feedback" "no" "$(has_new_comment_after_report 124 "$REPORT_MARKER")"
+
 # Scenario D — spec only, nothing after => "no".
 MOCK_COMMENTS=$(mock_comments \
   "## Refinement Pipeline — Spec Generated

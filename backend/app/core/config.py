@@ -109,6 +109,11 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = Field(default="", repr=False)
     SMTP_FROM_EMAIL: str = "MarketHawk Alerts <noreply@example.com>"
 
+    # System notifications (generic non-scanner alerts). Both optional/empty-default —
+    # NEVER make these required-no-default (would break the smoke gate, cf. REDIS_PASSWORD).
+    OPS_ALERT_EMAIL: str = ""
+    INTERNAL_API_TOKEN: str = Field(default="", repr=False)
+
     # ── Web Push / VAPID (Browser Push Notifications) ─────────────────────
     # Generate a key pair once with: python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print('PRIV:', v.private_pem().decode()); print('PUB:', v.public_key)"
     # Or use the /api/alerts/push/generate-keys endpoint on first run.

@@ -174,10 +174,14 @@ class NotificationDispatcher:
     # ── Browser Push ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def _send_browser_push(event: ScannerEvent, db: Session) -> None:
-        """Send a native browser push notification to all stored subscriptions."""
+    def _push_to_subscriptions(payload: dict, db: Session) -> int:
+        """Web-push a pre-built `payload` dict to all stored subscriptions.
+
+        Generic core shared by scanner-event push and system notifications.
+        Returns the number delivered. Raises RuntimeError only if ALL deliveries fail.
+        """
         try:
-            from pywebpush import WebPushException, webpush  # noqa: F401
+            from pywebpush import webpush  # noqa: F401
         except ImportError:
             raise RuntimeError(
                 "pywebpush is not installed. "
@@ -192,9 +196,9 @@ class NotificationDispatcher:
         subscriptions = db.query(PushSubscription).all()
         if not subscriptions:
             logger.debug("No push subscriptions registered — skipping browser push.")
-            return
+            return 0
 
-        data = json.dumps(NotificationDispatcher._build_push_payload(event))
+        data = json.dumps(payload)
         vapid_claims = {"sub": settings.VAPID_CLAIMS_EMAIL}
         # Key is stored as raw base64url (43 chars, no PEM headers) — py_vapid from_string
         # only supports this format; PEM is not recognized in this version.
@@ -222,8 +226,16 @@ class NotificationDispatcher:
                 else:
                     logger.warning(f"Push failed for subscription {sub.id}: {exc}")
 
-        if failed == len(subscriptions) and subscriptions:
+        if failed == len(subscriptions):
             raise RuntimeError(f"All {failed} push deliveries failed.")
+        return len(subscriptions) - failed
+
+    @staticmethod
+    def _send_browser_push(event: ScannerEvent, db: Session) -> None:
+        """Scanner-event browser push (thin wrapper over the generic sender)."""
+        NotificationDispatcher._push_to_subscriptions(
+            NotificationDispatcher._build_push_payload(event), db
+        )
 
     # ── Email ─────────────────────────────────────────────────────────────────
 
