@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Replay / Dry-Run Scanner Execution (issue #392)
+
+- [PATTERN] To re-run a scanner without persisting results (e.g., nightly replay-diff), patch `app.services.alert_service.save_event` to a no-op for the duration of the call. Capture signals from the in-memory `RawSignal`/`EnrichedSignal` dataclasses before the persist stage. This is safe within a single Celery task (single-threaded) and avoids threading a `dry_run` flag through every scanner function. <!-- issue:#392 date:2026-06-21 expires:2026-12-21 source:refine -->
+
+- [AVOID] Do not add a `dry_run: bool` parameter to `scan_orchestrator.run()` for replay purposes — it would need to thread through every scanner's `run()` signature and every `_save_event` call site. The no-op patch approach keeps scanner logic unchanged and contains the replay concern in the caller. <!-- issue:#392 date:2026-06-21 expires:2026-12-21 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
