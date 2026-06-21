@@ -22,6 +22,14 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Data Quality Task Separation (issue #387)
+
+- [PATTERN] Keep nightly data-health sweeps (`check_aggregate_staleness`) separate from the on-demand deep quality analysis (`analyze_universe_quality` / `DataQualityService`). The nightly task does a cheap `MAX(timestamp)` + gap-window query and emits Prometheus gauges. The deep analysis fetches every bar for every ticker×timespan and is user-triggered via `POST /api/v1/universe/{id}/quality`. Merging them would race on the shared `UniverseQualityReport` row and over-compute for a nightly health signal. <!-- issue:#387 date:2026-06-21 expires:2026-12-21 source:refine -->
+
+- [AVOID] Do not schedule `analyze_universe_quality` as the nightly staleness sweep — it fetches all OHLCV bars for every ticker×timespan combo and writes the on-demand user report, which creates a write-race with interactive quality-modal requests and wastes compute for a signal that only needs `MAX(timestamp)` per ticker. <!-- issue:#387 date:2026-06-21 expires:2026-12-21 source:refine -->
+
+- [PATTERN] Populate `ScannerRun.data_degraded` at scan start from the latest pre-computed `UniverseQualityReport` (one indexed query). Treat a missing or >48h stale report as `degraded=True`. Do not query staleness on-the-fly inside the scan hot-path, and do not retroactively update `ScannerRun` after the fact — the flag must reflect what was known at scan time. <!-- issue:#387 date:2026-06-21 expires:2026-12-21 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
