@@ -57,6 +57,7 @@ MarketHawk/
 │   │   │   ├── auth.py
 │   │   │   ├── scanner.py
 │   │   │   ├── universe.py
+│   │   │   ├── data_quality.py  (preflight data-quality gate — POST /api/v1/data-quality/gate)
 │   │   │   ├── stocks.py
 │   │   │   ├── news.py
 │   │   │   ├── live_data.py
