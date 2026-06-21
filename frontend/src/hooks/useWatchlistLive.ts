@@ -49,7 +49,17 @@ export interface LiveAlert {
   timestamp: string;
 }
 
-export type LiveMessage = LiveTick | LiveQuote | LiveMinuteBar | LiveAlert;
+export interface FeedLossMessage {
+  type: 'feed_loss';
+  timestamp: string;
+}
+
+export interface FeedRecoveredMessage {
+  type: 'feed_recovered';
+  timestamp: string;
+}
+
+export type LiveMessage = LiveTick | LiveQuote | LiveMinuteBar | LiveAlert | FeedLossMessage | FeedRecoveredMessage;
 
 export interface SymbolLiveData {
   price: number;
@@ -63,6 +73,7 @@ export interface SymbolLiveData {
 export function useWatchlistLive() {
   const [liveData, setLiveData] = useState<Record<string, SymbolLiveData>>({});
   const [connected, setConnected] = useState(false);
+  const [feedStatus, setFeedStatus] = useState<'live' | 'lost'>('live');
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -136,6 +147,10 @@ export function useWatchlistLive() {
                 sessionVolume: prev[msg.symbol]?.sessionVolume ?? null,
               },
             }));
+          } else if (msg.type === 'feed_loss') {
+            setFeedStatus('lost');
+          } else if (msg.type === 'feed_recovered') {
+            setFeedStatus('live');
           }
         } catch {
           // ignore parse errors
@@ -162,5 +177,5 @@ export function useWatchlistLive() {
     };
   }, []);
 
-  return { liveData, connected };
+  return { liveData, connected, feedStatus };
 }
