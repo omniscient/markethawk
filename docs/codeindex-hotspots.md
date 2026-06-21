@@ -20,13 +20,13 @@ Files with blast score ≥ 5.0  (42 found)
     14.5  frontend/src/api/universe.ts  (13d / 3t)  302 loc
     14.5  frontend/src/components/ui/Modal.tsx  (9d / 11t)  87 loc
     14.0  frontend/src/components/Ticker.tsx  (6d / 16t)  80 loc
-    12.5  frontend/src/api/outcomes.ts  (10d / 5t)  217 loc
+    12.5  frontend/src/api/outcomes.ts  (10d / 5t)  228 loc
     12.5  frontend/src/api/trading.ts  (9d / 7t)  244 loc
      9.0  backend/app/main.py  (1d / 16t)  526 loc
      9.0  backend/app/routers/auto_trading.py  (1d / 16t)  365 loc
      9.0  backend/app/routers/universe.py  (1d / 16t)  453 loc
      9.0  frontend/src/components/ui/MetricCard.tsx  (6d / 6t)  71 loc
-     8.5  backend/app/routers/outcomes.py  (1d / 15t)  366 loc
+     8.5  backend/app/routers/outcomes.py  (1d / 15t)  370 loc
      8.5  frontend/src/utils/url.ts  (3d / 11t)  36 loc
      8.0  frontend/src/hooks/useScorecard.ts  (5d / 6t)  98 loc
      8.0  frontend/src/pages/AutoTrading/components.tsx  (5d / 6t)  294 loc
