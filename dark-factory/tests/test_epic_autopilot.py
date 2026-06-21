@@ -270,3 +270,34 @@ def test_pick_next_epic_none_when_all_excluded():
     epics = [_e(373, "auth", labels=["epic", "security"]),
              _e(601, "trading kill switch", labels=["epic"])]
     assert ap.pick_next_epic(epics) is None
+
+
+class FakeEpicIO(FakeIO):
+    def __init__(self, candidates, review_text, ready_epics):
+        super().__init__(candidates, review_text)
+        self._epics = ready_epics
+        self.promoted = []
+
+    def fetch_ready_epics(self):
+        return self._epics
+
+    def promote_epic(self, n):
+        self.promoted.append(n)
+
+
+def test_run_starts_epic_when_no_child_candidates():
+    io = FakeEpicIO([], "x", [_e(483, labels=["epic", "must-have"])])
+    cfg = dict(CFG, start_epics=True)
+    out = ap.run_once(cfg, io, {}, "2026-06-20", now_iso="2026-06-20T00:00:00+00:00")
+    assert out["outcome"] == "epic_started" and out["issue"] == 483
+    assert io.promoted == [483]
+    assert any(sev == "info" for sev, _ in io.notes)
+
+
+def test_run_stuck_when_no_children_and_no_eligible_epic():
+    io = FakeEpicIO([], "x", [_e(373, "auth", labels=["epic", "security"])])
+    cfg = dict(CFG, start_epics=True)
+    out = ap.run_once(cfg, io, {}, "2026-06-20")
+    assert out["outcome"] == "no_candidates"
+    assert io.promoted == []
+    assert any(key == "autopilot-stuck" for _, key in io.notes)
