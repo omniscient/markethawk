@@ -96,14 +96,14 @@ The `db-restore-drill` sidecar runs weekly to verify that the latest backup can 
 
 **What it does**
 
-1. Locates the most recent `stockscanner_*.sql.gz` file in `BACKUP_DIR`.
-2. Starts a throwaway `postgres:15-alpine` container on the internal compose network.
-3. Restores the dump into that container via `psql`.
+1. Locates the most recent `stockscanner_*.sql.gz` file in `BACKUP_DIR`; if none exists (fresh deploy), logs a warning and exits cleanly (not a failure).
+2. Starts a throwaway postgres cluster inside the container via `initdb` + UNIX socket (no TCP, no external container, no live DB contact).
+3. Restores the dump into the throwaway cluster via `gunzip | psql`.
 4. Asserts that five critical tables (`scanner_events`, `trades`, `signal_reviews`, `scanner_configs`, `stock_aggregates`) each have at least one row.
 5. Asserts that `alembic_version` has a non-empty value (schema migration was restored).
-6. Emits a structured Seq event and unconditionally tears down the throwaway container.
+6. Emits a structured Seq event and unconditionally kills the throwaway postgres process and removes temp directories.
 
-The live `stockscanner-db` is never touched — the drill connects only to the throwaway container.
+The live `stockscanner-db` is never contacted — the drill embeds an isolated postgres cluster with no network listener and no live DB credentials.
 
 **Schedule**
 
@@ -114,8 +114,7 @@ Runs every Sunday at 4 AM UTC by default (one hour after the daily backup window
 | Variable | Default | Description |
 |---|---|---|
 | `RESTORE_DRILL_SCHEDULE` | `0 4 * * 0` | Cron schedule (UTC, supercronic syntax) |
-| `DRILL_NETWORK` | `markethawk_stockscanner-network` | Docker network the throwaway container joins |
-| `ALEMBIC_EXPECTED_HEAD` | _(empty)_ | Optional: exact alembic revision to assert; leave empty to accept any non-empty head |
+| `EXPECTED_ALEMBIC_HEAD` | _(empty)_ | Optional: exact alembic revision to assert after restore. Set to the output of `python -m alembic current` in your `.env`. When empty, the drill asserts only that `alembic_version` is non-empty. |
 
 **Trigger a manual one-shot drill**
 
@@ -131,8 +130,8 @@ Every drill emits a `backup.restore_drill` CLEF event. Filter in Seq:
 EventType = 'backup.restore_drill'
 ```
 
-Successful drill: `@l = 'Information'`, `Verdict = 'success'`, per-table counts in `TableCounts`.  
-Failed drill: `@l = 'Error'`, `Verdict = 'failure'`, `ErrorReason` explains why it failed.
+Successful drill: `@l = 'Information'`, `Verdict = 'passed'`, per-table counts in `TableCounts`.  
+Failed drill: `@l = 'Error'`, `Verdict = 'failed'`, `FailReason` explains why it failed.
 
 Set up a Seq alert on `@l = 'Error' and EventType = 'backup.restore_drill'` to be notified immediately when a drill fails.
 

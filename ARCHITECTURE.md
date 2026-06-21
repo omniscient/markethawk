@@ -89,7 +89,7 @@ graph TD
     dbbackup -->|"failure events"| seq
     dbrestoredrill -->|"read backups"| dbbackup
     dbrestoredrill -->|"drill events"| seq
-    dbrestoredrill -.->|"docker run throwaway"| postgres
+    dbrestoredrill -.->|"initdb+restore (isolated)"| dbbackup
 ```
 
 ### Container Users
@@ -100,7 +100,7 @@ graph TD
 | `markethawk-frontend` | `frontend` | `node` | Non-root; default node image user |
 | `markethawk-dark-factory` | `dark-factory`, `backlog-scheduler` | `factory` (uid 1000) | Non-root; created in `dark-factory/Dockerfile` |
 | `markethawk-forecast` | `forecast-worker` | `root` | Exception: HuggingFace model weights (~800 MB) cached at `/root/.cache/huggingface` via `timesfm_cache` named volume; converting to non-root requires relocating the cache path (tracked as a separate follow-up) |
-| `markethawk-db-restore-drill` | `db-restore-drill` | `root` | Exception: Docker socket mount (`/var/run/docker.sock`) requires root to manage the throwaway postgres container; access is limited to ops tooling only. |
+| `markethawk-db-restore-drill` | `db-restore-drill` | `postgres` | Runs as the postgres system user (required to run `initdb` / `postgres` daemon); no Docker socket access. |
 
 ## Scan Execution Flow
 
