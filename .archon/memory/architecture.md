@@ -22,6 +22,12 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+## Ephemeral Postgres for Sidecars (issue #386)
+
+- [PATTERN] When a sidecar container needs a temporary, throwaway PostgreSQL instance (e.g., for restore verification), run an embedded `initdb` + `postgres` subprocess on a UNIX socket inside the container — no TCP listener, no network exposure. This satisfies "provably untouched" guarantees without docker socket access and keeps the container self-contained. <!-- issue:#386 date:2026-06-21 expires:2026-12-21 source:refine -->
+
+- [AVOID] Do not grant a sidecar container docker socket access solely to spin up a temporary postgres container — the security regression (full daemon access) outweighs the convenience, and the embedded postgres approach (initdb + unix socket) achieves the same isolation without it. <!-- issue:#386 date:2026-06-21 expires:2026-12-21 source:refine -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
