@@ -90,9 +90,32 @@ def _run_replay(
 ) -> Optional[dict]:
     """Run the scanner for scan_date with save_event patched out.
 
-    Returns {ticker: captured_signal} or None on hard failure.
-    Imports scanner modules so that module-level descriptors self-register.
+    Returns {ticker: captured_signal}, or None when no StockAggregate bars exist
+    for scan_date (insufficient_data).  Re-raises on orchestrator errors so callers
+    distinguish a genuine data gap from a regression in the scanner itself.
     """
+    from datetime import datetime, timedelta
+    from datetime import time as _time
+
+    from app.models.stock_aggregate import StockAggregate
+
+    # Req #2: check for stored bars before running — if none, this is insufficient_data,
+    # not a scanner regression.  Missing bars means we can't replay, but it is not drift.
+    day_start = datetime.combine(scan_date, _time.min)
+    day_end = day_start + timedelta(days=1)
+    has_bars = (
+        db.query(StockAggregate)
+        .filter(
+            StockAggregate.ticker.in_(tickers),
+            StockAggregate.timestamp >= day_start,
+            StockAggregate.timestamp < day_end,
+        )
+        .count()
+        > 0
+    )
+    if not has_bars:
+        return None
+
     import app.services.liquidity_hunt  # noqa: F401
     import app.services.oversold_bounce_scan  # noqa: F401
     import app.services.pocket_pivot  # noqa: F401
@@ -103,21 +126,12 @@ def _run_replay(
     captured: dict = {}
     stub = _make_capture_stub(captured)
 
-    try:
-        with contextlib.ExitStack() as stack:
-            for target in _SAVE_EVENT_PATCH_TARGETS:
-                stack.enter_context(patch(target, stub))
-            asyncio.run(
-                _orchestrator.run(scanner_type, tickers, db=db, event_date=scan_date)
-            )
-    except Exception as exc:
-        logger.warning(
-            "replay_diff: _run_replay failed for scanner=%s date=%s: %s",
-            scanner_type,
-            scan_date,
-            exc,
+    with contextlib.ExitStack() as stack:
+        for target in _SAVE_EVENT_PATCH_TARGETS:
+            stack.enter_context(patch(target, stub))
+        asyncio.run(
+            _orchestrator.run(scanner_type, tickers, db=db, event_date=scan_date)
         )
-        return None
 
     return captured
 
@@ -295,7 +309,11 @@ def run_replay_diff_for_scanner(
         drift_kinds=diff["drift_kinds"],
     )
 
-    # Prometheus
+    # Prometheus — req #7: kind ∈ {matched, missing_in_replay, new_in_replay, metric_delta}
+    if matched_count > 0:
+        replay_drift_signals_total.labels(
+            scanner_type=scanner_type, kind="matched"
+        ).inc(matched_count)
     for kind in diff["drift_kinds"]:
         replay_drift_signals_total.labels(scanner_type=scanner_type, kind=kind).inc()
 

@@ -8,6 +8,7 @@ import pytest
 from app.services.replay_diff_service import (
     _compute_diff,
     _make_capture_stub,
+    _run_replay,
     run_replay_diff_for_scanner,
 )
 
@@ -333,3 +334,96 @@ def test_replay_failure_produces_insufficient_data():
 
     kwargs = mock_upsert.call_args[1]
     assert kwargs["status"] == "insufficient_data"
+
+
+# ---------------------------------------------------------------------------
+# Conformance-cycle fixes — req #7 (matched counter) and req #2 (bar check)
+# ---------------------------------------------------------------------------
+
+
+def test_matched_counter_incremented_on_clean_run():
+    """Req #7: kind='matched' must be incremented per spec, not just drift kinds."""
+    live_events = [_fake_scanner_event("AAPL", {"volume_ratio": 5.0, "gap_pct": 0.02})]
+    db, _ = _build_db_mock(live_events=live_events, existing_diff=None)
+
+    replay_signals = {
+        "AAPL": {
+            "ticker": "AAPL",
+            "event_date": SCAN_DATE,
+            "scanner_type": SCANNER_TYPE,
+            "indicators": {"volume_ratio": 5.0, "gap_pct": 0.02},
+            "criteria_met": {},
+        }
+    }
+
+    with (
+        patch(
+            "app.services.replay_diff_service._run_replay", return_value=replay_signals
+        ),
+        patch("app.services.replay_diff_service._upsert_diff") as mock_upsert,
+        patch("app.services.system_notifier.notify_system"),
+        patch(
+            "app.services.replay_diff_service.replay_drift_signals_total"
+        ) as mock_ctr,
+    ):
+        mock_upsert.return_value = {"status": "clean", "has_drift": False}
+        run_replay_diff_for_scanner(SCANNER_TYPE, SCAN_DATE, ["AAPL"], db)
+
+    # Verify labels() was called with kind="matched" at some point
+    all_label_calls = [str(c) for c in mock_ctr.labels.call_args_list]
+    assert any("matched" in c for c in all_label_calls), (
+        "replay_drift_signals_total must be incremented with kind='matched' "
+        "(spec req #7: kind ∈ {matched, missing_in_replay, new_in_replay, metric_delta})"
+    )
+
+
+def test_run_replay_returns_none_when_no_stock_aggregate_bars():
+    """Req #2: _run_replay must return None when no StockAggregate bars exist for the date."""
+    from app.models.stock_aggregate import StockAggregate
+
+    db = MagicMock()
+    bar_query = MagicMock()
+    bar_query.filter.return_value = bar_query
+    bar_query.count.return_value = 0  # no stored bars
+
+    def _query_side_effect(model):
+        if model is StockAggregate:
+            return bar_query
+        return MagicMock()
+
+    db.query.side_effect = _query_side_effect
+
+    result = _run_replay("liquidity_hunt", ["AAPL", "TSLA"], SCAN_DATE, db)
+    assert result is None, (
+        "_run_replay must return None (insufficient_data) when no StockAggregate bars "
+        "exist for the scan_date — not only on exception (spec req #2)"
+    )
+
+
+def test_run_replay_raises_when_bars_exist_but_orchestrator_fails():
+    """Req #2: _run_replay must NOT swallow orchestrator errors as insufficient_data.
+
+    When bars exist, a runtime failure means the regression-detection feature itself
+    is broken — silencing it as insufficient_data hides the very regressions the spec
+    is designed to surface.
+    """
+    from app.models.stock_aggregate import StockAggregate
+
+    db = MagicMock()
+    bar_query = MagicMock()
+    bar_query.filter.return_value = bar_query
+    bar_query.count.return_value = 42  # bars exist
+
+    def _query_side_effect(model):
+        if model is StockAggregate:
+            return bar_query
+        return MagicMock()
+
+    db.query.side_effect = _query_side_effect
+
+    with patch(
+        "app.services.replay_diff_service.asyncio.run",
+        side_effect=RuntimeError("orchestrator bug"),
+    ):
+        with pytest.raises(RuntimeError, match="orchestrator bug"):
+            _run_replay("liquidity_hunt", ["AAPL"], SCAN_DATE, db)
