@@ -137,15 +137,28 @@ def record_advance(state: dict, today: str) -> None:
     state["daily"] = d
 
 
-def cached_verdict(state: dict, issue: int, spec_hash_: str):
+def _age_hours(ts_iso: str, now_iso: str) -> float:
+    from datetime import datetime
+    try:
+        return (datetime.fromisoformat(now_iso) - datetime.fromisoformat(ts_iso)).total_seconds() / 3600.0
+    except Exception:
+        return 0.0
+
+
+def cached_verdict(state: dict, issue: int, spec_hash_: str, now_iso=None, ttl_hours=None):
     entry = (state.get("verdicts") or {}).get(str(issue))
-    if entry and entry.get("spec_hash") == spec_hash_:
-        return entry.get("verdict")
-    return None
+    if not entry or entry.get("spec_hash") != spec_hash_:
+        return None
+    if ttl_hours and now_iso and entry.get("ts") and _age_hours(entry["ts"], now_iso) >= ttl_hours:
+        return None
+    return entry.get("verdict")
 
 
-def record_verdict(state: dict, issue: int, spec_hash_: str, verdict: str) -> None:
-    state.setdefault("verdicts", {})[str(issue)] = {"spec_hash": spec_hash_, "verdict": verdict}
+def record_verdict(state: dict, issue: int, spec_hash_: str, verdict: str, now_iso=None) -> None:
+    entry = {"spec_hash": spec_hash_, "verdict": verdict}
+    if now_iso:
+        entry["ts"] = now_iso
+    state.setdefault("verdicts", {})[str(issue)] = entry
 
 
 # ── Orchestrator (pure control flow; all IO injected via `io`) ──────────────

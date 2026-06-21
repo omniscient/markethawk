@@ -224,3 +224,20 @@ def test_run_skips_cached_hold():
     out = ap.run_once(CFG, io, st, "2026-06-20")
     assert out["outcome"] == "no_candidates"   # only candidate is cache-suppressed
     assert io.advanced == []
+
+
+def test_hold_ttl_expires_and_reenables_review():
+    st = {}
+    h = ap.spec_hash("spec A")
+    ap.record_verdict(st, 402, h, "HOLD", now_iso="2026-06-20T00:00:00+00:00")
+    # within TTL → still cached
+    assert ap.cached_verdict(st, 402, h, "2026-06-20T10:00:00+00:00", 24) == "HOLD"
+    # past TTL → cache miss (re-review)
+    assert ap.cached_verdict(st, 402, h, "2026-06-21T01:00:00+00:00", 24) is None
+
+
+def test_cached_verdict_backward_compatible_without_timestamps():
+    st = {}
+    h = ap.spec_hash("spec A")
+    ap.record_verdict(st, 402, h, "HOLD")  # no now_iso
+    assert ap.cached_verdict(st, 402, h) == "HOLD"  # no ttl args → unconditional
