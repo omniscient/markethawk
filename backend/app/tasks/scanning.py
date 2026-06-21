@@ -143,6 +143,51 @@ def _run_range_scan_logic(
     return events_detected
 
 
+def _compute_data_degraded(universe_id: int, db: Session) -> bool:
+    """
+    Return True if the universe data is degraded at scan start time.
+
+    Reads the latest UniverseQualityReport; if missing or generated >48h ago,
+    treats as degraded. Otherwise uses the report's grade (D or F → degraded).
+    Non-blocking: any failure defaults to None (unknown) rather than aborting scan.
+    """
+    from datetime import datetime, timezone
+
+    from app.models.system_config import SystemConfig
+    from app.models.universe_quality_report import UniverseQualityReport
+
+    try:
+        staleness_rows = (
+            db.query(SystemConfig)
+            .filter(SystemConfig.key == "quality_staleness_hours")
+            .first()
+        )
+        try:
+            staleness_hours = int(staleness_rows.value) if staleness_rows else 48
+        except (ValueError, TypeError):
+            staleness_hours = 48
+
+        report = (
+            db.query(UniverseQualityReport)
+            .filter(UniverseQualityReport.universe_id == universe_id)
+            .first()
+        )
+        if not report or not report.generated_at:
+            return True
+
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        report_age_hours = (now_utc - report.generated_at).total_seconds() / 3600
+        if report_age_hours > staleness_hours:
+            return True
+
+        grade = report.overall_grade or "F"
+        return grade in ("D", "F")
+
+    except Exception as exc:
+        logger.warning("_compute_data_degraded: error reading quality report: %s", exc)
+        return True  # treat unknown as degraded to err on the side of caution
+
+
 def _run_universe_scan_logic(
     scan_id: str,
     scanner_type: str,
@@ -197,6 +242,7 @@ def _run_universe_scan_logic(
     run.stocks_scanned = len(tickers)
     run.scan_start_date = start
     run.scan_end_date = end
+    run.data_degraded = _compute_data_degraded(universe_id, db)
     db.commit()
 
     started_at = utc_now()
