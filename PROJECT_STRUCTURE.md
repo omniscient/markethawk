@@ -78,6 +78,7 @@ MarketHawk/
 │   │   │   ├── scan_orchestrator.py
 │   │   │   ├── scanner_query_service.py
 │   │   │   ├── system_service.py
+│   │   │   ├── system_notifier.py    (notify_system — generic email/push for non-scanner events; in-process dedupe)
 │   │   │   ├── auto_trade_service.py
 │   │   │   ├── pre_market_scan.py
 │   │   │   ├── oversold_bounce_scan.py
