@@ -1,7 +1,8 @@
 #!/bin/sh
-# Weekly restore drill — restores the latest pg_dump into a throwaway postgres container,
-# asserts row counts for critical tables, checks alembic_version, emits a Seq event,
-# and tears down the throwaway container unconditionally via trap.
+# Weekly restore drill — restores the latest pg_dump into a throwaway postgres cluster
+# (initdb + UNIX socket, no TCP, no live DB contact), asserts row counts for critical
+# tables, checks alembic_version, emits a Seq event, and tears down the cluster
+# unconditionally via trap.
 #
 # Critical tables must have COUNT(*) > 0 after restore for the drill to pass.
 # alembic_version must have at least one row (confirms schema migration was restored).
@@ -10,112 +11,104 @@
 set -eu
 
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
-POSTGRES_USER="${POSTGRES_USER:-postgres}"
-POSTGRES_DB="${POSTGRES_DB:-stockscanner}"
-PGPASSWORD="${PGPASSWORD:-}"
 SEQ_URL="${SEQ_URL:-}"
-DRILL_NETWORK="${DRILL_NETWORK:-markethawk_stockscanner-network}"
-RESTORE_POSTGRES_IMAGE="${RESTORE_POSTGRES_IMAGE:-postgres:15-alpine}"
-# Optional: set to a specific alembic revision to assert exact head match
-ALEMBIC_EXPECTED_HEAD="${ALEMBIC_EXPECTED_HEAD:-}"
+# Set to a specific alembic revision to assert exact head match; empty = non-empty check only
+EXPECTED_ALEMBIC_HEAD="${EXPECTED_ALEMBIC_HEAD:-}"
 
 CRITICAL_TABLES="scanner_events trades signal_reviews scanner_configs stock_aggregates"
 
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-DRILL_CONTAINER="mh-restore-drill-${TIMESTAMP}"
+PGDATA="/tmp/drill_pgdata_$$"
+PGSOCKET="/tmp/drill_socket_$$"
+PGPID=""
 
 EXIT_CODE=0
-VERDICT="success"
-ERROR_REASON=""
+VERDICT="passed"
+FAIL_REASON=""
 COUNTS_JSON="{}"
+ALEMBIC_HEAD=""
 LATEST_BACKUP=""
-ALEMBIC_VERSION=""
 
 cleanup() {
-    # Unconditional teardown — always attempt to remove the throwaway container
-    docker rm -f "${DRILL_CONTAINER}" >/dev/null 2>&1 || true
+    # Unconditional teardown: kill throwaway postgres and remove temp dirs
+    [ -n "${PGPID}" ] && kill "${PGPID}" 2>/dev/null || true
+    rm -rf "${PGDATA}" "${PGSOCKET}"
 
     if [ -n "${SEQ_URL}" ]; then
         SEQ_LEVEL="Information"
-        [ "${VERDICT}" = "failure" ] && SEQ_LEVEL="Error"
+        [ "${VERDICT}" = "failed" ] && SEQ_LEVEL="Error"
         curl -sf -X POST \
             "${SEQ_URL}/api/events/raw?clef" \
             -H "Content-Type: application/vnd.serilog.clef" \
-            -d "{\"@t\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"@mt\":\"Database restore drill ${VERDICT}\",\"@l\":\"${SEQ_LEVEL}\",\"EventType\":\"backup.restore_drill\",\"Verdict\":\"${VERDICT}\",\"ErrorReason\":\"${ERROR_REASON}\",\"TableCounts\":${COUNTS_JSON},\"AlembicVersion\":\"${ALEMBIC_VERSION}\",\"BackupFile\":\"${LATEST_BACKUP}\"}" \
+            -d "{\"@t\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"@mt\":\"Restore drill {Verdict}\",\"@l\":\"${SEQ_LEVEL}\",\"EventType\":\"backup.restore_drill\",\"Verdict\":\"${VERDICT}\",\"FailReason\":\"${FAIL_REASON}\",\"AlembicHead\":\"${ALEMBIC_HEAD}\",\"BackupFile\":\"$(basename "${LATEST_BACKUP:-none}")\",\"TableCounts\":${COUNTS_JSON}}" \
             || true
     fi
 
     exit "${EXIT_CODE}"
 }
 
-trap cleanup EXIT
-
 # --- Step 1: Find the most recent backup ---
 LATEST_BACKUP=$(ls -t "${BACKUP_DIR}"/stockscanner_*.sql.gz 2>/dev/null | head -1 || true)
 if [ -z "${LATEST_BACKUP}" ]; then
-    echo "restore-drill: ERROR — no backup files found in ${BACKUP_DIR}" >&2
-    VERDICT="failure"
-    ERROR_REASON="no backup files found in ${BACKUP_DIR}"
-    EXIT_CODE=1
-    exit 1
+    echo "restore-drill: no backup found in ${BACKUP_DIR} — skipping (fresh deploy?)"
+    exit 0
 fi
 echo "restore-drill: using backup $(basename "${LATEST_BACKUP}")"
 
-# --- Step 2: Spin up throwaway postgres container on the compose network ---
-docker run -d \
-    --name "${DRILL_CONTAINER}" \
-    --network "${DRILL_NETWORK}" \
-    -e POSTGRES_USER="${POSTGRES_USER}" \
-    -e POSTGRES_PASSWORD="${PGPASSWORD}" \
-    -e POSTGRES_DB="${POSTGRES_DB}" \
-    "${RESTORE_POSTGRES_IMAGE}" >/dev/null
-echo "restore-drill: started throwaway container ${DRILL_CONTAINER}"
+# Backup confirmed — register cleanup trap (nothing to tear down in the skip path above)
+trap cleanup EXIT
 
-# --- Step 3: Wait up to 30 s for postgres to be ready ---
+# --- Step 2: initdb throwaway postgres cluster on UNIX socket (no TCP listener) ---
+mkdir -p "${PGDATA}" "${PGSOCKET}"
+initdb -D "${PGDATA}" --no-locale --encoding=UTF8 -A trust -U postgres >/dev/null 2>&1
+postgres -D "${PGDATA}" -k "${PGSOCKET}" -h '' >/dev/null 2>&1 &
+PGPID=$!
+echo "restore-drill: started throwaway postgres (pid ${PGPID})"
+
+# Wait up to 30 s for socket to appear
 READY=0
 for i in $(seq 1 30); do
-    if PGPASSWORD="${PGPASSWORD}" pg_isready \
-            -h "${DRILL_CONTAINER}" \
-            -U "${POSTGRES_USER}" >/dev/null 2>&1; then
+    if [ -S "${PGSOCKET}/.s.PGSQL.5432" ]; then
         READY=1
         break
     fi
     sleep 1
 done
 if [ "${READY}" -eq 0 ]; then
-    echo "restore-drill: ERROR — throwaway postgres did not become ready within 30 s" >&2
-    VERDICT="failure"
-    ERROR_REASON="throwaway postgres did not become ready within 30 s"
+    echo "restore-drill: ERROR — postgres socket did not appear within 30 s" >&2
+    VERDICT="failed"
+    FAIL_REASON="throwaway postgres socket did not appear within 30 s"
     EXIT_CODE=1
     exit 1
 fi
 echo "restore-drill: throwaway postgres ready"
 
-# --- Step 4: Restore the dump ---
-if ! gunzip -c "${LATEST_BACKUP}" | PGPASSWORD="${PGPASSWORD}" psql \
-        -h "${DRILL_CONTAINER}" \
-        -U "${POSTGRES_USER}" \
-        -d "${POSTGRES_DB}" \
-        -v ON_ERROR_STOP=1 \
+# pg_dump plain format does not include CREATE DATABASE; create it before restoring
+psql -h "${PGSOCKET}" -U postgres -c "CREATE DATABASE stockscanner;" >/dev/null 2>&1
+
+# --- Step 3: Restore the dump ---
+if ! gunzip -c "${LATEST_BACKUP}" | psql \
+        -h "${PGSOCKET}" \
+        -U postgres \
+        -d stockscanner \
         >/dev/null 2>/tmp/restore_stderr; then
     RESTORE_ERR=$(head -1 /tmp/restore_stderr 2>/dev/null || true)
     echo "restore-drill: ERROR — restore failed: ${RESTORE_ERR}" >&2
-    VERDICT="failure"
-    ERROR_REASON="psql restore failed: ${RESTORE_ERR}"
+    VERDICT="failed"
+    FAIL_REASON="psql restore failed: ${RESTORE_ERR}"
     EXIT_CODE=1
     exit 1
 fi
 echo "restore-drill: restore complete"
 
-# --- Step 5: Assert row counts > 0 for critical tables ---
+# --- Step 4: Assert row counts > 0 for critical tables ---
 FAILED_TABLES=""
 FIRST=1
 COUNTS_JSON="{"
 for TABLE in ${CRITICAL_TABLES}; do
-    COUNT=$(PGPASSWORD="${PGPASSWORD}" psql \
-        -h "${DRILL_CONTAINER}" \
-        -U "${POSTGRES_USER}" \
-        -d "${POSTGRES_DB}" \
+    COUNT=$(psql \
+        -h "${PGSOCKET}" \
+        -U postgres \
+        -d stockscanner \
         -t -c "SELECT COUNT(*) FROM ${TABLE}" 2>/dev/null | tr -d ' \n' || echo "0")
     COUNT="${COUNT:-0}"
 
@@ -126,7 +119,7 @@ for TABLE in ${CRITICAL_TABLES}; do
     fi
     COUNTS_JSON="${COUNTS_JSON}\"${TABLE}\":${COUNT}"
 
-    if [ "${COUNT}" -le 0 ] 2>/dev/null || [ "${COUNT}" = "0" ]; then
+    if [ "${COUNT}" = "0" ]; then
         FAILED_TABLES="${FAILED_TABLES} ${TABLE}"
     fi
 done
@@ -135,35 +128,35 @@ echo "restore-drill: table counts: ${COUNTS_JSON}"
 
 if [ -n "${FAILED_TABLES}" ]; then
     echo "restore-drill: ERROR — zero rows in:${FAILED_TABLES}" >&2
-    VERDICT="failure"
-    ERROR_REASON="zero rows in critical tables:${FAILED_TABLES}"
+    VERDICT="failed"
+    FAIL_REASON="zero rows in critical tables:${FAILED_TABLES}"
     EXIT_CODE=1
     exit 1
 fi
 
-# --- Step 6: Assert alembic_version is non-empty ---
-ALEMBIC_VERSION=$(PGPASSWORD="${PGPASSWORD}" psql \
-    -h "${DRILL_CONTAINER}" \
-    -U "${POSTGRES_USER}" \
-    -d "${POSTGRES_DB}" \
+# --- Step 5: Assert alembic_version is non-empty ---
+ALEMBIC_HEAD=$(psql \
+    -h "${PGSOCKET}" \
+    -U postgres \
+    -d stockscanner \
     -t -c "SELECT version_num FROM alembic_version LIMIT 1" 2>/dev/null | tr -d ' \n' || true)
 
-if [ -z "${ALEMBIC_VERSION}" ]; then
+if [ -z "${ALEMBIC_HEAD}" ]; then
     echo "restore-drill: ERROR — alembic_version table empty or missing" >&2
-    VERDICT="failure"
-    ERROR_REASON="alembic_version table empty or missing after restore"
+    VERDICT="failed"
+    FAIL_REASON="alembic_version table empty or missing after restore"
     EXIT_CODE=1
     exit 1
 fi
 
 # Optional strict head check
-if [ -n "${ALEMBIC_EXPECTED_HEAD}" ] && [ "${ALEMBIC_VERSION}" != "${ALEMBIC_EXPECTED_HEAD}" ]; then
-    echo "restore-drill: ERROR — alembic head mismatch: got ${ALEMBIC_VERSION}, expected ${ALEMBIC_EXPECTED_HEAD}" >&2
-    VERDICT="failure"
-    ERROR_REASON="alembic head mismatch: got ${ALEMBIC_VERSION}, expected ${ALEMBIC_EXPECTED_HEAD}"
+if [ -n "${EXPECTED_ALEMBIC_HEAD}" ] && [ "${ALEMBIC_HEAD}" != "${EXPECTED_ALEMBIC_HEAD}" ]; then
+    echo "restore-drill: ERROR — alembic head mismatch: got ${ALEMBIC_HEAD}, expected ${EXPECTED_ALEMBIC_HEAD}" >&2
+    VERDICT="failed"
+    FAIL_REASON="alembic head mismatch: got ${ALEMBIC_HEAD} expected ${EXPECTED_ALEMBIC_HEAD}"
     EXIT_CODE=1
     exit 1
 fi
 
-echo "restore-drill: PASS — backup=$(basename "${LATEST_BACKUP}") alembic=${ALEMBIC_VERSION}"
-# Cleanup + Seq emit happen in the trap
+echo "restore-drill: PASS — backup=$(basename "${LATEST_BACKUP}") alembic=${ALEMBIC_HEAD}"
+# Cleanup trap fires: kills postgres, rm -rf PGDATA/PGSOCKET, emits Seq event

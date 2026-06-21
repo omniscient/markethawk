@@ -127,6 +127,15 @@ Set when using the `--profile tls` Caddy service. See [deployment-guide.md — S
 
 ---
 
+## Weekly Restore Drill (`db-restore-drill` service)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RESTORE_DRILL_SCHEDULE` | `0 4 * * 0` | Supercronic cron expression (UTC) controlling when the restore drill runs. Default is Sundays at 4 AM UTC — one hour after the daily backup. |
+| `EXPECTED_ALEMBIC_HEAD` | `` (empty) | Expected alembic migration revision to assert after restore. When set, the drill fails if the restored `alembic_version` does not match this value exactly. When empty, the drill asserts only that `alembic_version` is non-empty. Set this in `.env` to the output of `python -m alembic current` after each migration. |
+
+---
+
 ## Monitoring
 
 | Variable | Default | Purpose |

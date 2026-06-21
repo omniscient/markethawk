@@ -56,28 +56,20 @@ services:
         limits:
           memory: 128M
 
-  # Restore drill sidecar — weekly scheduled restore into a throwaway container to verify backups
+  # Restore drill sidecar — weekly restore into an embedded throwaway cluster (initdb + UNIX
+  # socket) to verify backups. Never contacts the live DB; no live DB credentials needed.
   db-restore-drill:
     build:
       context: .
       dockerfile: docker/Dockerfile.restore-drill
     container_name: markethawk-db-restore-drill
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-stockscanner}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
       SEQ_URL: http://seq:5341
       BACKUP_DIR: ${BACKUP_DIR:-/backups}
       RESTORE_DRILL_SCHEDULE: ${RESTORE_DRILL_SCHEDULE:-0 4 * * 0}
-      DRILL_NETWORK: ${DRILL_NETWORK:-markethawk_stockscanner-network}
-      RESTORE_POSTGRES_IMAGE: postgres:15-alpine
-      ALEMBIC_EXPECTED_HEAD: ${ALEMBIC_EXPECTED_HEAD:-}
+      EXPECTED_ALEMBIC_HEAD: ${EXPECTED_ALEMBIC_HEAD:-}
     volumes:
       - ${BACKUP_DIR:-/var/lib/markethawk/backups}:/backups:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - stockscanner-network
     restart: unless-stopped

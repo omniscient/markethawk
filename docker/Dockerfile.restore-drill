@@ -1,7 +1,8 @@
 FROM alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
 
-# postgresql15-client (psql, pg_isready), docker-cli (manage throwaway container), curl (Seq events)
-RUN apk add --no-cache postgresql15-client docker-cli curl
+# postgresql15 (server + client: initdb, postgres, psql), curl (Seq events)
+# No docker-cli needed — throwaway cluster runs via initdb + UNIX socket inside the container
+RUN apk add --no-cache postgresql15 curl
 
 # Install supercronic (arch-aware) — same version as Dockerfile.backup
 ARG SUPERCRONIC_VERSION=0.2.29
@@ -20,4 +21,6 @@ COPY scripts/restore-drill.sh /scripts/restore-drill.sh
 COPY scripts/restore-drill-entrypoint.sh /entrypoint.sh
 RUN chmod +x /scripts/restore-drill.sh /entrypoint.sh
 
+# postgres daemon cannot run as root; run as the postgres system user created by the package
+USER postgres
 ENTRYPOINT ["/entrypoint.sh"]

@@ -10,6 +10,6 @@ mkdir -p "${BACKUP_DIR}"
 CRONTAB_FILE="/tmp/restore-drill-crontab"
 printf '%s /scripts/restore-drill.sh >> /proc/1/fd/1 2>&1\n' "${RESTORE_DRILL_SCHEDULE}" > "${CRONTAB_FILE}"
 
-echo "db-restore-drill: schedule='${RESTORE_DRILL_SCHEDULE}' network=${DRILL_NETWORK:-markethawk_stockscanner-network} dir=${BACKUP_DIR}"
+echo "db-restore-drill: schedule='${RESTORE_DRILL_SCHEDULE}' dir=${BACKUP_DIR}"
 
 exec /usr/local/bin/supercronic "${CRONTAB_FILE}"
