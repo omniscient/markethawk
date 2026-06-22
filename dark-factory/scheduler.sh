@@ -71,6 +71,7 @@ read_config() {
   _set_cfg FACTORY_WIP_LIMIT          '.scheduler.factory_wip_limit'
   _set_cfg MAIN_RED_RECHECK_ENABLED   '.scheduler.main_red_recheck_enabled'
   _set_cfg MAIN_RED_RECHECK_MINUTES   '.scheduler.main_red_recheck_minutes'
+  _set_cfg BLOCKED_RESCUE_ENABLED     '.scheduler.blocked_rescue_enabled'
   _set_cfg REFINE_WIP_LIMIT           '.refine.wip_limit'
   _set_cfg DIRECT_TO_PR_LABEL         '.direct_to_pr.label'
   _set_cfg SPEC_GRACE_MINUTES         '.direct_to_pr.spec_grace_minutes'
@@ -828,6 +829,33 @@ ${FAIL_LIST}
     CI_BLOCKED="${CI_BLOCKED} ${ISSUE} "
   done < <(echo "$IN_REVIEW" | jq -c '.[]')
 
+  # --- Priority 0.6: rescue Blocked items whose PR is already green + mergeable ---
+  # Inverse of Priority 0. A ticket can sit in Blocked (CI gate, circuit-breaker trip,
+  # orphaned-run sweep) while its PR is actually green and conflict-free. The Priority 3
+  # retry loop below would re-dispatch "Continue" on it — re-running the whole pipeline,
+  # burning the Max session window, re-hitting the same gate — until the retry counter
+  # exhausts and trip_to_blocked parks it FOREVER with a mergeable PR stranded. Instead,
+  # promote it to In review so the normal merge flow (human / "Close issue #N") takes it.
+  # Dispatch-free (only sets board status + marks the PR ready + comments), so it runs
+  # every cycle regardless of factory capacity, like Priority 0. RESCUED is consumed by
+  # Priority 3 so a just-rescued issue is not retried in the same cycle.
+  RESCUED=""
+  if [ "${BLOCKED_RESCUE_ENABLED:-true}" = "true" ]; then
+    while IFS= read -r item; do
+      ISSUE=$(get_issue_number "$item")
+      if has_skip_label "$item"; then continue; fi
+      # Above-ceiling items are parked in Blocked by design (#339), not failed.
+      if has_above_ceiling_label "$item"; then continue; fi
+      if is_issue_running "$ISSUE"; then continue; fi
+      RESCUE_OUT=$(python3 "$FACTORY_CORE_CLI" rescue-blocked --issue "$ISSUE" 2>/dev/null) || true
+      if [ "$RESCUE_OUT" = "rescued" ]; then
+        echo "[$(date -u +%FT%TZ)] blocked_rescue issue=#${ISSUE} action=promoted_to_in_review"
+        RESCUED="${RESCUED} ${ISSUE} "
+        reset_retry "$ISSUE" || true
+      fi
+    done < <(echo "$BLOCKED" | jq -c '.[]')
+  fi
+
   # Guard: cap concurrent factory containers at FACTORY_WIP_LIMIT (Claude Max 5h-window
   # burn scales with concurrency — default 1, override in .archon/.env). Everything
   # below DISPATCHES factory work, so it waits for a free slot; the CI gate above has
@@ -1003,6 +1031,9 @@ To proceed:
       [ -n "$DISPATCHED" ] && break
       ISSUE=$(get_issue_number "$item")
       if has_skip_label "$item"; then continue; fi
+      # Promoted to In review by the Priority 0.6 rescue this cycle — don't re-dispatch
+      # (its green PR is now in the merge flow; BLOCKED was snapshotted before the move).
+      case "$RESCUED" in *" $ISSUE "*) continue ;; esac
       # Above-ceiling items in Blocked are parked by design (#339), not failed — the
       # retry loop must not auto-dispatch them.
       if has_above_ceiling_label "$item"; then continue; fi
