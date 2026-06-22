@@ -29,13 +29,13 @@ RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
     apt-get update && apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Python 3.12 (ships with Ubuntu 24.04)
+# Python 3.14 (ships with Ubuntu 26.04 "resolute"; 24.04 carried 3.12)
 RUN apt-get update && apt-get install -y \
-    python3.12 \
-    python3.12-venv \
+    python3.14 \
+    python3.14-venv \
     python3-pip \
-    && ln -sf /usr/bin/python3.12 /usr/bin/python \
-    && ln -sf /usr/bin/python3.12 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.14 /usr/bin/python \
+    && ln -sf /usr/bin/python3.14 /usr/bin/python3 \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /usr/lib/python*/EXTERNALLY-MANAGED
 
@@ -79,7 +79,7 @@ RUN YQ_ARCH=$(dpkg --print-architecture) && \
 # Docker CLI (client only — no daemon)
 RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
     | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu noble stable" \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu resolute stable" \
     | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
     apt-get update && apt-get install -y docker-ce-cli docker-compose-plugin docker-buildx-plugin && \
     rm -rf /var/lib/apt/lists/*
