@@ -676,7 +676,9 @@ async def _orchestrator_run(
     tickers: list,
     db: Any,
     event_date: date,
-    scanner_run: Optional[Any] = None,
+    scanner_run: Optional[
+        Any
+    ] = None,  # accepted for protocol conformance; not used here
     gate_metadata: Optional[Any] = None,
 ) -> list[dict]:
     """Adapter: maps the standard ScannerFn signature to run_liquidity_hunt_scan."""

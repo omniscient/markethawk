@@ -3,6 +3,7 @@ import json
 import logging
 import time as _time
 from datetime import date, datetime, timezone
+from types import SimpleNamespace
 
 import redis
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 from app.models.monitored_stock import MonitoredStock
+from app.services.quality_gate import QualityGateService
 from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -300,11 +302,6 @@ def _run_universe_scan_logic(
 
     gate_metadata = None
     try:
-        import json as _json
-        from types import SimpleNamespace
-
-        from app.services.quality_gate import QualityGateService
-
         _gate_req = SimpleNamespace(
             policy="advisory",
             universe_id=universe_id,
@@ -313,11 +310,9 @@ def _run_universe_scan_logic(
             requirements=None,
         )
         _assessment = QualityGateService.assess(db, _gate_req)
-        run.quality_gate = _json.loads(
-            _json.dumps(_assessment.model_dump(), default=str)
-        )
+        run.quality_gate = json.loads(json.dumps(_assessment.model_dump(), default=str))
         gate_metadata = {
-            "tier": _assessment.verdict.value,
+            "verdict": _assessment.verdict.value,
             "warnings": [
                 {"code": w.code.value, "severity": w.severity, "message": w.message}
                 for w in _assessment.warnings
@@ -333,7 +328,7 @@ def _run_universe_scan_logic(
                 scanner_type,
             )
     except Exception as _gate_exc:
-        logger.warning(
+        logger.exception(
             "run_universe_scan %s: quality gate assessment failed (degrading gracefully): %s",
             scan_id,
             _gate_exc,
