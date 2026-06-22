@@ -102,3 +102,5 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
 
 - [PROVISIONAL] `WebSocketException(code=1008)` raised inside the route handler body (not only from a FastAPI Dependency) is caught by Starlette and closes the connection before `websocket.accept()` returns to the client — so an `async with ws_connection_slot(user_id):` context manager in the handler body (before `await websocket.accept()`) correctly delivers 1008 without needing a separate Dependency. <!-- evidence:test-output issue:#377 date:2026-06-14 expires:2026-12-14 source:implement -->
+
+- [PROVISIONAL] To persist a Pydantic v2 model that contains `datetime` fields into a JSONB column, use `json.loads(json.dumps(model.model_dump(), default=str))` — `model.model_dump()` returns `datetime` objects which PostgreSQL's JSON encoder rejects; `default=str` coerces them to ISO strings and `json.loads` rebuilds a plain dict. <!-- evidence:test-output issue:#494 date:2026-06-22 expires:2026-12-22 source:implement -->
