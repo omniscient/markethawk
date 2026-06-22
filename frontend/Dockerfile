@@ -12,7 +12,15 @@ COPY package*.json ./
 # npm ci (not npm install) — install the exact locked versions so the image is
 # reproducible and matches what was security-scanned. npm install would resolve
 # newest-in-range at build time, drifting the CVE surface between builds.
-RUN npm ci
+#
+# Clean the npm cache in the same layer. `npm ci` leaves resolved-but-overridden
+# tarballs in /root/.npm/_cacache — e.g. undici 6.26.0 (CVE-2026-12151), fetched
+# during resolution then replaced at install time by the `^7.28.0` override in
+# package.json. node_modules ships the fixed 7.28.0, but Trivy scans the stale
+# cache tarball and fails the HIGH/CRITICAL image gate on a vuln that isn't
+# actually installed. Dropping the cache clears the false positive (and shrinks
+# the image); the build below only needs node_modules, never the cache.
+RUN npm ci && npm cache clean --force
 
 COPY . .
 
