@@ -16,7 +16,7 @@ import math
 import time as _time
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
-from typing import Any
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import desc
@@ -426,6 +426,7 @@ async def run_liquidity_hunt_scan(
     end_date: date | None = None,
     config: dict | None = None,
     diagnostics_out: dict | None = None,
+    gate_metadata: dict | None = None,
 ) -> list[dict[str, Any]]:
     """
     Run liquidity_hunt_pre and liquidity_hunt_post scans over a date range.
@@ -551,6 +552,7 @@ async def run_liquidity_hunt_scan(
                             previous_close=prior_day_close,
                             opening_price=session_metrics["regular_open"],
                             closing_price=session_metrics["regular_close"],
+                            gate_metadata=gate_metadata,
                         )
                         results.append(event_dict)
                         counts["fired_pre"] += 1
@@ -593,6 +595,7 @@ async def run_liquidity_hunt_scan(
                                 previous_close=event_date_regular_close,
                                 opening_price=session_metrics["regular_open"],
                                 closing_price=session_metrics["regular_close"],
+                                gate_metadata=gate_metadata,
                             )
                             results.append(event_dict)
                             counts["fired_post"] += 1
@@ -669,13 +672,22 @@ async def run_liquidity_hunt_scan_for_date(
 from app.services.scan_orchestrator import ScannerDescriptor, register  # noqa: E402
 
 
-async def _orchestrator_run(tickers: list, db: Any, event_date: date) -> list[dict]:
+async def _orchestrator_run(
+    tickers: list,
+    db: Any,
+    event_date: date,
+    scanner_run: Optional[
+        Any
+    ] = None,  # accepted for protocol conformance; not used here
+    gate_metadata: Optional[Any] = None,
+) -> list[dict]:
     """Adapter: maps the standard ScannerFn signature to run_liquidity_hunt_scan."""
     return await run_liquidity_hunt_scan(
         tickers=tickers,
         db=db,
         start_date=event_date,
         end_date=event_date,
+        gate_metadata=gate_metadata,
     )
 
 
