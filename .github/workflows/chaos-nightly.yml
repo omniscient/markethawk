@@ -1,8 +1,18 @@
 name: IBKR Chaos Nightly
 
 on:
-  schedule:
-    - cron: '0 3 * * 1-5'  # 03:00 UTC, weekdays only
+  # NOTE: the nightly `schedule:` trigger is intentionally PAUSED.
+  # `chaos-mock` runs `docker compose up postgres redis backend live-scanner`,
+  # which pulls the PRIVATE ghcr.io/omniscient/markethawk-backend image and
+  # stands up a multi-service Docker stack. A GitHub-hosted runner is not logged
+  # into GHCR (Head manifests -> 401 unauthorized) and is the wrong place for a
+  # full integration/chaos harness, so every scheduled run went red as noise.
+  # Run it on demand (workflow_dispatch) or locally:
+  #   bash scripts/chaos/ibkr_kill_test.sh --mock
+  # Re-enable the cron only once it runs on a self-hosted runner with GHCR auth
+  # (or the harness is reworked to build images in-job). Tracking: see issue.
+  # schedule:
+  #   - cron: '0 3 * * 1-5'  # 03:00 UTC, weekdays only
   workflow_dispatch:
 
 jobs:
