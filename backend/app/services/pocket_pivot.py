@@ -169,6 +169,7 @@ async def run_pocket_pivot_scan(
     end_date: date | None = None,
     config: dict | None = None,
     diagnostics_out: dict | None = None,
+    gate_metadata: dict | None = None,
 ) -> list[dict[str, Any]]:
     """
     Run the pocket pivot scanner over a date range.
@@ -321,6 +322,7 @@ async def run_pocket_pivot_scan(
                         enrichment=enrichment,
                         previous_close=prior_close,
                         closing_price=today["close"],
+                        gate_metadata=gate_metadata,
                     )
                     results.append(event_dict)
                     counts["fired"] += 1
@@ -400,6 +402,7 @@ async def _orchestrator_run(
     db: Any,
     event_date: date,
     scanner_run: Optional[Any] = None,
+    gate_metadata: Optional[Any] = None,
 ) -> list[dict]:
     """Adapter: maps the standard ScannerFn signature to run_pocket_pivot_scan."""
     return await run_pocket_pivot_scan(
@@ -407,6 +410,7 @@ async def _orchestrator_run(
         db=db,
         start_date=event_date,
         end_date=event_date,
+        gate_metadata=gate_metadata,
     )
 
 
