@@ -124,18 +124,14 @@ def _run_replay(
     # replay.  Precise session alignment is handled inside the scanner itself.
     day_start = datetime.combine(scan_date, _time.min)
     day_end = day_start + timedelta(days=1)
-    # Use limit(1) instead of filtering by ticker to avoid a potentially huge IN list
-    # when the universe is large, and because any bars for the date are sufficient as
-    # a presence gate.
     has_bars = (
         db.query(StockAggregate)
         .filter(
             StockAggregate.timestamp >= day_start,
             StockAggregate.timestamp < day_end,
         )
-        .limit(1)
-        .first()
-        is not None
+        .count()
+        > 0
     )
     if not has_bars:
         return None
