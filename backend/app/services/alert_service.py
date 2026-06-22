@@ -382,6 +382,7 @@ def save_event(
     opening_price: float = None,
     closing_price: float = None,
     ranker_config: Optional[Dict[str, Any]] = None,
+    gate_metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Persist a ScannerEvent and enqueue alert evaluation for new events."""
     from app.services.event_helpers import (
@@ -452,7 +453,10 @@ def save_event(
         event_dict["id"] = existing.id
     else:
         model_data = event_dict.copy()
-        model_data["metadata_"] = model_data.pop("metadata")
+        enrichment_with_gate = dict(model_data.pop("metadata"))
+        if gate_metadata is not None:
+            enrichment_with_gate["quality_gate"] = gate_metadata
+        model_data["metadata_"] = enrichment_with_gate
         new_event = ScannerEvent(**model_data)
         db.add(new_event)
         db.flush()

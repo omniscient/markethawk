@@ -35,13 +35,16 @@ async def run(
     db: Any,
     event_date: date,
     scanner_run: Optional[Any] = None,
+    gate_metadata: Optional[Any] = None,
 ) -> list[dict]:
     descriptor = _REGISTRY.get(scanner_type)
     if descriptor is None:
         raise ValueError(
             f"Unknown scanner type: {scanner_type!r}. Registered: {list(_REGISTRY)}"
         )
-    return await descriptor.run(tickers, db, event_date, scanner_run=scanner_run)
+    return await descriptor.run(
+        tickers, db, event_date, scanner_run=scanner_run, gate_metadata=gate_metadata
+    )
 
 
 def compute_next_run(scanner_type: str) -> Optional[datetime]:
