@@ -1,0 +1,91 @@
+name: Docker Build (PR)
+
+# Build the deployed images on PRs that touch their Dockerfiles or build inputs,
+# so base-image bumps (Dependabot deps(docker) PRs) and Dockerfile edits are
+# exercised BEFORE merge. ci-publish.yml only builds on push to main; without
+# this, a broken FROM bump sails through PR CI green and breaks image publish
+# (and any deploy pulling :latest) post-merge. Build only, never push.
+#
+# Each job always runs and reports a status — the heavy `docker build` step is
+# gated on whether that image's inputs actually changed (cheap no-op otherwise).
+# Keeping the job (not the workflow) conditional means the check context is
+# always present, so these can be promoted to required status checks without the
+# "missing required check" / stuck-pending trap that workflow-level path filters
+# cause.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docker-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Detect backend image changes
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" HEAD \
+              | grep -qE '^backend/(Dockerfile(\.forecast)?|requirements\.txt)$'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "No backend image inputs changed — nothing to build."
+          fi
+      - name: Build backend image (no push)
+        if: steps.detect.outputs.build == 'true'
+        run: docker build -f backend/Dockerfile -t markethawk-backend:pr ./backend
+      - name: Build backend forecast image (no push)
+        if: steps.detect.outputs.build == 'true'
+        run: docker build -f backend/Dockerfile.forecast -t markethawk-backend-forecast:pr ./backend
+
+  docker-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Detect frontend image changes
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" HEAD \
+              | grep -qE '^frontend/(Dockerfile|package(-lock)?\.json)$'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "No frontend image inputs changed — nothing to build."
+          fi
+      - name: Build frontend image (no push)
+        if: steps.detect.outputs.build == 'true'
+        run: docker build -f frontend/Dockerfile -t markethawk-frontend:pr ./frontend
+
+  docker-dark-factory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - name: Detect dark-factory image changes
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA" HEAD \
+              | grep -qE '^dark-factory/Dockerfile$'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "No dark-factory image inputs changed — nothing to build."
+          fi
+      - name: Build dark-factory image (no push)
+        if: steps.detect.outputs.build == 'true'
+        run: docker build -f dark-factory/Dockerfile -t markethawk-dark-factory:pr .

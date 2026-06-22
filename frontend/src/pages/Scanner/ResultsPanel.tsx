@@ -20,6 +20,7 @@ export function ResultsPanel({ scanResults, sortBy, sortOrder, onSort }: Results
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSort={onSort}
+            qualityGate={scanResults.quality_gate}
           />
         </div>
       )}

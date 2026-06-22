@@ -97,7 +97,7 @@ function AddSymbolForm() {
 
 export default function ActiveWatchlist() {
   const { data: items = [], isLoading, isError } = useWatchlist();
-  const { liveData, connected } = useWatchlistLive();
+  const { liveData, connected, feedStatus } = useWatchlistLive();
 
   const count = items.length;
   const atLimit = count >= SOFT_LIMIT;
@@ -120,6 +120,11 @@ export default function ActiveWatchlist() {
               <><Wifi className="h-3.5 w-3.5 text-positive" /><span className="text-positive">Live</span></>
             ) : (
               <><WifiOff className="h-3.5 w-3.5 text-gray-500" /><span className="text-gray-500">Connecting…</span></>
+            )}
+            {feedStatus === 'lost' && (
+              <span className="inline-block text-xs px-1.5 py-0.5 rounded border border-amber-500 text-amber-400 bg-amber-950">
+                Feed stale — IBKR gateway disconnected
+              </span>
             )}
           </div>
           <div className="text-right">

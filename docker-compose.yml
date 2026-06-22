@@ -56,6 +56,28 @@ services:
         limits:
           memory: 128M
 
+  # Restore drill sidecar — weekly restore into an embedded throwaway cluster (initdb + UNIX
+  # socket) to verify backups. Never contacts the live DB; no live DB credentials needed.
+  db-restore-drill:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.restore-drill
+    container_name: markethawk-db-restore-drill
+    environment:
+      SEQ_URL: http://seq:5341
+      BACKUP_DIR: ${BACKUP_DIR:-/backups}
+      RESTORE_DRILL_SCHEDULE: ${RESTORE_DRILL_SCHEDULE:-0 4 * * 0}
+      EXPECTED_ALEMBIC_HEAD: ${EXPECTED_ALEMBIC_HEAD:-}
+    volumes:
+      - ${BACKUP_DIR:-/var/lib/markethawk/backups}:/backups:ro
+    networks:
+      - stockscanner-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
   # Redis for caching and Celery broker
   redis:
     image: redis:7-alpine
@@ -278,6 +300,7 @@ services:
       IBKR_HOST: ib-gateway
       IBKR_PORT: 4004
       IBKR_CLIENT_ID: 5   # dedicated clientId — never shares with backend or Celery
+      LIVE_SCANNER_MOCK: "false"
       PYTHONDONTWRITEBYTECODE: "1"
       # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}

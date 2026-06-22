@@ -409,6 +409,7 @@ def _persist(
     event_date: date,
     ranker_config: Optional[Dict[str, Any]],
     scanner_run: Optional[Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
 ) -> list[Dict[str, Any]]:
     from app.services.scanner import ScannerService
 
@@ -426,6 +427,7 @@ def _persist(
             opening_price=signal.day_metrics.get("opening_price", 0.0),
             closing_price=signal.day_metrics.get("closing_price"),
             ranker_config=ranker_config,
+            gate_metadata=gate_metadata,
         )
         results.append(event_dict)
         scanner_events_total.labels(scanner_type="pre_market_volume_spike").inc()
@@ -447,6 +449,7 @@ async def run_pre_market_scan(
     db: Session,
     event_date: date = None,
     scanner_run: Optional["ScannerRun"] = None,
+    gate_metadata: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """Run extended hours volume spike scanner using DB aggregates."""
     import app.services.scanner as _scanner_mod
@@ -553,7 +556,9 @@ async def run_pre_market_scan(
             db,
         )
         failed.extend(enrich_failed)
-        results = _persist(enriched, failed, db, event_date, ranker_config, scanner_run)
+        results = _persist(
+            enriched, failed, db, event_date, ranker_config, scanner_run, gate_metadata
+        )
         # --- SLO metrics -------------------------------------------------------
         if not tickers or len(failed) < len(tickers):
             scan_last_success_timestamp.labels(
@@ -591,10 +596,18 @@ async def run_pre_market_scan(
 
 
 async def _run(
-    tickers: list[str], db: Any, event_date: date, scanner_run: Optional[Any] = None
+    tickers: list[str],
+    db: Any,
+    event_date: date,
+    scanner_run: Optional[Any] = None,
+    gate_metadata: Optional[Any] = None,
 ) -> list[dict]:
     return await run_pre_market_scan(
-        tickers, db, event_date=event_date, scanner_run=scanner_run
+        tickers,
+        db,
+        event_date=event_date,
+        scanner_run=scanner_run,
+        gate_metadata=gate_metadata,
     )
 
 

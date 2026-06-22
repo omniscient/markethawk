@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # Default is "production" so that an unset env var NEVER leaks stack traces.
     ENVIRONMENT: str = "production"
 
+    # Live scanner: when True, use MockLiveAdapter instead of IBKRLiveAdapter.
+    # Set to "true" in CI environments that lack IBKR paper credentials.
+    LIVE_SCANNER_MOCK: bool = False
+
     # Error Tracking
     # SEQ_URL: base URL for the Seq container (no trailing slash).
     # Set to an empty string or "disabled" to fall back to stdout-only logging.

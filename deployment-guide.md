@@ -90,6 +90,74 @@ gunzip -c ${BACKUP_DIR:-/var/lib/markethawk/backups}/stockscanner_YYYYMMDD_HHMMS
 docker compose start backend celery-worker celery-beat
 ```
 
+### Weekly Restore Drill
+
+The `db-restore-drill` sidecar runs weekly to verify that the latest backup can actually be restored. It starts automatically with `docker-compose up -d` alongside the other services.
+
+**What it does**
+
+1. Locates the most recent `stockscanner_*.sql.gz` file in `BACKUP_DIR`; if none exists (fresh deploy), logs a warning and exits cleanly (not a failure).
+2. Starts a throwaway postgres cluster inside the container via `initdb` + UNIX socket (no TCP, no external container, no live DB contact).
+3. Restores the dump into the throwaway cluster via `gunzip | psql`.
+4. Asserts that five critical tables (`scanner_events`, `trades`, `signal_reviews`, `scanner_configs`, `stock_aggregates`) each have at least one row.
+5. Asserts that `alembic_version` has a non-empty value (schema migration was restored).
+6. Emits a structured Seq event and unconditionally kills the throwaway postgres process and removes temp directories.
+
+The live `stockscanner-db` is never contacted — the drill embeds an isolated postgres cluster with no network listener and no live DB credentials.
+
+**Schedule**
+
+Runs every Sunday at 4 AM UTC by default (one hour after the daily backup window).
+
+**Configuration (`.env`)**
+
+| Variable | Default | Description |
+|---|---|---|
+| `RESTORE_DRILL_SCHEDULE` | `0 4 * * 0` | Cron schedule (UTC, supercronic syntax) |
+| `EXPECTED_ALEMBIC_HEAD` | _(empty)_ | Optional: exact alembic revision to assert after restore. Set to the output of `python -m alembic current` in your `.env`. When empty, the drill asserts only that `alembic_version` is non-empty. |
+
+**Trigger a manual one-shot drill**
+
+```bash
+docker compose run --rm db-restore-drill /scripts/restore-drill.sh
+```
+
+**Reading drill results in Seq**
+
+Every drill emits a `backup.restore_drill` CLEF event. Filter in Seq:
+
+```
+EventType = 'backup.restore_drill'
+```
+
+Successful drill: `@l = 'Information'`, `Verdict = 'passed'`, per-table counts in `TableCounts`.  
+Failed drill: `@l = 'Error'`, `Verdict = 'failed'`, `FailReason` explains why it failed.
+
+Set up a Seq alert on `@l = 'Error' and EventType = 'backup.restore_drill'` to be notified immediately when a drill fails.
+
+**Simulating a corrupted backup**
+
+To verify the drill catches bad backups, truncate a copy of the latest dump and run the drill against it:
+
+```bash
+# Truncate a copy of the latest backup to simulate corruption
+LATEST=$(ls -t ${BACKUP_DIR:-/var/lib/markethawk/backups}/stockscanner_*.sql.gz | head -1)
+cp "${LATEST}" "${LATEST%.sql.gz}_corrupt.sql.gz"
+truncate -s 512 "${LATEST%.sql.gz}_corrupt.sql.gz"
+
+# Rename to make it the "latest" file temporarily (alphabetically last by timestamp)
+mv "${LATEST}" "${LATEST}.bak"
+mv "${LATEST%.sql.gz}_corrupt.sql.gz" "${LATEST}"
+
+# Run the drill — it should fail loudly
+docker compose run --rm db-restore-drill /scripts/restore-drill.sh
+
+# Restore the original
+mv "${LATEST}" "${LATEST%.sql.gz}_corrupt.sql.gz"
+mv "${LATEST}.bak" "${LATEST}"
+rm "${LATEST%.sql.gz}_corrupt.sql.gz"
+```
+
 ### SSL / TLS
 
 A Caddy reverse proxy service is included in `docker-compose.yml`, gated behind `profiles: ["tls"]`. Caddy auto-provisions and renews Let's Encrypt certificates from a single `DOMAIN` environment variable — no pre-provisioned secrets required.
@@ -216,3 +284,54 @@ After upgrading, always check `docker-compose logs backend` for startup errors a
 | Docker | `docker-compose logs -f` | Raw container stdout for all services |
 
 See [DEVELOPMENT.md — Monitoring Services](DEVELOPMENT.md#monitoring-services) for query examples.
+
+---
+
+## IBKR Feed Loss Runbook
+
+### What Operators See During a Feed Loss
+
+**Seq** (filter by `live_scanner.ibkr_adapter`):
+- `WARNING`: `"IB Gateway disconnected"` fires immediately on container stop.
+- For network partition: `WARNING` from watchdog: `"no bars for Xs during market hours — forcing disconnect"` fires after ~30–40 s.
+- Subsequent reconnect attempts: logged with backoff delays (5 s, 10 s, 20 s, … capped at 60 s).
+- On recovery: `"live-scanner: reconnect succeeded"` followed by per-symbol resubscription logs.
+
+**Grafana** (`ibkr_connection_status` gauge, sourced from `app/core/metrics.py`):
+- Drops to `0` on disconnect; returns to `1` on recovery.
+- Alert rule `ibkr_disconnect_2min` fires if the outage exceeds 2 minutes.
+
+**Frontend (`/watchlist`)**:
+- Amber banner: `"Feed stale — IBKR gateway disconnected"` appears next to the Live/Connecting badge.
+- Per-symbol prices grey out after 15 s of no ticks (pre-existing per-symbol staleness — complementary, not replaced).
+- Banner clears automatically when `feed_recovered` event arrives on `watchlist:alerts`.
+
+**`/api/ready`** — HTTP 200 even during an outage; only DB/Redis gate the HTTP status:
+```json
+{
+  "status": "ready",
+  "db": {"ok": true, "latency_ms": 2},
+  "redis": {"ok": true, "latency_ms": 1},
+  "live_data": {"ok": false, "latency_ms": 3001, "error": "Connection refused"}
+}
+```
+
+### Recovery
+
+In-process reconnect fires automatically with exponential backoff. No manual intervention needed unless:
+- All 10 retries are exhausted (see Seq for `"exhausted reconnect retries"`) — restart the live-scanner container.
+- The IB Gateway container itself is in a bad state — restart `stockscanner-ibgateway`.
+
+### Chaos Test
+
+Reproduce and verify both failure modes locally:
+
+```bash
+# Mock mode (no IBKR credentials)
+bash scripts/chaos/ibkr_kill_test.sh --mock
+
+# Live mode (paper IBKR credentials)
+IB_USERNAME=mypaper IB_PASSWORD=... bash scripts/chaos/ibkr_kill_test.sh
+```
+
+See `scripts/chaos/README.md` for full invocation details.

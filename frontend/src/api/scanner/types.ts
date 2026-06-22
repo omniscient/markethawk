@@ -94,6 +94,66 @@ export interface ScannerDiagnostics {
   errors?: number;
 }
 
+export type QualityIssueCode =
+  | 'missing_bars'
+  | 'split_dividend_anomaly'
+  | 'stale_quote_risk'
+  | 'provider_gaps'
+  | 'timezone_session_mismatch'
+  | 'survivorship_bias_risk'
+  | 'stale_reference_data';
+
+export type QualityGateVerdict = 'trusted' | 'warning' | 'blocked' | 'skipped';
+
+export interface QualityGateIssue {
+  issue_code: QualityIssueCode;
+  severity: 'blocker' | 'warning' | 'info';
+  title: string;
+  scope: 'ticker' | 'universe' | 'session' | 'provider';
+  ticker: string | null;
+  asset_class: string | null;
+  affected_inputs: {
+    timespans?: string[];
+    date_range?: { start: string; end: string };
+    session?: string;
+    fields?: string[];
+  } | null;
+  detail: Record<string, unknown>;
+  remediation: {
+    action: string;
+    label: string;
+    description: string;
+    automated: boolean;
+  };
+}
+
+export interface QualityGateSummary {
+  blocker_count: number;
+  warning_count: number;
+  info_count: number;
+  affected_ticker_count: number;
+  total_tickers_evaluated: number;
+  most_affected_tickers: Array<{
+    ticker: string;
+    issue_count: number;
+    max_severity: 'blocker' | 'warning' | 'info';
+  }>;
+  issue_code_counts: Partial<Record<QualityIssueCode, number>>;
+}
+
+export interface QualityGateAssessment {
+  verdict: QualityGateVerdict;
+  policy: 'advisory' | 'strict';
+  consumer: string;
+  scanner_type: string | null;
+  universe_id: number | null;
+  generated_at: string;
+  assessment_id: string;
+  verdict_reason: string;
+  summary: QualityGateSummary;
+  issues: QualityGateIssue[];
+}
+
 export interface ScannerRunResponse {
   scan_id: string;
   status: string;
@@ -107,6 +167,7 @@ export interface ScannerRunResponse {
   scan_start_date?: string;
   scan_end_date?: string;
   diagnostics?: ScannerDiagnostics;
+  quality_gate?: QualityGateAssessment;
 }
 
 export interface ScannerRunAsyncResponse {

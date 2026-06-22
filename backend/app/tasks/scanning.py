@@ -3,6 +3,7 @@ import json
 import logging
 import time as _time
 from datetime import date, datetime, timezone
+from types import SimpleNamespace
 
 import redis
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 from app.models.monitored_stock import MonitoredStock
+from app.services.quality_gate import QualityGateService
 from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -297,6 +299,41 @@ def _run_universe_scan_logic(
     run.scan_start_date = start
     run.scan_end_date = end
     run.data_degraded = _compute_data_degraded(universe_id, db)
+
+    gate_metadata = None
+    try:
+        _gate_req = SimpleNamespace(
+            policy="advisory",
+            universe_id=universe_id,
+            scanner_type=scanner_type,
+            ticker=None,
+            requirements=None,
+        )
+        _assessment = QualityGateService.assess(db, _gate_req)
+        run.quality_gate = json.loads(json.dumps(_assessment.model_dump(), default=str))
+        gate_metadata = {
+            "tier": _assessment.verdict.value,
+            "warnings": [
+                {"code": w.code.value, "severity": w.severity, "message": w.message}
+                for w in _assessment.warnings
+            ],
+            "schema_version": _assessment.schema_version,
+        }
+        if _assessment.verdict.value != "trusted":
+            logger.warning(
+                "run_universe_scan %s: quality gate verdict=%s for universe=%s scanner=%s",
+                scan_id,
+                _assessment.verdict.value,
+                universe_id,
+                scanner_type,
+            )
+    except Exception as _gate_exc:
+        logger.exception(
+            "run_universe_scan %s: quality gate assessment failed (degrading gracefully): %s",
+            scan_id,
+            _gate_exc,
+        )
+
     db.commit()
 
     started_at = utc_now()
@@ -367,7 +404,12 @@ def _run_universe_scan_logic(
         try:
             day_events = asyncio.run(
                 _orchestrator.run(
-                    scanner_type, tickers, db=db, event_date=day, scanner_run=run
+                    scanner_type,
+                    tickers,
+                    db=db,
+                    event_date=day,
+                    scanner_run=run,
+                    gate_metadata=gate_metadata,
                 )
             )
         except Exception as e:

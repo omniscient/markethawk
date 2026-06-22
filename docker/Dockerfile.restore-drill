@@ -1,0 +1,26 @@
+FROM alpine:3.19@sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1
+
+# postgresql15 (server + client: initdb, postgres, psql), curl (Seq events)
+# No docker-cli needed — throwaway cluster runs via initdb + UNIX socket inside the container
+RUN apk add --no-cache postgresql15 curl
+
+# Install supercronic (arch-aware) — same version as Dockerfile.backup
+ARG SUPERCRONIC_VERSION=0.2.29
+RUN ARCH=$(uname -m); \
+    case "${ARCH}" in \
+        x86_64)  SC_ARCH="linux-amd64" ;; \
+        aarch64) SC_ARCH="linux-arm64" ;; \
+        armv7l)  SC_ARCH="linux-arm" ;; \
+        *)       echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac; \
+    wget -q "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-${SC_ARCH}" \
+         -O /usr/local/bin/supercronic && \
+    chmod +x /usr/local/bin/supercronic
+
+COPY scripts/restore-drill.sh /scripts/restore-drill.sh
+COPY scripts/restore-drill-entrypoint.sh /entrypoint.sh
+RUN chmod +x /scripts/restore-drill.sh /entrypoint.sh
+
+# postgres daemon cannot run as root; run as the postgres system user created by the package
+USER postgres
+ENTRYPOINT ["/entrypoint.sh"]

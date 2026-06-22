@@ -29,6 +29,7 @@ async def run_oversold_bounce_scan(
     db: Session,
     event_date: date = None,
     scanner_run: Optional["ScannerRun"] = None,
+    gate_metadata: Optional[Any] = None,
 ) -> List[Dict[str, Any]]:
     """Run the Oversold Bounce (Dual RSI) scan using DB daily aggregates."""
     import app.services.scanner as _scanner_mod
@@ -191,6 +192,7 @@ async def run_oversold_bounce_scan(
                         opening_price=float(today["Open"]),
                         closing_price=float(today["Close"]),
                         ranker_config=ranker_config,
+                        gate_metadata=gate_metadata,
                     )
                     results.append(event_dict)
                     scanner_events_total.labels(scanner_type="oversold_bounce").inc()
@@ -230,10 +232,18 @@ async def run_oversold_bounce_scan(
 
 
 async def _run(
-    tickers: list[str], db: Any, event_date: date, scanner_run: Optional[Any] = None
+    tickers: list[str],
+    db: Any,
+    event_date: date,
+    scanner_run: Optional[Any] = None,
+    gate_metadata: Optional[Any] = None,
 ) -> list[dict]:
     return await run_oversold_bounce_scan(
-        tickers, db, event_date=event_date, scanner_run=scanner_run
+        tickers,
+        db,
+        event_date=event_date,
+        scanner_run=scanner_run,
+        gate_metadata=gate_metadata,
     )
 
 

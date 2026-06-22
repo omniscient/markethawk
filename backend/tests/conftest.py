@@ -4,6 +4,7 @@ import os
 # Redis (db 1) is not available in the test environment; without this the
 # SlowAPIASGIMiddleware raises ConnectionError on every request.
 os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
+os.environ.setdefault("LIVE_SCANNER_MOCK", "false")
 
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 os.environ.setdefault("POLYGON_API_KEY", "test-key-for-unit-tests-only")

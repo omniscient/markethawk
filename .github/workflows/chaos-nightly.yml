@@ -1,0 +1,60 @@
+name: IBKR Chaos Nightly
+
+on:
+  # NOTE: the nightly `schedule:` trigger is intentionally PAUSED.
+  # `chaos-mock` runs `docker compose up postgres redis backend live-scanner`,
+  # which pulls the PRIVATE ghcr.io/omniscient/markethawk-backend image and
+  # stands up a multi-service Docker stack. A GitHub-hosted runner is not logged
+  # into GHCR (Head manifests -> 401 unauthorized) and is the wrong place for a
+  # full integration/chaos harness, so every scheduled run went red as noise.
+  # Run it on demand (workflow_dispatch) or locally:
+  #   bash scripts/chaos/ibkr_kill_test.sh --mock
+  # Re-enable the cron only once it runs on a self-hosted runner with GHCR auth
+  # (or the harness is reworked to build images in-job). Tracking: see issue.
+  # schedule:
+  #   - cron: '0 3 * * 1-5'  # 03:00 UTC, weekdays only
+  workflow_dispatch:
+
+jobs:
+  chaos-mock:
+    name: Chaos test (mock mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run IBKR chaos test — mock mode
+        env:
+          POSTGRES_PASSWORD: test
+          SECRET_KEY: test-secret-key-must-be-at-least-32-chars
+          JWT_SECRET_KEY: test-jwt-secret-key-must-be-at-least-32-chars
+          REDIS_PASSWORD: testpassword
+          POLYGON_API_KEY: test
+          DATABASE_URL: postgresql://markethawk:test@postgres:5432/markethawk
+        run: bash scripts/chaos/ibkr_kill_test.sh --mock
+
+  chaos-live:
+    name: Chaos test (live IBKR credentials)
+    runs-on: ubuntu-latest
+    # NOTE: the `secrets` context is NOT available in a job-level `if`, so the
+    # presence check is done inside the step (where secrets are exposed as env).
+    # The previous `if: ${{ secrets.IB_USERNAME != '' }}` made the whole workflow
+    # invalid, failing on every push to main.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run IBKR chaos test — live mode
+        env:
+          IB_USERNAME: ${{ secrets.IB_USERNAME }}
+          IB_PASSWORD: ${{ secrets.IB_PASSWORD }}
+          POSTGRES_PASSWORD: test
+          SECRET_KEY: test-secret-key-must-be-at-least-32-chars
+          JWT_SECRET_KEY: test-jwt-secret-key-must-be-at-least-32-chars
+          REDIS_PASSWORD: testpassword
+          POLYGON_API_KEY: test
+          DATABASE_URL: postgresql://markethawk:test@postgres:5432/markethawk
+        run: |
+          if [ -z "${IB_USERNAME}" ]; then
+            echo "No live IBKR credentials (secrets.IB_USERNAME unset) — skipping live chaos test."
+            exit 0
+          fi
+          bash scripts/chaos/ibkr_kill_test.sh
