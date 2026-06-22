@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, ShieldCheck, ShieldAlert, ShieldX, ShieldOff } from 'lucide-react';
-import type { QualityGateAssessment, QualityGateIssue, QualityGateVerdict } from '../../api/scanner';
+import type { QualityGateAssessment, QualityGateIssue, QualityGateVerdict } from '../api/scanner';
 
 interface TrustGateSummaryProps {
   gate?: QualityGateAssessment;
@@ -20,13 +20,13 @@ const SEVERITY_STYLES: Record<string, string> = {
 };
 
 const ISSUE_CODE_LABELS: Record<string, string> = {
-  missing_bars:               'Missing Bars',
-  split_dividend_anomaly:     'Split/Dividend Anomaly',
-  stale_quote_risk:           'Stale Quote Risk',
-  provider_gap:               'Provider Gap',
-  timezone_session_mismatch:  'Timezone/Session Mismatch',
-  survivorship_bias:          'Survivorship Bias',
-  insufficient_lookback:      'Insufficient Lookback',
+  missing_bars:              'Missing Bars',
+  split_dividend_anomaly:    'Split/Dividend Anomaly',
+  stale_quote_risk:          'Stale Quote Risk',
+  provider_gaps:             'Provider Gap',
+  timezone_session_mismatch: 'Timezone/Session Mismatch',
+  survivorship_bias_risk:    'Survivorship Bias',
+  stale_reference_data:      'Stale Reference Data',
 };
 
 interface IssueGroupProps {
@@ -70,14 +70,16 @@ const IssueGroup: React.FC<IssueGroupProps> = ({ code, issues }) => {
                 )}
                 <span className="text-gray-400">{issue.scope}</span>
               </div>
-              {issue.affected_inputs && issue.affected_inputs.length > 0 && (
+              {issue.affected_inputs && (
                 <div className="text-gray-500">
-                  Affected: {issue.affected_inputs.join(', ')}
+                  {issue.affected_inputs.timespans && `Timespans: ${issue.affected_inputs.timespans.join(', ')}`}
+                  {issue.affected_inputs.session && ` Session: ${issue.affected_inputs.session}`}
+                  {issue.affected_inputs.fields && ` Fields: ${issue.affected_inputs.fields.join(', ')}`}
                 </div>
               )}
               {issue.remediation && (
                 <div className="text-gray-400 italic">
-                  {issue.remediation.human_label}
+                  {issue.remediation.label}
                   {issue.remediation.automated && (
                     <span className="ml-1 text-[10px] text-green-400 font-bold">[auto]</span>
                   )}
@@ -99,7 +101,6 @@ const TrustGateSummary: React.FC<TrustGateSummaryProps> = ({ gate }) => {
   const style = VERDICT_STYLES[gate.verdict] ?? VERDICT_STYLES.skipped;
   const Icon = style.icon;
 
-  // Group issues by issue_code
   const grouped = gate.issues.reduce<Record<string, QualityGateIssue[]>>((acc, issue) => {
     const key = issue.issue_code;
     if (!acc[key]) acc[key] = [];
@@ -109,7 +110,6 @@ const TrustGateSummary: React.FC<TrustGateSummaryProps> = ({ gate }) => {
 
   return (
     <div className={`rounded-lg border p-4 space-y-3 ${style.bg} ${style.border}`}>
-      {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`h-5 w-5 ${style.text}`} />
@@ -134,19 +134,17 @@ const TrustGateSummary: React.FC<TrustGateSummaryProps> = ({ gate }) => {
         </div>
       </div>
 
-      {/* Most affected tickers */}
       {gate.summary.most_affected_tickers.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] text-gray-500 uppercase tracking-wider">Most affected:</span>
-          {gate.summary.most_affected_tickers.slice(0, 5).map(ticker => (
-            <span key={ticker} className="text-[10px] font-mono text-financial-light bg-gray-800/60 px-1.5 py-0.5 rounded">
-              {ticker}
+          {gate.summary.most_affected_tickers.slice(0, 5).map(t => (
+            <span key={t.ticker} className="text-[10px] font-mono text-financial-light bg-gray-800/60 px-1.5 py-0.5 rounded">
+              {t.ticker}
             </span>
           ))}
         </div>
       )}
 
-      {/* Issue groups toggle */}
       {gate.issues.length > 0 && (
         <div className="space-y-2">
           <button

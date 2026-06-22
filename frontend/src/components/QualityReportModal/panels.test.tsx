@@ -9,7 +9,7 @@ import TickerRow from './TickerRow';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import QualityOverviewCard from './QualityOverviewCard';
 import QualityFiltersBar from './QualityFiltersBar';
-import TrustGateSummary from './TrustGateSummary';
+import TrustGateSummary from '../TrustGateSummary';
 import type { QualityTickerResult, CoverageDetail, NormalizationProgress, QualityReport } from '../../api/universe';
 import type { QualityGateAssessment } from '../../api/scanner';
 
@@ -380,9 +380,17 @@ const makeGate = (overrides: Partial<QualityGateAssessment> = {}): QualityGateAs
   verdict: 'trusted',
   policy: 'advisory',
   consumer: 'scanner',
+  scanner_type: null,
+  universe_id: null,
+  generated_at: '2026-06-20T00:00:00Z',
+  assessment_id: 'test-gate-1',
+  verdict_reason: '',
   summary: {
     blocker_count: 0,
     warning_count: 0,
+    info_count: 0,
+    affected_ticker_count: 0,
+    total_tickers_evaluated: 0,
     most_affected_tickers: [],
     issue_code_counts: {},
   },
@@ -410,7 +418,13 @@ describe('TrustGateSummary', () => {
           summary: {
             blocker_count: 0,
             warning_count: 3,
-            most_affected_tickers: ['AAPL', 'TSLA'],
+            info_count: 0,
+            affected_ticker_count: 2,
+            total_tickers_evaluated: 10,
+            most_affected_tickers: [
+              { ticker: 'AAPL', issue_count: 2, max_severity: 'warning' },
+              { ticker: 'TSLA', issue_count: 1, max_severity: 'warning' },
+            ],
             issue_code_counts: { missing_bars: 3 },
           },
         })}
@@ -429,8 +443,11 @@ describe('TrustGateSummary', () => {
           summary: {
             blocker_count: 2,
             warning_count: 1,
-            most_affected_tickers: ['NVDA'],
-            issue_code_counts: { provider_gap: 2 },
+            info_count: 0,
+            affected_ticker_count: 1,
+            total_tickers_evaluated: 10,
+            most_affected_tickers: [{ ticker: 'NVDA', issue_count: 2, max_severity: 'blocker' }],
+            issue_code_counts: { provider_gaps: 2 },
           },
         })}
       />
@@ -448,11 +465,11 @@ describe('TrustGateSummary', () => {
   it('groups issues by issue_code', () => {
     const gate = makeGate({
       verdict: 'warning',
-      summary: { blocker_count: 0, warning_count: 2, most_affected_tickers: [], issue_code_counts: {} },
+      summary: { blocker_count: 0, warning_count: 2, info_count: 1, affected_ticker_count: 2, total_tickers_evaluated: 10, most_affected_tickers: [], issue_code_counts: {} },
       issues: [
-        { issue_code: 'missing_bars', severity: 'warning', scope: 'ticker', ticker: 'AAPL' },
-        { issue_code: 'missing_bars', severity: 'warning', scope: 'ticker', ticker: 'TSLA' },
-        { issue_code: 'stale_quote_risk', severity: 'info', scope: 'session' },
+        { issue_code: 'missing_bars', severity: 'warning', title: 'Missing Bars', scope: 'ticker', ticker: 'AAPL', asset_class: 'us_equity', affected_inputs: null, detail: {}, remediation: { action: 'backfill', label: 'Backfill', description: 'Run backfill', automated: true } },
+        { issue_code: 'missing_bars', severity: 'warning', title: 'Missing Bars', scope: 'ticker', ticker: 'TSLA', asset_class: 'us_equity', affected_inputs: null, detail: {}, remediation: { action: 'backfill', label: 'Backfill', description: 'Run backfill', automated: true } },
+        { issue_code: 'stale_quote_risk', severity: 'info', title: 'Stale Quote Risk', scope: 'session', ticker: null, asset_class: null, affected_inputs: null, detail: {}, remediation: { action: 'refresh', label: 'Refresh quotes', description: 'Refresh', automated: false } },
       ],
     });
     renderWithQuery(<TrustGateSummary gate={gate} />);
@@ -468,9 +485,9 @@ describe('TrustGateSummary', () => {
   it('expands issues by default when verdict is blocked', () => {
     const gate = makeGate({
       verdict: 'blocked',
-      summary: { blocker_count: 1, warning_count: 0, most_affected_tickers: [], issue_code_counts: {} },
+      summary: { blocker_count: 1, warning_count: 0, info_count: 0, affected_ticker_count: 0, total_tickers_evaluated: 10, most_affected_tickers: [], issue_code_counts: {} },
       issues: [
-        { issue_code: 'provider_gap', severity: 'blocker', scope: 'universe' },
+        { issue_code: 'provider_gaps', severity: 'blocker', title: 'Provider Gap', scope: 'universe', ticker: null, asset_class: null, affected_inputs: null, detail: {}, remediation: { action: 'contact', label: 'Contact provider', description: 'Contact', automated: false } },
       ],
     });
     renderWithQuery(<TrustGateSummary gate={gate} />);

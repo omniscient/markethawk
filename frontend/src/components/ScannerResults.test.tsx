@@ -81,7 +81,12 @@ const makeGate = (overrides: Partial<QualityGateAssessment> = {}): QualityGateAs
   verdict: 'trusted',
   policy: 'advisory',
   consumer: 'scanner',
-  summary: { blocker_count: 0, warning_count: 0, most_affected_tickers: [], issue_code_counts: {} },
+  scanner_type: null,
+  universe_id: null,
+  generated_at: '2026-06-20T00:00:00Z',
+  assessment_id: 'test-gate-1',
+  verdict_reason: '',
+  summary: { blocker_count: 0, warning_count: 0, info_count: 0, affected_ticker_count: 0, total_tickers_evaluated: 0, most_affected_tickers: [], issue_code_counts: {} },
   issues: [],
   ...overrides,
 });
@@ -106,7 +111,7 @@ describe('ScannerResults — TrustGateBanner', () => {
         results={emptyResults}
         qualityGate={makeGate({
           verdict: 'warning',
-          summary: { blocker_count: 0, warning_count: 2, most_affected_tickers: [], issue_code_counts: {} },
+          summary: { blocker_count: 0, warning_count: 2, info_count: 0, affected_ticker_count: 0, total_tickers_evaluated: 0, most_affected_tickers: [], issue_code_counts: {} },
         })}
       />
     );
@@ -120,7 +125,7 @@ describe('ScannerResults — TrustGateBanner', () => {
         results={emptyResults}
         qualityGate={makeGate({
           verdict: 'blocked',
-          summary: { blocker_count: 1, warning_count: 0, most_affected_tickers: [], issue_code_counts: {} },
+          summary: { blocker_count: 1, warning_count: 0, info_count: 0, affected_ticker_count: 0, total_tickers_evaluated: 0, most_affected_tickers: [], issue_code_counts: {} },
         })}
       />
     );

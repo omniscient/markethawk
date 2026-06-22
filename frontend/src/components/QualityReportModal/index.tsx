@@ -10,7 +10,7 @@ import TickerRow from './TickerRow';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import QualityOverviewCard from './QualityOverviewCard';
 import QualityFiltersBar from './QualityFiltersBar';
-import TrustGateSummary from './TrustGateSummary';
+import TrustGateSummary from '../TrustGateSummary';
 
 type SortKey = 'ticker' | 'grade' | 'coverage_pct' | 'gap_count' | 'actual_bars';
 
@@ -143,6 +143,7 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
       }
     >
       <div className="relative space-y-4 min-h-[300px]">
+        {gate && <TrustGateSummary gate={gate} />}
 
         {(isLoading || isAnalyzing) && (
           <div className={`flex flex-col items-center justify-center gap-3 ${rd ? 'py-4' : 'py-12'} text-gray-400`}>
@@ -180,8 +181,6 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
 
         {rd && !isAnalyzing && (
           <>
-            <TrustGateSummary gate={gate} />
-
             <QualityOverviewCard
               rd={rd}
               gradeFilter={gradeFilter}
