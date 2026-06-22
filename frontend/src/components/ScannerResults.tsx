@@ -12,7 +12,7 @@ import Card from './ui/Card';
 import Ticker from './Ticker';
 import ReviewControls from './ReviewControls';
 import TrustGateBanner from './TrustGateBanner';
-import { ScannerEvent, ScannerDiagnostics, QualityGateAssessment, QualityGateIssue } from '../api/scanner';
+import { ScannerEvent, ScannerDiagnostics, QualityGateAssessment } from '../api/scanner';
 import { safeExternalUrl } from '../utils/url';
 
 const TWEET_HOSTS = ['twitter.com', 'x.com', 't.co'];
@@ -263,9 +263,9 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                         showIcon={true}
                       />
                       {Array.isArray(event.metadata?.quality_warnings) &&
-                        (event.metadata.quality_warnings as QualityGateIssue[]).length > 0 && (
+                        (event.metadata.quality_warnings as string[]).length > 0 && (
                           <QualityWarningBadge
-                            warnings={event.metadata.quality_warnings as QualityGateIssue[]}
+                            warnings={event.metadata.quality_warnings as string[]}
                           />
                         )}
                     </div>
@@ -451,7 +451,7 @@ const ScoreQualityBadge: React.FC<ScoreQualityBadgeProps> = ({ score, criteriaMe
 };
 
 interface QualityWarningBadgeProps {
-  warnings: QualityGateIssue[];
+  warnings: string[];
 }
 
 const QualityWarningBadge: React.FC<QualityWarningBadgeProps> = ({ warnings }) => {

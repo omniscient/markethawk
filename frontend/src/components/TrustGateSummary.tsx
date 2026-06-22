@@ -1,17 +1,11 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, ShieldCheck, ShieldAlert, ShieldX, ShieldOff } from 'lucide-react';
-import type { QualityGateAssessment, QualityGateIssue, QualityGateVerdict } from '../api/scanner';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import type { QualityGateAssessment, QualityGateIssue } from '../api/scanner';
+import { VERDICT_CONFIG } from './verdictConfig';
 
 interface TrustGateSummaryProps {
   gate?: QualityGateAssessment;
 }
-
-const VERDICT_STYLES: Record<QualityGateVerdict, { bg: string; border: string; text: string; icon: React.FC<{ className?: string }> }> = {
-  trusted:  { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-400', icon: ShieldCheck },
-  warning:  { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400', icon: ShieldAlert },
-  blocked:  { bg: 'bg-red-500/10',   border: 'border-red-500/30',   text: 'text-red-400',   icon: ShieldX },
-  skipped:  { bg: 'bg-gray-500/10',  border: 'border-gray-500/30',  text: 'text-gray-400',  icon: ShieldOff },
-};
 
 const SEVERITY_STYLES: Record<string, string> = {
   blocker: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -71,10 +65,19 @@ const IssueGroup: React.FC<IssueGroupProps> = ({ code, issues }) => {
                 <span className="text-gray-400">{issue.scope}</span>
               </div>
               {issue.affected_inputs && (
-                <div className="text-gray-500">
-                  {issue.affected_inputs.timespans && `Timespans: ${issue.affected_inputs.timespans.join(', ')}`}
-                  {issue.affected_inputs.session && ` Session: ${issue.affected_inputs.session}`}
-                  {issue.affected_inputs.fields && ` Fields: ${issue.affected_inputs.fields.join(', ')}`}
+                <div className="text-gray-500 space-y-0.5">
+                  {issue.affected_inputs.timespans && (
+                    <div>Timespans: {issue.affected_inputs.timespans.join(', ')}</div>
+                  )}
+                  {issue.affected_inputs.session && (
+                    <div>Session: {issue.affected_inputs.session}</div>
+                  )}
+                  {issue.affected_inputs.fields && (
+                    <div>Fields: {issue.affected_inputs.fields.join(', ')}</div>
+                  )}
+                  {issue.affected_inputs.date_range && (
+                    <div>Date range: {issue.affected_inputs.date_range.start} – {issue.affected_inputs.date_range.end}</div>
+                  )}
                 </div>
               )}
               {issue.remediation && (
@@ -94,11 +97,20 @@ const IssueGroup: React.FC<IssueGroupProps> = ({ code, issues }) => {
 };
 
 const TrustGateSummary: React.FC<TrustGateSummaryProps> = ({ gate }) => {
-  const [issuesOpen, setIssuesOpen] = useState(() => gate?.verdict === 'blocked');
+  const [prevAssessmentId, setPrevAssessmentId] = useState(gate?.assessment_id);
+  const [issuesOpen, setIssuesOpen] = useState(gate?.verdict === 'blocked');
+
+  // Sync open state when a new gate arrives (React "prev-state during render" pattern)
+  if (gate?.assessment_id !== prevAssessmentId) {
+    setPrevAssessmentId(gate?.assessment_id);
+    if (gate?.verdict === 'blocked') {
+      setIssuesOpen(true);
+    }
+  }
 
   if (!gate) return null;
 
-  const style = VERDICT_STYLES[gate.verdict] ?? VERDICT_STYLES.skipped;
+  const style = VERDICT_CONFIG[gate.verdict] ?? VERDICT_CONFIG.skipped;
   const Icon = style.icon;
 
   const grouped = gate.issues.reduce<Record<string, QualityGateIssue[]>>((acc, issue) => {
@@ -128,7 +140,7 @@ const TrustGateSummary: React.FC<TrustGateSummaryProps> = ({ gate }) => {
               {gate.summary.warning_count} warning{gate.summary.warning_count !== 1 ? 's' : ''}
             </span>
           )}
-          {gate.summary.blocker_count === 0 && gate.summary.warning_count === 0 && (
+          {gate.verdict === 'trusted' && (
             <span className="text-gray-500">Data quality checks passed</span>
           )}
         </div>
