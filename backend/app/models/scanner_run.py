@@ -38,6 +38,8 @@ class ScannerRun(Base):
     error_message = Column(Text, nullable=True)
     # Per-ticker failures from partial scan runs: [{ticker, error_type, message, retryable}, ...]
     failed_tickers = Column(JSONB, nullable=True)
+    # Full QualityGateAssessment persisted at scan start (advisory mode); null for nightly/live scans
+    quality_gate = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=utc_now)
     scan_start_date = Column(Date, nullable=True)
     scan_end_date = Column(Date, nullable=True)
