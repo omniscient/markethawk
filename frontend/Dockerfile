@@ -1,9 +1,19 @@
 FROM node:26-alpine@sha256:a2dc166a387cc6ca1e62d0c8e265e49ca985d6e60abc9fe6e6c3d6ce8e63f606
 
-# Upgrade npm to 11.x. node:22-alpine bundles npm 10.9.8, whose vendored
-# picomatch 4.0.3 carries a HIGH ReDoS (CVE-2026-33671); npm 11 drops that
-# bundled dependency entirely, clearing the Trivy image gate.
-RUN npm install -g npm@11.17.0
+# Upgrade npm to 11.x and patch npm's *bundled* undici.
+#
+# npm@11.17.0 (the newest release) vendors undici 6.26.0 — CVE-2026-12151, a
+# HIGH DoS via unbounded memory. No npm release has shipped a fixed bundle yet,
+# so we delete the vulnerable copy and install the patched undici 6.27.0 in the
+# global root, where npm still resolves it (verified: npm and its registry/HTTP
+# stack work against the relocated copy). The app's own undici is separately
+# pinned to 7.28.0 via package.json overrides; this only concerns npm's vendored
+# HTTP client. (npm 11 also drops the picomatch 4.0.3 ReDoS, CVE-2026-33671,
+# that the older bundled npm on node:22-alpine carried.)
+RUN npm install -g npm@11.17.0 && \
+    rm -rf "$(npm root -g)/npm/node_modules/undici" && \
+    npm install -g undici@6.27.0 && \
+    npm cache clean --force
 
 WORKDIR /app
 
