@@ -297,6 +297,48 @@ def _run_universe_scan_logic(
     run.scan_start_date = start
     run.scan_end_date = end
     run.data_degraded = _compute_data_degraded(universe_id, db)
+
+    gate_metadata = None
+    try:
+        import json as _json
+        from types import SimpleNamespace
+
+        from app.services.quality_gate import QualityGateService
+
+        _gate_req = SimpleNamespace(
+            policy="advisory",
+            universe_id=universe_id,
+            scanner_type=scanner_type,
+            ticker=None,
+            requirements=None,
+        )
+        _assessment = QualityGateService.assess(db, _gate_req)
+        run.quality_gate = _json.loads(
+            _json.dumps(_assessment.model_dump(), default=str)
+        )
+        gate_metadata = {
+            "tier": _assessment.verdict.value,
+            "warnings": [
+                {"code": w.code.value, "severity": w.severity, "message": w.message}
+                for w in _assessment.warnings
+            ],
+            "schema_version": _assessment.schema_version,
+        }
+        if _assessment.verdict.value != "trusted":
+            logger.warning(
+                "run_universe_scan %s: quality gate verdict=%s for universe=%s scanner=%s",
+                scan_id,
+                _assessment.verdict.value,
+                universe_id,
+                scanner_type,
+            )
+    except Exception as _gate_exc:
+        logger.warning(
+            "run_universe_scan %s: quality gate assessment failed (degrading gracefully): %s",
+            scan_id,
+            _gate_exc,
+        )
+
     db.commit()
 
     started_at = utc_now()
@@ -367,7 +409,12 @@ def _run_universe_scan_logic(
         try:
             day_events = asyncio.run(
                 _orchestrator.run(
-                    scanner_type, tickers, db=db, event_date=day, scanner_run=run
+                    scanner_type,
+                    tickers,
+                    db=db,
+                    event_date=day,
+                    scanner_run=run,
+                    gate_metadata=gate_metadata,
                 )
             )
         except Exception as e:

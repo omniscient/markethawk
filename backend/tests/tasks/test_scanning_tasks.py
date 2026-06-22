@@ -317,6 +317,96 @@ class TestEvaluateScannerAlertsLogic:
 
 
 # ---------------------------------------------------------------------------
+# Quality gate integration tests
+# ---------------------------------------------------------------------------
+
+
+def _make_assessment(verdict="trusted", warnings=None):
+    """Build a minimal QualityGateAssessment-like object for tests."""
+    from app.schemas.quality_gate import (
+        QualityGateAssessment,
+        QualityGatePolicy,
+        QualityGateScope,
+        QualityGateVerdict,
+    )
+    from app.utils.time import utc_now
+
+    return QualityGateAssessment(
+        policy=QualityGatePolicy.advisory,
+        verdict=QualityGateVerdict(verdict),
+        trusted=(verdict == "trusted"),
+        scope=QualityGateScope(universe_id=1, scanner_type="pre_market_volume_spike"),
+        score=95.0,
+        grade="A",
+        issues=[],
+        warnings=warnings or [],
+        generated_at=utc_now(),
+    )
+
+
+class TestQualityGateInUniverseScan:
+    def _run_logic_with_gate(self, assessment, gate_raises=False):
+        from app.tasks.scanning import _run_universe_scan_logic
+
+        run = _make_run("scan-gate-01")
+        published = []
+        db = _make_db(run=run, tickers=[_make_ticker("AAPL")])
+
+        patch_target = "app.services.quality_gate.QualityGateService.assess"
+        if gate_raises:
+            gate_mock = patch(patch_target, side_effect=RuntimeError("gate boom"))
+        else:
+            gate_mock = patch(patch_target, return_value=assessment)
+
+        with gate_mock, patch("app.tasks.scanning.asyncio.run", return_value=[]):
+            _run_universe_scan_logic(
+                scan_id="scan-gate-01",
+                scanner_type="pre_market_volume_spike",
+                universe_id=1,
+                start=date(2026, 6, 2),
+                end=date(2026, 6, 2),
+                db=db,
+                publish=lambda p: published.append(p),
+                is_cancelled=lambda: False,
+                task_id="task-gate",
+            )
+
+        return run, published
+
+    def test_gate_assessment_persisted_to_quality_gate(self):
+        """QualityGateService.assess() result is stored on run.quality_gate."""
+        assessment = _make_assessment(verdict="trusted")
+        run, _ = self._run_logic_with_gate(assessment)
+        assert run.quality_gate is not None
+        assert run.quality_gate["verdict"] == "trusted"
+        assert run.quality_gate["schema_version"] == "quality_gate.v1"
+
+    def test_advisory_warning_does_not_block_scan(self):
+        """A warning verdict under advisory policy does not block scan execution."""
+        from app.schemas.quality_gate import QualityGateIssue, QualityIssueCode
+
+        warning_issue = QualityGateIssue(
+            code=QualityIssueCode.missing_bars,
+            severity="warning",
+            message="No completed quality report found",
+        )
+        assessment = _make_assessment(verdict="warning", warnings=[warning_issue])
+        run, published = self._run_logic_with_gate(assessment)
+        # scan completed despite warning
+        assert run.status == "completed"
+        assert any(p.get("type") == "completed" for p in published)
+
+    def test_gate_exception_degrades_gracefully(self):
+        """When QualityGateService raises, scan continues and quality_gate is not set to a dict."""
+        run, published = self._run_logic_with_gate(assessment=None, gate_raises=True)
+        # quality_gate was never assigned a dict (exception prevented it)
+        assert not isinstance(run.quality_gate, dict)
+        # scan still completed
+        assert run.status == "completed"
+        assert any(p.get("type") == "completed" for p in published)
+
+
+# ---------------------------------------------------------------------------
 # _run_range_scan_logic tests
 # ---------------------------------------------------------------------------
 
