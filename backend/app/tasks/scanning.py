@@ -312,7 +312,7 @@ def _run_universe_scan_logic(
         _assessment = QualityGateService.assess(db, _gate_req)
         run.quality_gate = json.loads(json.dumps(_assessment.model_dump(), default=str))
         gate_metadata = {
-            "verdict": _assessment.verdict.value,
+            "tier": _assessment.verdict.value,
             "warnings": [
                 {"code": w.code.value, "severity": w.severity, "message": w.message}
                 for w in _assessment.warnings
