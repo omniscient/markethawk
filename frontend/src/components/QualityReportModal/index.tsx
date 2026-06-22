@@ -4,11 +4,13 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { useQualityReport } from '../../hooks/useQualityReport';
 import type { StockUniverse, QualityTickerResult } from '../../api/universe';
+import type { QualityGateAssessment } from '../../api/scanner';
 import NormalizationProgressPanel from './NormalizationProgressPanel';
 import TickerRow from './TickerRow';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import QualityOverviewCard from './QualityOverviewCard';
 import QualityFiltersBar from './QualityFiltersBar';
+import TrustGateSummary from '../TrustGateSummary';
 
 type SortKey = 'ticker' | 'grade' | 'coverage_pct' | 'gap_count' | 'actual_bars';
 
@@ -32,9 +34,10 @@ interface QualityReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   universe: StockUniverse | null;
+  gate?: QualityGateAssessment;
 }
 
-const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose, universe }) => {
+const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose, universe, gate }) => {
   const [sortKey, setSortKey] = useState<SortKey>('grade');
   const [sortAsc, setSortAsc] = useState(true);
   const [gradeFilter, setGradeFilter] = useState<string>('all');
@@ -140,6 +143,7 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
       }
     >
       <div className="relative space-y-4 min-h-[300px]">
+        {gate && <TrustGateSummary gate={gate} />}
 
         {(isLoading || isAnalyzing) && (
           <div className={`flex flex-col items-center justify-center gap-3 ${rd ? 'py-4' : 'py-12'} text-gray-400`}>
