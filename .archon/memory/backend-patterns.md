@@ -24,8 +24,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 
 
-- [PATTERN] When adding a NOT NULL FK column to a table that already has rows: (1) add nullable, (2) UPDATE to backfill default, (3) ALTER to NOT NULL — all in the same Alembic migration. The universe_id migration (c7d8e9f0a1b2) demonstrates this three-step pattern for `scanner_configs`. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
-
 ## Backend: Cookie Security
 
 - [PATTERN] Use a dedicated `COOKIE_SECURE: bool = True` field in `Settings` rather than deriving the secure flag from `ENVIRONMENT == "production"` — the dedicated field is overridable independently, defaults secure-by-default, and avoids a regression if `ENVIRONMENT` is not set. Add `COOKIE_SECURE: "false"` to the `backend` service in `docker-compose.override.yml` so local HTTP dev works automatically. <!-- issue:#202 date:2026-06-05 expires:2026-12-05 source:implement -->
@@ -89,6 +87,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PATTERN] Gate `scan_last_success_timestamp.set(time.time())` on non-total-failure: `if not tickers or len(failed) < len(tickers)`. A run where every ticker fails still "completes", but should not advance last-success — otherwise the missed-slot staleness alert never fires on total outage, defeating the acceptance criterion. An empty universe counts as success. <!-- issue:#391 date:2026-06-15 expires:2026-12-15 source:implement -->
 
 - [PATTERN] Wrap the scanner body in `try/finally` and call `scan_duration_seconds.observe()` in the `finally` block — not after the work. If `_persist` or any post-scan query raises, the observation is skipped and p95 is biased low (slow-then-crashing runs silently drop out). Applies to all scanner entry points in `backend/app/services/`. <!-- issue:#391 date:2026-06-15 expires:2026-12-15 source:implement -->
+
+## Backend: Replay / No-persist Patching
+
+- [PATTERN] When patching `save_event` out for dry-run or replay, patch ALL import-site bindings — not just the source module. `liquidity_hunt`, `pocket_pivot`, and `trend_pullback_scan` each do `from app.services.alert_service import save_event as _save_event` at module load time; patching only `alert_service.save_event` does not rebind those local aliases. Use `contextlib.ExitStack` with `_SAVE_EVENT_PATCH_TARGETS = ["app.services.liquidity_hunt._save_event", "app.services.pocket_pivot._save_event", "app.services.trend_pullback_scan._save_event", "app.services.scanner.ScannerService._save_event"]`. See `replay_diff_service.py`. <!-- issue:#392 date:2026-06-21 expires:2026-12-21 source:implement -->
 
 ## Backend: Backtest / Simulation
 

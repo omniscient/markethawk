@@ -913,6 +913,96 @@ def run_trend_pullback_scheduled(self):
 
 
 # ---------------------------------------------------------------------------
+# Nightly replay-diff task — 04:00 UTC weekdays
+# ---------------------------------------------------------------------------
+
+
+def _run_replay_diff_logic(db: Session, scan_date: date) -> None:
+    """Testable core of run_replay_diff_nightly. No Celery/OTel context needed."""
+    import app.services.liquidity_hunt  # noqa: F401
+    import app.services.oversold_bounce_scan  # noqa: F401
+    import app.services.pocket_pivot  # noqa: F401
+    import app.services.pre_market_scan  # noqa: F401
+    import app.services.scan_orchestrator as _orchestrator
+    import app.services.trend_pullback_scan  # noqa: F401
+    from app.models.scanner_config import ScannerConfig
+    from app.services.replay_diff_service import run_replay_diff_for_scanner
+
+    all_descriptors = _orchestrator.get_all()
+    eligible = [d for d in all_descriptors if d.supports_date_range]
+
+    if not eligible:
+        logger.warning("run_replay_diff_nightly: no eligible scanner descriptors found")
+        return
+
+    for descriptor in eligible:
+        scanner_type = descriptor.key
+        configs = (
+            db.query(ScannerConfig)
+            .filter(
+                ScannerConfig.scanner_type == scanner_type,
+                ScannerConfig.is_active.is_(True),
+            )
+            .all()
+        )
+        if not configs:
+            logger.info(
+                "replay_diff: no active ScannerConfig for scanner_type=%s, skipping",
+                scanner_type,
+            )
+            continue
+
+        # Collect tickers from all active universes for this scanner type
+        tickers_seen: set = set()
+        for cfg in configs:
+            if cfg.universe_id is None:
+                continue
+            rows = (
+                db.query(MonitoredStock)
+                .filter(
+                    MonitoredStock.universe_id == cfg.universe_id,
+                    MonitoredStock.is_active.is_(True),
+                )
+                .all()
+            )
+            tickers_seen.update(ms.ticker for ms in rows)
+
+        tickers = sorted(tickers_seen)
+        try:
+            run_replay_diff_for_scanner(scanner_type, scan_date, tickers, db)
+        except Exception as exc:
+            logger.exception(
+                "replay_diff: run_replay_diff_for_scanner failed scanner=%s date=%s: %s",
+                scanner_type,
+                scan_date,
+                exc,
+            )
+
+
+@celery_app.task(bind=True, max_retries=1, name="app.tasks.run_replay_diff_nightly")
+def run_replay_diff_nightly(self):
+    """04:00 UTC weekdays: re-run yesterday's scans and diff vs live signals."""
+    from datetime import timedelta
+
+    _task_name = "run_replay_diff_nightly"
+    _start = _time.monotonic()
+    db: Session = SessionLocal()
+    try:
+        yesterday = date.today() - timedelta(days=1)
+        _run_replay_diff_logic(db, yesterday)
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
+    except Exception as exc:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
+        logger.exception("run_replay_diff_nightly failed: %s", exc)
+        raise self.retry(exc=exc)
+    finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
+        db.close()
+
+
+# ---------------------------------------------------------------------------
 # Startup validation — wired to worker_ready signal in celery_app.py
 # ---------------------------------------------------------------------------
 
