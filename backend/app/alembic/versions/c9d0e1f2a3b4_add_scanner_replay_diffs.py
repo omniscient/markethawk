@@ -1,7 +1,7 @@
 """add_scanner_replay_diffs
 
 Revision ID: c9d0e1f2a3b4
-Revises: b45cf49c1c5a
+Revises: 9f1e80e7a081
 Create Date: 2026-06-21 04:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "c9d0e1f2a3b4"
-down_revision: Union[str, None] = "b45cf49c1c5a"
+down_revision: Union[str, None] = "9f1e80e7a081"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
