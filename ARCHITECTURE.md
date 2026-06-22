@@ -28,6 +28,7 @@ graph TD
         seqgelf["seq-gelf :12201/udp"]
         forecastworker["forecast-worker (profile: forecasting)"]
         dbbackup["db-backup"]
+        dbrestoredrill["db-restore-drill"]
     end
 
     subgraph factory["factory-network"]
@@ -86,6 +87,8 @@ graph TD
     forecastworker --> redis
     dbbackup -->|"pg_dump"| postgres
     dbbackup -->|"failure events"| seq
+    dbrestoredrill -->|"read backups :ro"| dbbackup
+    dbrestoredrill -->|"drill events"| seq
 ```
 
 ### Container Users
@@ -96,6 +99,7 @@ graph TD
 | `markethawk-frontend` | `frontend` | `node` | Non-root; default node image user |
 | `markethawk-dark-factory` | `dark-factory`, `backlog-scheduler` | `factory` (uid 1000) | Non-root; created in `dark-factory/Dockerfile` |
 | `markethawk-forecast` | `forecast-worker` | `root` | Exception: HuggingFace model weights (~800 MB) cached at `/root/.cache/huggingface` via `timesfm_cache` named volume; converting to non-root requires relocating the cache path (tracked as a separate follow-up) |
+| `markethawk-db-restore-drill` | `db-restore-drill` | `postgres` | Runs as the postgres system user (required to run `initdb` / `postgres` daemon); no Docker socket access. |
 
 ## Scan Execution Flow
 
