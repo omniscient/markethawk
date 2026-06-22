@@ -4,11 +4,13 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { useQualityReport } from '../../hooks/useQualityReport';
 import type { StockUniverse, QualityTickerResult } from '../../api/universe';
+import type { QualityGateAssessment } from '../../api/scanner';
 import NormalizationProgressPanel from './NormalizationProgressPanel';
 import TickerRow from './TickerRow';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import QualityOverviewCard from './QualityOverviewCard';
 import QualityFiltersBar from './QualityFiltersBar';
+import TrustGateSummary from './TrustGateSummary';
 
 type SortKey = 'ticker' | 'grade' | 'coverage_pct' | 'gap_count' | 'actual_bars';
 
@@ -32,9 +34,10 @@ interface QualityReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   universe: StockUniverse | null;
+  gate?: QualityGateAssessment;
 }
 
-const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose, universe }) => {
+const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose, universe, gate }) => {
   const [sortKey, setSortKey] = useState<SortKey>('grade');
   const [sortAsc, setSortAsc] = useState(true);
   const [gradeFilter, setGradeFilter] = useState<string>('all');
@@ -177,6 +180,8 @@ const QualityReportModal: React.FC<QualityReportModalProps> = ({ isOpen, onClose
 
         {rd && !isAnalyzing && (
           <>
+            <TrustGateSummary gate={gate} />
+
             <QualityOverviewCard
               rd={rd}
               gradeFilter={gradeFilter}

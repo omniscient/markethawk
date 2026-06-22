@@ -94,6 +94,49 @@ export interface ScannerDiagnostics {
   errors?: number;
 }
 
+export type QualityIssueCode =
+  | 'missing_bars'
+  | 'split_dividend_anomaly'
+  | 'stale_quote_risk'
+  | 'provider_gap'
+  | 'timezone_session_mismatch'
+  | 'survivorship_bias'
+  | 'insufficient_lookback';
+
+export type QualityGateVerdict = 'trusted' | 'warning' | 'blocked' | 'skipped';
+
+export interface QualityGateRemediation {
+  action_code: string;
+  human_label: string;
+  automated: boolean;
+}
+
+export interface QualityGateIssue {
+  issue_code: QualityIssueCode;
+  severity: 'blocker' | 'warning' | 'info';
+  scope: string;
+  ticker?: string | null;
+  affected_inputs?: string[] | null;
+  detail?: Record<string, unknown> | null;
+  remediation?: QualityGateRemediation | null;
+}
+
+export interface QualityGateSummary {
+  blocker_count: number;
+  warning_count: number;
+  most_affected_tickers: string[];
+  issue_code_counts: Record<string, number>;
+}
+
+export interface QualityGateAssessment {
+  assessment_id?: string;
+  verdict: QualityGateVerdict;
+  policy: string;
+  consumer: string;
+  summary: QualityGateSummary;
+  issues: QualityGateIssue[];
+}
+
 export interface ScannerRunResponse {
   scan_id: string;
   status: string;
@@ -107,6 +150,7 @@ export interface ScannerRunResponse {
   scan_start_date?: string;
   scan_end_date?: string;
   diagnostics?: ScannerDiagnostics;
+  quality_gate?: QualityGateAssessment;
 }
 
 export interface ScannerRunAsyncResponse {
