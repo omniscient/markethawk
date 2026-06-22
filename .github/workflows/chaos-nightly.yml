@@ -25,7 +25,10 @@ jobs:
   chaos-live:
     name: Chaos test (live IBKR credentials)
     runs-on: ubuntu-latest
-    if: ${{ secrets.IB_USERNAME != '' }}
+    # NOTE: the `secrets` context is NOT available in a job-level `if`, so the
+    # presence check is done inside the step (where secrets are exposed as env).
+    # The previous `if: ${{ secrets.IB_USERNAME != '' }}` made the whole workflow
+    # invalid, failing on every push to main.
     steps:
       - uses: actions/checkout@v4
 
@@ -39,4 +42,9 @@ jobs:
           REDIS_PASSWORD: testpassword
           POLYGON_API_KEY: test
           DATABASE_URL: postgresql://markethawk:test@postgres:5432/markethawk
-        run: bash scripts/chaos/ibkr_kill_test.sh
+        run: |
+          if [ -z "${IB_USERNAME}" ]; then
+            echo "No live IBKR credentials (secrets.IB_USERNAME unset) — skipping live chaos test."
+            exit 0
+          fi
+          bash scripts/chaos/ibkr_kill_test.sh
