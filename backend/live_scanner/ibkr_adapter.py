@@ -130,11 +130,8 @@ async def create_adapter(
     """
     util.patchAsyncio()
     ib = IB()
-    ib.disconnectedEvent += lambda: logger.warning(
-        "IB Gateway disconnected — will retry subscriptions on next sync cycle"
-    )
     if await _connect_ib(ib, host, port, client_id):
-        return IBKRLiveAdapter(ib)
+        return IBKRLiveAdapter(ib, host, port, client_id)
     return None
 
 
@@ -147,8 +144,13 @@ class IBKRLiveAdapter:
     Receives a pre-connected IB instance from create_adapter().
     """
 
-    def __init__(self, ib: IB) -> None:
+    def __init__(
+        self, ib: IB, host: str = "", port: int = 0, client_id: int = 0
+    ) -> None:
         self._ib = ib
+        self._host = host
+        self._port = port
+        self._client_id = client_id
         self._bar_subs: dict[str, Any] = {}
         self._mkt_subs: dict[str, Any] = {}
 
@@ -160,6 +162,34 @@ class IBKRLiveAdapter:
         if qualified is None:
             return 0.0, 0.0
         return await _fetch_prior_data(self._ib, qualified, symbol)
+
+    # ── Reconnect interface ────────────────────────────────────────────────
+
+    def wire_disconnect_queue(
+        self,
+        queue: asyncio.Queue,
+        disconnect_tag: str,
+        loop: asyncio.AbstractEventLoop,
+    ) -> None:
+        """Wire disconnectedEvent to put TAG_DISCONNECT on the asyncio queue."""
+
+        def _on_disconnect() -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, (disconnect_tag, None, None))
+
+        self._ib.disconnectedEvent += _on_disconnect
+
+    async def reconnect(self) -> bool:
+        """Re-establish connection using stored host/port/client_id."""
+        return await _connect_ib(self._ib, self._host, self._port, self._client_id)
+
+    def is_connected(self) -> bool:
+        return self._ib.isConnected()
+
+    def force_disconnect(self) -> None:
+        """Force-close the connection (triggers disconnectedEvent for network-partition recovery)."""
+        self._ib.disconnect()
+
+    # ── Data streaming ─────────────────────────────────────────────────────
 
     async def subscribe(
         self,

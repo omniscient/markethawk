@@ -113,6 +113,27 @@ class LivePublisher:
         await self._redis.publish("watchlist:live_data", msg)
 
     # ------------------------------------------------------------------
+    # Feed-status events
+    # ------------------------------------------------------------------
+
+    async def publish_feed_loss(self) -> None:
+        """Publish a feed_loss event to watchlist:alerts when IBKR disconnects."""
+        msg = json.dumps(
+            {"type": "feed_loss", "timestamp": datetime.now(timezone.utc).isoformat()}
+        )
+        await self._redis.publish("watchlist:alerts", msg)
+
+    async def publish_feed_recovered(self) -> None:
+        """Publish a feed_recovered event to watchlist:alerts after reconnect."""
+        msg = json.dumps(
+            {
+                "type": "feed_recovered",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        await self._redis.publish("watchlist:alerts", msg)
+
+    # ------------------------------------------------------------------
     # Alert publishing
     # ------------------------------------------------------------------
 

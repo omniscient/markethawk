@@ -216,3 +216,54 @@ After upgrading, always check `docker-compose logs backend` for startup errors a
 | Docker | `docker-compose logs -f` | Raw container stdout for all services |
 
 See [DEVELOPMENT.md — Monitoring Services](DEVELOPMENT.md#monitoring-services) for query examples.
+
+---
+
+## IBKR Feed Loss Runbook
+
+### What Operators See During a Feed Loss
+
+**Seq** (filter by `live_scanner.ibkr_adapter`):
+- `WARNING`: `"IB Gateway disconnected"` fires immediately on container stop.
+- For network partition: `WARNING` from watchdog: `"no bars for Xs during market hours — forcing disconnect"` fires after ~30–40 s.
+- Subsequent reconnect attempts: logged with backoff delays (5 s, 10 s, 20 s, … capped at 60 s).
+- On recovery: `"live-scanner: reconnect succeeded"` followed by per-symbol resubscription logs.
+
+**Grafana** (`ibkr_connection_status` gauge, sourced from `app/core/metrics.py`):
+- Drops to `0` on disconnect; returns to `1` on recovery.
+- Alert rule `ibkr_disconnect_2min` fires if the outage exceeds 2 minutes.
+
+**Frontend (`/watchlist`)**:
+- Amber banner: `"Feed stale — IBKR gateway disconnected"` appears next to the Live/Connecting badge.
+- Per-symbol prices grey out after 15 s of no ticks (pre-existing per-symbol staleness — complementary, not replaced).
+- Banner clears automatically when `feed_recovered` event arrives on `watchlist:alerts`.
+
+**`/api/ready`** — HTTP 200 even during an outage; only DB/Redis gate the HTTP status:
+```json
+{
+  "status": "ready",
+  "db": {"ok": true, "latency_ms": 2},
+  "redis": {"ok": true, "latency_ms": 1},
+  "live_data": {"ok": false, "latency_ms": 3001, "error": "Connection refused"}
+}
+```
+
+### Recovery
+
+In-process reconnect fires automatically with exponential backoff. No manual intervention needed unless:
+- All 10 retries are exhausted (see Seq for `"exhausted reconnect retries"`) — restart the live-scanner container.
+- The IB Gateway container itself is in a bad state — restart `stockscanner-ibgateway`.
+
+### Chaos Test
+
+Reproduce and verify both failure modes locally:
+
+```bash
+# Mock mode (no IBKR credentials)
+bash scripts/chaos/ibkr_kill_test.sh --mock
+
+# Live mode (paper IBKR credentials)
+IB_USERNAME=mypaper IB_PASSWORD=... bash scripts/chaos/ibkr_kill_test.sh
+```
+
+See `scripts/chaos/README.md` for full invocation details.

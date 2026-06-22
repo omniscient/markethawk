@@ -1,0 +1,42 @@
+name: IBKR Chaos Nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * 1-5'  # 03:00 UTC, weekdays only
+  workflow_dispatch:
+
+jobs:
+  chaos-mock:
+    name: Chaos test (mock mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run IBKR chaos test — mock mode
+        env:
+          POSTGRES_PASSWORD: test
+          SECRET_KEY: test-secret-key-must-be-at-least-32-chars
+          JWT_SECRET_KEY: test-jwt-secret-key-must-be-at-least-32-chars
+          REDIS_PASSWORD: testpassword
+          POLYGON_API_KEY: test
+          DATABASE_URL: postgresql://markethawk:test@postgres:5432/markethawk
+        run: bash scripts/chaos/ibkr_kill_test.sh --mock
+
+  chaos-live:
+    name: Chaos test (live IBKR credentials)
+    runs-on: ubuntu-latest
+    if: ${{ secrets.IB_USERNAME != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run IBKR chaos test — live mode
+        env:
+          IB_USERNAME: ${{ secrets.IB_USERNAME }}
+          IB_PASSWORD: ${{ secrets.IB_PASSWORD }}
+          POSTGRES_PASSWORD: test
+          SECRET_KEY: test-secret-key-must-be-at-least-32-chars
+          JWT_SECRET_KEY: test-jwt-secret-key-must-be-at-least-32-chars
+          REDIS_PASSWORD: testpassword
+          POLYGON_API_KEY: test
+          DATABASE_URL: postgresql://markethawk:test@postgres:5432/markethawk
+        run: bash scripts/chaos/ibkr_kill_test.sh

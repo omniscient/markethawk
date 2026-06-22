@@ -1,4 +1,8 @@
 import inspect
+import json
+from unittest.mock import AsyncMock
+
+import pytest
 
 import live_scanner.publisher as pub_mod
 
@@ -33,3 +37,37 @@ def test_publisher_does_not_import_create_engine():
                 assert "Session" not in names, (
                     "publisher.py must not import Session from sqlalchemy.orm (dead import)"
                 )
+
+
+@pytest.mark.asyncio
+async def test_publish_feed_loss_sends_to_watchlist_alerts():
+    from live_scanner.publisher import LivePublisher
+
+    publisher = LivePublisher("redis://localhost:6379")
+    publisher._redis = AsyncMock()
+
+    await publisher.publish_feed_loss()
+
+    publisher._redis.publish.assert_awaited_once()
+    channel, raw = publisher._redis.publish.call_args[0]
+    assert channel == "watchlist:alerts"
+    msg = json.loads(raw)
+    assert msg["type"] == "feed_loss"
+    assert "timestamp" in msg
+
+
+@pytest.mark.asyncio
+async def test_publish_feed_recovered_sends_to_watchlist_alerts():
+    from live_scanner.publisher import LivePublisher
+
+    publisher = LivePublisher("redis://localhost:6379")
+    publisher._redis = AsyncMock()
+
+    await publisher.publish_feed_recovered()
+
+    publisher._redis.publish.assert_awaited_once()
+    channel, raw = publisher._redis.publish.call_args[0]
+    assert channel == "watchlist:alerts"
+    msg = json.loads(raw)
+    assert msg["type"] == "feed_recovered"
+    assert "timestamp" in msg
