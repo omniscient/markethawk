@@ -6,6 +6,7 @@ scheduler:
   factory_wip_limit: 1           # max concurrent factory containers; env: FACTORY_WIP_LIMIT overrides
   main_red_recheck_enabled: true # periodically recheck a red main to self-clear (#365); env: MAIN_RED_RECHECK_ENABLED overrides
   main_red_recheck_minutes: 20   # interval between red-main recheck dispatches; env: MAIN_RED_RECHECK_MINUTES overrides
+  blocked_rescue_enabled: true   # promote a Blocked ticket whose PR is green+mergeable to In review instead of re-running it; env: BLOCKED_RESCUE_ENABLED overrides
 
 refine:
   wip_limit: 2                   # env: REFINE_WIP_LIMIT overrides

@@ -77,6 +77,11 @@ def _epic_autopilot(args):
     main_once()
 
 
+def _rescue_blocked(args):
+    from factory_core.rescue import rescue_blocked
+    print(rescue_blocked(args.issue))
+
+
 def main():
     parser = argparse.ArgumentParser(prog="factory-core")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -117,6 +122,10 @@ def main():
     ea = sub.add_parser("epic-autopilot")
     ea.add_argument("--once", action="store_true")
     ea.set_defaults(func=_epic_autopilot)
+
+    rb = sub.add_parser("rescue-blocked")
+    rb.add_argument("--issue", type=int, required=True)
+    rb.set_defaults(func=_rescue_blocked)
 
     parsed = parser.parse_args()
     parsed.func(parsed)
