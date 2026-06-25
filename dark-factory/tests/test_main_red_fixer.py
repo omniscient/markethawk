@@ -65,3 +65,106 @@ def test_should_escalate():
     assert mf.should_escalate(0, 3, "protected") is True        # protected scope
     assert mf.should_escalate(0, 3, "unknown") is True          # fail-closed
     assert mf.should_escalate(1, 3, "allowed") is False
+
+
+class FakeIO:
+    def __init__(self, issue=700, failure="tsc error in backend",
+                 changed=None, ci="green"):
+        self._issue = issue
+        self._failure = failure
+        self._changed = ["backend/app/x.py"] if changed is None else changed
+        self._ci = ci
+        self.applied = []
+        self.opened = []
+        self.merged = []
+        self.escalations = []
+        self.notes = []
+        self.comments = []
+
+    def regression_issue(self):
+        return self._issue
+
+    def reproduce(self):
+        return self._failure
+
+    def start_branch(self, issue):
+        return f"fix/main-red-{issue}"
+
+    def apply_fix(self, prompt):
+        self.applied.append(prompt)
+
+    def changed_paths(self):
+        return self._changed
+
+    def open_pr(self, branch, issue, failure):
+        self.opened.append((branch, issue))
+        return 999
+
+    def poll_ci(self, pr):
+        return self._ci
+
+    def merge(self, pr):
+        self.merged.append(pr)
+
+    def comment(self, issue, body):
+        self.comments.append((issue, body))
+
+    def notify(self, title, body, severity, dedupe_key):
+        self.notes.append((severity, dedupe_key))
+
+    def escalate(self, issue, reason, pr=None):
+        self.escalations.append((issue, reason, pr))
+
+
+CFG = dict(max_attempts=3, model="claude-opus-4-8",
+           allowed_paths=ALLOWED, blocked_paths=BLOCKED)
+
+
+def test_run_noop_when_not_red():
+    io = FakeIO(issue=None)
+    out = mf.run_once(CFG, io, {})
+    assert out["outcome"] == "noop" and io.applied == []
+
+
+def test_run_merges_on_green():
+    io = FakeIO(ci="green")
+    st = {}
+    out = mf.run_once(CFG, io, st)
+    assert out["outcome"] == "merged" and io.merged == [999]
+    assert any(sev == "info" for sev, _ in io.notes)        # recovered notice
+    assert mf.attempts_for(st, 700) == 1                    # attempt counted
+
+
+def test_run_escalates_on_protected_scope_without_pr():
+    io = FakeIO(changed=["dark-factory/scheduler.sh"])
+    out = mf.run_once(CFG, io, {})
+    assert out["outcome"] == "escalated" and "scope" in out["reason"]
+    assert io.opened == [] and io.merged == []              # never opened a PR
+
+
+def test_run_escalates_at_cap_without_attempting():
+    io = FakeIO()
+    st = {"issues": {"700": {"attempts": 3}}}
+    out = mf.run_once(CFG, io, st)
+    assert out["outcome"] == "escalated" and out["reason"] == "cap"
+    assert io.applied == [] and io.escalations and io.escalations[0][0] == 700
+
+
+def test_run_escalates_on_red_ci_leaving_pr_open():
+    io = FakeIO(ci="red")
+    out = mf.run_once(CFG, io, {})
+    assert out["outcome"] == "fixing" and io.merged == []
+    assert io.escalations and io.escalations[0][2] == 999    # pr passed to escalate
+
+
+def test_run_escalates_on_empty_diff():
+    io = FakeIO(changed=[])
+    out = mf.run_once(CFG, io, {})
+    assert out["outcome"] == "escalated" and out["reason"] == "empty-diff"
+
+
+def test_build_fix_prompt_names_scope():
+    p = mf.build_fix_prompt("tsc: x.ts(3,1) error", ALLOWED, BLOCKED)
+    assert "tsc: x.ts(3,1) error" in p
+    assert "dark-factory/scheduler.sh" in p          # blocked list shown
+    assert "backend/" in p                            # allowed list shown
