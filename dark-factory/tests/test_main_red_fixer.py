@@ -69,11 +69,12 @@ def test_should_escalate():
 
 class FakeIO:
     def __init__(self, issue=700, failure="tsc error in backend",
-                 changed=None, ci="green"):
+                 changed=None, ci="green", merge_ok=True):
         self._issue = issue
         self._failure = failure
         self._changed = ["backend/app/x.py"] if changed is None else changed
         self._ci = ci
+        self._merge_ok = merge_ok
         self.applied = []
         self.opened = []
         self.merged = []
@@ -105,6 +106,7 @@ class FakeIO:
 
     def merge(self, pr):
         self.merged.append(pr)
+        return self._merge_ok
 
     def comment(self, issue, body):
         self.comments.append((issue, body))
@@ -161,6 +163,15 @@ def test_run_escalates_on_empty_diff():
     io = FakeIO(changed=[])
     out = mf.run_once(CFG, io, {})
     assert out["outcome"] == "escalated" and out["reason"] == "empty-diff"
+
+
+def test_run_escalates_on_merge_failure():
+    io = FakeIO(ci="green", merge_ok=False)
+    out = mf.run_once(CFG, io, {})
+    assert out["outcome"] == "fixing" and out["reason"] == "merge-failed"
+    assert io.merged == [999]                       # merge was attempted
+    assert io.escalations and io.escalations[0][2] == 999   # PR passed to escalate
+    assert not any(sev == "info" for sev, _ in io.notes)    # no "recovered" notice
 
 
 def test_build_fix_prompt_names_scope():

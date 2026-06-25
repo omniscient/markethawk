@@ -102,10 +102,12 @@ def run_once(cfg: dict, io, state: dict) -> dict:
     pr = io.open_pr(branch, issue, failure)
     ci = io.poll_ci(pr)
     if ci == "green":
-        io.merge(pr)
-        io.notify(f"Main-red auto-fix merged PR #{pr}",
-                  f"main is green again (regression #{issue}).", "info", None)
-        return {"outcome": "merged", "issue": issue, "pr": pr}
+        if io.merge(pr):
+            io.notify(f"Main-red auto-fix merged PR #{pr}",
+                      f"main is green again (regression #{issue}).", "info", None)
+            return {"outcome": "merged", "issue": issue, "pr": pr}
+        io.escalate(issue, "merge-failed", pr=pr)
+        return {"outcome": "fixing", "issue": issue, "pr": pr, "reason": "merge-failed"}
 
     io.escalate(issue, f"ci:{ci}", pr=pr)
     return {"outcome": "fixing", "issue": issue, "pr": pr, "reason": f"ci:{ci}"}
@@ -114,8 +116,6 @@ def run_once(cfg: dict, io, state: dict) -> dict:
 # ── Live IO (exercised in manual validation, not unit tests) ────────────────
 OWNER = "omniscient/markethawk"
 CLONE_DIR = os.environ.get("CLONE_DIR", "/workspace/markethawk")
-SMOKE_MARKER = "<!-- df-main-red -->"
-
 
 def _run(cmd, cwd=None, timeout=600, stdin=None):
     return subprocess.run(cmd, cwd=cwd or CLONE_DIR, input=stdin,
@@ -166,14 +166,18 @@ class LiveIO:
     def open_pr(self, branch, issue, failure):
         _run(["git", "add", "-A"])
         _run(["git", "commit", "-m", f"fix: main-red recovery (regression #{issue})"])
-        _run(["git", "push", "-u", "origin", branch, "--force-with-lease"])
+        push = _run(["git", "push", "-u", "origin", branch, "--force-with-lease"])
+        if push.returncode != 0:
+            raise RuntimeError(f"git push failed for {branch}: {push.stderr.strip()}")
         body = (f"Closes #{issue}\n\nAutonomous main-red recovery. Reproduced failure:\n\n"
                 f"```\n{failure[:4000]}\n```\n\n---\n*MarketHawk Main-Red Auto-Fix*")
         r = _run(["gh", "pr", "create", "--repo", OWNER, "--base", "main",
                   "--head", branch, "--title", f"fix: main-red recovery (#{issue})",
                   "--body", body])
         m = re.search(r"/pull/(\d+)", r.stdout or "")
-        return int(m.group(1)) if m else 0
+        if not m:
+            raise RuntimeError(f"could not parse PR number from gh output: {(r.stdout or r.stderr).strip()}")
+        return int(m.group(1))
 
     def poll_ci(self, pr):
         import time
@@ -194,7 +198,8 @@ class LiveIO:
         return "pending"
 
     def merge(self, pr):
-        _run(["gh", "pr", "merge", str(pr), "--repo", OWNER, "--merge", "--delete-branch"])
+        r = _run(["gh", "pr", "merge", str(pr), "--repo", OWNER, "--merge", "--delete-branch"])
+        return r.returncode == 0
 
     def comment(self, issue, body):
         _run(["gh", "issue", "comment", str(issue), "--repo", OWNER, "--body", body])
@@ -242,11 +247,13 @@ def main_once() -> int:
                        "docker-compose", ".github/", ".env"],
         blocked_paths=["dark-factory/scheduler.sh", "dark-factory/scripts/factory_core/",
                        "dark-factory/entrypoint.sh"])
-    out = run_once(cfg, LiveIO(cfg), state)
     try:
-        with open(path, "w") as f:
-            json.dump(state, f)
-    except Exception:
-        pass
+        out = run_once(cfg, LiveIO(cfg), state)
+    finally:
+        try:
+            with open(path, "w") as f:
+                json.dump(state, f)
+        except Exception:
+            pass
     print(f"main_red_fixer={out['outcome']} issue=#{out.get('issue')}")
     return 0
