@@ -109,3 +109,144 @@ def run_once(cfg: dict, io, state: dict) -> dict:
 
     io.escalate(issue, f"ci:{ci}", pr=pr)
     return {"outcome": "fixing", "issue": issue, "pr": pr, "reason": f"ci:{ci}"}
+
+
+# ── Live IO (exercised in manual validation, not unit tests) ────────────────
+OWNER = "omniscient/markethawk"
+CLONE_DIR = os.environ.get("CLONE_DIR", "/workspace/markethawk")
+SMOKE_MARKER = "<!-- df-main-red -->"
+
+
+def _run(cmd, cwd=None, timeout=600, stdin=None):
+    return subprocess.run(cmd, cwd=cwd or CLONE_DIR, input=stdin,
+                          capture_output=True, text=True, timeout=timeout)
+
+
+class LiveIO:
+    def __init__(self, cfg):
+        self.cfg = cfg
+
+    def regression_issue(self):
+        path = os.path.join(os.environ.get("SCHEDULER_STATE_DIR", "/var/lib/dark-factory"),
+                            "main-is-red-issue")
+        try:
+            with open(path) as f:
+                n = f.read().strip()
+            return int(n) if n else None
+        except Exception:
+            return None
+
+    def reproduce(self):
+        """Run the smoke checks in the clone; return combined failure text (empty if green)."""
+        out = []
+        tsc = _run(["npx", "tsc", "--noEmit", "-p", "frontend/tsconfig.app.json"],
+                   cwd=CLONE_DIR, timeout=300)
+        if tsc.returncode != 0:
+            out.append("[tsc]\n" + (tsc.stdout or "") + (tsc.stderr or ""))
+        imp = _run(["python", "-c", "import backend.app.main"], cwd=CLONE_DIR, timeout=120)
+        if imp.returncode != 0:
+            out.append("[python import]\n" + (imp.stdout or "") + (imp.stderr or ""))
+        return "\n\n".join(out)
+
+    def start_branch(self, issue):
+        branch = f"fix/main-red-{issue}"
+        _run(["git", "checkout", "-B", branch, "origin/main"])
+        return branch
+
+    def apply_fix(self, prompt):
+        # headless claude with edit/bash tools, constrained to the clone dir
+        _run(["claude", "-p", "--model", self.cfg["model"],
+              "--allowedTools", "Edit,Write,Read,Bash,Grep,Glob"],
+             stdin=prompt, timeout=self.cfg.get("agent_timeout", 1200))
+
+    def changed_paths(self):
+        r = _run(["git", "diff", "--name-only", "origin/main", "--"])
+        return [ln.strip() for ln in (r.stdout or "").splitlines() if ln.strip()]
+
+    def open_pr(self, branch, issue, failure):
+        _run(["git", "add", "-A"])
+        _run(["git", "commit", "-m", f"fix: main-red recovery (regression #{issue})"])
+        _run(["git", "push", "-u", "origin", branch, "--force-with-lease"])
+        body = (f"Closes #{issue}\n\nAutonomous main-red recovery. Reproduced failure:\n\n"
+                f"```\n{failure[:4000]}\n```\n\n---\n*MarketHawk Main-Red Auto-Fix*")
+        r = _run(["gh", "pr", "create", "--repo", OWNER, "--base", "main",
+                  "--head", branch, "--title", f"fix: main-red recovery (#{issue})",
+                  "--body", body])
+        m = re.search(r"/pull/(\d+)", r.stdout or "")
+        return int(m.group(1)) if m else 0
+
+    def poll_ci(self, pr):
+        import time
+        deadline = self.cfg.get("ci_wait_minutes", 20) * 60
+        waited, step = 0, 30
+        while waited < deadline:
+            r = _run(["gh", "pr", "checks", str(pr), "--repo", OWNER,
+                      "--json", "name,bucket"], timeout=60)
+            try:
+                checks = json.loads(r.stdout) if r.stdout.strip() else []
+            except Exception:
+                checks = []
+            status = ci_status(checks)
+            if status in ("green", "red"):
+                return status
+            time.sleep(step)
+            waited += step
+        return "pending"
+
+    def merge(self, pr):
+        _run(["gh", "pr", "merge", str(pr), "--repo", OWNER, "--merge", "--delete-branch"])
+
+    def comment(self, issue, body):
+        _run(["gh", "issue", "comment", str(issue), "--repo", OWNER, "--body", body])
+
+    def notify(self, title, body, severity, dedupe_key):
+        token = os.environ.get("INTERNAL_API_TOKEN", "")
+        if not token:
+            return
+        import urllib.request
+        payload = {"title": title, "body": body, "severity": severity}
+        if dedupe_key:
+            payload["dedupe_key"] = dedupe_key
+        try:
+            req = urllib.request.Request(
+                "http://backend:8000/api/v1/alerts/system",
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json", "X-Internal-Token": token},
+                method="POST")
+            urllib.request.urlopen(req, timeout=10)
+        except Exception:
+            pass
+
+    def escalate(self, issue, reason, pr=None):
+        pr_txt = f" PR #{pr} left open for review." if pr else ""
+        self.comment(issue, f"\U0001f6e0️ **Main-Red Auto-Fix** — escalating to a human "
+                            f"(reason: {reason}).{pr_txt}\n\n---\n*MarketHawk Main-Red Auto-Fix*")
+        self.notify("Main-red auto-fix needs a human",
+                    f"Regression #{issue}: {reason}.{pr_txt}", "warning", f"main-red-{issue}")
+
+
+def main_once() -> int:
+    state_dir = os.environ.get("SCHEDULER_STATE_DIR", "/var/lib/dark-factory")
+    path = os.path.join(state_dir, "main-red-fixer-state.json")
+    try:
+        with open(path) as f:
+            state = json.load(f)
+    except Exception:
+        state = {}
+    cfg = dict(
+        max_attempts=int(os.environ.get("MAIN_RED_AUTOFIX_MAX_ATTEMPTS", "3")),
+        model=os.environ.get("MAIN_RED_AUTOFIX_MODEL", "claude-opus-4-8"),
+        ci_wait_minutes=int(os.environ.get("MAIN_RED_AUTOFIX_CI_WAIT_MINUTES", "20")),
+        agent_timeout=int(os.environ.get("MAIN_RED_AUTOFIX_AGENT_TIMEOUT", "1200")),
+        allowed_paths=["backend/", "frontend/", "alembic/", "dark-factory/smoke_gate.sh",
+                       "docker-compose", ".github/", ".env"],
+        blocked_paths=["dark-factory/scheduler.sh", "dark-factory/scripts/factory_core/",
+                       "dark-factory/entrypoint.sh"])
+    out = run_once(cfg, LiveIO(cfg), state)
+    try:
+        with open(path, "w") as f:
+            json.dump(state, f)
+    except Exception:
+        pass
+    print(f"main_red_fixer={out['outcome']} issue=#{out.get('issue')}")
+    return 0
