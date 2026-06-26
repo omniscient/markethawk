@@ -174,6 +174,17 @@ Follow the process in `orchestrator-prompt.md`:
       - [AVOID] <the rejected approach and the concrete reason it was rejected> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
       ```
 
+   **Append-only rule:** New memory entries must be written with shell appends:
+     echo '- [PATTERN] ...' >> .archon/memory/architecture.md
+   NEVER use the Write or Edit tool on a memory file to add new entries — doing so risks
+   regenerating the file from a stale in-context copy and silently dropping existing entries.
+
+   The ONLY operations permitted to remove or modify existing lines are:
+     (a) the awk expiry-cleanup block (entries with a past `expires:` date)
+     (b) R4 cap-drop (explicit drop of the oldest/lowest-signal entries when COUNT > 30)
+     (c) R5 invalidation (rewrite `[PATTERN]` → `[INVALID: reason]` for a single entry)
+   Each of these operations must touch ONLY the targeted lines and leave all other lines verbatim.
+
    **Provisional tier for empirical claims (R2):**
 
    If an architectural decision depends on an empirically-observed runtime behavior (e.g.,
@@ -198,6 +209,46 @@ Follow the process in `orchestrator-prompt.md`:
    c. Before appending any entry, check for duplicates: `grep -F "<core sentence of the new entry>" .archon/memory/architecture.md`. If a matching line exists, skip that entry.
 
    d. Do NOT write to `codebase-patterns.md` from the refine agent — that file is maintained by the implement agent for runtime-proven lessons only.
+
+   **Post-write verification backstop** — run after all R3/R4 operations and before `git add .archon/memory/`:
+
+   ```bash
+# Memory write guard — detect unexpected deletions and restore (append-only; never reverts this run's new entries)
+for MEM_FILE in .archon/memory/*.md; do
+  [ -f "$MEM_FILE" ] || continue
+  # Deleted content lines (diff marker '-'), excluding file-header markers
+  DELETED=$(git diff "$MEM_FILE" | grep '^-' | grep -v '^---' | grep -v '^-#' | grep -v '^-<!--' || true)
+  if [ -n "$DELETED" ]; then
+    # Added content lines with the diff '+' marker stripped, for R5 body comparison
+    ADDED=$(git diff "$MEM_FILE" | grep '^+' | grep -v '^+++' | sed 's/^+//')
+    TODAY=$(date +%Y-%m-%d)
+    UNEXPECTED=$(echo "$DELETED" | while IFS= read -r line; do
+      # Strip the diff '-' marker to recover the file-content line
+      CONTENT=$(printf '%s' "$line" | sed 's/^-//')
+      # Legitimate expiry cleanup: an expires: date in the past
+      if echo "$CONTENT" | grep -q 'expires:'; then
+        EXPIRY=$(echo "$CONTENT" | sed 's/.*expires:\([0-9-]*\).*/\1/')
+        [ "$EXPIRY" \< "$TODAY" ] && continue
+      fi
+      # Legitimate R5 invalidation: same body re-added with a changed tag.
+      # Strip a leading "- [ANYTAG]" to get the bare body, then look for it among added lines.
+      BODY=$(printf '%s' "$CONTENT" | sed 's/^- \[[^]]*\]//')
+      if [ -n "$BODY" ] && printf '%s\n' "$ADDED" | grep -qF -- "$BODY"; then
+        continue
+      fi
+      printf '%s\n' "$CONTENT"
+    done)
+    if [ -n "$UNEXPECTED" ]; then
+      echo "MEMORY GUARD: unexpected deletion(s) in $MEM_FILE — re-appending to preserve them:"
+      printf '%s\n' "$UNEXPECTED"
+      # Append-only restore: re-append the deleted authoritative line(s). This preserves
+      # this run's new entries (unlike a whole-file checkout) and is self-healing for R4
+      # cap-drops (a re-appended over-cap entry is simply re-capped on the next run).
+      printf '%s\n' "$UNEXPECTED" >> "$MEM_FILE"
+    fi
+  fi
+done
+   ```
 
    e. If any entries were added, commit:
       ```bash
