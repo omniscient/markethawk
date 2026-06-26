@@ -481,6 +481,7 @@ services:
         condition: service_completed_successfully
     networks:
       - stockscanner-network
+    restart: unless-stopped
     deploy:
       resources:
         limits:
