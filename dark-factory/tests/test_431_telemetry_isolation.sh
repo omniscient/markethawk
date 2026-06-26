@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Test: run_post_mortem() writes failure telemetry via a git worktree on main,
-# never touching the feature-branch CLONE_DIR.
-# Issue #431
+# Test: run_post_mortem() writes failure telemetry to ARTIFACTS_DIR,
+# with zero git operations — no worktree, no push, no commit.
+# Issue #521
 # Run: bash dark-factory/tests/test_431_telemetry_isolation.sh
 set -uo pipefail
 
@@ -11,20 +11,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export GH_TOKEN="stub-token"
 export CLAUDE_CODE_OAUTH_TOKEN="stub-token"
 
-GIT_LOG=$(mktemp /tmp/431-git-XXXXXX.log)
+GIT_LOG=$(mktemp /tmp/521-git-XXXXXX.log)
 
 git() {
   echo "git $*" >> "$GIT_LOG"
-  local prev=""
-  for arg in "$@"; do
-    if [ "$prev" = "--detach" ]; then
-      mkdir -p "${arg}/dark-factory/evals"
-      echo '{"issue":1,"title":"prior","phase":"fix","exit_code":1,"postmortem":"prior","promoted_at":"2026-01-01T00:00:00Z"}' \
-        > "${arg}/dark-factory/evals/factory-failures.jsonl"
-      break
-    fi
-    prev="$arg"
-  done
   return 0
 }
 export -f git
@@ -41,22 +31,26 @@ export -f claude
 # ── Source entrypoint (guard prevents clone + main execution) ─────────────
 ENTRYPOINT_SOURCE_ONLY=1 source "$SCRIPT_DIR/../entrypoint.sh"
 
-# Reset error handling set by entrypoint — test context manages its own flow
+# Reset strict error handling from entrypoint — test context manages its own flow
 trap - ERR
 set +e
+set +u
 set +o pipefail
 
+# Reset git log: sourcing entrypoint runs top-level git config calls; we only
+# want to count git operations from run_post_mortem itself.
+> "$GIT_LOG"
+
 # ── Test fixture ──────────────────────────────────────────────────────────
-CLONE_DIR=$(mktemp -d /tmp/431-clone-XXXXXX)
-JSONL_IN_CLONE="${CLONE_DIR}/dark-factory/evals/factory-failures.jsonl"
-mkdir -p "$(dirname "$JSONL_IN_CLONE")"
-echo '{"issue":1,"title":"prior","phase":"fix","exit_code":1,"postmortem":"prior","promoted_at":"2026-01-01T00:00:00Z"}' \
-  > "$JSONL_IN_CLONE"
+CLONE_DIR=$(mktemp -d /tmp/521-clone-XXXXXX)
 
-INITIAL_LINES=$(wc -l < "$JSONL_IN_CLONE")
-INITIAL_MD5=$(md5sum "$JSONL_IN_CLONE" | awk '{print $1}')
+# Set ARTIFACTS_DIR to a temp directory (simulates the global per-run dir)
+ARTIFACTS_DIR=$(mktemp -d /tmp/521-artifacts-XXXXXX)
+export ARTIFACTS_DIR
 
-ISSUE_NUM=431
+JSONL_IN_ARTIFACTS="${ARTIFACTS_DIR}/factory-failures.jsonl"
+
+ISSUE_NUM=521
 INTENT=fix
 
 # ── Run ───────────────────────────────────────────────────────────────────
@@ -73,34 +67,38 @@ assert_eq() {
     FAILED=$((FAILED + 1))
   fi
 }
+assert_true() {
+  local desc="$1" condition="$2"
+  if eval "$condition"; then
+    echo "  PASS: $desc"; PASSED=$((PASSED + 1))
+  else
+    echo "  FAIL: $desc — condition false: $condition" >&2
+    FAILED=$((FAILED + 1))
+  fi
+}
 
-echo "=== #431: Telemetry isolation — worktree on main, never touches CLONE_DIR ==="
+echo "=== #521: Telemetry isolation — ARTIFACTS_DIR write, zero git operations ==="
 echo ""
 
-FINAL_MD5=$(md5sum "$JSONL_IN_CLONE" | awk '{print $1}')
-assert_eq "CLONE_DIR jsonl not modified (md5)" "$INITIAL_MD5" "$FINAL_MD5"
+GIT_CALL_COUNT=$(wc -l < "$GIT_LOG" 2>/dev/null || echo "0")
+assert_eq "no git operations called" "0" "$GIT_CALL_COUNT"
 
-FINAL_LINES=$(wc -l < "$JSONL_IN_CLONE")
-assert_eq "CLONE_DIR jsonl line count unchanged" "$INITIAL_LINES" "$FINAL_LINES"
+assert_true "factory-failures.jsonl exists in ARTIFACTS_DIR" "[ -f '$JSONL_IN_ARTIFACTS' ]"
 
-PUSH_TO_MAIN=$(grep 'push origin HEAD:main' "$GIT_LOG" 2>/dev/null | wc -l)
-assert_eq "push targets HEAD:main exactly once" "1" "$PUSH_TO_MAIN"
+LINE_COUNT=$(wc -l < "$JSONL_IN_ARTIFACTS" 2>/dev/null || echo "0")
+assert_eq "exactly one JSONL line written" "1" "$LINE_COUNT"
 
-PUSH_TO_BRANCH=$(grep 'push origin' "$GIT_LOG" 2>/dev/null | grep -v 'HEAD:main' | wc -l)
-assert_eq "no direct push to feature branch" "0" "$PUSH_TO_BRANCH"
+# Use stdin redirection so Python does not need to resolve the Unix tmp path
+# (avoids Git Bash /tmp path incompatibility with Windows Python).
+VALID_JSON=$(python3 -c "import json,sys; json.loads(sys.stdin.read())" < "$JSONL_IN_ARTIFACTS" 2>/dev/null && echo "ok" || echo "invalid")
+assert_eq "JSONL line is valid JSON" "ok" "$VALID_JSON"
 
-WORKTREE_ADD=$(grep 'worktree add' "$GIT_LOG" 2>/dev/null | wc -l)
-assert_eq "worktree add called" "1" "$WORKTREE_ADD"
-
-WORKTREE_REMOVE=$(grep 'worktree remove' "$GIT_LOG" 2>/dev/null | wc -l)
-assert_eq "worktree remove called" "1" "$WORKTREE_REMOVE"
-
-FETCH_MAIN=$(grep 'fetch origin main' "$GIT_LOG" 2>/dev/null | wc -l)
-assert_eq "git fetch origin main called" "1" "$FETCH_MAIN"
+ISSUE_FIELD=$(python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(d.get('issue','missing'))" < "$JSONL_IN_ARTIFACTS" 2>/dev/null || echo "missing")
+assert_eq "issue field matches ISSUE_NUM" "521" "$ISSUE_FIELD"
 
 # ── Cleanup ───────────────────────────────────────────────────────────────
 rm -f "$GIT_LOG"
-rm -rf "$CLONE_DIR"
+rm -rf "$CLONE_DIR" "$ARTIFACTS_DIR"
 
 echo ""
 echo "Results: ${PASSED} passed, ${FAILED} failed"
