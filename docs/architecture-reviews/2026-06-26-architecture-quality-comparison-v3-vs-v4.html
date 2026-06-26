@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketHawk — Architecture Quality: v3 → v4 Comparison</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body{background:#0b1120;color:#e2e8f0;font-family:'Segoe UI',Inter,system-ui,sans-serif}
+  .grad{background:radial-gradient(1200px 500px at 20% -10%,rgba(14,165,233,.18),transparent),radial-gradient(900px 500px at 90% 0%,rgba(34,197,94,.12),transparent),#0b1120}
+  .glass{background:rgba(30,41,59,.6);backdrop-filter:blur(6px);border:1px solid #334155}
+  .mono{font-family:'JetBrains Mono','Cascadia Code',monospace}
+  .track{background:#1e293b;border-radius:9999px;height:10px;overflow:hidden}
+  .v1fill{background:linear-gradient(90deg,#64748b,#94a3b8);height:100%}
+  .v2fill{background:linear-gradient(90deg,#0ea5e9,#22c55e);height:100%}
+  .glow-green{box-shadow:0 0 0 1px rgba(34,197,94,.4),0 8px 30px -12px rgba(34,197,94,.35)}
+  .glow-amber{box-shadow:0 0 0 1px rgba(234,179,8,.35),0 8px 30px -12px rgba(234,179,8,.3)}
+  .glow-red{box-shadow:0 0 0 1px rgba(239,68,68,.4),0 8px 30px -12px rgba(239,68,68,.35)}
+  .mermaid{background:#111827;border:1px solid #334155;border-radius:12px;padding:1rem}
+  .chip{font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:9999px;letter-spacing:.03em}
+</style>
+</head>
+<body class="grad">
+<div class="max-w-6xl mx-auto px-5 py-8">
+
+<!-- HERO -->
+<div class="glass rounded-2xl p-8 mb-8">
+  <div class="flex items-center gap-3 mb-2">
+    <span class="chip bg-sky-500/20 text-sky-300">COMPARATIVE REPORT</span>
+    <span class="chip bg-slate-500/20 text-slate-300">v3 2026-06-09 → v4 2026-06-26</span>
+    <span class="chip bg-emerald-500/20 text-emerald-300">~17 DAYS · +474 COMMITS · 133 MERGED PRs</span>
+  </div>
+  <h1 class="text-4xl font-extrabold text-white">Did the quality actually improve?</h1>
+  <p class="text-slate-400 mt-2 max-w-3xl">A side-by-side of the v3 review against the live codebase after the two epics and honesty-gap fixes it spawned. Every number is verified against code on <span class="mono text-slate-300">main @ 56ab037</span>. Short answer: <span class="text-emerald-300 font-semibold">yes &mdash; but it&rsquo;s a plateau</span>. v3&rsquo;s honesty gaps closed and two epics shipped, yet only <span class="text-emerald-300">Operational Readiness</span> moved; the remaining ceiling is <span class="text-amber-300">structural</span> (authz/RBAC, single-replica scale), not finish-quality.</p>
+</div>
+
+<!-- HEADLINE KPIs -->
+<div class="grid md:grid-cols-4 gap-4 mb-8">
+  <div class="glass rounded-2xl p-5 glow-green">
+    <div class="text-slate-400 text-xs uppercase tracking-wide">Overall Quality /100</div>
+    <div class="flex items-end gap-2 mt-1"><span class="text-slate-500 text-2xl font-bold line-through">90</span><span class="text-emerald-300 text-5xl font-extrabold">91</span></div>
+    <div class="text-emerald-400 text-sm font-semibold mt-1">▲ +1 point</div>
+  </div>
+  <div class="glass rounded-2xl p-5">
+    <div class="text-slate-400 text-xs uppercase tracking-wide">Architecture /5</div>
+    <div class="flex items-end gap-2 mt-1"><span class="text-slate-500 text-2xl font-bold line-through">4.3</span><span class="text-sky-300 text-5xl font-extrabold">4.3</span></div>
+    <div class="text-slate-400 text-sm font-semibold mt-1">— flat (plateau)</div>
+  </div>
+  <div class="glass rounded-2xl p-5 glow-green">
+    <div class="text-slate-400 text-xs uppercase tracking-wide">Weighted Scorecard /5</div>
+    <div class="flex items-end gap-2 mt-1"><span class="text-slate-500 text-2xl font-bold line-through">4.06</span><span class="text-emerald-300 text-5xl font-extrabold">4.12</span></div>
+    <div class="text-emerald-400 text-sm font-semibold mt-1">▲ +0.06</div>
+  </div>
+  <div class="glass rounded-2xl p-5 glow-green">
+    <div class="text-slate-400 text-xs uppercase tracking-wide">Change-Failure proxy</div>
+    <div class="flex items-end gap-2 mt-1"><span class="text-slate-500 text-2xl font-bold line-through">19%</span><span class="text-emerald-300 text-5xl font-extrabold">12.7%</span></div>
+    <div class="text-emerald-400 text-sm font-semibold mt-1">▼ improved (lower is better)</div>
+  </div>
+</div>
+
+<!-- DIVERGING DELTA CHART -->
+<div class="glass rounded-2xl p-6 mb-8">
+  <h2 class="text-xl font-bold text-white mb-1">Movement across all 16 quality dimensions</h2>
+  <p class="text-slate-400 text-sm mb-4">Sorted by improvement. Grey = v3 score, gradient = v4 score. Pills show the delta. <span class="text-slate-300">One mover</span> — the plateau is real.</p>
+  <div id="chart" class="space-y-2"></div>
+</div>
+
+<!-- TWO COLUMNS: DRAMATIC vs STAGNANT -->
+<div class="grid lg:grid-cols-2 gap-6 mb-8">
+  <!-- DRAMATIC -->
+  <div>
+    <h2 class="text-2xl font-bold text-emerald-300 mb-3">🚀 Dramatically improved</h2>
+    <div class="space-y-3" id="wins"></div>
+  </div>
+  <!-- STAGNANT / REGRESSED -->
+  <div>
+    <h2 class="text-2xl font-bold text-amber-300 mb-3">🧊 Cold spots &amp; stuck dimensions</h2>
+    <div class="space-y-3" id="cold"></div>
+  </div>
+</div>
+
+<!-- NEW CRACKS -->
+<div class="glass rounded-2xl p-6 mb-8 glow-red">
+  <h2 class="text-xl font-bold text-white mb-1">⚠️ New cracks in the fresh concrete</h2>
+  <p class="text-slate-400 text-sm mb-4">The two epics introduced their own defects. These are <strong>not</strong> in v3 — they are the cost of moving fast. All verified in code.</p>
+  <div class="grid md:grid-cols-2 gap-3" id="cracks"></div>
+</div>
+
+<!-- TICKET SCOREBOARD -->
+<div class="glass rounded-2xl p-6 mb-8">
+  <h2 class="text-xl font-bold text-white mb-1">Ticket scoreboard — what each fix actually delivered</h2>
+  <p class="text-slate-400 text-sm mb-4">Verified from code, not commit messages. <span class="text-emerald-300">Done</span> · <span class="text-amber-300">Partial / has-gap</span> · <span class="text-sky-300">Declined / deferred</span> · <span class="text-red-300">Broken</span>. New audit label: <span class="mono text-slate-300">architecture-audit-v4</span>.</p>
+  <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-2 text-sm" id="tickets"></div>
+</div>
+
+<!-- TRACE: where the foundations stand -->
+<div class="glass rounded-2xl p-6 mb-8">
+  <h2 class="text-xl font-bold text-white mb-3">The shape of the change</h2>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div>
+      <div class="text-slate-400 text-sm mb-2">v3 — <span class="text-slate-300">unfinished edges</span></div>
+      <div class="mermaid">
+flowchart TD
+  A[Backups fictional · #195 no artifacts] -->|risk| X((Unfinished edges))
+  B[ruff red in CI] --> X
+  C[Liveness-only probe] --> X
+  D[No migration gate] --> X
+  style X fill:#78350f,stroke:#f59e0b
+      </div>
+    </div>
+    <div>
+      <div class="text-slate-400 text-sm mb-2">v4 — <span class="text-slate-300">mature single-tenant ceiling</span></div>
+      <div class="mermaid">
+flowchart TD
+  A2[Backups real ✓ db-backup + restore-drill] --> Z([Solid])
+  B2[ruff + readiness + migration-gate ✓] --> Z
+  C2[2 epics shipped · #491 + #372 ✓] --> Z
+  D2[No authz / RBAC · #373] -->|ceiling| Y((Single-tenant ceiling))
+  E2[Single-replica scale · in-mem WS counters] -->|ceiling| Y
+  style Y fill:#78350f,stroke:#f59e0b
+  style Z fill:#14532d,stroke:#22c55e
+      </div>
+    </div>
+  </div>
+  <p class="text-slate-400 text-sm mt-4">The risk profile <strong>changed in kind</strong>: v3 was defined by finish-quality on new infrastructure; v4 is defined by <strong>structural ceilings</strong>. Backups are real, the gates are green, the epics shipped — what now caps the score is multi-tenant authorization and horizontal scale, neither of which more feature completion can buy.</p>
+</div>
+
+<!-- VERDICT -->
+<div class="glass rounded-2xl p-8 glow-green">
+  <h2 class="text-2xl font-bold text-white mb-2">Verdict</h2>
+  <p class="text-slate-300">The codebase responded to the v3 report the way a healthy engineering org should: it <span class="text-emerald-300 font-semibold">closed every honesty gap with verified artifacts</span> (automated backups + restore-drill genuinely resolving the #195 "closed-without-artifacts" risk, ruff-in-CI, readiness probe, migration-gate ADR-0012), <span class="text-emerald-300 font-semibold">shipped two epics</span> (Data Quality Trust Gate #491 and the security-remediation #372 with live-IBKR hard guards #368), and <span class="text-emerald-300 font-semibold">fixed a factory outage</span> (the Python-3.14/scipy break, #622).</p>
+  <p class="text-slate-300 mt-3">The honest caveat: the score <span class="text-amber-300 font-semibold">plateaus at ~91</span>. Only <span class="text-emerald-300 font-semibold">Operational Readiness 3 → 4</span> moved; the other 15 dimensions are flat. Further gains are no longer a matter of completing features — they need <span class="text-amber-300 font-semibold">structural work</span>: an authorization model (<span class="mono">#373</span>, the #1 carried ceiling) and a horizontal-scalability story (Redis-backed WS counters, read replicas — Scalability has been stuck at 3 for four reviews). Close those and the ceiling lifts; ship more features and it won&rsquo;t.</p>
+  <div class="mt-4 text-sm text-slate-400">Full detail in the companion <span class="mono text-slate-300">2026-06-26-architecture-quality-report-v4.html</span>.</div>
+</div>
+
+<div class="text-center text-slate-500 text-xs mt-8">Generated 2026-06-26 by Claude Opus 4.8 (1M) · verified against main @ 56ab037 · companion to v3 (2026-06-09)</div>
+</div>
+
+<script>
+mermaid.initialize({startOnLoad:true,theme:'dark'});
+
+/* ---- 16-dimension diverging chart ---- */
+const dims=[
+ ["Architecture Clarity",4,4],["Modularity",5,5],["Separation of Concerns",4,4],
+ ["Maintainability",4,4],["Testability",4,4],["Code Coverage Maturity",4,4],
+ ["Reliability",5,5],["Security Posture",4,4],["Observability",5,5],
+ ["Performance Readiness",4,4],["Scalability Readiness",3,3],["Deployment Readiness",4,4],
+ ["Developer Experience",4,4],["Documentation",4,4],["Dependency Hygiene",4,4],
+ ["Operational Readiness",3,4]
+];
+dims.sort((a,b)=>(b[2]-b[1])-(a[2]-a[1]));
+const col=v=>v>=5?'#22c55e':v>=4?'#4ade80':v>=3?'#eab308':v>=2?'#f97316':'#ef4444';
+let c='';
+for(const [n,v1,v2] of dims){
+  const d=v2-v1;
+  const pill = d>0?`<span class="chip bg-emerald-500/20 text-emerald-300">▲ +${d}</span>`
+            : d<0?`<span class="chip bg-red-500/20 text-red-300">▼ ${d}</span>`
+            : `<span class="chip bg-slate-500/20 text-slate-400">— flat</span>`;
+  c+=`<div class="flex items-center gap-3">
+    <div class="w-52 text-sm text-slate-300 shrink-0">${n}</div>
+    <div class="flex-1">
+      <div class="track mb-1"><div class="v1fill" style="width:${v1/5*100}%"></div></div>
+      <div class="track"><div class="v2fill" style="width:${v2/5*100}%"></div></div>
+    </div>
+    <div class="w-16 text-right text-sm"><span class="text-slate-500">${v1}</span> <span class="text-white font-bold">→ ${v2}</span></div>
+    <div class="w-20 text-right">${pill}</div>
+  </div>`;
+}
+document.getElementById('chart').innerHTML=c;
+
+/* ---- dramatic wins ---- */
+const wins=[
+ ["Operational Readiness: 3 → 4","R01 / #195","THE MOVER. Automated db-backup + db-restore-drill sidecars verified in docker-compose.yml:30-72 & :368-407 — v3's #195 'closed without artifacts' risk genuinely resolved with REAL artifacts, plus admin-env-check."],
+ ["Honesty gap: ruff now in CI","R02","ruff runs as a hard CI gate (ci.yml:45) — no more `||true`. The v3 'lint is red' finding is closed."],
+ ["Honesty gap: deep readiness probe","R05","/ready probe added (health.py:34) alongside liveness; migration-gate captured as ADR-0012. v3's liveness-only gap closed."],
+ ["Epic shipped: Data Quality Trust Gate","#491 (#499–#502)","quality_gate.py + quality_gate_evidence.py + lineage (#498) + tests; survivorship + backtesting contract verified in code."],
+ ["Epic shipped: Security remediation","#372 (#368 + #369–#382)","Full epic: secrets validators, CSRF, WS auth, log redaction, Docker hardening, + #368 live-IBKR fail-closed Redis kill switch with non-bypassable caps (ibkr_orders.py:233-280)."],
+ ["Factory outage fixed","#622","Python-3.14 / scipy break diagnosed and resolved (requirements.txt cp314 stack bumps); the dependency stack was modernized in the same pass."]
+];
+document.getElementById('wins').innerHTML = wins.map(([t,tk,d])=>`
+  <div class="glass rounded-xl p-4 glow-green">
+    <div class="flex justify-between items-start gap-2">
+      <div class="font-bold text-emerald-200">${t}</div>
+      <span class="chip bg-sky-500/15 text-sky-300 shrink-0">${tk}</span>
+    </div>
+    <div class="text-slate-400 text-sm mt-1">${d}</div>
+  </div>`).join('');
+
+/* ---- cold spots / stuck ---- */
+const cold=[
+ ["Scalability Readiness: 3 → 3","STUCK 4 REVIEWS","Workers scale, but API/DB are single-instance and the WebSocket connection counters are in-memory (ws_limits.py:18-19) — not multi-replica. No read replicas. The #1 structural scale ceiling.","amber"],
+ ["Developer Experience: 4 → 4","STUCK","Hard CI gates and rich observability, but no mypy (backend type-checking gap), no E2E tests, no IDE launch config. Capped at 4 for four reviews.","amber"],
+ ["Authorization: carried gap","CARRIED","Still single-user, no RBAC. #373 epic split out but design pending. Now the #1 ceiling — caps Security Arch and blocks any multi-tenant story.","red"],
+ ["Maintainability debt: 4 → 4","STUCK","Pervasive duplication (287 UTC-normalize sites, 195 Redis-JSON, 4 near-identical scanners) plus a 290-line guard cascade. Active but not shrinking.","amber"],
+ ["Performance: N+1 margins","UNTOUCHED","Only 2 selectinload uses across the data layer → latent N+1 margins; no transaction context managers.","amber"],
+ ["Transport security: 3 → 3","UNTOUCHED","TLS still opt-in (--profile tls); no HSTS/CSP/X-Frame headers. Fine for single-tenant dev, a gap for prod.","amber"]
+];
+const gl=c=>c==='red'?'glow-red':'glow-amber';
+const tc=c=>c==='red'?'text-red-200':'text-amber-200';
+const cb=c=>c==='red'?'bg-red-500/15 text-red-300':'bg-amber-500/15 text-amber-300';
+document.getElementById('cold').innerHTML = cold.map(([t,tag,d,c])=>`
+  <div class="glass rounded-xl p-4 ${gl(c)}">
+    <div class="flex justify-between items-start gap-2">
+      <div class="font-bold ${tc(c)}">${t}</div>
+      <span class="chip ${cb(c)} shrink-0">${tag}</span>
+    </div>
+    <div class="text-slate-400 text-sm mt-1">${d}</div>
+  </div>`).join('');
+
+/* ---- new cracks ---- */
+const cracks=[
+ ["MED","maybe_execute() guard cascade","auto_trade_service.py:92-381 — 290L / 15-branch fn; #368 live-guards piled onto an already-large function. Testability + maintainability risk. (R01v4)","amber"],
+ ["LOW","Service raises HTTPException","universe_export.py:11-12,59 — a service layer raises a web HTTPException → SoC web-leak, untestable as a pure service. (R02v4)","amber"],
+ ["MED","TZ-normalization duplication grew","287 UTC-normalize sites (was ~96 in v3 R03) — still no utils/time.py. The duplication grew instead of consolidating. (R03v4)","amber"],
+ ["LOW","Quality-gate coupling","3 modules to touch per new evidence type (quality_gate.py + quality_gate_evidence.py + auto_trade_service.py). No QualityGatePolicy interface. (R04v4)","amber"]
+];
+document.getElementById('cracks').innerHTML = cracks.map(([sev,t,d,c])=>`
+  <div class="rounded-xl p-4 border ${c==='red'?'border-red-500/40 bg-red-500/5':'border-amber-500/40 bg-amber-500/5'}">
+    <div class="flex items-center gap-2">
+      <span class="chip ${c==='red'?'bg-red-500/20 text-red-300':'bg-amber-500/20 text-amber-300'}">${sev}</span>
+      <span class="font-bold text-slate-100">${t}</span>
+    </div>
+    <div class="text-slate-400 text-sm mt-1 mono" style="font-size:.78rem">${d}</div>
+  </div>`).join('');
+
+/* ---- ticket scoreboard ---- */
+const tickets=[
+ ["#491 Data Quality epic","done"],["#499 Quality gate","done"],["#500 Gate evidence","done"],
+ ["#501 Gate UI","done"],["#502 Gate tests","done"],["#498 Lineage","done"],
+ ["#372 Security epic","done"],["#368 Live-IBKR guards","done"],["#369–#382 Security","done"],
+ ["#622 Py-3.14 fix","done"],["#522 Memory guard","done"],["#617 Seq restart","done"],
+ ["R01 Backups (verified)","done"],["R02 ruff-in-CI","done"],["R05 Readiness+migration","done"],
+ ["#148 AGT","declined"]
+];
+const tcol={done:'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',partial:'bg-amber-500/15 text-amber-300 border-amber-500/30',declined:'bg-sky-500/15 text-sky-300 border-sky-500/30',broken:'bg-red-500/15 text-red-300 border-red-500/30'};
+document.getElementById('tickets').innerHTML = tickets.map(([t,s])=>`
+  <div class="flex items-center justify-between rounded-lg px-3 py-2 border ${tcol[s]}">
+    <span>${t}</span><span class="uppercase text-[10px] font-bold tracking-wide">${s}</span>
+  </div>`).join('');
+</script>
+</body>
+</html>

@@ -15,16 +15,17 @@ Open the `.html` files in a browser — they are self-contained (Tailwind/Mermai
 | 3 | [`2026-06-03-architecture-quality-comparison-v1-vs-v2.html`](2026-06-03-architecture-quality-comparison-v1-vs-v2.html) | 2026-06-03 | **Comparison** — visual v1→v2 side-by-side: a diverging delta chart across all 16 dimensions, "dramatically improved" vs "cold spots & regressions", and the new defects the remediation introduced. |
 | 4 | [`2026-06-09-architecture-quality-report-v3.html`](2026-06-09-architecture-quality-report-v3.html) | 2026-06-09 | **v3** — re-assessment after round-2 tickets #190–#205. Overall **90/100**, architecture **4.3/5**, scorecard **4.06/5**. First report with the Code Health Deep-Dive, DORA-proxy, and Score Trend sections. Caught one ticket (#195 backups) closed with no implementation. |
 | — | [`2026-06-12-security-review.html`](2026-06-12-security-review.html) | 2026-06-12 | **Security Review** (not a quality vN) — comprehensive read-only application-security assessment. Mean posture **2.6/5** on a security-specific 12-category scorecard (independent of the 16-dimension quality rubric). 0 Critical / 4 High / 8 Medium / 2 Low. Confirmed the system can place **live** IBKR bracket orders. Follow-ups labeled `security-audit-2026-06-12`, grouped under an epic. |
+| 5 | [`2026-06-26-architecture-quality-report-v4.html`](2026-06-26-architecture-quality-report-v4.html) | 2026-06-26 | **v4** — re-assessment after the Data-Quality-Gate epic (#491/#499–#502), the security-remediation epic (#372, incl. #368's live-IBKR fail-closed Redis kill switch), and the factory Python-3.14 fix (#622). Overall **91/100**, architecture **4.3/5**, scorecard **4.12/5**. Verified v3's top risk resolved — automated DB backups (`db-backup` + `db-restore-drill` sidecars) are now real in `docker-compose.yml`. The lone scorecard mover is Operational Readiness (3→4); remaining gaps are structural (authz/RBAC #373, single-replica scale). |
 
 > **Note:** the security review reuses the visual shell for consistency but is a **distinct artifact** — it is scored on its own security rubric and does **not** renumber the comparable v1→v2→v3 quality series.
 
 ## Headline movement
 
-| Metric | v1 | v2 | v3 |
-|---|---|---|---|
-| Overall Quality (0–100) | 62 | 83 | **90** |
-| Architecture Quality (0–5) | 3.2 | 3.9 | **4.3** |
-| Weighted Scorecard (0–5) | 2.8 | 3.75 | **4.06** |
+| Metric | v1 | v2 | v3 | v4 |
+|---|---|---|---|---|
+| Overall Quality (0–100) | 62 | 83 | 90 | **91** |
+| Architecture Quality (0–5) | 3.2 | 3.9 | 4.3 | **4.3** |
+| Weighted Scorecard (0–5) | 2.8 | 3.75 | 4.06 | **4.12** |
 
 **v1 → v2:** 22 of 24 remediation tickets (#84–#107) closed; auth + observability foundations built.
 One ticket (#101 async SQLAlchemy) deliberately **declined** (ADR-0004).
@@ -32,6 +33,12 @@ One ticket (#101 async SQLAlchemy) deliberately **declined** (ADR-0004).
 scanner/futures god-module decomposition, circuit breakers, WebSocket auth, CSRF, and worker-metrics
 fix. One closure (#195 automated backups) was **broken** — closed with no artifacts in the repo;
 v3 follow-ups carry the `architecture-audit-v3` label.
+**v3 → v4:** the Data-Quality-Gate epic (#491) and the security-remediation epic (#372) completed,
+and v3's "honesty gaps" were verified closed **against code** — automated backups + restore-drill
+(`db-backup`/`db-restore-drill` sidecars, R01/#195), ruff-in-CI (R02), readiness probe + migration-gate
+ADR-0012 (R05). Operational Readiness moved 3→4 (the lone scorecard mover). The system is now at a
+**mature single-tenant ceiling** — the gating gaps are authorization/RBAC (#373) and single-replica
+scalability, not missing foundations. New findings carry the `architecture-audit-v4` label.
 
 ## Reproducing these reports
 
