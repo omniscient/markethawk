@@ -36,8 +36,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Backend: Migrations
 
-- [FIX] When a migration backfills a FK column (e.g. `UPDATE scanner_configs SET universe_id = 1`), ensure the referenced row exists BEFORE the UPDATE by inserting it with `ON CONFLICT (id) DO NOTHING` — CI databases start empty (no seed SQL applied), so the FK constraint will fail if the parent row is absent. See migration `c7d8e9f0a1b2` for the pattern. <!-- issue:#156 date:2026-06-03 expires:2026-12-03 source:implement -->
-
 ## Backend: Redis / Caching
 
 - [PATTERN] Always call `db.commit()` before writing to Redis in functions that persist a DB row then cache it — if the commit fails, the Redis entry must not exist or it will expose a version that was never persisted. Also clear any process-level date-keyed dicts (`_foo_cache.clear()`) immediately after a successful commit so that in-process cache entries for stale data are evicted on retrain. See `regime_service.train_and_persist`. <!-- issue:#106 date:2026-06-15 expires:2026-12-15 source:implement -->
@@ -106,3 +104,5 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PROVISIONAL] `WebSocketException(code=1008)` raised inside the route handler body (not only from a FastAPI Dependency) is caught by Starlette and closes the connection before `websocket.accept()` returns to the client — so an `async with ws_connection_slot(user_id):` context manager in the handler body (before `await websocket.accept()`) correctly delivers 1008 without needing a separate Dependency. <!-- evidence:test-output issue:#377 date:2026-06-14 expires:2026-12-14 source:implement -->
 
 - [PROVISIONAL] To persist a Pydantic v2 model that contains `datetime` fields into a JSONB column, use `json.loads(json.dumps(model.model_dump(), default=str))` — `model.model_dump()` returns `datetime` objects which PostgreSQL's JSON encoder rejects; `default=str` coerces them to ISO strings and `json.loads` rebuilds a plain dict. <!-- evidence:test-output issue:#494 date:2026-06-22 expires:2026-12-22 source:implement -->
+
+- [AVOID] Never import `HTTPException` from `fastapi` in service modules (`app/services/`) — HTTP translation belongs in routers only. Raise domain exceptions (`UniverseNotFoundError`, `UniverseValidationError`) instead; the router catches them and converts to the appropriate HTTP status. A service that imports FastAPI cannot be unit-tested without the full HTTP stack. Flagged as SoC violation in architecture review R02-v4. <!-- issue:#631 date:2026-06-26 expires:2026-12-26 source:refine -->
