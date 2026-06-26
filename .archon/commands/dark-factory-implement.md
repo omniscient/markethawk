@@ -322,35 +322,38 @@ it — it prevents the same wrong claim from being re-added during the TTL windo
 Run this block after all R3/R4/R5 operations and before `git add .archon/memory/`:
 
 ```bash
-# Memory write guard — detect unexpected deletions and restore
+# Memory write guard — detect unexpected deletions and restore (append-only; never reverts this run's new entries)
 for MEM_FILE in .archon/memory/*.md; do
   [ -f "$MEM_FILE" ] || continue
-  # Lines starting with '-' that are not file-header markers
+  # Deleted content lines (diff marker '-'), excluding file-header markers
   DELETED=$(git diff "$MEM_FILE" | grep '^-' | grep -v '^---' | grep -v '^-#' | grep -v '^-<!--' || true)
   if [ -n "$DELETED" ]; then
-    # Filter out expected deletions: expiry-cleaned lines (expired dates),
-    # R4 drops (oldest-date lines), R5 rewrites (tag-only change, body unchanged)
+    # Added content lines with the diff '+' marker stripped, for R5 body comparison
+    ADDED=$(git diff "$MEM_FILE" | grep '^+' | grep -v '^+++' | sed 's/^+//')
     TODAY=$(date +%Y-%m-%d)
     UNEXPECTED=$(echo "$DELETED" | while IFS= read -r line; do
-      # Skip lines whose expires: date is in the past (legitimate expiry cleanup)
-      if echo "$line" | grep -q 'expires:'; then
-        EXPIRY=$(echo "$line" | sed 's/.*expires:\([0-9-]*\).*/\1/')
+      # Strip the diff '-' marker to recover the file-content line
+      CONTENT=$(printf '%s' "$line" | sed 's/^-//')
+      # Legitimate expiry cleanup: an expires: date in the past
+      if echo "$CONTENT" | grep -q 'expires:'; then
+        EXPIRY=$(echo "$CONTENT" | sed 's/.*expires:\([0-9-]*\).*/\1/')
         [ "$EXPIRY" \< "$TODAY" ] && continue
       fi
-      # Skip R5 invalidations: deleted line body matches an added line body (tag change only)
-      BODY=$(echo "$line" | sed 's/^\- \[PATTERN\]//' | sed 's/^\- \[AVOID\]//' | sed 's/^\- \[FIX\]//')
-      if git diff "$MEM_FILE" | grep '^+' | grep -v '^+++' | grep -qF "$BODY"; then
+      # Legitimate R5 invalidation: same body re-added with a changed tag.
+      # Strip a leading "- [ANYTAG]" to get the bare body, then look for it among added lines.
+      BODY=$(printf '%s' "$CONTENT" | sed 's/^- \[[^]]*\]//')
+      if [ -n "$BODY" ] && printf '%s\n' "$ADDED" | grep -qF -- "$BODY"; then
         continue
       fi
-      echo "$line"
+      printf '%s\n' "$CONTENT"
     done)
     if [ -n "$UNEXPECTED" ]; then
-      echo "MEMORY GUARD: unexpected deletions detected in $MEM_FILE — restoring"
-      echo "$UNEXPECTED"
-      git checkout HEAD -- "$MEM_FILE"
-      # Re-apply only the intended new entries by echoing them back
-      # (The agent must re-append them after the restore.)
-      echo "MEMORY GUARD: re-append your new entries to $MEM_FILE now"
+      echo "MEMORY GUARD: unexpected deletion(s) in $MEM_FILE — re-appending to preserve them:"
+      printf '%s\n' "$UNEXPECTED"
+      # Append-only restore: re-append the deleted authoritative line(s). This preserves
+      # this run's new entries (unlike a whole-file checkout) and is self-healing for R4
+      # cap-drops (a re-appended over-cap entry is simply re-capped on the next run).
+      printf '%s\n' "$UNEXPECTED" >> "$MEM_FILE"
     fi
   fi
 done
