@@ -27,3 +27,13 @@ entries as higher-confidence than source:refine entries when the two conflict.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+## Replay Engine (#484)
+
+- [PATTERN] Create new `replay_runs`/`replay_trades` tables as a parallel design alongside `backtest_runs`/`backtest_trades` — do not extend or modify the live backtest tables. The two schemas diverge on manifest freezing (universe snapshot, data_hash, exit_fidelity), per-trade fields (MFE/MAE, regime, fill_source), and strategy nullability. <!-- issue:#484 date:2026-06-26 expires:2026-12-26 source:refine -->
+- [AVOID] Do not extend `BacktestRun`/`BacktestTrade` with replay-engine columns — the live backtest tables have a running service, Celery task, and tests; mixing replay concerns entangles two feature areas and risks regressions in the production path. <!-- issue:#484 date:2026-06-26 expires:2026-12-26 source:refine -->
+
+- [PATTERN] Compute `data_hash` synchronously at ReplayRun creation in the same DB transaction that writes the ReplayRun row — the hash pins the data state before execution begins, guaranteeing determinism. If bar data is absent for the window, fail at creation rather than deferring. <!-- issue:#484 date:2026-06-26 expires:2026-12-26 source:refine -->
+- [AVOID] Do not defer `data_hash` computation (e.g. NULL initially, populated later) — a deferred hash lets the run start executing before its inputs are pinned, defeating the reproducibility guarantee of the replay engine. <!-- issue:#484 date:2026-06-26 expires:2026-12-26 source:refine -->
+
+- [PATTERN] `trading_strategy_id` on `ReplayRun` is nullable — scanner-only replays (pure signal analysis without trade simulation) are a legitimate first-class use case. When NULL, `strategy_snapshot` is also NULL and ManifestResolver skips strategy freezing. <!-- issue:#484 date:2026-06-26 expires:2026-12-26 source:refine -->
