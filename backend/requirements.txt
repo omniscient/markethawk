@@ -13,11 +13,13 @@ alembic==1.18.4
 polygon-api-client==1.16.3
 websockets==16.0
 pandas==2.3.3
-numpy==2.2.6
+numpy==2.3.3
 lightgbm==4.6.0
-shap==0.47.2
-scikit-learn==1.6.1
-scipy==1.15.3
+shap==0.51.0
+numba==0.63.0      # pinned for cp314 wheels (Python 3.14 factory)
+llvmlite==0.46.0   # pinned for cp314 wheels (Python 3.14 factory)
+scikit-learn==1.7.2
+scipy==1.16.1
 hmmlearn>=0.3
 ib_insync==0.9.86
 
