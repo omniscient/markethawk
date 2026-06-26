@@ -24,6 +24,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Optional
 
 import redis
@@ -33,8 +34,11 @@ from app.core.config import settings
 from app.models.alert_rule import AlertRule
 from app.models.auto_trade_order import AutoTradeOrder
 from app.models.scanner_event import ScannerEvent
+from app.models.scanner_run import ScannerRun
 from app.models.system_config import SystemConfig
 from app.models.trading_strategy import TradingStrategy
+from app.schemas.quality_gate import QualityGatePolicy
+from app.services.quality_gate import QualityGateService
 from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -148,6 +152,60 @@ class AutoTradeExecutor:
                 f"{event.ticker}/strategy={strategy.id}/{today} id={existing.id} — skipping"
             )
             return None
+
+        # ── 2.5. Data quality gate (strict policy) ───────────────────────
+        # Re-assess under strict policy — do NOT trust any advisory pre-stamped
+        # metadata_["quality_gate"] blob from the scanner run (computed under
+        # advisory policy, which does not escalate blocked-severity issues).
+        # When universe_id is None (no scanner_run_id linkage), the gate uses
+        # policy=off which returns verdict='skipped' (bypassable, not fail-closed).
+        try:
+            universe_id = self._resolve_universe_id(event, db)
+            gate_policy = (
+                QualityGatePolicy.strict if universe_id is not None else QualityGatePolicy.off
+            )
+            _gate_req = SimpleNamespace(
+                policy=gate_policy.value,
+                universe_id=universe_id,
+                scanner_type=event.scanner_type,
+                ticker=event.ticker,
+                requirements=None,
+            )
+            assessment = QualityGateService.assess(db, _gate_req)
+        except Exception as exc:
+            logger.warning(
+                "quality_gate_service_error: ticker=%s event=%s rule=%s error=%s"
+                " — failing closed",
+                event.ticker,
+                event.id,
+                rule.id,
+                exc,
+            )
+            return None
+
+        gate_ok = self._gate_passes(assessment, db)
+        bypass_used = assessment.verdict == "skipped" and gate_ok
+        if not gate_ok:
+            logger.warning(
+                "quality_gate_refused: ticker=%s event=%s rule=%s"
+                " verdict=%s issues=%s warnings=%s bypass_used=%s",
+                event.ticker,
+                event.id,
+                rule.id,
+                assessment.verdict,
+                assessment.issues,
+                assessment.warnings,
+                False,
+            )
+            return None
+        if bypass_used:
+            logger.warning(
+                "quality_gate_bypass_used: ticker=%s event=%s rule=%s"
+                " verdict=skipped bypass=QUALITY_GATE_SKIP_BYPASS",
+                event.ticker,
+                event.id,
+                rule.id,
+            )
 
         # ── 3. Redis distributed lock ────────────────────────────────────
         redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -544,6 +602,41 @@ class AutoTradeExecutor:
             return 0.0
         finally:
             loop.close()
+
+    # ── Quality gate helpers ─────────────────────────────────────────────
+
+    def _resolve_universe_id(self, event: ScannerEvent, db: Session) -> Optional[int]:
+        """Canonical universe resolution: event.scanner_run_id → ScannerRun.universe_id.
+
+        Returns None when the run linkage is absent or the run has no universe.
+        A None result causes the gate call to use policy=off, which returns
+        verdict='skipped' — bypassable via QUALITY_GATE_SKIP_BYPASS.
+        """
+        if not event.scanner_run_id:
+            return None
+        run = db.query(ScannerRun).filter(ScannerRun.id == event.scanner_run_id).first()
+        return run.universe_id if run else None
+
+    def _gate_passes(self, assessment, db: Session) -> bool:
+        """Determine whether the quality gate assessment permits order creation.
+
+        trusted   → allow
+        skipped   → allow only if QUALITY_GATE_SKIP_BYPASS SystemConfig key == 'true'
+        warning   → refuse (strict policy escalates warnings to blockers)
+        blocked   → refuse
+        """
+        if assessment.verdict == "trusted":
+            return True
+        if assessment.verdict == "skipped":
+            cfg = (
+                db.query(SystemConfig)
+                .filter(SystemConfig.key == "QUALITY_GATE_SKIP_BYPASS")
+                .first()
+            )
+            bypass_enabled = cfg is not None and cfg.value.lower() == "true"
+            return bypass_enabled
+        # warning or blocked → always refuse
+        return False
 
 
 # Module-level singleton for import convenience

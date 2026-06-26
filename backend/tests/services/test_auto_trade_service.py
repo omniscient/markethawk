@@ -25,6 +25,20 @@ from app.services.auto_trade_service import (
     get_stats,
 )
 
+# ── Quality-gate patch target ──────────────────────────────────────────────────
+# QualityGateService is imported into auto_trade_service's module namespace;
+# patch via the service module attribute so all tests can override it cleanly.
+GATE_PATCH = "app.services.auto_trade_service.QualityGateService.assess"
+
+
+def _gate_assessment(verdict_str: str):
+    """Return a lightweight mock QualityGateAssessment with the given verdict."""
+    a = MagicMock()
+    a.verdict = verdict_str  # str enum comparison works with plain string
+    a.issues = []
+    a.warnings = []
+    return a
+
 # ── helpers ────────────────────────────────────────────────────────────────
 
 
@@ -103,6 +117,59 @@ def _fake_redis():
 
 # Patch target for Redis: use the module-local name, not the top-level redis package.
 REDIS_PATCH = "app.services.auto_trade_service.redis.from_url"
+
+
+@pytest.fixture(autouse=True)
+def _default_gate_trusted():
+    """Patch QualityGateService.assess to return 'trusted' for all tests by default.
+
+    Tests that explicitly verify gate behaviour use their own patch(GATE_PATCH, ...)
+    which overrides this autouse fixture's outer mock for the duration of the test.
+    This prevents existing maybe_execute tests from breaking when Guard 2.5 is added.
+    """
+    with patch(GATE_PATCH, return_value=_gate_assessment("trusted")):
+        yield
+
+
+def _event_with_run(db, ticker="AAPL", scanner_run_id_override=None):
+    """Create a Universe, ScannerRun, and ScannerEvent with scanner_run_id set.
+
+    Used by gate-specific tests that need a resolvable universe_id so Guard 2.5
+    will call QualityGateService.assess under strict policy (not policy=off).
+    """
+    from app.models.scanner_run import ScannerRun
+    from app.models.stock_universe import StockUniverse
+
+    universe = StockUniverse(
+        name=f"Test Universe {ticker}",
+        description="",
+        criteria={},
+        is_active=True,
+    )
+    db.add(universe)
+    db.flush()
+
+    run = ScannerRun(
+        scanner_type="pre_market_volume_spike",
+        universe_id=universe.id,
+        status="completed",
+    )
+    db.add(run)
+    db.flush()
+
+    ev = ScannerEvent(
+        ticker=ticker,
+        event_date=date.today(),
+        scanner_type="pre_market_volume_spike",
+        indicators={"last_trade_price": 50.0},
+        criteria_met={},
+        metadata_={"session": "pre_market"},
+        opening_price=Decimal("50.00"),
+        scanner_run_id=scanner_run_id_override if scanner_run_id_override is not None else run.id,
+    )
+    db.add(ev)
+    db.flush()
+    return ev
 
 
 # ── _calculate_position (pure math, no DB/Redis) ───────────────────────────
@@ -390,3 +457,110 @@ def test_get_stats_returns_expected_shape(db):
     assert "by_status" in result
     assert "win_rate" in result
     assert result["period_days"] == 30
+
+
+# ── Guard 2.5: quality gate verdicts ──────────────────────────────────────────
+
+
+def test_quality_gate_trusted_allows_order(db: Session):
+    """verdict=trusted → order created normally; gate called with policy=strict."""
+    from app.schemas.quality_gate import QualityGatePolicy
+
+    strategy = _strategy(db, max_concurrent_positions=10, max_trades_per_day=10)
+    rule = _rule(db, strategy)
+    event = _event_with_run(db)
+
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch(GATE_PATCH, return_value=_gate_assessment("trusted")) as mock_assess,
+    ):
+        order = AutoTradeExecutor().maybe_execute(rule, event, db)
+
+    assert order is not None
+    assert order.status == "submitted"
+    # Gate must be called exactly once with strict policy (not trusting advisory blob)
+    mock_assess.assert_called_once()
+    call_request = mock_assess.call_args.args[1]
+    assert call_request.policy == QualityGatePolicy.strict.value
+
+
+def test_quality_gate_warning_refuses_order(db: Session):
+    """verdict=warning → no order created."""
+    strategy = _strategy(db, max_concurrent_positions=10, max_trades_per_day=10)
+    rule = _rule(db, strategy)
+    event = _event_with_run(db, ticker="MSFT")
+
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch(GATE_PATCH, return_value=_gate_assessment("warning")),
+    ):
+        order = AutoTradeExecutor().maybe_execute(rule, event, db)
+
+    assert order is None
+
+
+def test_quality_gate_blocked_refuses_order(db: Session):
+    """verdict=blocked → no order created."""
+    strategy = _strategy(db, max_concurrent_positions=10, max_trades_per_day=10)
+    rule = _rule(db, strategy)
+    event = _event_with_run(db, ticker="GOOG")
+
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch(GATE_PATCH, return_value=_gate_assessment("blocked")),
+    ):
+        order = AutoTradeExecutor().maybe_execute(rule, event, db)
+
+    assert order is None
+
+
+def test_quality_gate_skipped_without_bypass_refuses_order(db: Session):
+    """verdict=skipped and QUALITY_GATE_SKIP_BYPASS absent → no order created."""
+    strategy = _strategy(db, max_concurrent_positions=10, max_trades_per_day=10)
+    rule = _rule(db, strategy)
+    event = _event_with_run(db, ticker="AMZN")
+    # No QUALITY_GATE_SKIP_BYPASS row in SystemConfig
+
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch(GATE_PATCH, return_value=_gate_assessment("skipped")),
+    ):
+        order = AutoTradeExecutor().maybe_execute(rule, event, db)
+
+    assert order is None
+
+
+def test_quality_gate_skipped_with_bypass_allows_order(db: Session):
+    """verdict=skipped + QUALITY_GATE_SKIP_BYPASS='true' → order created."""
+    from app.models.system_config import SystemConfig
+
+    db.add(SystemConfig(key="QUALITY_GATE_SKIP_BYPASS", value="true"))
+    db.flush()
+
+    strategy = _strategy(db, max_concurrent_positions=10, max_trades_per_day=10)
+    rule = _rule(db, strategy)
+    event = _event_with_run(db, ticker="NFLX")
+
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch(GATE_PATCH, return_value=_gate_assessment("skipped")),
+    ):
+        order = AutoTradeExecutor().maybe_execute(rule, event, db)
+
+    assert order is not None
+    assert order.status == "submitted"
+
+
+def test_quality_gate_exception_fails_closed(db: Session):
+    """Gate service raises → no order created (fail-closed)."""
+    strategy = _strategy(db, max_concurrent_positions=10, max_trades_per_day=10)
+    rule = _rule(db, strategy)
+    event = _event_with_run(db, ticker="META")
+
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch(GATE_PATCH, side_effect=RuntimeError("gate unavailable")),
+    ):
+        order = AutoTradeExecutor().maybe_execute(rule, event, db)
+
+    assert order is None

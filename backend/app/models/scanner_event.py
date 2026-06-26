@@ -56,6 +56,10 @@ class ScannerEvent(Base):
         Integer, ForeignKey("signal_clusters.id"), nullable=True, index=True
     )
 
+    scanner_run_id = Column(
+        Integer, ForeignKey("scanner_runs.id"), nullable=True, index=True
+    )
+
     signal_quality_score = Column(Float, nullable=True)
     regime = Column(String(30), nullable=True, index=True)
 
