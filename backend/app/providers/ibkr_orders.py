@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -227,6 +228,44 @@ class IBKROrderManager:
 
         Returns BracketOrderResult with broker IDs for all three legs.
         """
+        # ── Non-bypassable live-order guards (R1 / R2) ───────────────────────────
+        # These checks fire before any IBKR connection opens. They cannot be
+        # bypassed by flipping API-mutable DB config (AUTO_TRADING_ENABLED, paper_mode).
+        if os.getenv("TRADING_KILL_SWITCH", "").lower() in ("1", "true", "yes"):
+            raise PermissionError(
+                "Trading kill switch engaged — refusing to place order"
+            )
+        if not settings.LIVE_TRADING_ARMED:
+            raise PermissionError(
+                "LIVE_TRADING_ARMED is not set — live order placement is disabled. "
+                "Set LIVE_TRADING_ARMED=true in the environment to enable."
+            )
+        notional = quantity * (entry_price if entry_price is not None else target_price)
+        if notional > settings.MAX_ORDER_NOTIONAL:
+            raise ValueError(
+                f"Order exceeds notional cap: {notional:.2f} > {settings.MAX_ORDER_NOTIONAL}"
+            )
+        if quantity > settings.MAX_ORDER_QTY:
+            raise ValueError(
+                f"Order exceeds quantity cap: {quantity} > {settings.MAX_ORDER_QTY}"
+            )
+        # ── WARN-level audit log (all guards passed) ──────────────────────────────
+        logger.warning(
+            "LIVE ORDER PLACEMENT: symbol=%s side=%s qty=%d entry=%s stop=%s target=%s "
+            "notional=%.2f order_ref=%s",
+            symbol,
+            side,
+            quantity,
+            f"{entry_price:.4f}" if entry_price is not None else "MKT",
+            stop_price,
+            target_price,
+            notional,
+            order_ref,
+        )
+        # ── Prometheus counter ────────────────────────────────────────────────────
+        from app.core.metrics import live_orders_total
+
+        live_orders_total.labels(symbol=symbol, side=side).inc()
         ib = await self._connect()
         try:
             contract = Stock(symbol, "SMART", "USD")

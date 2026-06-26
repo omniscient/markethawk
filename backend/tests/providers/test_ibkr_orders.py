@@ -2,6 +2,8 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 
 def _make_manager():
     with patch("app.providers.ibkr_orders.IB_INSYNC_AVAILABLE", True):
@@ -125,3 +127,120 @@ class TestGetAccountAndOrders:
         _, ib_mock = self._run(items, [])
         # Called once with no positional filtering args (tags filtering happens client-side)
         ib_mock.reqAccountSummaryAsync.assert_called_once()
+
+
+class TestPlaceBracketOrderGuards:
+    """Non-bypassable guards at the top of place_bracket_order (R1 / R2)."""
+
+    def _make_manager(self):
+        with patch("app.providers.ibkr_orders.IB_INSYNC_AVAILABLE", True):
+            from app.providers.ibkr_orders import IBKROrderManager
+
+            return IBKROrderManager.__new__(IBKROrderManager)
+
+    def _armed_settings(self):
+        """Settings mock: LIVE_TRADING_ARMED=True, conservative caps."""
+        s = MagicMock()
+        s.LIVE_TRADING_ARMED = True
+        s.TRADING_KILL_SWITCH = False
+        s.MAX_ORDER_NOTIONAL = 10_000.0
+        s.MAX_ORDER_QTY = 200
+        s.IBKR_HOST = "127.0.0.1"
+        s.IBKR_PORT = 7496
+        s.IBKR_TRADING_CLIENT_ID = 11
+        return s
+
+    def _run(
+        self,
+        manager,
+        quantity=10,
+        entry_price=100.0,
+        stop_price=95.0,
+        target_price=110.0,
+    ):
+        import asyncio as _asyncio
+
+        loop = _asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(
+                manager.place_bracket_order(
+                    symbol="AAPL",
+                    side="long",
+                    quantity=quantity,
+                    entry_price=entry_price,
+                    stop_price=stop_price,
+                    target_price=target_price,
+                )
+            )
+        finally:
+            loop.close()
+
+    def _attach_ib_mock(self, manager):
+        """Wire a disconnected IB mock so _connect never touches the network."""
+        ib_mock = MagicMock()
+        ib_mock.placeOrder = MagicMock()
+
+        async def fake_connect():
+            return ib_mock
+
+        async def fake_disconnect(ib):
+            pass
+
+        manager._connect = fake_connect
+        manager._disconnect = fake_disconnect
+        return ib_mock
+
+    def test_place_bracket_order_kill_switch(self):
+        """TRADING_KILL_SWITCH=true must raise PermissionError; placeOrder not called."""
+        import os as _os
+
+        manager = self._make_manager()
+        ib_mock = self._attach_ib_mock(manager)
+
+        with patch.dict(_os.environ, {"TRADING_KILL_SWITCH": "true"}):
+            with pytest.raises(PermissionError, match="kill switch"):
+                self._run(manager)
+
+        ib_mock.placeOrder.assert_not_called()
+
+    def test_place_bracket_order_not_armed(self):
+        """LIVE_TRADING_ARMED=False (test default via conftest.py) must raise PermissionError."""
+        import os as _os
+
+        manager = self._make_manager()
+        ib_mock = self._attach_ib_mock(manager)
+
+        # conftest.py sets LIVE_TRADING_ARMED=false; disable kill switch explicitly
+        with patch.dict(_os.environ, {"TRADING_KILL_SWITCH": ""}):
+            with pytest.raises(PermissionError, match="LIVE_TRADING_ARMED"):
+                self._run(manager)
+
+        ib_mock.placeOrder.assert_not_called()
+
+    def test_place_bracket_order_notional_cap(self):
+        """qty=100 * entry=200.0 → notional=20_000 > 10_000 cap → ValueError."""
+        import os as _os
+
+        manager = self._make_manager()
+        ib_mock = self._attach_ib_mock(manager)
+
+        with patch("app.providers.ibkr_orders.settings", self._armed_settings()):
+            with patch.dict(_os.environ, {"TRADING_KILL_SWITCH": ""}):
+                with pytest.raises(ValueError, match="notional cap"):
+                    self._run(manager, quantity=100, entry_price=200.0)
+
+        ib_mock.placeOrder.assert_not_called()
+
+    def test_place_bracket_order_qty_cap(self):
+        """qty=300 > 200 cap → ValueError; notional=300*10=3_000 < cap, so only qty fires."""
+        import os as _os
+
+        manager = self._make_manager()
+        ib_mock = self._attach_ib_mock(manager)
+
+        with patch("app.providers.ibkr_orders.settings", self._armed_settings()):
+            with patch.dict(_os.environ, {"TRADING_KILL_SWITCH": ""}):
+                with pytest.raises(ValueError, match="quantity cap"):
+                    self._run(manager, quantity=300, entry_price=10.0)
+
+        ib_mock.placeOrder.assert_not_called()

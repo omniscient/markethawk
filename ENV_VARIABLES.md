@@ -200,3 +200,19 @@ curl http://localhost:8000/health
 3. Read it in `backend/app/core/config.py` via `os.getenv("VAR_NAME", "default")`.
 4. Restart containers: `docker-compose down && docker-compose up -d`.
 5. Document it in this file.
+
+
+---
+
+## Live Trading Safety Controls
+
+These variables control the non-bypassable order guards added at the `place_bracket_order` chokepoint (F-TRADE-01). They must be set at the container/env level — **they are not API-settable**.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LIVE_TRADING_ARMED` | `false` | **Must be explicitly set to `true` to allow live IBKR order placement.** Defaults to `false` — any container without this env var set will refuse all live orders with `PermissionError`. Requires container restart to change. |
+| `TRADING_KILL_SWITCH` | `` (unset) | Emergency halt: set to `1`, `true`, or `yes` (case-insensitive) to immediately block all live order placement without restarting the container. Checked via `os.getenv()` at call time so it takes effect instantly via `docker exec -e TRADING_KILL_SWITCH=true ...`. |
+| `MAX_ORDER_NOTIONAL` | `10000.0` | Hard USD notional cap per order (`quantity * entry_price`). Orders exceeding this raise `ValueError` before connecting to IBKR. Override if your live account trades larger sizes (e.g. `MAX_ORDER_NOTIONAL=50000`). |
+| `MAX_ORDER_QTY` | `200` | Hard shares-per-order cap. Orders with `quantity > MAX_ORDER_QTY` raise `ValueError`. Override for large-cap positions where 200 shares is too restrictive. |
+
+> **Breaking default:** Any container currently placing live IBKR orders **must** set `LIVE_TRADING_ARMED=true` before deploying this change, or live order placement will be blocked. The default is intentionally safe/conservative.

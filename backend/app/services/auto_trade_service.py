@@ -135,6 +135,17 @@ class AutoTradeExecutor:
                 )
                 return None
 
+        # ── 1b. max_position_usd required for live strategies (R3) ─────────────
+        if not strategy.paper_mode and strategy.max_position_usd is None:
+            logger.error(
+                "AutoTradeExecutor: live strategy '%s' (id=%s) has no max_position_usd "
+                "— refusing live order for rule %s",
+                strategy.name,
+                strategy.id,
+                rule.id,
+            )
+            return None
+
         # ── 2. Idempotency — one order per symbol/strategy/day ───────────
         today = datetime.now(timezone.utc).date()
         existing = (
@@ -162,7 +173,9 @@ class AutoTradeExecutor:
         try:
             universe_id = self._resolve_universe_id(event, db)
             gate_policy = (
-                QualityGatePolicy.strict if universe_id is not None else QualityGatePolicy.off
+                QualityGatePolicy.strict
+                if universe_id is not None
+                else QualityGatePolicy.off
             )
             _gate_req = SimpleNamespace(
                 policy=gate_policy.value,

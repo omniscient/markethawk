@@ -39,6 +39,7 @@ def _gate_assessment(verdict_str: str):
     a.warnings = []
     return a
 
+
 # ── helpers ────────────────────────────────────────────────────────────────
 
 
@@ -165,7 +166,9 @@ def _event_with_run(db, ticker="AAPL", scanner_run_id_override=None):
         criteria_met={},
         metadata_={"session": "pre_market"},
         opening_price=Decimal("50.00"),
-        scanner_run_id=scanner_run_id_override if scanner_run_id_override is not None else run.id,
+        scanner_run_id=scanner_run_id_override
+        if scanner_run_id_override is not None
+        else run.id,
     )
     db.add(ev)
     db.flush()
@@ -334,6 +337,7 @@ def test_maybe_execute_live_mode_isolates_ibkr(db: Session):
         requires_approval=False,
         max_concurrent_positions=10,
         max_trades_per_day=10,
+        max_position_usd=Decimal("5000.0"),
     )
     rule = _rule(db, strategy)
     event = _event(db)
@@ -614,3 +618,76 @@ def test_quality_gate_blocked_refuses_even_with_bypass(db: Session):
 
     assert order is None
     assert db.query(AutoTradeOrder).count() == 0
+
+
+# ── Guard 1b: max_position_usd required for live strategies ───────────────────
+
+
+class TestMaybeExecuteMaxPositionGuard:
+    """Execution-time guard: live strategy with no max_position_usd returns None (R3)."""
+
+    def test_maybe_execute_rejects_live_strategy_without_max_position(self, db):
+        from app.models.scanner_event import ScannerEvent
+        from app.models.system_config import SystemConfig
+
+        # AUTO_TRADING_ENABLED=true so it passes the kill-switch check for live strategies
+        db.add(SystemConfig(key="AUTO_TRADING_ENABLED", value="true"))
+        strat = _strategy(db, paper_mode=False, max_position_usd=None)
+
+        rule = AlertRule(
+            name="Live Guard Test",
+            auto_trade=True,
+            trading_strategy_id=strat.id,
+        )
+        db.add(rule)
+        event = ScannerEvent(
+            ticker="AAPL",
+            scanner_type="pre_market_volume_spike",
+            event_date=date.today(),
+            indicators={"last_trade_price": 150.0},
+        )
+        db.add(event)
+        db.flush()
+
+        fake_r = fakeredis.FakeRedis(decode_responses=True)
+        executor = AutoTradeExecutor()
+
+        with patch("redis.from_url", return_value=fake_r):
+            result = executor.maybe_execute(rule=rule, event=event, db=db)
+
+        assert result is None, "Live strategy missing max_position_usd must be rejected"
+
+
+class TestPaperOrderNeverCallsPlaceBracketOrder:
+    """Paper mode must never invoke place_bracket_order — validates the upstream invariant (R-V-8)."""
+
+    def test_paper_order_never_calls_place_bracket_order(self, db):
+        from app.models.scanner_event import ScannerEvent
+
+        strat = _strategy(db, paper_mode=True, max_position_usd=Decimal("5000.0"))
+        rule = AlertRule(
+            name="Paper Invariant Test",
+            auto_trade=True,
+            trading_strategy_id=strat.id,
+        )
+        db.add(rule)
+        event = ScannerEvent(
+            ticker="TSLA",
+            scanner_type="pre_market_volume_spike",
+            event_date=date.today(),
+            indicators={"last_trade_price": 200.0},
+        )
+        db.add(event)
+        db.flush()
+
+        fake_r = fakeredis.FakeRedis(decode_responses=True)
+        executor = AutoTradeExecutor()
+
+        with patch("redis.from_url", return_value=fake_r):
+            with patch(
+                "app.providers.ibkr_orders.IBKROrderManager.place_bracket_order",
+                new_callable=AsyncMock,
+            ) as mock_place:
+                executor.maybe_execute(rule=rule, event=event, db=db)
+
+        mock_place.assert_not_called()
