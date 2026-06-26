@@ -84,6 +84,9 @@ fi
 ISSUE_NUM=$(echo "$ARGUMENTS" | grep -oP '#\K\d+' | head -1 || true)
 INTENT=$(echo "$ARGUMENTS" | grep -oiP '^\s*\K(fix|continue|close|refine|plan|deconflict|recheck)' | head -1 | tr '[:upper:]' '[:lower:]' || true)
 INTENT=${INTENT:-fix}
+case "$ARGUMENTS" in
+  "Fix main"|"fix main") INTENT="fix-main" ;;
+esac
 
 # --- Canonical run identity and artifact directory ---
 # ARCHON_RUN_ID is not set by archon; always generate a UUID for correlation.
@@ -485,6 +488,16 @@ fi
 
 # --- Install pre-commit hooks so codeindex-blast warn hook fires in the run log ---
 pre-commit install --allow-missing-config 2>/dev/null || true
+
+if [ "$INTENT" = "fix-main" ]; then
+  echo "[fix-main] dispatched main-red auto-fix; repo cloned at ${CLONE_DIR}"
+  if [ "${MAIN_RED_AUTOFIX_ENABLED:-false}" != "true" ]; then
+    echo "[fix-main] disabled (MAIN_RED_AUTOFIX_ENABLED != true); exiting"
+    exit 0
+  fi
+  python3 "$CLONE_DIR/dark-factory/scripts/factory_core/cli.py" main-red-fix --once || true
+  exit 0
+fi
 
 # --- Smoke gate: verify origin/main is green before any per-ticket work ---
 # Applies to fix (new), continue, deconflict (resolve), and recheck intents.

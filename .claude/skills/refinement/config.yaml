@@ -91,3 +91,13 @@ epic_autopilot:
   # When starved (a poll dispatched nothing) and main is green, review the refined, below-ceiling
   # children of in-progress epics with Opus and advance the low-risk ones via direct-to-pr.
   # See docs/superpowers/specs/2026-06-20-epic-autopilot-design.md
+
+main_red_autofix:
+  # kill-switch — ships OFF. To ENABLE, set MAIN_RED_AUTOFIX_ENABLED=true in .archon/.env
+  # (like EPIC_AUTOPILOT_ENABLED): the dispatched "Fix main" container reads .archon/.env, NOT this
+  # file, so flipping `enabled` here alone does NOT turn the feature on. env MAIN_RED_AUTOFIX_ENABLED
+  enabled: false
+  model: claude-opus-4-8      # fix-agent model (container default; env MAIN_RED_AUTOFIX_MODEL)
+  max_attempts: 3             # fix→CI cycles per red event (container default; env MAIN_RED_AUTOFIX_MAX_ATTEMPTS)
+  throttle_minutes: 15        # min minutes between fixer dispatches (scheduler; env MAIN_RED_AUTOFIX_THROTTLE_MIN)
+  ci_wait_minutes: 20         # bounded wait for branch CI (container default; env MAIN_RED_AUTOFIX_CI_WAIT_MINUTES)
