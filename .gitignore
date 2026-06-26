@@ -58,6 +58,7 @@ backend/celerybeat-schedule
 
 # Dark factory runtime
 dark-factory/tmp/
+dark-factory/evals/factory-failures.jsonl
 
 # Local artifacts (log dumps, scratch DBs)
 *.db

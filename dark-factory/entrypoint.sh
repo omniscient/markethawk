@@ -178,10 +178,10 @@ run_post_mortem() {
   fi
 
   local artifacts_context=""
-  local ARTIFACTS_DIR="${HOME}/.archon/workspaces/omniscient/markethawk/artifacts/runs"
+  local ARTIFACTS_BASE_DIR="${HOME}/.archon/workspaces/omniscient/markethawk/artifacts/runs"
   # Find the most recent run artifacts directory for this issue
   local run_dir
-  run_dir=$(ls -dt "${ARTIFACTS_DIR}"/*/issue.json 2>/dev/null \
+  run_dir=$(ls -dt "${ARTIFACTS_BASE_DIR}"/*/issue.json 2>/dev/null \
     | xargs grep -l "\"resolved_number\": ${ISSUE_NUM}" 2>/dev/null \
     | head -1 | xargs dirname 2>/dev/null || true)
 
@@ -233,11 +233,9 @@ ${post_mortem_text}
 ---
 *Posted by MarketHawk Dark Factory*" || true
 
-  # Write failure telemetry to main via a temporary detached worktree.
-  # The feature-branch CLONE_DIR working tree and index are never touched,
-  # so factory-failures.jsonl can never appear in the feature-branch diff.
-  if [ -d "${CLONE_DIR}" ]; then
-    local JSONL_PATH="dark-factory/evals/factory-failures.jsonl"
+  # Write failure telemetry to per-run ARTIFACTS_DIR (no git operations).
+  if [ -n "${ARTIFACTS_DIR:-}" ]; then
+    local JSONL_PATH="${ARTIFACTS_DIR}/factory-failures.jsonl"
     local excerpt
     excerpt=$(echo "$post_mortem_text" | head -c 500 | tr '\n' ' ')
     local record
@@ -248,17 +246,7 @@ ${post_mortem_text}
       "${exit_code}" \
       "$(echo "$excerpt" | sed 's/"/\\"/g')" \
       "$PROMOTED_AT")
-    (
-      git -C "${CLONE_DIR}" fetch origin main 2>/dev/null || true
-      WT=$(mktemp -d)
-      git -C "${CLONE_DIR}" worktree add --detach "$WT" origin/main 2>/dev/null
-      echo "$record" >> "${WT}/${JSONL_PATH}"
-      git -C "$WT" add "${JSONL_PATH}"
-      git -C "$WT" commit -m "eval: record factory failure for issue #${ISSUE_NUM}"
-      git -C "$WT" push origin HEAD:main 2>/dev/null
-      git -C "${CLONE_DIR}" worktree remove --force "$WT" 2>/dev/null || true
-      rm -rf "$WT" 2>/dev/null || true
-    ) 2>/dev/null || true
+    echo "$record" >> "$JSONL_PATH" 2>/dev/null || true
   fi
 }
 
