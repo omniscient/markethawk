@@ -397,14 +397,19 @@ def generate_split_dividend_anomaly_issues(
         splits = _load_splits(db, t)
 
         # Sub-check 1: unapplied split straddled by stored bars.
-        first_ts = bars[0].timestamp
-        last_ts = bars[-1].timestamp
+        # Straddle is decided on Eastern-time calendar dates (via _et_date), not
+        # naive UTC midnight: a bar is pre-split iff its ET date < execution_date
+        # and post-split iff its ET date >= execution_date. The old naive-UTC
+        # boundary falsely counted a winter (EST, UTC-5) 20:00 ET post-market bar
+        # the evening BEFORE the split — whose UTC timestamp rolls into
+        # execution_date — as post-split, firing a false-positive blocker.
+        first_et_date = _et_date(bars[0].timestamp)
+        last_et_date = _et_date(bars[-1].timestamp)
         for split in splits:
             if split.adjustments_applied_at is not None:
                 continue
-            exec_dt = datetime.combine(split.execution_date, datetime.min.time())
-            has_pre = first_ts < exec_dt
-            has_post = last_ts >= exec_dt
+            has_pre = first_et_date < split.execution_date
+            has_post = last_et_date >= split.execution_date
             if has_pre and has_post:
                 issues.append(
                     GateIssue(
@@ -504,22 +509,28 @@ def generate_timezone_session_mismatch_issues(
                 )
             )
 
-        mismatch_rate = mismatch_count / total
-        if mismatch_rate > threshold:
-            issues.append(
-                GateIssue(
-                    issue_code="session_mismatch",
-                    ticker=t,
-                    context={
-                        "severity": "warning",
-                        "reason": "flag_mismatch",
-                        "mismatch_count": mismatch_count,
-                        "total_bars": total,
-                        "mismatch_rate_pct": round(mismatch_rate * 100, 2),
-                        "threshold_pct": round(threshold * 100, 2),
-                        "sample_mismatches": sample_mismatches,
-                    },
+        # Deliberate refinement over the spec draft: closed-window bars are
+        # surfaced by the independent blocker above, so the warning rate is
+        # measured over open-window bars only (denominator excludes closed bars).
+        denom = total - closed_count
+        if denom > 0:
+            mismatch_rate = mismatch_count / denom
+            if mismatch_rate > threshold:
+                issues.append(
+                    GateIssue(
+                        issue_code="session_mismatch",
+                        ticker=t,
+                        context={
+                            "severity": "warning",
+                            "reason": "flag_mismatch",
+                            "mismatch_count": mismatch_count,
+                            "total_bars": total,
+                            "open_window_bars": denom,
+                            "mismatch_rate_pct": round(mismatch_rate * 100, 2),
+                            "threshold_pct": round(threshold * 100, 2),
+                            "sample_mismatches": sample_mismatches,
+                        },
+                    )
                 )
-            )
 
     return issues

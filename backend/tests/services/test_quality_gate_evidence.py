@@ -492,6 +492,70 @@ def test_split_no_bars_no_emit():
     assert issues == []
 
 
+def test_split_winter_evening_before_bar_is_not_a_straddle_no_emit():
+    """Regression (#500): in winter (EST, UTC-5) a 20:00 ET post-market bar the
+    evening BEFORE execution_date carries a UTC timestamp of 01:00 ON
+    execution_date. The old naive-UTC-midnight straddle boundary wrongly counted
+    it as a post-split bar and emitted a false-positive blocker; ET-date
+    comparison correctly treats it as pre-split, so no anomaly is emitted.
+
+    (Fails against the old naive-UTC logic, passes with the _et_date boundary.)
+    """
+    bars = [
+        # 09:00 EST 01-15 (ET date 01-15) — genuinely pre-split, regular session.
+        _bar(datetime(2026, 1, 15, 14, 0), c=100.0),
+        # 20:00 EST 01-15 == 01:00 UTC 01-16 (ET date 01-15) — evening-before
+        # post-market bar; its UTC date rolls into execution_date.
+        _bar(datetime(2026, 1, 16, 1, 0), c=100.0, post=True),
+    ]
+    split = _split(date(2026, 1, 16), applied=None)
+    db = _DispatchDB(bars=[bars], splits=[[split]])
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+    assert issues == []
+
+
+def test_split_winter_genuine_straddle_emits_blocker():
+    """Positive counterpart to the winter regression: a bar whose ET date is
+    actually >= execution_date is a genuine straddle and still emits the
+    unapplied-split blocker."""
+    bars = [
+        _bar(datetime(2026, 1, 15, 14, 0), c=100.0),  # ET 01-15, pre-split
+        # 09:00 EST 01-16 (ET date 01-16) — genuinely post-split.
+        _bar(datetime(2026, 1, 16, 14, 0), c=100.0, pre=True),
+    ]
+    split = _split(date(2026, 1, 16), applied=None)
+    db = _DispatchDB(bars=[bars], splits=[[split]])
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+
+    assert len(issues) == 1
+    assert issues[0].context["reason"] == "unapplied_split"
+    assert issues[0].context["severity"] == "blocker"
+
+
+def test_split_universe_wide_only_flags_offending_ticker():
+    """ticker=None iterates universe tickers; only AAPL (unapplied straddling
+    split) is flagged, MSFT (clean) is not."""
+    aapl_bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), c=100.0),  # before exec
+        _bar(datetime(2026, 6, 16, 14, 0), o=100.0, c=100.0),  # on/after exec
+    ]
+    msft_bars = [_bar(datetime(2026, 6, 15, 14, 0), c=100.0)]
+    aapl_split = _split(date(2026, 6, 16), applied=None)
+    db = _DispatchDB(
+        tickers=["AAPL", "MSFT"],
+        bars=[aapl_bars, msft_bars],
+        splits=[[aapl_split], []],
+    )
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker=None)
+
+    assert len(issues) == 1
+    assert issues[0].ticker == "AAPL"
+    assert issues[0].context["reason"] == "unapplied_split"
+
+
 # --- generate_timezone_session_mismatch_issues ------------------------------
 
 
@@ -587,3 +651,32 @@ def test_session_universe_wide_only_flags_offending_ticker():
     assert len(issues) == 1
     assert issues[0].ticker == "AAPL"
     assert issues[0].context["reason"] == "bars_in_closed_window"
+
+
+def test_session_mismatch_rate_uses_open_window_denominator():
+    """Fix 2 (#500): the warning rate is computed over open-window bars only, not
+    over the full bar count (closed bars are handled by the separate blocker).
+
+    2 closed + 3 open bars (1 open mismatch), threshold 25%:
+      - full-count rate  = 1/5 = 20% -> would NOT warn (old logic)
+      - open-window rate = 1/3 = 33% -> warns (new logic)
+    The closed-window blocker fires in both cases.
+    """
+    bars = [
+        _bar(datetime(2026, 6, 15, 6, 0)),  # 02:00 ET -> closed
+        _bar(datetime(2026, 6, 15, 6, 1)),  # 02:01 ET -> closed
+        _bar(datetime(2026, 6, 15, 14, 0), pre=True),  # regular flagged pre -> mismatch
+        _bar(datetime(2026, 6, 15, 14, 1)),  # regular, correct
+        _bar(datetime(2026, 6, 15, 14, 2)),  # regular, correct
+    ]
+    db = _DispatchDB(bars=[bars])
+    cfg = _params_cfg(session_mismatch_threshold_pct=25.0)
+
+    issues = generate_timezone_session_mismatch_issues(db, 1, cfg, ticker="AAPL")
+
+    reasons = {i.context["reason"] for i in issues}
+    assert reasons == {"bars_in_closed_window", "flag_mismatch"}
+    warning = next(i for i in issues if i.context["reason"] == "flag_mismatch")
+    assert warning.context["severity"] == "warning"
+    assert warning.context["open_window_bars"] == 3
+    assert warning.context["mismatch_count"] == 1
