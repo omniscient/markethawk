@@ -5,8 +5,8 @@ assessment. Split into a pure builder (no DB) and a thin DB-aware wrapper.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-from typing import List, Optional
+from datetime import date, datetime, timedelta
+from typing import List, Optional, Set, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -18,7 +18,79 @@ from app.schemas.quality_gate import (
     QualityGateVerdict,
     QualityIssueCode,
 )
-from app.utils.time import utc_now
+from app.utils.time import to_utc_naive, utc_now
+
+# Reuse the freshness window used elsewhere (system_service): a quality report
+# snapshot older than this can no longer certify per-ticker freshness.
+STALE_REPORT_MAX_AGE_HOURS = 4
+# Intraday timespans tolerate far less staleness than daily+ resolutions.
+INTRADAY_TIMESPANS = ("minute", "hour")
+
+
+def _parse_iso_datetime(value) -> Optional[datetime]:
+    """Parse an ISO timestamp (tz-aware or naive) to naive UTC; None on failure."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value))
+    except (ValueError, TypeError):
+        return None
+    return to_utc_naive(parsed)
+
+
+def _parse_iso_date(value) -> Optional[date]:
+    """Parse the date portion of an ISO string; None on failure."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (ValueError, TypeError):
+        return None
+
+
+def _median(values: List[float]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    mid = n // 2
+    if n % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def _trading_days_stale(
+    last_bar: date,
+    reference: date,
+    holidays: Set[date],
+    cap: int,
+) -> int:
+    """
+    Count trading days (weekday and not a full-close holiday) strictly after
+    ``last_bar`` up to and including ``reference``. Returns 0 when the data
+    already covers ``reference``. Stops counting once the result exceeds
+    ``cap`` (the verdict only needs to know it crossed the threshold), so the
+    loop stays bounded even for very old data.
+    """
+    if reference <= last_bar:
+        return 0
+    count = 0
+    day = last_bar + timedelta(days=1)
+    while day <= reference:
+        if day.weekday() < 5 and day not in holidays:
+            count += 1
+            if count > cap:
+                return count
+        day += timedelta(days=1)
+    return count
+
+
+def _stale_threshold(policy: QualityGatePolicy, timespan) -> Tuple[int, str]:
+    """Return (max acceptable trading-day staleness, issue severity)."""
+    if policy == QualityGatePolicy.strict:
+        return 1, "blocker"
+    # advisory: looser tolerances, warning severity
+    if timespan in INTRADAY_TIMESPANS:
+        return 5, "warning"
+    return 7, "warning"
 
 
 def _derive_verdict(
@@ -43,8 +115,10 @@ def _build_assessment(
     data_requirements: Optional[dict],
     scope: QualityGateScope,
     policy: QualityGatePolicy,
+    market_holidays: Optional[Set[date]] = None,
 ) -> QualityGateAssessment:
     now = utc_now()
+    holidays: Set[date] = market_holidays if market_holidays is not None else set()
 
     if policy == QualityGatePolicy.off:
         return QualityGateAssessment(
@@ -111,7 +185,153 @@ def _build_assessment(
             )
         )
 
-    # provider_gap: gate on worst ticker continuity_score and any gap_count
+    # stale_quote: report-freshness guard, then per-ticker staleness.
+    # The report-freshness guard fires a single scope-level issue when the
+    # snapshot itself is too old to certify per-ticker freshness; when it fires
+    # the per-ticker loop is skipped (the scope issue already covers everything).
+    # An optional ``as_of_date`` in data_requirements shifts the reference date
+    # for historical/backtest consumers (and disables the freshness guard, which
+    # only makes sense for live "now" consumers).
+    as_of_date = _parse_iso_date((data_requirements or {}).get("as_of_date"))
+    reference_date = as_of_date or now.date()
+    report_stale_emitted = False
+
+    if as_of_date is None:
+        generated_at = _parse_iso_datetime(report_data.get("generated_at"))
+        if generated_at is not None:
+            age_hours = (now - generated_at).total_seconds() / 3600.0
+            if age_hours > STALE_REPORT_MAX_AGE_HOURS:
+                sev = "blocker" if policy == QualityGatePolicy.strict else "warning"
+                issues.append(
+                    QualityGateIssue(
+                        code=QualityIssueCode.stale_quote,
+                        severity=sev,
+                        message=(
+                            "Quality report is stale (generated"
+                            f" {generated_at.isoformat()}, {age_hours:.1f}h ago,"
+                            f" exceeds {STALE_REPORT_MAX_AGE_HOURS}h)"
+                        ),
+                        detail={
+                            "subtype": "report_stale",
+                            "ticker": None,
+                            "generated_at": report_data.get("generated_at"),
+                            "age_hours": round(age_hours, 1),
+                            "threshold_hours": STALE_REPORT_MAX_AGE_HOURS,
+                            "as_of_date": None,
+                            "source": None,
+                        },
+                    )
+                )
+                report_stale_emitted = True
+
+    if not report_stale_emitted:
+        for t in tickers:
+            last_bar_date = _parse_iso_date(t.get("last_bar"))
+            if last_bar_date is None:
+                # Total absence is handled by the provider_gap "absent" subtype.
+                continue
+            if as_of_date is not None and last_bar_date >= as_of_date:
+                # Data already covers the requested historical date → fresh.
+                continue
+            threshold, sev = _stale_threshold(policy, t.get("timespan"))
+            stale_days = _trading_days_stale(
+                last_bar_date, reference_date, holidays, threshold
+            )
+            if stale_days > threshold:
+                issues.append(
+                    QualityGateIssue(
+                        code=QualityIssueCode.stale_quote,
+                        severity=sev,
+                        message=(
+                            f"{t.get('ticker')} last bar"
+                            f" {last_bar_date.isoformat()} is {stale_days} trading"
+                            f" day(s) stale (threshold {threshold})"
+                        ),
+                        detail={
+                            "subtype": "ticker_stale",
+                            "ticker": t.get("ticker"),
+                            "timespan": t.get("timespan"),
+                            "multiplier": t.get("multiplier"),
+                            "last_bar": t.get("last_bar"),
+                            "trading_days_stale": stale_days,
+                            "threshold_trading_days": threshold,
+                            "as_of_date": (
+                                as_of_date.isoformat() if as_of_date else None
+                            ),
+                            "source": None,
+                        },
+                    )
+                )
+
+    # provider_gap: absent (zero bars) + partial (low coverage) + structural.
+    # absent/partial are per-ticker and only apply to reports that carry the
+    # coverage fields (real reports always do; legacy/synthetic entries without
+    # an ``actual_bars`` key fall through to the retained structural check).
+    coverages = [
+        t["coverage_pct"]
+        for t in tickers
+        if (t.get("actual_bars") or 0) > 0 and t.get("coverage_pct") is not None
+    ]
+    universe_median_coverage = _median(coverages) if coverages else None
+
+    for t in tickers:
+        actual_bars = t.get("actual_bars")
+        if actual_bars is None:
+            continue
+        if actual_bars == 0:
+            # Provider returned nothing for a ticker that was asked for. Never
+            # acceptable, so severity=blocker regardless of policy (advisory
+            # still downgrades the verdict via _derive_verdict).
+            issues.append(
+                QualityGateIssue(
+                    code=QualityIssueCode.provider_gap,
+                    severity="blocker",
+                    message=f"{t.get('ticker')} returned zero bars from the provider",
+                    detail={
+                        "subtype": "absent",
+                        "ticker": t.get("ticker"),
+                        "timespan": t.get("timespan"),
+                        "multiplier": t.get("multiplier"),
+                        "actual_bars": 0,
+                        "expected_bars": t.get("expected_bars"),
+                        "source": None,
+                    },
+                )
+            )
+            continue
+        coverage_pct = t.get("coverage_pct")
+        if coverage_pct is None:
+            continue
+        is_partial = coverage_pct < 50 or (
+            universe_median_coverage is not None
+            and coverage_pct < 80
+            and coverage_pct < universe_median_coverage - 30
+        )
+        if is_partial:
+            sev = "blocker" if policy == QualityGatePolicy.strict else "warning"
+            issues.append(
+                QualityGateIssue(
+                    code=QualityIssueCode.provider_gap,
+                    severity=sev,
+                    message=(
+                        f"{t.get('ticker')} coverage {coverage_pct:.1f}% indicates"
+                        " a partial provider return"
+                    ),
+                    detail={
+                        "subtype": "partial",
+                        "ticker": t.get("ticker"),
+                        "timespan": t.get("timespan"),
+                        "multiplier": t.get("multiplier"),
+                        "coverage_pct": coverage_pct,
+                        "universe_median_coverage": universe_median_coverage,
+                        "actual_bars": actual_bars,
+                        "expected_bars": t.get("expected_bars"),
+                        "source": None,
+                    },
+                )
+            )
+
+    # structural: retained #492 gap-based detection (universe-level worst case).
     has_gap = any(t.get("gap_count", 0) >= 1 for t in tickers)
     worst_continuity = min(
         (t.get("continuity_score", 100.0) for t in tickers), default=100.0
@@ -125,7 +345,10 @@ def _build_assessment(
                     f"Worst ticker continuity {worst_continuity:.1f}% is below"
                     " the 70% threshold (>6 gaps)"
                 ),
-                detail={"worst_continuity_score": worst_continuity},
+                detail={
+                    "subtype": "structural",
+                    "worst_continuity_score": worst_continuity,
+                },
             )
         )
     elif has_gap:
@@ -134,7 +357,10 @@ def _build_assessment(
                 code=QualityIssueCode.provider_gap,
                 severity="warning",
                 message="One or more tickers have provider data gaps",
-                detail={"worst_continuity_score": worst_continuity},
+                detail={
+                    "subtype": "structural",
+                    "worst_continuity_score": worst_continuity,
+                },
             )
         )
 
@@ -212,6 +438,7 @@ class QualityGateService:
         db: Session,
         request,
     ) -> QualityGateAssessment:
+        from app.models.market_holiday import MarketHoliday
         from app.models.scanner_config import ScannerConfig
         from app.models.universe_quality_report import UniverseQualityReport
 
@@ -275,4 +502,27 @@ class QualityGateService:
         ):
             data_requirements = request.requirements.model_dump()
 
-        return _build_assessment(report_data, data_requirements, scope, policy)
+        # Trading-day staleness thresholds respect the NYSE full-close calendar.
+        # We resolve it here (where a DB session exists) into a plain date set so
+        # _build_assessment stays a pure, DB-free function (no MAX(timestamp) or
+        # per-ticker live queries). Only needed when a report is present, since
+        # the stale-quote checks run against report_data tickers.
+        market_holidays: Optional[Set[date]] = None
+        if report_data is not None:
+            holiday_rows = (
+                db.query(MarketHoliday.date)
+                .filter(
+                    MarketHoliday.exchange == "NYSE",
+                    MarketHoliday.event_type == "full_close",
+                )
+                .all()
+            )
+            market_holidays = {row.date for row in holiday_rows}
+
+        return _build_assessment(
+            report_data,
+            data_requirements,
+            scope,
+            policy,
+            market_holidays=market_holidays,
+        )
