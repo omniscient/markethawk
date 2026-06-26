@@ -27,3 +27,5 @@ entries as higher-confidence than source:refine entries when the two conflict.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+- [AVOID] Do not commit `.archon/memory/index.jsonl` — it is a generated projection of the markdown files; committing it causes merge collisions in parallel factory worktrees (same root cause as the codeindex.json #343 merge-conflict issue). Add it to .gitignore and regenerate at Phase 1 LOAD. <!-- issue:#643 date:2026-06-26 expires:2026-12-26 source:refine -->
+- [PATTERN] For the Dark Factory memory retriever (memory_retrieve.py), use 3-factor deterministic scoring (kind_weight × path_score × recency_factor) over existing metadata tags only. Do NOT wire usage-counter-based scoring or evidence-count scoring until Phase 3 (write-path replacement) lands — those signals require new write-path state that gate_lib.sh does not currently emit. <!-- issue:#643 date:2026-06-26 expires:2026-12-26 source:refine -->
