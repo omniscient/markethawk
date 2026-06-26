@@ -63,7 +63,7 @@ def _load_report_cache(
         .filter(UniverseQualityReport.universe_id == universe_id)
         .first()
     )
-    if not report or not report.report_data:
+    if not report or report.status != "complete" or not report.report_data:
         return {}
     cache: dict[tuple[str, str, int], tuple[int, int]] = {}
     for entry in report.report_data.get("tickers", []):
@@ -71,10 +71,12 @@ def _load_report_cache(
         ts = entry.get("timespan")
         mult = entry.get("multiplier")
         if t and ts and mult is not None:
-            cache[(t, ts, int(mult))] = (
-                int(entry.get("actual_bars", 0)),
-                int(entry.get("expected_bars", 0)),
-            )
+            exp = int(entry.get("expected_bars", 0))
+            if exp > 0:
+                cache[(t, ts, int(mult))] = (
+                    int(entry.get("actual_bars", 0)),
+                    exp,
+                )
     return cache
 
 

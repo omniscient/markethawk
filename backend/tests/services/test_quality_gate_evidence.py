@@ -7,14 +7,11 @@ regression tests). Each test exercises one scenario from AC-6.
 """
 from unittest.mock import MagicMock
 
-import pytest
-
 from app.services.quality_gate_evidence import (
     GateIssue,
     generate_insufficient_lookback_issues,
     generate_missing_bars_issues,
 )
-
 
 # --- helpers ----------------------------------------------------------------
 
@@ -32,10 +29,13 @@ def _flat_cfg() -> MagicMock:
     return cfg
 
 
-def _db_with_report(report_data, ticker_rows=None, scalar_side_effect=None) -> MagicMock:
+def _db_with_report(
+    report_data, ticker_rows=None, scalar_side_effect=None, status="complete"
+) -> MagicMock:
     """Build a MagicMock db that returns a cached report and optional bar counts."""
     report_mock = MagicMock()
     report_mock.report_data = report_data
+    report_mock.status = status
 
     filter_mock = MagicMock()
     filter_mock.first.return_value = report_mock
@@ -165,6 +165,64 @@ def test_missing_bars_fallback_direct_db_when_no_report():
     assert len(issues) == 1
     assert issues[0].observed == 10
     assert issues[0].required == 90
+
+
+def test_missing_bars_zero_expected_bars_falls_through_to_direct_count():
+    """Cache entry with expected_bars=0 must NOT be trusted — gate would silently
+    pass even with 0 actual bars.  After FIX-A the entry is skipped; the code
+    falls through to direct count + lookback estimate and emits a missing_bars issue."""
+    report_data = {
+        "tickers": [
+            {
+                "ticker": "AAPL",
+                "timespan": "minute",
+                "multiplier": 1,
+                "actual_bars": 0,
+                "expected_bars": 0,  # corrupt / absent in report
+            }
+        ]
+    }
+    cfg = _cfg([{"timespan": "minute", "multiplier": 1, "lookback_days": 10}])
+    # scalar.return_value=0 by default — direct DB count shows no bars
+    db = _db_with_report(report_data)
+
+    issues = generate_missing_bars_issues(db, 1, cfg, ticker="AAPL")
+
+    # Fallback: expected = lookback_days(10) * bars_per_day(minute/1=390) = 3900
+    # 0 < 3900 -> issue must be emitted (not a silent false-clear)
+    assert len(issues) == 1
+    assert issues[0].issue_code == "missing_bars"
+    assert issues[0].ticker == "AAPL"
+    assert issues[0].observed == 0
+    assert issues[0].required == 3900
+
+
+def test_missing_bars_running_report_ignored_falls_through():
+    """A report with status='running' must be ignored; the code falls through to the
+    direct count path and emits a missing_bars issue rather than trusting stale data."""
+    report_data = {
+        "tickers": [
+            {
+                "ticker": "AAPL",
+                "timespan": "minute",
+                "multiplier": 1,
+                "actual_bars": 500,
+                "expected_bars": 500,  # would look healthy if trusted
+            }
+        ]
+    }
+    cfg = _cfg([{"timespan": "minute", "multiplier": 1, "lookback_days": 10}])
+    # Report is running — cache must be ignored; direct count shows 0 bars
+    db = _db_with_report(report_data, status="running")
+
+    issues = generate_missing_bars_issues(db, 1, cfg, ticker="AAPL")
+
+    # Cache not trusted; fallback: 0 < 3900 -> issue emitted
+    assert len(issues) == 1
+    assert issues[0].issue_code == "missing_bars"
+    assert issues[0].ticker == "AAPL"
+    assert issues[0].observed == 0
+    assert issues[0].required == 3900
 
 
 # --- generate_insufficient_lookback_issues ----------------------------------
