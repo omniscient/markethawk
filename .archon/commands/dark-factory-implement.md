@@ -276,6 +276,17 @@ Format:
 - [PATTERN|AVOID|FIX] <concise actionable sentence, specific paths/commands/names where relevant> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:implement -->
 ```
 
+**Append-only rule:** New memory entries must be written with shell appends:
+  echo '- [PATTERN] ...' >> .archon/memory/backend-patterns.md
+NEVER use the Write or Edit tool on a memory file to add new entries — doing so risks
+regenerating the file from a stale in-context copy and silently dropping existing entries.
+
+The ONLY operations permitted to remove or modify existing lines are:
+  (a) the awk expiry-cleanup block (entries with a past `expires:` date)
+  (b) R4 cap-drop (explicit drop of the oldest/lowest-signal entries when COUNT > 30)
+  (c) R5 invalidation (rewrite `[PATTERN]` → `[INVALID: reason]` for a single entry)
+Each of these operations must touch ONLY the targeted lines and leave all other lines verbatim.
+
 ### Per-file authoritative entry cap (R4)
 
 After appending, count authoritative entries in the target file:
@@ -305,6 +316,45 @@ Example:
 
 The tombstone counts toward the 30-entry cap and expires on the original TTL. Do not delete
 it — it prevents the same wrong claim from being re-added during the TTL window.
+
+### Post-write verification backstop
+
+Run this block after all R3/R4/R5 operations and before `git add .archon/memory/`:
+
+```bash
+# Memory write guard — detect unexpected deletions and restore
+for MEM_FILE in .archon/memory/*.md; do
+  [ -f "$MEM_FILE" ] || continue
+  # Lines starting with '-' that are not file-header markers
+  DELETED=$(git diff "$MEM_FILE" | grep '^-' | grep -v '^---' | grep -v '^-#' | grep -v '^-<!--' || true)
+  if [ -n "$DELETED" ]; then
+    # Filter out expected deletions: expiry-cleaned lines (expired dates),
+    # R4 drops (oldest-date lines), R5 rewrites (tag-only change, body unchanged)
+    TODAY=$(date +%Y-%m-%d)
+    UNEXPECTED=$(echo "$DELETED" | while IFS= read -r line; do
+      # Skip lines whose expires: date is in the past (legitimate expiry cleanup)
+      if echo "$line" | grep -q 'expires:'; then
+        EXPIRY=$(echo "$line" | sed 's/.*expires:\([0-9-]*\).*/\1/')
+        [ "$EXPIRY" \< "$TODAY" ] && continue
+      fi
+      # Skip R5 invalidations: deleted line body matches an added line body (tag change only)
+      BODY=$(echo "$line" | sed 's/^\- \[PATTERN\]//' | sed 's/^\- \[AVOID\]//' | sed 's/^\- \[FIX\]//')
+      if git diff "$MEM_FILE" | grep '^+' | grep -v '^+++' | grep -qF "$BODY"; then
+        continue
+      fi
+      echo "$line"
+    done)
+    if [ -n "$UNEXPECTED" ]; then
+      echo "MEMORY GUARD: unexpected deletions detected in $MEM_FILE — restoring"
+      echo "$UNEXPECTED"
+      git checkout HEAD -- "$MEM_FILE"
+      # Re-apply only the intended new entries by echoing them back
+      # (The agent must re-append them after the restore.)
+      echo "MEMORY GUARD: re-append your new entries to $MEM_FILE now"
+    fi
+  fi
+done
+```
 
 ### Commit
 
