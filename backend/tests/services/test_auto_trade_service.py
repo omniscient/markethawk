@@ -624,16 +624,15 @@ def test_quality_gate_blocked_refuses_even_with_bypass(db: Session):
 
 
 class TestMaybeExecuteMaxPositionGuard:
-    """Execution-time guard: live strategy with no max_position_usd returns None (R3)."""
+    """Execution-time guard: live strategy with no or invalid max_position_usd returns None (R3)."""
 
-    def test_maybe_execute_rejects_live_strategy_without_max_position(self, db):
+    def _setup(self, db, max_position_usd=None):
+        """Create AUTO_TRADING_ENABLED=true, a live strategy, rule, and event."""
         from app.models.scanner_event import ScannerEvent
         from app.models.system_config import SystemConfig
 
-        # AUTO_TRADING_ENABLED=true so it passes the kill-switch check for live strategies
         db.add(SystemConfig(key="AUTO_TRADING_ENABLED", value="true"))
-        strat = _strategy(db, paper_mode=False, max_position_usd=None)
-
+        strat = _strategy(db, paper_mode=False, max_position_usd=max_position_usd)
         rule = AlertRule(
             name="Live Guard Test",
             auto_trade=True,
@@ -648,14 +647,63 @@ class TestMaybeExecuteMaxPositionGuard:
         )
         db.add(event)
         db.flush()
+        return strat, rule, event
 
-        fake_r = fakeredis.FakeRedis(decode_responses=True)
+    def test_maybe_execute_rejects_live_strategy_without_max_position(self, db):
+        """guard 1b: max_position_usd=None → returns None.
+
+        Uses _get_account_equity mocked to positive equity so the ONLY reason
+        maybe_execute returns None is the max_position_usd guard (not a missing
+        account-equity fallback).  If the guard is removed the code proceeds to
+        create an order and returns it — the assertion then FAILS, making the test
+        non-vacuous.
+        """
+        strat, rule, event = self._setup(db, max_position_usd=None)
         executor = AutoTradeExecutor()
 
-        with patch("redis.from_url", return_value=fake_r):
+        with (
+            patch(REDIS_PATCH, return_value=_fake_redis()),
+            patch.object(executor, "_get_account_equity", return_value=100_000.0),
+            patch.object(executor, "_submit_to_ibkr") as mock_submit,
+        ):
             result = executor.maybe_execute(rule=rule, event=event, db=db)
 
         assert result is None, "Live strategy missing max_position_usd must be rejected"
+        mock_submit.assert_not_called()
+
+    def test_maybe_execute_rejects_live_strategy_with_zero_max_position(self, db):
+        """guard 1b: max_position_usd=0 → returns None (FIX 5: reject <= 0)."""
+        from decimal import Decimal
+
+        strat, rule, event = self._setup(db, max_position_usd=Decimal("0"))
+        executor = AutoTradeExecutor()
+
+        with (
+            patch(REDIS_PATCH, return_value=_fake_redis()),
+            patch.object(executor, "_get_account_equity", return_value=100_000.0),
+            patch.object(executor, "_submit_to_ibkr") as mock_submit,
+        ):
+            result = executor.maybe_execute(rule=rule, event=event, db=db)
+
+        assert result is None, "Live strategy with max_position_usd=0 must be rejected"
+        mock_submit.assert_not_called()
+
+    def test_maybe_execute_rejects_live_strategy_with_negative_max_position(self, db):
+        """guard 1b: max_position_usd=-100 → returns None (FIX 5: reject <= 0)."""
+        from decimal import Decimal
+
+        strat, rule, event = self._setup(db, max_position_usd=Decimal("-100"))
+        executor = AutoTradeExecutor()
+
+        with (
+            patch(REDIS_PATCH, return_value=_fake_redis()),
+            patch.object(executor, "_get_account_equity", return_value=100_000.0),
+            patch.object(executor, "_submit_to_ibkr") as mock_submit,
+        ):
+            result = executor.maybe_execute(rule=rule, event=event, db=db)
+
+        assert result is None, "Live strategy with max_position_usd<0 must be rejected"
+        mock_submit.assert_not_called()
 
 
 class TestPaperOrderNeverCallsPlaceBracketOrder:

@@ -84,8 +84,8 @@ def list_strategies(
 
 
 def _validate_live_strategy(paper_mode: bool, max_position_usd) -> None:
-    """Raise HTTP 422 if a live strategy has no max_position_usd."""
-    if not paper_mode and max_position_usd is None:
+    """Raise HTTP 422 if a live strategy has no or non-positive max_position_usd."""
+    if not paper_mode and (max_position_usd is None or float(max_position_usd) <= 0):
         raise HTTPException(
             status_code=422,
             detail="max_position_usd is required when paper_mode=False",

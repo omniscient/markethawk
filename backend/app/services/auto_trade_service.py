@@ -135,11 +135,13 @@ class AutoTradeExecutor:
                 )
                 return None
 
-        # ── 1b. max_position_usd required for live strategies (R3) ─────────────
-        if not strategy.paper_mode and strategy.max_position_usd is None:
+        # ── 1b. max_position_usd required and must be positive for live strategies (R3) ──
+        if not strategy.paper_mode and (
+            strategy.max_position_usd is None or float(strategy.max_position_usd) <= 0
+        ):
             logger.error(
-                "AutoTradeExecutor: live strategy '%s' (id=%s) has no max_position_usd "
-                "— refusing live order for rule %s",
+                "AutoTradeExecutor: live strategy '%s' (id=%s) has no valid max_position_usd "
+                "(None or <= 0) — refusing live order for rule %s",
                 strategy.name,
                 strategy.id,
                 rule.id,
