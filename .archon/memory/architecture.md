@@ -27,3 +27,5 @@ entries as higher-confidence than source:refine entries when the two conflict.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+- [PATTERN] Use `typing.Protocol` (structural subtyping) rather than `abc.ABC` (nominal) when defining service interfaces in the backend — put the Protocol in `schemas/` (co-located with its return types) so consumers import the abstraction from one place; the concrete class satisfies the Protocol structurally without inheritance. Module-level singleton `service_instance: Protocol = ConcreteService()` gives a stable import target. <!-- issue:#633 date:2026-06-26 expires:2026-12-26 source:refine -->
+- [AVOID] Do not use `abc.ABC` for backend service interfaces — requires modifying the concrete class metaclass and creates nominal coupling where structural typing is sufficient; Protocol achieves the same consumer isolation with less churn. <!-- issue:#633 date:2026-06-26 expires:2026-12-26 source:refine -->
