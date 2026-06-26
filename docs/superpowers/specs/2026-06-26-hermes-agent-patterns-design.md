@@ -1,6 +1,6 @@
 # Dark Factory — Hermes Agent Patterns: Agent Memory, Self-Interruption, Prompt Hardening
 
-**Status:** design
+**Status:** design (v2 — refined with full Hermes article)
 **Date:** 2026-06-26
 **Issue:** #609
 **Build constraint:** Factory self-edit → **human-implemented** only. Changes to `scheduler.sh`,
@@ -35,8 +35,23 @@ per-ticket container dispatch model:
    extending the scheduler's durable state with per-issue error fingerprints and decision metadata.
 2. **Early self-interruption** — `factory_core/breaker.py` trips the circuit-breaker at attempt 2
    when the same error fingerprint recurs, rather than always waiting for attempt 3.
-3. **Three concrete prompt hardening improvements** to `.archon/commands/dark-factory-implement.md`,
+3. **Four concrete prompt hardening improvements** to `.archon/commands/dark-factory-implement.md`,
    derived from the Hermes/Nie et al. principles that can be implemented from in-repo context alone.
+
+### Hermes mental model mapping
+
+The Hermes article closes with: *"A prompt to a persistent agent is a job description: it needs a trigger (a schedule or an event), a body (what to do), and an escalation rule (when to bother you). Drop any of the three and the prompt either never fires, does the wrong thing, or buries you in noise."*
+
+The four prompt improvements cover all three elements:
+
+| Improvement | Hermes element |
+|---|---|
+| Improvement 3: Prior-error context preamble | **Trigger enrichment** — the run starts with prior-failure context, not just the issue |
+| Improvement 4: Explicit assumptions | **Body** — enumerate autonomously-resolved ambiguities before coding begins |
+| Improvement 2: Confidence reporting | **Body completion criterion** — signal quality of the completed run |
+| Improvement 1: Stuck detection | **Escalation rule** — when to STOP and hand to a human instead of retrying |
+
+Recipe 6 ("don't wait on me, list assumptions") is covered by Improvement 4. A standalone escalation-rule declaration header (from the Hermes Recipe 2 pattern) is **not** added — those conditions are already enforced by mechanism (`should_trip_early()`, the OOS gate, the stuck-detection block). Prose rules that duplicate mechanism become stale and misleading; prefer the mechanism.
 
 ### Why not a true persistent daemon (Hermes-literal approach)
 
@@ -239,20 +254,32 @@ increment_retry "$ISSUE"
 
 ### `trip_to_blocked` enrichment
 
-The `trip_to_blocked()` function in `breaker.py` gains an optional `error_type` and
-`fingerprint` parameter. When set, the circuit-breaker comment includes:
+The `trip_to_blocked()` function in `breaker.py` gains optional `error_type`, `fingerprint`, and
+`postmortem_excerpt` parameters (all from the bridge file). The enriched comment:
 
 ```
 **Error type:** oos_files (recurred 2 times)
 **Fingerprint:** a3f1c9d2 — same failure as previous attempt
+
+> **Diagnosis:** OOS gate excised backend/app/models/agent_state.py — the implement
+> agent created a new model file outside the spec-allowed path set. Check that the
+> spec's Files Changed list matches the OOS allowlist before re-running.
 ```
+
+**Postmortem excerpt inclusion rule** (from Hermes Recipe 14 — "on-call diagnosis before paging"):
+- Include excerpt when `error_type IN (oos_files, build_failure, test_failure, unknown)` — these benefit from a one-paragraph hypothesis.
+- **Omit** excerpt when `error_type = rate_limit` — the cause and fix are known (API cooldown); the postmortem adds no diagnostic value and may include noisy API response bodies.
+
+The excerpt is already normalized (timestamps/UUIDs stripped, 300-char cap) by the bridge file writer, so it is safe to embed in GitHub Markdown.
 
 ---
 
-## Component 4: Prompt Hardening (3 Improvements)
+## Component 4: Prompt Hardening (4 Improvements)
 
 These are concrete additions to `.archon/commands/dark-factory-implement.md`. All are derivable
-from in-repo context; they do NOT require the Hermes article to be fetched.
+from in-repo context. Improvements 1–3 were derived from the issue body in the initial spec run;
+Improvement 4 is derived from the full Hermes article (Recipe 6: "make reasonable assumptions
+and list them at the top").
 
 ### Improvement 1: Stuck Detection / Self-Assessment Block
 
@@ -340,19 +367,77 @@ changes against the OOS allowlist before writing a single line of code. If `test
 read the prior test output carefully before re-running tests.
 ```
 
+### Improvement 4: Explicit Assumptions (Hermes Recipe 6)
+
+Added to **Phase 2: PLAN** in `dark-factory-implement.md`, before writing `plan.md`:
+
+```markdown
+## Explicit Assumptions (Phase 2, step 0 — before plan.md)
+
+Before writing `plan.md`, identify every ambiguity you are resolving autonomously (the Hermes
+"make reasonable assumptions and list them at the top" pattern). Write them to
+`$ARTIFACTS_DIR/decision.json` as the `assumptions` array:
+
+```bash
+cat > "$ARTIFACTS_DIR/decision.json" << ASSUMPTIONS_EOF
+{
+  "confidence": "tbd",
+  "decision_summary": "tbd",
+  "risk_factors": [],
+  "assumptions": [
+    "<ambiguity 1 and how you are resolving it>",
+    "<ambiguity 2 and how you are resolving it>"
+  ]
+}
+ASSUMPTIONS_EOF
+```
+
+**What counts as an assumption:**
+- Spec says "update the X table" but doesn't specify which column — you chose Y
+- Issue references an API endpoint pattern not yet confirmed in the codebase
+- You're choosing one of two equally-valid implementation paths without user guidance
+- You're scoping OUT something the issue mentions but the spec doesn't require
+
+If you have zero assumptions (the spec is fully unambiguous), write `"assumptions": []`.
+
+**Purpose:** If the implementation later fails or is reverted, the reviewer sees exactly what
+was decided autonomously — not just "confidence: low" but the specific bets made. The
+`assumptions` array feeds `agent-memory.json`'s `last_decision_summary` field and is included
+in `trip_to_blocked` comments on subsequent-run early trips.
+```
+
+**`decision.json` schema extension** (extends Improvement 2's schema):
+
+```json
+{
+  "confidence": "high|medium|low",
+  "decision_summary": "1-sentence summary of what was implemented",
+  "risk_factors": ["risk 1", "risk 2"],
+  "assumptions": [
+    "Spec said 'update X'; chose column Y because Z",
+    "Scoped out feature F — mentioned in issue but not in spec"
+  ]
+}
+```
+
 ---
 
 ## Out of Scope (v1)
 
 The following deliverables from the original issue are **explicitly deferred**:
 
-- **17-prompt Hermes research** — The factory cannot browse external URLs (X/Twitter) and has
-  no WebFetch/WebSearch MCP configured. This is a **human task**: the product owner should paste
-  a summary of the Hermes article into a GitHub comment on issue #609. Any additional prompt
-  improvements identified from the full 17 prompts can be filed as a follow-on issue.
 - **Persistent agent daemon (Hermes-literal)** — Ruled out by architecture constraints (see
   Decision section above). The scheduler IS the persistent daemon.
 - **Confidence.json → QualityGate integration** — Out of scope for v1; future enhancement.
+- **Recipes 3–14 (inbox triage, competitor watch, stand-up, mention radar, etc.)** — These are
+  Hermes workflows for personal task management, not dark factory patterns. Not applicable.
+
+---
+
+## Deployment / Configuration Notes
+
+> **Recipe 15 (Hermes) — model tier:**
+> Hermes Recipe 15 showed that "the failures were never the prompts, they were the model underneath." The dark factory defaults to `claude-sonnet-4-6` (set via `CLAUDE_MODEL` in `scheduler.sh`). For `size:L` issues or issues with titles containing `migration`, `architecture`, or `refactor` keywords, operators should configure `CLAUDE_MODEL=claude-opus-4-8` before dispatch — or configure the scheduler to detect these labels/keywords and override the model for that dispatch. This mirrors the existing pattern in `dark-factory-refine.md` which already pins Opus 4.8 for the product-owner subagent. This is an **operator configuration change**, not a code change in this spec's scope.
 
 ---
 
@@ -364,6 +449,8 @@ The following deliverables from the original issue are **explicitly deferred**:
 | Error fingerprinting from GitHub comment content | Rejected: comment posting can fail under rate limits; `factory-failures.jsonl` more reliable |
 | Global `MAX_RETRIES=2` reduction | Rejected: harms transient-failure retry cases (rate limits, smoke flakiness) |
 | Embedding `agent-memory.json` in git repo | Rejected: per-run state pollutes git history; volume-only is correct |
+| Standalone escalation-rule declaration header (Hermes Recipe 2) | Rejected: conditions are already enforced by mechanism (`should_trip_early()`, OOS gate, stuck-detection block); prose rules that duplicate mechanism drift and mislead |
+| Always-include postmortem excerpt in trip comments | Rejected for `rate_limit` type: cause and fix are known (API cooldown); excerpt adds noise not signal. Conditional inclusion (non-rate-limit errors) is correct per Recipe 14 |
 
 ---
 
@@ -373,8 +460,9 @@ The following deliverables from the original issue are **explicitly deferred**:
   and `backlog-scheduler` containers — confirmed in `docker-compose.yml`.
 - [A2] `entrypoint.sh:handle_failure()` is the sole failure exit path — any new failure path
   added later must also write the bridge file.
-- [A3] The Hermes article and 17-prompt content are available out-of-band to the product owner;
-  implementation does not depend on fetching them.
+- [A3] The full Hermes article was reviewed in this spec (provided as a GitHub comment by the owner).
+  All applicable patterns have been mapped; remaining recipes (personal task management workflows)
+  are out of scope.
 - [A4] The Nie et al. paper's credit-assignment principle is satisfied by per-issue
   `failures_by_type` tracking in `agent-memory.json` — each cycle is no longer treated as
   independent.
@@ -397,11 +485,16 @@ The following deliverables from the original issue are **explicitly deferred**:
 
 | File | Change |
 |---|---|
-| `dark-factory/entrypoint.sh` | `handle_failure()`: add bridge file write + fingerprint + classify_error |
-| `dark-factory/scripts/factory_core/breaker.py` | Add `read_agent_memory`, `record_failure`, `should_trip_early`; extend `trip_to_blocked` |
+| `dark-factory/entrypoint.sh` | `handle_failure()`: add bridge file write + fingerprint + `classify_error` |
+| `dark-factory/scripts/factory_core/breaker.py` | Add `read_agent_memory`, `record_failure`, `should_trip_early`; extend `trip_to_blocked` with conditional postmortem excerpt (non-rate-limit errors only) |
 | `dark-factory/scheduler.sh` | Post-dispatch: read bridge file, call `should_trip_early`, `record_failure`; enrich trip comment |
-| `.archon/commands/dark-factory-implement.md` | Add 3 prompt hardening blocks (Phase 1.5 stuck detection, Phase 1 preamble, pre-commit confidence) |
+| `.archon/commands/dark-factory-implement.md` | Add 4 prompt hardening blocks: Phase 1.5 stuck detection, Phase 1 prior-error preamble, Phase 2 explicit assumptions (new), pre-commit confidence reporting |
 | `docs/superpowers/specs/` | This document |
+
+**`decision.json` schema** (written by implement agent to `$ARTIFACTS_DIR/`):
+```json
+{ "confidence": "high|medium|low", "decision_summary": "...", "risk_factors": [...], "assumptions": [...] }
+```
 
 **Not changed:** `.archon/memory/*.md` (remains the in-container, repo-committed layer),
 `docker-compose.yml` (no new volumes or services), `config.yaml` (no new config knobs needed).
