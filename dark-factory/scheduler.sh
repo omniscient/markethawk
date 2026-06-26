@@ -89,6 +89,10 @@ read_config() {
   _set_cfg EPIC_AUTOPILOT_SIZE_CEILING      '.epic_autopilot.size_ceiling'
   _set_cfg EPIC_AUTOPILOT_START_EPICS       '.epic_autopilot.start_epics'
   _set_cfg EPIC_AUTOPILOT_SENSITIVE_KEYWORDS '.epic_autopilot.sensitive_keywords'
+  _set_cfg MAIN_RED_AUTOFIX_ENABLED        '.main_red_autofix.enabled'
+  _set_cfg MAIN_RED_AUTOFIX_MODEL          '.main_red_autofix.model'
+  _set_cfg MAIN_RED_AUTOFIX_MAX_ATTEMPTS   '.main_red_autofix.max_attempts'
+  _set_cfg MAIN_RED_AUTOFIX_THROTTLE_MIN   '.main_red_autofix.throttle_minutes'
 
   echo "[config] loaded from ${cfg}"
 }
@@ -203,6 +207,32 @@ main_red_recheck_check() {
     DISPATCHED="Recheck main"
     touch "$RECHECK_STAMP_FILE"
     echo "[$(date -u +%FT%TZ)] main_red_recheck=dispatched interval=${MAIN_RED_RECHECK_MINUTES}m"
+  fi
+}
+
+FIXER_STAMP_FILE="${SCHEDULER_STATE_DIR}/main-red-fixer-last-run"
+
+is_fixer_running() {
+  docker ps --no-trunc --format '{{.Command}}' 2>/dev/null | grep -q 'Fix main' && return 0
+  return 1
+}
+
+fixer_due() {
+  [ -f "$FIXER_STAMP_FILE" ] || return 0
+  local last now
+  last=$(stat -c %Y "$FIXER_STAMP_FILE" 2>/dev/null || echo 0)
+  now=$(date +%s)
+  [ $(( now - last )) -ge $(( ${MAIN_RED_AUTOFIX_THROTTLE_MIN:-15} * 60 )) ]
+}
+
+main_red_fixer_check() {
+  [ "${MAIN_RED_AUTOFIX_ENABLED:-false}" = "true" ] || return 0
+  is_fixer_running && return 0
+  fixer_due || return 0
+  if dispatch "Fix main"; then
+    DISPATCHED="Fix main"
+    touch "$FIXER_STAMP_FILE"
+    echo "[$(date -u +%FT%TZ)] main_red_fixer=dispatched"
   fi
 }
 
@@ -897,6 +927,7 @@ This issue was left in **In progress** with no running factory container — the
   if [ "$MAIN_IS_RED" = "true" ]; then
     echo "[$(date -u +%FT%TZ)] main_red_gate=active action=skip_implement_dispatch"
     main_red_recheck_check
+    main_red_fixer_check
   fi
 
   # --- Priority 1.5: In Review items with merge conflicts (proactive auto-resolve) ---
