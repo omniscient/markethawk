@@ -116,7 +116,22 @@ def _build_assessment(
     scope: QualityGateScope,
     policy: QualityGatePolicy,
     market_holidays: Optional[Set[date]] = None,
+    survivorship_scope: bool = False,
 ) -> QualityGateAssessment:
+    """
+    Build a quality_gate.v1 assessment from report data dicts (no DB access).
+
+    ``survivorship_scope`` is a derived boolean threaded in from
+    ``QualityGateService.assess()`` — True only for historical-analysis consumers
+    (backtesting/scorecard). It exists because MarketHawk has **no delisted-symbol
+    tracking today**: neither ``StockUniverse`` nor ``StockUniverseTicker`` carries
+    a ``delisted_date`` / ``survivorship_safe`` field, so a universe assembled
+    "as of today" silently excludes symbols delisted before the run. Current
+    metadata therefore **cannot prove** any universe is survivorship-safe, so every
+    historical-analysis scope is flagged as potentially biased. We keep this as a
+    pure-function boolean (not a DB query) so ``_build_assessment`` stays DB-free,
+    mirroring the ``market_holidays`` threading pattern (#499).
+    """
     now = utc_now()
     holidays: Set[date] = market_holidays if market_holidays is not None else set()
 
@@ -134,6 +149,39 @@ def _build_assessment(
         )
 
     issues: List[QualityGateIssue] = []
+
+    # survivorship_bias (#501): historical-analysis scopes (backtesting/scorecard)
+    # cannot prove their universe is free of survivorship bias — see the function
+    # docstring for the metadata gap. Severity is policy-driven so the *policy*
+    # doubles as the trusted-vs-exploratory toggle: strict → blocker (a trusted
+    # backtest/scorecard refuses biased data), advisory → warning (exploratory:
+    # proceeds but is visibly not-trusted). policy=off already short-circuited
+    # above. No DB query lives here; the bool is derived in assess().
+    #
+    # FUTURE UNBLOCK: once delisted-symbol tracking exists (e.g. a
+    # StockUniverseTicker.delisted_date column + a universe-level survivorship_safe
+    # marker), assess() can pass survivorship_scope=False for proven-safe universes
+    # and this issue stops firing.
+    if survivorship_scope:
+        sev = "blocker" if policy == QualityGatePolicy.strict else "warning"
+        issues.append(
+            QualityGateIssue(
+                code=QualityIssueCode.survivorship_bias,
+                severity=sev,
+                message=(
+                    "Universe survivorship safety is unproven — MarketHawk has no"
+                    " delisted-symbol tracking, so this historical-analysis scope"
+                    " may exclude symbols delisted before the run"
+                ),
+                detail={
+                    "reason": (
+                        "universe survivorship safety unproven — no delisted-symbol"
+                        " tracking"
+                    ),
+                    "consumer_scope": "historical",
+                },
+            )
+        )
 
     if report_data is None:
         sev = "blocker" if policy == QualityGatePolicy.strict else "warning"
@@ -519,10 +567,19 @@ class QualityGateService:
             )
             market_holidays = {row.date for row in holiday_rows}
 
+        # Survivorship bias only applies to historical-analysis consumers; live /
+        # forward consumers (scanner, auto_trading, ui) are exempt. The policy then
+        # selects strict (blocker) vs advisory (warning) inside _build_assessment.
+        survivorship_scope = getattr(request, "consumer", None) in (
+            "backtesting",
+            "scorecard",
+        )
+
         return _build_assessment(
             report_data,
             data_requirements,
             scope,
             policy,
             market_holidays=market_holidays,
+            survivorship_scope=survivorship_scope,
         )

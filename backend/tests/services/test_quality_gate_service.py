@@ -579,3 +579,133 @@ def test_policy_off_suppresses_stale_and_provider_gap():
     result = _build_assessment(report, None, _scope(), QualityGatePolicy.off)
     assert result.verdict == QualityGateVerdict.skipped
     assert result.issues == []
+
+
+# ── #501: survivorship_bias ───────────────────────────────────────────────────
+
+
+def _mock_db_with_clean_report():
+    """A MagicMock db whose universe report is clean (no other issues fire)."""
+    from unittest.mock import MagicMock
+
+    mock_report = MagicMock()
+    mock_report.status = "complete"
+    mock_report.report_data = {
+        "overall_score": 95.0,
+        "overall_grade": "A",
+        "tickers": [
+            {
+                "ticker": "AAPL",
+                "gap_count": 0,
+                "continuity_score": 100.0,
+                "first_bar": "2025-01-01T00:00:00",
+                "last_bar": _FRESH_LAST_BAR,
+                "coverage_pct": 95.0,
+            }
+        ],
+    }
+    mock_db = MagicMock()
+    mock_db.query.return_value.filter.return_value.first.return_value = mock_report
+    # MarketHoliday lookup uses .all(); return no holidays.
+    mock_db.query.return_value.filter.return_value.all.return_value = []
+    return mock_db
+
+
+# -- builder-level (survivorship_scope passed explicitly) ----------------------
+
+
+def test_survivorship_strict_historical_is_blocker():
+    report = _report_with([_clean_ticker()])
+    result = _build_assessment(
+        report, None, _scope(), QualityGatePolicy.strict, survivorship_scope=True
+    )
+    surv = [i for i in result.issues if i.code == QualityIssueCode.survivorship_bias]
+    assert surv and surv[0].severity == "blocker"
+    assert surv[0].detail["consumer_scope"] == "historical"
+    assert result.verdict == QualityGateVerdict.blocked
+    assert result.trusted is False
+
+
+def test_survivorship_advisory_historical_is_warning():
+    report = _report_with([_clean_ticker()])
+    result = _build_assessment(
+        report, None, _scope(), QualityGatePolicy.advisory, survivorship_scope=True
+    )
+    surv = [i for i in result.issues if i.code == QualityIssueCode.survivorship_bias]
+    assert surv and surv[0].severity == "warning"
+    # advisory surfaces it as a warning so exploratory runs proceed but not-trusted.
+    assert any(i.code == QualityIssueCode.survivorship_bias for i in result.warnings)
+    assert result.verdict == QualityGateVerdict.warning
+    assert result.trusted is False
+
+
+def test_survivorship_live_scope_exempt():
+    report = _report_with([_clean_ticker()])
+    # survivorship_scope=False models a live/forward consumer (scanner/auto_trading/ui).
+    result = _build_assessment(
+        report, None, _scope(), QualityGatePolicy.strict, survivorship_scope=False
+    )
+    assert not any(i.code == QualityIssueCode.survivorship_bias for i in result.issues)
+    assert result.verdict == QualityGateVerdict.trusted
+
+
+def test_survivorship_off_skips():
+    report = _report_with([_clean_ticker()])
+    result = _build_assessment(
+        report, None, _scope(), QualityGatePolicy.off, survivorship_scope=True
+    )
+    assert result.verdict == QualityGateVerdict.skipped
+    assert result.issues == []
+
+
+# -- assess()-level (consumer → survivorship_scope derivation) -----------------
+
+
+def test_assess_backtesting_consumer_emits_survivorship_blocker():
+    from app.schemas.data_quality import GateRequest
+    from app.services.quality_gate import QualityGateService
+
+    mock_db = _mock_db_with_clean_report()
+    body = GateRequest(universe_id=1, policy="strict", consumer="backtesting")
+    result = QualityGateService.assess(db=mock_db, request=body)
+    assert any(
+        i.code == QualityIssueCode.survivorship_bias and i.severity == "blocker"
+        for i in result.issues
+    )
+    assert result.verdict == QualityGateVerdict.blocked
+    assert result.trusted is False
+
+
+def test_assess_scorecard_consumer_emits_survivorship_blocker():
+    from app.schemas.data_quality import GateRequest
+    from app.services.quality_gate import QualityGateService
+
+    mock_db = _mock_db_with_clean_report()
+    body = GateRequest(universe_id=1, policy="strict", consumer="scorecard")
+    result = QualityGateService.assess(db=mock_db, request=body)
+    assert any(i.code == QualityIssueCode.survivorship_bias for i in result.issues)
+    assert result.verdict == QualityGateVerdict.blocked
+
+
+def test_assess_scanner_consumer_no_survivorship():
+    from app.schemas.data_quality import GateRequest
+    from app.services.quality_gate import QualityGateService
+
+    mock_db = _mock_db_with_clean_report()
+    body = GateRequest(universe_id=1, policy="strict", consumer="scanner")
+    result = QualityGateService.assess(db=mock_db, request=body)
+    assert not any(i.code == QualityIssueCode.survivorship_bias for i in result.issues)
+    assert result.verdict == QualityGateVerdict.trusted
+
+
+def test_assess_advisory_backtesting_consumer_is_warning():
+    from app.schemas.data_quality import GateRequest
+    from app.services.quality_gate import QualityGateService
+
+    mock_db = _mock_db_with_clean_report()
+    body = GateRequest(universe_id=1, policy="advisory", consumer="backtesting")
+    result = QualityGateService.assess(db=mock_db, request=body)
+    surv = [i for i in result.issues if i.code == QualityIssueCode.survivorship_bias]
+    assert surv and surv[0].severity == "warning"
+    assert result.verdict == QualityGateVerdict.warning
+    assert result.trusted is False
