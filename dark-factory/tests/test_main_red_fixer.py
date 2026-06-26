@@ -152,6 +152,15 @@ def test_run_escalates_at_cap_without_attempting():
     assert io.applied == [] and io.escalations and io.escalations[0][0] == 700
 
 
+def test_run_cap_escalation_deduped():
+    io = FakeIO()
+    st = {"issues": {"700": {"attempts": 3}}}
+    out1 = mf.run_once(CFG, io, st)
+    out2 = mf.run_once(CFG, io, st)
+    assert out1["outcome"] == "escalated" and out2["outcome"] == "escalated"
+    assert len(io.escalations) == 1          # comment/escalate fired only once
+
+
 def test_run_escalates_on_red_ci_leaving_pr_open():
     io = FakeIO(ci="red")
     out = mf.run_once(CFG, io, {})

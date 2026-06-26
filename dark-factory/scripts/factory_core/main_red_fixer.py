@@ -54,6 +54,15 @@ def should_escalate(attempts: int, cap: int, scope: str) -> bool:
     return attempts >= cap or scope in ("protected", "unknown")
 
 
+def cap_escalated(state: dict, issue: int) -> bool:
+    return (state.get("issues") or {}).get(str(issue), {}).get("cap_escalated", False)
+
+
+def mark_cap_escalated(state: dict, issue: int) -> None:
+    d = state.setdefault("issues", {}).setdefault(str(issue), {"attempts": 0})
+    d["cap_escalated"] = True
+
+
 def build_fix_prompt(failure: str, allowed: list, blocked: list) -> str:
     return f"""main is RED — the dark-factory smoke gate (tsc + python import) is failing on origin/main.
 Your job: make the smoke checks pass with the SMALLEST, safest change.
@@ -79,7 +88,9 @@ def run_once(cfg: dict, io, state: dict) -> dict:
 
     attempts = attempts_for(state, issue)
     if should_escalate(attempts, cfg["max_attempts"], "allowed"):  # cap-only check here
-        io.escalate(issue, "cap")
+        if not cap_escalated(state, issue):
+            io.escalate(issue, "cap")
+            mark_cap_escalated(state, issue)
         return {"outcome": "escalated", "issue": issue, "reason": "cap"}
     record_attempt(state, issue)
 
@@ -137,16 +148,16 @@ class LiveIO:
             return None
 
     def reproduce(self):
-        """Run the smoke checks in the clone; return combined failure text (empty if green)."""
-        out = []
-        tsc = _run(["npx", "tsc", "--noEmit", "-p", "frontend/tsconfig.app.json"],
-                   cwd=CLONE_DIR, timeout=300)
-        if tsc.returncode != 0:
-            out.append("[tsc]\n" + (tsc.stdout or "") + (tsc.stderr or ""))
-        imp = _run(["python", "-c", "import backend.app.main"], cwd=CLONE_DIR, timeout=120)
-        if imp.returncode != 0:
-            out.append("[python import]\n" + (imp.stdout or "") + (imp.stderr or ""))
-        return "\n\n".join(out)
+        """Run the EXACT smoke-gate checks in the clone by sourcing smoke_gate.sh and
+        calling _smoke_check_main, so diagnosis can never drift from the gate. Returns the
+        combined failure output (empty string if both checks pass). See smoke_gate.sh."""
+        gate = os.path.join(CLONE_DIR, "dark-factory", "smoke_gate.sh")
+        r = _run(["bash", "-c",
+                  f'CLONE_DIR="{CLONE_DIR}" SMOKE_GATE_SOURCE_ONLY=1 source "{gate}" && _smoke_check_main'],
+                 cwd=CLONE_DIR, timeout=600)
+        if r.returncode == 0:
+            return ""
+        return ((r.stdout or "") + (r.stderr or "")).strip()
 
     def start_branch(self, issue):
         branch = f"fix/main-red-{issue}"
@@ -160,7 +171,8 @@ class LiveIO:
              stdin=prompt, timeout=self.cfg.get("agent_timeout", 1200))
 
     def changed_paths(self):
-        r = _run(["git", "diff", "--name-only", "origin/main", "--"])
+        _run(["git", "add", "-A"])
+        r = _run(["git", "diff", "--cached", "--name-only", "origin/main", "--"])
         return [ln.strip() for ln in (r.stdout or "").splitlines() if ln.strip()]
 
     def open_pr(self, branch, issue, failure):
