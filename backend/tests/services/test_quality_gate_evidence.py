@@ -5,12 +5,19 @@ generate_insufficient_lookback_issues.
 Uses MagicMock for the DB session (service-layer unit tests, not full-pipeline
 regression tests). Each test exercises one scenario from AC-6.
 """
+
+from datetime import date, datetime
 from unittest.mock import MagicMock
 
+from app.models.stock_aggregate import StockAggregate
+from app.models.stock_split import StockSplit
+from app.models.stock_universe_ticker import StockUniverseTicker
 from app.services.quality_gate_evidence import (
     GateIssue,
     generate_insufficient_lookback_issues,
     generate_missing_bars_issues,
+    generate_split_dividend_anomaly_issues,
+    generate_timezone_session_mismatch_issues,
 )
 
 # --- helpers ----------------------------------------------------------------
@@ -231,7 +238,9 @@ def test_missing_bars_running_report_ignored_falls_through():
 def test_insufficient_lookback_flat_shape_returns_empty():
     """Flat data_requirements (no timespans key) -> []."""
     db = MagicMock()
-    assert generate_insufficient_lookback_issues(db, 1, _flat_cfg(), ticker="AAPL") == []
+    assert (
+        generate_insufficient_lookback_issues(db, 1, _flat_cfg(), ticker="AAPL") == []
+    )
 
 
 def test_insufficient_lookback_no_min_bars_returns_empty():
@@ -246,7 +255,9 @@ def test_insufficient_lookback_no_min_bars_returns_empty():
 
 def test_insufficient_lookback_per_ticker_emits_when_below_min_bars():
     """Per-ticker: emits issue when actual bar count < min_bars."""
-    cfg = _cfg([{"timespan": "day", "multiplier": 1, "lookback_days": 90, "min_bars": 260}])
+    cfg = _cfg(
+        [{"timespan": "day", "multiplier": 1, "lookback_days": 90, "min_bars": 260}]
+    )
     db = MagicMock()
     db.query.return_value.filter.return_value.scalar.return_value = 50  # actual bars
 
@@ -261,7 +272,9 @@ def test_insufficient_lookback_per_ticker_emits_when_below_min_bars():
 
 def test_insufficient_lookback_universe_wide_partial_coverage():
     """Universe-wide (ticker=None): AAPL fails (50 < 260), MSFT passes (300 >= 260)."""
-    cfg = _cfg([{"timespan": "day", "multiplier": 1, "lookback_days": 90, "min_bars": 260}])
+    cfg = _cfg(
+        [{"timespan": "day", "multiplier": 1, "lookback_days": 90, "min_bars": 260}]
+    )
     ticker_rows = [MagicMock(ticker="AAPL"), MagicMock(ticker="MSFT")]
 
     filter_mock = MagicMock()
@@ -277,3 +290,300 @@ def test_insufficient_lookback_universe_wide_partial_coverage():
     assert issues[0].ticker == "AAPL"
     assert issues[0].observed == 50
     assert issues[0].required == 260
+
+
+# --- split/dividend + session helpers ---------------------------------------
+
+
+class _Result:
+    """Minimal query result that ignores filter/order_by and returns fixed rows."""
+
+    def __init__(self, rows):
+        self._rows = list(rows)
+
+    def filter(self, *a, **k):
+        return self
+
+    def order_by(self, *a, **k):
+        return self
+
+    def all(self):
+        return list(self._rows)
+
+    def first(self):
+        return self._rows[0] if self._rows else None
+
+
+class _DispatchDB:
+    """Fake Session that returns queued result-sets keyed by model class.
+
+    Each model maps to a list of row-lists; successive db.query(model) calls
+    pop the next row-list, so universe-wide tests can give each ticker its own
+    bars/splits in iteration order.
+    """
+
+    def __init__(self, *, tickers=None, splits=None, bars=None):
+        self._queues = {
+            StockUniverseTicker: (
+                [[MagicMock(ticker=t) for t in tickers]] if tickers else []
+            ),
+            StockSplit: list(splits) if splits else [],
+            StockAggregate: list(bars) if bars else [],
+        }
+
+    def query(self, model):
+        queue = self._queues.get(model, [])
+        rows = queue.pop(0) if queue else []
+        return _Result(rows)
+
+
+def _bar(ts, *, o=10.0, h=10.0, low=10.0, c=10.0, volume=1000, pre=False, post=False):
+    return MagicMock(
+        timestamp=ts,
+        open=o,
+        high=h,
+        low=low,
+        close=c,
+        volume=volume,
+        is_pre_market=pre,
+        is_after_market=post,
+    )
+
+
+def _split(execution_date, *, split_from=1, split_to=2, applied=None):
+    return MagicMock(
+        execution_date=execution_date,
+        split_from=split_from,
+        split_to=split_to,
+        adjustments_applied_at=applied,
+    )
+
+
+def _params_cfg(**params) -> MagicMock:
+    cfg = MagicMock()
+    cfg.parameters = params
+    return cfg
+
+
+# --- GateIssue richer payload -----------------------------------------------
+
+
+def test_gate_issue_context_defaults_to_none():
+    """Richer checks can construct a GateIssue with only code/ticker; the
+    bar-count numeric fields default and context starts None."""
+    issue = GateIssue(issue_code="split_dividend_anomaly", ticker="AAPL")
+    assert issue.context is None
+    assert issue.observed == 0
+    assert issue.timespan == "minute"
+
+
+# --- generate_split_dividend_anomaly_issues ---------------------------------
+
+
+def test_split_unapplied_with_straddling_bars_emits_blocker():
+    """Unapplied split with bars on both sides of execution_date -> blocker."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), c=100.0),  # before exec
+        _bar(datetime(2026, 6, 16, 14, 0), o=100.0, c=100.0),  # on/after exec
+    ]
+    split = _split(date(2026, 6, 16), applied=None)
+    db = _DispatchDB(bars=[bars], splits=[[split]])
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+
+    assert len(issues) == 1
+    assert issues[0].issue_code == "split_dividend_anomaly"
+    assert issues[0].ticker == "AAPL"
+    assert issues[0].context["severity"] == "blocker"
+    assert issues[0].context["reason"] == "unapplied_split"
+
+
+def test_split_unapplied_without_straddling_bars_no_emit():
+    """Unapplied split but every bar is on/after execution_date -> no straddle."""
+    bars = [
+        _bar(datetime(2026, 6, 16, 14, 0), c=100.0),
+        _bar(datetime(2026, 6, 16, 15, 0), c=100.0),
+    ]
+    split = _split(date(2026, 6, 16), applied=None)
+    db = _DispatchDB(bars=[bars], splits=[[split]])
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+    assert issues == []
+
+
+def test_split_applied_within_factor_tolerance_no_emit():
+    """Applied 2:1 split, observed jump matches factor 0.5 -> consistent, no emit."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), c=100.0),
+        _bar(datetime(2026, 6, 16, 14, 0), o=50.0, c=50.0),
+    ]
+    split = _split(
+        date(2026, 6, 16), split_from=1, split_to=2, applied=datetime(2026, 6, 16)
+    )
+    db = _DispatchDB(bars=[bars], splits=[[split]])
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+    assert issues == []
+
+
+def test_split_recorded_factor_outside_tolerance_emits_blocker():
+    """Recorded split factor (1:3 -> 0.333) disagrees with observed 0.5 -> blocker."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), c=100.0),
+        _bar(datetime(2026, 6, 16, 14, 0), o=50.0, c=50.0),
+    ]
+    split = _split(
+        date(2026, 6, 16), split_from=1, split_to=3, applied=datetime(2026, 6, 16)
+    )
+    db = _DispatchDB(bars=[bars], splits=[[split]])
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+
+    assert len(issues) == 1
+    assert issues[0].context["reason"] == "split_factor_mismatch"
+    assert issues[0].context["severity"] == "blocker"
+    assert "volume_ratio" in issues[0].context
+
+
+def test_split_discontinuity_with_missing_split_emits_blocker():
+    """Large overnight jump with no recorded split -> unexplained discontinuity."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), c=100.0),
+        _bar(datetime(2026, 6, 16, 14, 0), o=50.0, c=50.0),
+    ]
+    db = _DispatchDB(bars=[bars], splits=[[]])
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+
+    assert len(issues) == 1
+    assert issues[0].context["reason"] == "unexplained_discontinuity"
+    assert issues[0].context["discontinuity_pct"] == 50.0
+
+
+def test_split_subfloor_move_no_emit():
+    """Overnight move below the discontinuity floor -> no emit."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), c=100.0),
+        _bar(datetime(2026, 6, 16, 14, 0), o=98.0, c=98.0),
+    ]
+    db = _DispatchDB(bars=[bars], splits=[[]])
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+    assert issues == []
+
+
+def test_split_custom_floor_threshold_from_config():
+    """A 30% jump clears the default 25% floor but not a configured 40% floor."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), c=100.0),
+        _bar(datetime(2026, 6, 16, 14, 0), o=70.0, c=70.0),
+    ]
+    db = _DispatchDB(bars=[bars], splits=[[]])
+    cfg = _params_cfg(split_discontinuity_floor_pct=40)
+
+    issues = generate_split_dividend_anomaly_issues(db, 1, cfg, ticker="AAPL")
+    assert issues == []
+
+
+def test_split_no_bars_no_emit():
+    """Ticker with no minute bars is skipped entirely."""
+    db = _DispatchDB(bars=[[]], splits=[[_split(date(2026, 6, 16), applied=None)]])
+    issues = generate_split_dividend_anomaly_issues(db, 1, None, ticker="AAPL")
+    assert issues == []
+
+
+# --- generate_timezone_session_mismatch_issues ------------------------------
+
+
+def test_session_correct_flags_no_emit():
+    """Correctly flagged pre/regular/post bars -> no mismatch, no emit."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 12, 0), pre=True),  # 08:00 ET -> pre
+        _bar(datetime(2026, 6, 15, 14, 0)),  # 10:00 ET -> regular
+        _bar(datetime(2026, 6, 15, 22, 0), post=True),  # 18:00 ET -> post
+    ]
+    db = _DispatchDB(bars=[bars])
+
+    issues = generate_timezone_session_mismatch_issues(db, 1, None, ticker="AAPL")
+    assert issues == []
+
+
+def test_session_wrong_flags_above_threshold_emits_warning():
+    """A regular bar mis-flagged as pre-market pushes mismatch rate over 1%."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), pre=True),  # regular flagged pre -> wrong
+        _bar(datetime(2026, 6, 15, 14, 1)),
+        _bar(datetime(2026, 6, 15, 14, 2)),
+        _bar(datetime(2026, 6, 15, 14, 3)),
+        _bar(datetime(2026, 6, 15, 14, 4)),
+    ]
+    db = _DispatchDB(bars=[bars])
+
+    issues = generate_timezone_session_mismatch_issues(db, 1, None, ticker="AAPL")
+
+    assert len(issues) == 1
+    assert issues[0].issue_code == "session_mismatch"
+    assert issues[0].context["severity"] == "warning"
+    assert issues[0].context["reason"] == "flag_mismatch"
+    assert issues[0].context["mismatch_count"] == 1
+    assert len(issues[0].context["sample_mismatches"]) == 1
+
+
+def test_session_wrong_flags_below_threshold_no_emit():
+    """Same single mismatch stays under a configured 50% threshold -> no emit."""
+    bars = [
+        _bar(datetime(2026, 6, 15, 14, 0), pre=True),  # wrong
+        _bar(datetime(2026, 6, 15, 14, 1)),
+        _bar(datetime(2026, 6, 15, 14, 2)),
+    ]
+    db = _DispatchDB(bars=[bars])
+    cfg = _params_cfg(session_mismatch_threshold_pct=50.0)
+
+    issues = generate_timezone_session_mismatch_issues(db, 1, cfg, ticker="AAPL")
+    assert issues == []
+
+
+def test_session_closed_window_bar_emits_blocker():
+    """A bar landing in a 'closed' window is always a blocker."""
+    bars = [_bar(datetime(2026, 6, 15, 6, 0))]  # 02:00 ET -> closed
+    db = _DispatchDB(bars=[bars])
+
+    issues = generate_timezone_session_mismatch_issues(db, 1, None, ticker="AAPL")
+
+    assert len(issues) == 1
+    assert issues[0].context["severity"] == "blocker"
+    assert issues[0].context["reason"] == "bars_in_closed_window"
+    assert issues[0].context["closed_bar_count"] == 1
+
+
+def test_session_dst_aware_flags_match():
+    """Same 13:30 UTC wall-time is 'pre' in winter (EST) but 'regular' in summer
+    (EDT); correctly DST-aware flags produce no mismatch."""
+    bars = [
+        _bar(datetime(2026, 1, 15, 13, 30), pre=True),  # 08:30 EST -> pre
+        _bar(datetime(2026, 6, 15, 13, 30)),  # 09:30 EDT -> regular
+    ]
+    db = _DispatchDB(bars=[bars])
+
+    issues = generate_timezone_session_mismatch_issues(db, 1, None, ticker="AAPL")
+    assert issues == []
+
+
+def test_session_empty_bars_no_emit():
+    """Ticker with no minute bars is skipped."""
+    db = _DispatchDB(bars=[[]])
+    issues = generate_timezone_session_mismatch_issues(db, 1, None, ticker="AAPL")
+    assert issues == []
+
+
+def test_session_universe_wide_only_flags_offending_ticker():
+    """ticker=None iterates universe tickers; only AAPL (closed bar) is flagged."""
+    aapl_bars = [_bar(datetime(2026, 6, 15, 6, 0))]  # closed
+    msft_bars = [_bar(datetime(2026, 6, 15, 14, 0))]  # regular, correct
+    db = _DispatchDB(tickers=["AAPL", "MSFT"], bars=[aapl_bars, msft_bars])
+
+    issues = generate_timezone_session_mismatch_issues(db, 1, None, ticker=None)
+
+    assert len(issues) == 1
+    assert issues[0].ticker == "AAPL"
+    assert issues[0].context["reason"] == "bars_in_closed_window"
