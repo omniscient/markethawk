@@ -90,6 +90,10 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Gate commands (conformance, code-review, validate) that need `route_memory_file()`, `write_memory_entry()`, or `emit_verdict()` must source `dark-factory/scripts/gate_lib.sh` at Phase 1 LOAD: `REPO_ROOT=$(git rev-parse --show-toplevel); source "${REPO_ROOT}/dark-factory/scripts/gate_lib.sh"`. Do NOT add `set -euo pipefail` in gate_lib.sh — it is sourced, not executed, and strictness in the library would abort the caller on any non-zero grep/awk. <!-- issue:#334 date:2026-06-12 expires:2026-12-12 source:implement path:.archon/commands/ -->
 
+## Scope Enforcement
+
+- [PATTERN] `dedupe_oos.py` classifies each `[OOS]` conformance finding as one of three actions: `create` (no existing match → file a new scope ticket), `comment:<n>` (an open issue `<n>` already carries a matching embedded `<!-- dedup-key: <file/area>|<finding-type> -->` → post a comment instead of a duplicate ticket), or `suppress` (ruff/reformat-class noise or a within-run duplicate → drop silently). The dedup-key is `<file-or-area lowercased>|<finding-type>`; cross-run dedup matches it against `<!-- dedup-key: … -->` markers in open issue bodies, so every auto-filed scope ticket must embed its own dedup-key for later runs to find it. This replaces the older "one ticket per finding" behaviour. path:dark-factory/scripts/dedupe_oos.py <!-- issue:#421 date:2026-06-14 expires:2026-12-14 source:implement -->
+
 ## Path-Tag Memory Filtering
 
 - [PATTERN] Path-tag filtering in Phase 1 LOAD extracts the `path:` prefix with `sed 's/.*path:\([^ >]*\).*/\1/'` (POSIX-compatible; not `grep -oP`) and matches via `echo "$AFFECTED" | grep -q "^${PATH_TAG}"` against the affected file list; empty `AFFECTED` means "include all" — correct fallback for new branches. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
