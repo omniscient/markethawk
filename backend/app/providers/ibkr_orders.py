@@ -22,8 +22,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional
+
+import redis
 
 from app.core.config import settings
 
@@ -227,6 +230,101 @@ class IBKROrderManager:
 
         Returns BracketOrderResult with broker IDs for all three legs.
         """
+        # ── Non-bypassable live-order guards ─────────────────────────────────────
+        # These checks fire before any IBKR connection opens. They cannot be
+        # bypassed by flipping API-mutable DB config (AUTO_TRADING_ENABLED, paper_mode).
+
+        # 1. Kill switch — FIRST guard, before LIVE_TRADING_ARMED or any IBKR I/O.
+        #    (a) Boot-time env override: DENY-LIST semantics — only the explicit
+        #        allow-set ("", "0", "false", "no", "off") disengages it; any other
+        #        value (including custom tokens like "on", "stop", " true ") is ENGAGED.
+        _ks_env = os.getenv("TRADING_KILL_SWITCH", "").strip().lower()
+        if _ks_env not in ("", "0", "false", "no", "off"):
+            raise PermissionError(
+                "Trading kill switch engaged (env TRADING_KILL_SWITCH) "
+                "— refusing to place order"
+            )
+        # (b) Redis runtime flag — FAIL-CLOSED: any Redis error (connection refused,
+        #     timeout, server down) treats the switch as ENGAGED. A short socket
+        #     timeout prevents a hung Redis from blocking the caller indefinitely.
+        try:
+            _ks_client = redis.from_url(
+                settings.REDIS_URL,
+                decode_responses=True,
+                socket_timeout=1.0,
+                socket_connect_timeout=1.0,
+            )
+            _ks_val = _ks_client.get("trading:kill_switch")
+        except Exception as _ks_exc:
+            raise PermissionError(
+                "Trading kill switch: Redis unreachable — failing closed, "
+                "refusing to place order"
+            ) from _ks_exc
+        if _ks_val is not None and str(_ks_val).strip().lower() not in (
+            "",
+            "0",
+            "false",
+            "no",
+            "off",
+        ):
+            raise PermissionError(
+                "Trading kill switch engaged (Redis key trading:kill_switch) "
+                "— refusing to place order"
+            )
+
+        # 2. LIVE_TRADING_ARMED must be explicitly set — fails to False by default.
+        if not settings.LIVE_TRADING_ARMED:
+            raise PermissionError(
+                "LIVE_TRADING_ARMED is not set — live order placement is disabled. "
+                "Set LIVE_TRADING_ARMED=true in the environment to enable."
+            )
+
+        # 3. Positive lower bounds — defense-in-depth at the non-bypassable perimeter.
+        #    Upstream callers already guarantee qty>0 and positive prices, but the
+        #    chokepoint must not rely on caller invariants for live-money protection.
+        if quantity <= 0:
+            raise ValueError(f"quantity must be positive, got {quantity}")
+        # Conservative price basis: use the HIGHEST available price so neither
+        # longs nor shorts can circumvent the notional cap with a low-side price.
+        # For shorts: stop_price > entry > target, so stop is the worst-case notional.
+        _price_candidates = [
+            p for p in (entry_price, target_price, stop_price) if p is not None
+        ]
+        _price_basis = max(_price_candidates) if _price_candidates else 0.0
+        if _price_basis <= 0:
+            raise ValueError(
+                f"effective price basis must be positive, got {_price_basis}"
+            )
+
+        # 4. Notional cap (uses conservative price basis, not just entry).
+        notional = quantity * _price_basis
+        if notional > settings.MAX_ORDER_NOTIONAL:
+            raise ValueError(
+                f"Order exceeds notional cap: {notional:.2f} > {settings.MAX_ORDER_NOTIONAL}"
+            )
+
+        # 5. Quantity cap.
+        if quantity > settings.MAX_ORDER_QTY:
+            raise ValueError(
+                f"Order exceeds quantity cap: {quantity} > {settings.MAX_ORDER_QTY}"
+            )
+        # ── WARN-level audit log (all guards passed) ──────────────────────────────
+        logger.warning(
+            "LIVE ORDER PLACEMENT: symbol=%s side=%s qty=%d entry=%s stop=%s target=%s "
+            "notional=%.2f order_ref=%s",
+            symbol,
+            side,
+            quantity,
+            f"{entry_price:.4f}" if entry_price is not None else "MKT",
+            stop_price,
+            target_price,
+            notional,
+            order_ref,
+        )
+        # ── Prometheus counter ────────────────────────────────────────────────────
+        from app.core.metrics import live_orders_total
+
+        live_orders_total.labels(symbol=symbol, side=side).inc()
         ib = await self._connect()
         try:
             contract = Stock(symbol, "SMART", "USD")

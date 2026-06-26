@@ -119,7 +119,9 @@ def test_patch_strategy_updates_field(db: Session):
 
 
 def test_patch_strategy_not_found_returns_404(db: Session):
-    response = client.patch("/api/v1/trading/strategies/999999", json={"is_active": True})
+    response = client.patch(
+        "/api/v1/trading/strategies/999999", json={"is_active": True}
+    )
     assert response.status_code == 404
 
 
@@ -258,3 +260,89 @@ def test_patch_config_updates_enabled_flag(db: Session):
     )
     assert response.status_code == 200
     assert response.json()["AUTO_TRADING_ENABLED"] is True
+
+
+# ── Live strategy max_position_usd validation ─────────────────────────────────
+
+
+class TestStrategyLiveRequiresMaxPosition:
+    """Router must return 422 when paper_mode=False and max_position_usd is absent or <= 0 (R3)."""
+
+    def test_create_strategy_live_requires_max_position(self, db: Session):
+        resp = client.post(
+            "/api/v1/trading/strategies",
+            json={
+                "name": "Unguarded Live Strategy",
+                "paper_mode": False,
+                # max_position_usd intentionally omitted
+            },
+        )
+        assert resp.status_code == 422, resp.json()
+        assert "max_position_usd" in resp.json().get("detail", "").lower()
+
+    def test_update_strategy_live_requires_max_position(self, db: Session):
+        # Create a safe paper strategy first
+        s = _strategy(db, paper_mode=True)
+        db.flush()
+
+        # PATCH to live mode without providing max_position_usd → 422
+        resp = client.patch(
+            f"/api/v1/trading/strategies/{s.id}",
+            json={
+                "paper_mode": False
+            },  # max_position_usd absent; existing value is None
+        )
+        assert resp.status_code == 422, resp.json()
+        assert "max_position_usd" in resp.json().get("detail", "").lower()
+
+    def test_create_strategy_live_rejects_zero_max_position(self, db: Session):
+        """max_position_usd=0 with paper_mode=False must return 422 (FIX 5)."""
+        resp = client.post(
+            "/api/v1/trading/strategies",
+            json={
+                "name": "Zero Cap Live Strategy",
+                "paper_mode": False,
+                "max_position_usd": 0,
+            },
+        )
+        assert resp.status_code == 422, resp.json()
+        assert "max_position_usd" in resp.json().get("detail", "").lower()
+
+    def test_create_strategy_live_rejects_negative_max_position(self, db: Session):
+        """max_position_usd=-500 with paper_mode=False must return 422 (FIX 5)."""
+        resp = client.post(
+            "/api/v1/trading/strategies",
+            json={
+                "name": "Negative Cap Live Strategy",
+                "paper_mode": False,
+                "max_position_usd": -500,
+            },
+        )
+        assert resp.status_code == 422, resp.json()
+        assert "max_position_usd" in resp.json().get("detail", "").lower()
+
+    def test_create_strategy_live_accepts_positive_max_position(self, db: Session):
+        """max_position_usd=5000 with paper_mode=False must be accepted (sanity check)."""
+        resp = client.post(
+            "/api/v1/trading/strategies",
+            json={
+                "name": "Valid Live Strategy",
+                "paper_mode": False,
+                "max_position_usd": 5000,
+            },
+        )
+        assert resp.status_code == 201, resp.json()
+        assert resp.json()["paper_mode"] is False
+        assert resp.json()["max_position_usd"] == 5000
+
+    def test_update_strategy_live_rejects_zero_max_position(self, db: Session):
+        """PATCH to max_position_usd=0 on a live strategy must return 422 (FIX 5)."""
+        s = _strategy(db, paper_mode=True)
+        db.flush()
+
+        resp = client.patch(
+            f"/api/v1/trading/strategies/{s.id}",
+            json={"paper_mode": False, "max_position_usd": 0},
+        )
+        assert resp.status_code == 422, resp.json()
+        assert "max_position_usd" in resp.json().get("detail", "").lower()

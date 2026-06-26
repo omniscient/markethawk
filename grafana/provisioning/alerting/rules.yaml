@@ -231,3 +231,36 @@ groups:
             model:
               type: math
               expression: $B > 0.1
+
+  - name: LiveTrading
+    orgId: 1
+    folder: MarketHawk
+    interval: 1m
+    rules:
+      - uid: live-order-placed
+        title: Live Order Placed
+        condition: C
+        for: 0m
+        annotations:
+          summary: >
+            A live bracket order was submitted to IBKR.
+            Symbol: {{ $labels.symbol }}, Side: {{ $labels.side }}
+        labels:
+          severity: critical
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: rate(live_orders_total[1m])
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B > 0

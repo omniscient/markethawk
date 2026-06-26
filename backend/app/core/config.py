@@ -104,6 +104,16 @@ class Settings(BaseSettings):
     # Must differ from IBKR_CLIENT_ID and from the live scanner's clientId (5).
     IBKR_TRADING_CLIENT_ID: int = 11
 
+    # ── Live trading safety controls ──────────────────────────────────────────────
+    # LIVE_TRADING_ARMED: must be explicitly True in env to allow real orders.
+    # Not API-settable — requires container/env access to change.
+    LIVE_TRADING_ARMED: bool = False
+    # TRADING_KILL_SWITCH: also checked via os.getenv() at call time for
+    # real-time halt without restart. Settings field provides startup visibility.
+    TRADING_KILL_SWITCH: bool = False
+    MAX_ORDER_NOTIONAL: float = 10_000.0  # USD hard cap per order
+    MAX_ORDER_QTY: int = 200  # shares hard cap per order
+
     # ── Email / SMTP (Alert Notifications) ────────────────────────────────
     # Use Gmail + an App Password (not your real Gmail password).
     # Generate one at: https://myaccount.google.com/apppasswords
@@ -165,6 +175,17 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_environment(cls, v: str) -> str:
         return v.lower()
+
+    @field_validator("LIVE_TRADING_ARMED")
+    @classmethod
+    def warn_live_trading_armed(cls, v: bool) -> bool:
+        if v:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "LIVE_TRADING_ARMED=True — live order placement is ENABLED at the env level."
+            )
+        return v
 
     @field_validator("REDIS_PASSWORD")
     @classmethod

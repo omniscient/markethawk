@@ -101,3 +101,9 @@ replay_drift_signals_total = Counter(
     "Replay diff drift signals by kind",
     ["scanner_type", "kind"],
 )
+
+live_orders_total = Counter(
+    "live_orders_total",
+    "Total live (non-paper) bracket orders placed to IBKR",
+    ["symbol", "side"],
+)
