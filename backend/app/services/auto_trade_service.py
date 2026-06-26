@@ -195,7 +195,7 @@ class AutoTradeExecutor:
                 assessment.verdict,
                 assessment.issues,
                 assessment.warnings,
-                False,
+                bypass_used,
             )
             return None
         if bypass_used:

@@ -564,3 +564,53 @@ def test_quality_gate_exception_fails_closed(db: Session):
         order = AutoTradeExecutor().maybe_execute(rule, event, db)
 
     assert order is None
+
+
+def test_quality_gate_warning_refuses_even_with_bypass(db: Session):
+    """verdict=warning + QUALITY_GATE_SKIP_BYPASS='true' → still refuses.
+
+    The bypass flag only covers 'skipped' verdicts (universe-unresolvable runs).
+    An active 'warning' verdict from a strict-policy assessment must never be
+    overridden — this is the critical live-trading safety invariant.
+    """
+    from app.models.system_config import SystemConfig
+
+    db.add(SystemConfig(key="QUALITY_GATE_SKIP_BYPASS", value="true"))
+    db.flush()
+
+    strategy = _strategy(db, max_concurrent_positions=10, max_trades_per_day=10)
+    rule = _rule(db, strategy)
+    event = _event_with_run(db, ticker="TSLA")
+
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch(GATE_PATCH, return_value=_gate_assessment("warning")),
+    ):
+        order = AutoTradeExecutor().maybe_execute(rule, event, db)
+
+    assert order is None
+    assert db.query(AutoTradeOrder).count() == 0
+
+
+def test_quality_gate_blocked_refuses_even_with_bypass(db: Session):
+    """verdict=blocked + QUALITY_GATE_SKIP_BYPASS='true' → still refuses.
+
+    Same invariant as warning: bypass only unlocks 'skipped', never 'blocked'.
+    """
+    from app.models.system_config import SystemConfig
+
+    db.add(SystemConfig(key="QUALITY_GATE_SKIP_BYPASS", value="true"))
+    db.flush()
+
+    strategy = _strategy(db, max_concurrent_positions=10, max_trades_per_day=10)
+    rule = _rule(db, strategy)
+    event = _event_with_run(db, ticker="NVDA")
+
+    with (
+        patch(REDIS_PATCH, return_value=_fake_redis()),
+        patch(GATE_PATCH, return_value=_gate_assessment("blocked")),
+    ):
+        order = AutoTradeExecutor().maybe_execute(rule, event, db)
+
+    assert order is None
+    assert db.query(AutoTradeOrder).count() == 0
