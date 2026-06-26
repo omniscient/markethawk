@@ -6,3 +6,5 @@
 !docker/
 !scripts/backup.sh
 !scripts/backup-entrypoint.sh
+!scripts/restore-drill.sh
+!scripts/restore-drill-entrypoint.sh
