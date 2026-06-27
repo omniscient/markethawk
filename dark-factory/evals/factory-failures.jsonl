@@ -122,3 +122,4 @@
 {"issue":645,"title":"Define Dark Factory memory contract and structured schema","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:53:52Z"}
 {"issue":645,"title":"Define Dark Factory memory contract and structured schema","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:56:44Z"}
 {"issue":645,"title":"Define Dark Factory memory contract and structured schema","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:56:57Z"}
+{"issue":651,"title":"Add agent role and project scoping to Dark Factory memory calls","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5pm (UTC) ","promoted_at":"2026-06-27T14:33:26Z"}
