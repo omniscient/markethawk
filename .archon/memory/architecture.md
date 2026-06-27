@@ -27,3 +27,5 @@ entries as higher-confidence than source:refine entries when the two conflict.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+- [PATTERN] Memory trace artifacts for the flat-file load_memory() system use a file-level schema with schema_version and retrieval_mechanism discriminator fields (not entry-level pseudo-IDs or floating-point scores) — ensures the trace is mechanism-honest and forward-compatible when epic #643 adds semantic retrieval. <!-- issue:#647 date:2026-06-27 expires:2026-12-27 source:refine -->
+- [AVOID] Do not emit pseudo-IDs (e.g., 'file.md#L42') or floating-point scores (e.g., score: 1.0) in memory trace artifacts for the current flat-file load_memory() system — these fields imply semantic retrieval that does not exist and would mislead reviewers. Defer them to epic #643. <!-- issue:#647 date:2026-06-27 expires:2026-12-27 source:refine -->
