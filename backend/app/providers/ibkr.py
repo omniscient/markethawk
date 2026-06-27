@@ -35,11 +35,21 @@ try:
     from ib_insync.contract import ContractDetails
 
     IB_INSYNC_AVAILABLE = True
-except ImportError:
+except (ImportError, RuntimeError) as _ib_insync_err:
+    # RuntimeError covers Python 3.14+ environments (e.g. the dark-factory
+    # image) where ib_insync's transitive dep eventkit calls
+    # asyncio.get_event_loop() at import time and raises
+    # "There is no current event loop in thread 'MainThread'." Importing
+    # app.main must not hard-fail just because this optional provider can't
+    # load — it degrades gracefully via IB_INSYNC_AVAILABLE instead. The
+    # IBKR symbols (IB/Future/...) are only referenced inside methods, so
+    # leaving them unbound here is safe until IBKR features are used.
     IB_INSYNC_AVAILABLE = False
     logger.warning(
-        "ib_insync not installed. IBKRDataProvider will be unavailable. "
-        "Run: pip install ib_insync"
+        "ib_insync unavailable (%s). IBKRDataProvider will be disabled. "
+        "Run: pip install ib_insync (requires a Python runtime compatible "
+        "with ib_insync/eventkit).",
+        _ib_insync_err,
     )
 
 
