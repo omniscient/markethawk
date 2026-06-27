@@ -118,3 +118,4 @@
 {"issue":645,"title":"Define Dark Factory memory contract and structured schema","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:51:22Z"}
 {"issue":644,"title":"Memory backend spike: evaluate agentmemory with existing .archon memory data","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:52:23Z"}
 {"issue":644,"title":"Memory backend spike: evaluate agentmemory with existing .archon memory data","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:52:36Z"}
+{"issue":645,"title":"Define Dark Factory memory contract and structured schema","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:53:38Z"}
