@@ -29,6 +29,7 @@ graph TD
         forecastworker["forecast-worker (profile: forecasting)"]
         dbbackup["db-backup"]
         dbrestoredrill["db-restore-drill"]
+        agentmemoryengine["agentmemory-engine :3111 (profile: agentmemory-spike)"]
     end
 
     subgraph factory["factory-network"]
