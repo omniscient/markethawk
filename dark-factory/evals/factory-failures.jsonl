@@ -130,3 +130,4 @@
 {"issue":650,"title":"Add Dark Factory memory lifecycle maintenance job","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5pm (UTC) ","promoted_at":"2026-06-27T14:36:31Z"}
 {"issue":651,"title":"Add agent role and project scoping to Dark Factory memory calls","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5pm (UTC) ","promoted_at":"2026-06-27T14:37:28Z"}
 {"issue":651,"title":"Add agent role and project scoping to Dark Factory memory calls","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5pm (UTC) ","promoted_at":"2026-06-27T14:37:43Z"}
+{"issue":650,"title":"Add Dark Factory memory lifecycle maintenance job","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5pm (UTC) ","promoted_at":"2026-06-27T14:38:52Z"}
