@@ -97,3 +97,4 @@
 {"issue":632,"title":"architecture-v4: extract app/utils/time.py — UTC-normalization duplication at 287 sites","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:01:47Z"}
 {"issue":633,"title":"architecture-v4: QualityGatePolicy interface to decouple gate evidence (3-modules-per-type)","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:01:51Z"}
 {"issue":632,"title":"architecture-v4: extract app/utils/time.py — UTC-normalization duplication at 287 sites","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:01:55Z"}
+{"issue":633,"title":"architecture-v4: QualityGatePolicy interface to decouple gate evidence (3-modules-per-type)","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7am (UTC) ","promoted_at":"2026-06-27T04:02:00Z"}
