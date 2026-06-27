@@ -317,6 +317,39 @@ Remove shell functions; gate command files call `python3 memory_write.py` direct
 Increases the blast radius of Phase 3 (gate command prompts must be edited) with no
 benefit over the thin-wrapper approach. Rejected.
 
+### Alternative G: `rohitg00/agentmemory` as primary backend
+
+The Hermes Agent (research, gpt-5.5) reviewed the `rohitg00/agentmemory` library
+(commit `f6f9e3c`) and recommended it as the structured memory backend: BM25+vector+graph
+hybrid retrieval, a Lessons API with confidence/reinforcement/decay, and multi-agent
+coordination primitives (leases, actions) via a REST API on port 3111 or an NPX shim.
+
+**Rejected as the primary backend for this ticket.** Two hard constraints rule it out:
+
+1. **New runtime service dependency.** The Dark Factory container must be fully functional
+   during startup isolation passes — before the application stack (postgres, redis, backend)
+   is up — and in per-issue preview worktrees where no auxiliary services are running.
+   agentmemory's REST API on port 3111 (or an `npx`-launched Node process) reintroduces
+   exactly the service-coupling fragility this architecture avoids. sqlite-vec has zero
+   runtime dependencies beyond the Python standard library.
+
+2. **Over-engineered for a ~200-entry, single-writer-per-worktree corpus.** BM25+vector+graph
+   retrieval, graph stores, and lease/action coordination solve problems (corpus scale,
+   concurrent multi-agent writes to a shared store) that do not yet exist here. The hybrid
+   sqlite-vec + 3-factor deterministic model specified in Phase 2 covers the same retrieval
+   needs without a Node toolchain or a new container.
+
+**Future option — revisit when:**
+- The memory corpus exceeds ~2,000 entries and graph-structure retrieval starts paying off, or
+- A future ticket introduces genuinely concurrent multi-agent writes to a *shared*
+  (non-per-worktree) memory store, at which point agentmemory's lease/action primitives
+  become relevant.
+
+**If adopted in the future:** integrate as a read-through (then write-through) adapter behind
+the `memory_retrieve.py` / `memory_write.py` interfaces already defined here, preserving
+`.archon/memory/*.md` as the git-committed human-readable surface — which is exactly the
+staged adapter approach the Hermes Agent recommends.
+
 ## Open Questions (Non-Blocking)
 
 - **`--top-k` tuning**: 25 is a reasonable default. The memory-trace artifact makes this
