@@ -78,7 +78,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PATTERN] Pure-ASGI middleware classes (like `CSRFMiddleware`) should be defined at module level in `main.py`, not inside `create_app()` — module-level placement makes them importable by the test suite without triggering the full app factory. The `AuthMiddleware` is an exception because it closes over `EXEMPT_PREFIXES`. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
 
-- [PATTERN] CSRF_EXEMPT_PREFIXES and AUTH EXEMPT_PREFIXES serve different concerns and must remain separate tuples in `main.py`. Do not merge them — CSRF exempts pre-authentication paths; auth exempts docs/health/metrics paths that are unrelated to CSRF. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 
 
@@ -106,3 +105,5 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PROVISIONAL] `WebSocketException(code=1008)` raised inside the route handler body (not only from a FastAPI Dependency) is caught by Starlette and closes the connection before `websocket.accept()` returns to the client — so an `async with ws_connection_slot(user_id):` context manager in the handler body (before `await websocket.accept()`) correctly delivers 1008 without needing a separate Dependency. <!-- evidence:test-output issue:#377 date:2026-06-14 expires:2026-12-14 source:implement -->
 
 - [PROVISIONAL] To persist a Pydantic v2 model that contains `datetime` fields into a JSONB column, use `json.loads(json.dumps(model.model_dump(), default=str))` — `model.model_dump()` returns `datetime` objects which PostgreSQL's JSON encoder rejects; `default=str` coerces them to ISO strings and `json.loads` rebuilds a plain dict. <!-- evidence:test-output issue:#494 date:2026-06-22 expires:2026-12-22 source:implement -->
+- [AVOID] Never raise `HTTPException` from a service module (`app/services/`) — services have no HTTP context and become untestable without FastAPI. Raise domain exceptions (`UniverseValidationError`, `UniverseNotFoundError`, etc.) and convert to `HTTPException` in the router handler (`except UniverseValidationError as e: raise HTTPException(400, detail=str(e))`). `starlette.responses` types (e.g. `StreamingResponse`) are acceptable in services since they are data-format, not control-flow, concerns. <!-- issue:#631 date:2026-06-27 expires:2026-12-27 source:implement -->
+- [PATTERN] CSRF_EXEMPT_PREFIXES and AUTH EXEMPT_PREFIXES serve different concerns and must remain separate tuples in `main.py`. Do not merge them — CSRF exempts pre-authentication paths; auth exempts docs/health/metrics paths that are unrelated to CSRF. <!-- issue:#192 date:2026-06-05 expires:2026-12-05 source:implement -->

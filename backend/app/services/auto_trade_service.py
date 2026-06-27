@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Optional
@@ -69,6 +69,10 @@ class PositionCalc:
     target: float
     risk_amount_usd: float
     stop_distance: float  # $ per share from entry to stop
+    side: str  # "long" or "short"
+    trigger_price: float = (
+        0.0  # raw price used for sizing; stored to avoid recomputation
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -101,126 +105,20 @@ class AutoTradeExecutor:
         Returns the AutoTradeOrder that was created (any status), or None if
         execution was skipped for any reason.
         """
-        # ── 1. Basic guards ──────────────────────────────────────────────
-        if not rule.auto_trade or not rule.trading_strategy_id:
+        # ── 1/1b/1c. Basic guards (pre-lock) ────────────────────────────
+        strategy = self._validate_basics(rule, db)
+        if strategy is None:
             return None
 
-        strategy = (
-            db.query(TradingStrategy)
-            .filter(
-                TradingStrategy.id == rule.trading_strategy_id,
-                TradingStrategy.is_active == True,
-            )
-            .first()
-        )
-        if not strategy:
-            logger.debug(
-                f"AutoTradeExecutor: strategy {rule.trading_strategy_id} "
-                f"not found or inactive — skipping"
-            )
-            return None
-
-        # Global kill-switch only blocks live orders, not paper.
-        if not strategy.paper_mode:
-            cfg = (
-                db.query(SystemConfig)
-                .filter(SystemConfig.key == "AUTO_TRADING_ENABLED")
-                .first()
-            )
-            if not cfg or cfg.value.lower() != "true":
-                logger.info(
-                    "AutoTradeExecutor: AUTO_TRADING_ENABLED is off — "
-                    "blocking live order for rule %s",
-                    rule.id,
-                )
-                return None
-
-        # ── 1b. max_position_usd required and must be positive for live strategies (R3) ──
-        if not strategy.paper_mode and (
-            strategy.max_position_usd is None or float(strategy.max_position_usd) <= 0
-        ):
-            logger.error(
-                "AutoTradeExecutor: live strategy '%s' (id=%s) has no valid max_position_usd "
-                "(None or <= 0) — refusing live order for rule %s",
-                strategy.name,
-                strategy.id,
-                rule.id,
-            )
-            return None
-
-        # ── 2. Idempotency — one order per symbol/strategy/day ───────────
         today = datetime.now(timezone.utc).date()
-        existing = (
-            db.query(AutoTradeOrder)
-            .filter(
-                AutoTradeOrder.symbol == event.ticker,
-                AutoTradeOrder.trading_strategy_id == strategy.id,
-                AutoTradeOrder.event_date == today,
-            )
-            .first()
-        )
-        if existing:
-            logger.debug(
-                f"AutoTradeExecutor: order already exists for "
-                f"{event.ticker}/strategy={strategy.id}/{today} id={existing.id} — skipping"
-            )
+
+        # ── 2. Idempotency (pre-lock) ────────────────────────────────────
+        if not self._check_idempotency(event, strategy, today, db):
             return None
 
-        # ── 2.5. Data quality gate (strict policy) ───────────────────────
-        # Re-assess under strict policy — do NOT trust any advisory pre-stamped
-        # metadata_["quality_gate"] blob from the scanner run (computed under
-        # advisory policy, which does not escalate blocked-severity issues).
-        # When universe_id is None (no scanner_run_id linkage), the gate uses
-        # policy=off which returns verdict='skipped' (bypassable, not fail-closed).
-        try:
-            universe_id = self._resolve_universe_id(event, db)
-            gate_policy = (
-                QualityGatePolicy.strict
-                if universe_id is not None
-                else QualityGatePolicy.off
-            )
-            _gate_req = SimpleNamespace(
-                policy=gate_policy.value,
-                universe_id=universe_id,
-                scanner_type=event.scanner_type,
-                ticker=event.ticker,
-                requirements=None,
-            )
-            assessment = quality_gate_service.assess(db, _gate_req)
-        except Exception as exc:
-            logger.warning(
-                "quality_gate_service_error: ticker=%s event=%s rule=%s error=%s"
-                " — failing closed",
-                event.ticker,
-                event.id,
-                rule.id,
-                exc,
-            )
+        # ── 2.5. Data quality gate (pre-lock) ───────────────────────────
+        if not self._validate_quality_gate(event, rule, db):
             return None
-
-        gate_ok = self._gate_passes(assessment, db)
-        bypass_used = assessment.verdict == "skipped" and gate_ok
-        if not gate_ok:
-            logger.warning(
-                "quality_gate_refused: ticker=%s event=%s rule=%s"
-                " verdict=%s issues=%s warnings=%s bypass_used=%s",
-                event.ticker,
-                event.id,
-                rule.id,
-                assessment.verdict,
-                assessment.issues,
-                assessment.warnings,
-                bypass_used,
-            )
-            return None
-        if bypass_used:
-            logger.warning(
-                "quality_gate_bypass_used: ticker=%s event=%s rule=%s"
-                " verdict=skipped bypass=QUALITY_GATE_SKIP_BYPASS",
-                event.ticker,
-                event.id,
-                rule.id,
-            )
 
         # ── 3. Redis distributed lock ────────────────────────────────────
         redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -231,90 +129,21 @@ class AutoTradeExecutor:
             return None
 
         try:
-            # ── 4. Daily trade count check ───────────────────────────────
-            today_start = datetime.combine(today, datetime.min.time())
-            today_count = (
-                db.query(AutoTradeOrder)
-                .filter(
-                    AutoTradeOrder.trading_strategy_id == strategy.id,
-                    AutoTradeOrder.created_at >= today_start,
-                    AutoTradeOrder.status.notin_(["rejected", "error", "cancelled"]),
-                )
-                .count()
-            )
-            if today_count >= strategy.max_trades_per_day:
-                logger.info(
-                    f"AutoTradeExecutor: daily limit reached for strategy "
-                    f"'{strategy.name}' ({today_count}/{strategy.max_trades_per_day}) — skipping"
-                )
+            # ── 4+5. Concurrency limits (inside lock) ────────────────────
+            if not self._validate_concurrency(strategy, today, db):
                 return None
 
-            # ── 5. Concurrent position check ─────────────────────────────
-            open_count = (
-                db.query(AutoTradeOrder)
-                .filter(
-                    AutoTradeOrder.trading_strategy_id == strategy.id,
-                    AutoTradeOrder.status.in_(
-                        ["submitted", "open", "pending_approval", "pending"]
-                    ),
-                )
-                .count()
-            )
-            if open_count >= strategy.max_concurrent_positions:
-                logger.info(
-                    f"AutoTradeExecutor: max concurrent positions reached for strategy "
-                    f"'{strategy.name}' ({open_count}/{strategy.max_concurrent_positions}) — skipping"
-                )
+            # ── 6. Session eligibility (inside lock) ─────────────────────
+            if not self._validate_session(event, strategy):
                 return None
 
-            # ── 6. Session eligibility ───────────────────────────────────
-            event_session = (event.metadata_ or {}).get("session", "regular")
-            allowed = strategy.allowed_sessions or ["regular"]
-            if event_session not in allowed:
-                logger.info(
-                    f"AutoTradeExecutor: session '{event_session}' not in "
-                    f"allowed_sessions={allowed} — skipping"
-                )
-                return None
-
-            # ── 7. Extract trigger price ─────────────────────────────────
-            trigger_price = self._extract_trigger_price(event)
-            if not trigger_price or trigger_price <= 0:
-                logger.warning(
-                    f"AutoTradeExecutor: could not extract trigger price from "
-                    f"event {event.id} {event.ticker} — skipping"
-                )
-                return None
-
-            # ── 8. Determine trade side ──────────────────────────────────
-            side = self._determine_side(event, strategy)
-            if not side:
-                logger.info(
-                    f"AutoTradeExecutor: direction constraint blocks trade "
-                    f"for {event.ticker} — skipping"
-                )
-                return None
-
-            # ── 9. Account equity ────────────────────────────────────────
-            account_equity = self._get_account_equity(strategy, db)
-            if account_equity <= 0:
-                logger.warning(
-                    "AutoTradeExecutor: could not determine account equity — skipping"
-                )
-                return None
-
-            # ── 10. Position sizing ──────────────────────────────────────
-            calc = self._calculate_position(
-                strategy, trigger_price, side, account_equity
-            )
-            if calc.quantity <= 0:
-                logger.info(
-                    f"AutoTradeExecutor: calculated quantity=0 for "
-                    f"{event.ticker} — risk too small or price too high, skipping"
-                )
+            # ── 7–10. Trigger price, side, equity, sizing (inside lock) ──
+            calc = self._size_position(event, strategy, db)
+            if calc is None:
                 return None
 
             # ── 11. Create AutoTradeOrder ────────────────────────────────
+            trigger_price = calc.trigger_price
             initial_status = (
                 "pending_approval" if strategy.requires_approval else "pending"
             )
@@ -323,7 +152,7 @@ class AutoTradeExecutor:
                 scanner_event_id=event.id,
                 trading_strategy_id=strategy.id,
                 symbol=event.ticker,
-                side=side,
+                side=calc.side,
                 event_date=today,
                 status=initial_status,
                 trigger_price=Decimal(str(round(trigger_price, 4))),
@@ -342,7 +171,7 @@ class AutoTradeExecutor:
 
             logger.info(
                 f"AutoTradeExecutor: order created id={order.id} "
-                f"{side.upper()} {calc.quantity}x {event.ticker} "
+                f"{calc.side.upper()} {calc.quantity}x {event.ticker} "
                 f"entry~{trigger_price:.2f} stop={calc.stop:.2f} target={calc.target:.2f} "
                 f"risk=${calc.risk_amount_usd:.0f} status={initial_status} "
                 f"paper={strategy.paper_mode}"
@@ -379,6 +208,270 @@ class AutoTradeExecutor:
         finally:
             redis_client.delete(lock_key)
 
+    # ── Extracted decision steps ─────────────────────────────────────────
+
+    def _validate_basics(
+        self, rule: AlertRule, db: Session
+    ) -> Optional[TradingStrategy]:
+        """Steps 1+1b+1c: rule guards, strategy load, kill-switch, max_position_usd.
+
+        Returns the active TradingStrategy if all guards pass, else None.
+        """
+        if not rule.auto_trade or not rule.trading_strategy_id:
+            return None
+
+        strategy = (
+            db.query(TradingStrategy)
+            .filter(
+                TradingStrategy.id == rule.trading_strategy_id,
+                TradingStrategy.is_active == True,
+            )
+            .first()
+        )
+        if not strategy:
+            logger.debug(
+                f"AutoTradeExecutor: strategy {rule.trading_strategy_id} "
+                f"not found or inactive — skipping"
+            )
+            return None
+
+        # Global kill-switch only blocks live orders, not paper.
+        if not strategy.paper_mode:
+            cfg = (
+                db.query(SystemConfig)
+                .filter(SystemConfig.key == "AUTO_TRADING_ENABLED")
+                .first()
+            )
+            if not cfg or cfg.value.lower() != "true":
+                logger.info(
+                    "AutoTradeExecutor: AUTO_TRADING_ENABLED is off — "
+                    "blocking live order for rule %s",
+                    rule.id,
+                )
+                return None
+
+        # max_position_usd required and must be positive for live strategies
+        if not strategy.paper_mode and (
+            strategy.max_position_usd is None or float(strategy.max_position_usd) <= 0
+        ):
+            logger.error(
+                "AutoTradeExecutor: live strategy '%s' (id=%s) has no valid max_position_usd "
+                "(None or <= 0) — refusing live order for rule %s",
+                strategy.name,
+                strategy.id,
+                rule.id,
+            )
+            return None
+
+        return strategy
+
+    def _check_idempotency(
+        self,
+        event: ScannerEvent,
+        strategy: TradingStrategy,
+        today: date,
+        db: Session,
+    ) -> bool:
+        """Step 2: one order per symbol/strategy/day.
+
+        Returns True if no order exists yet (proceed), False if duplicate.
+        """
+        existing = (
+            db.query(AutoTradeOrder)
+            .filter(
+                AutoTradeOrder.symbol == event.ticker,
+                AutoTradeOrder.trading_strategy_id == strategy.id,
+                AutoTradeOrder.event_date == today,
+            )
+            .first()
+        )
+        if existing:
+            logger.debug(
+                f"AutoTradeExecutor: order already exists for "
+                f"{event.ticker}/strategy={strategy.id}/{today} id={existing.id} — skipping"
+            )
+            return False
+        return True
+
+    def _validate_quality_gate(
+        self,
+        event: ScannerEvent,
+        rule: AlertRule,
+        db: Session,
+    ) -> bool:
+        """Step 2.5: strict quality gate assessment.
+
+        Re-assess under strict policy — do NOT trust any advisory pre-stamped
+        metadata_["quality_gate"] blob from the scanner run (computed under
+        advisory policy, which does not escalate blocked-severity issues).
+        When universe_id is None (no scanner_run_id linkage), the gate uses
+        policy=off which returns verdict='skipped' (bypassable, not fail-closed).
+
+        Returns True if the gate permits order creation, False to skip.
+        """
+        try:
+            universe_id = self._resolve_universe_id(event, db)
+            gate_policy = (
+                QualityGatePolicy.strict
+                if universe_id is not None
+                else QualityGatePolicy.off
+            )
+            _gate_req = SimpleNamespace(
+                policy=gate_policy.value,
+                universe_id=universe_id,
+                scanner_type=event.scanner_type,
+                ticker=event.ticker,
+                requirements=None,
+            )
+            assessment = quality_gate_service.assess(db, _gate_req)
+        except Exception as exc:
+            logger.warning(
+                "quality_gate_service_error: ticker=%s event=%s rule=%s error=%s"
+                " — failing closed",
+                event.ticker,
+                event.id,
+                rule.id,
+                exc,
+            )
+            return False
+
+        gate_ok = self._gate_passes(assessment, db)
+        bypass_used = assessment.verdict == "skipped" and gate_ok
+        if not gate_ok:
+            logger.warning(
+                "quality_gate_refused: ticker=%s event=%s rule=%s"
+                " verdict=%s issues=%s warnings=%s bypass_used=%s",
+                event.ticker,
+                event.id,
+                rule.id,
+                assessment.verdict,
+                assessment.issues,
+                assessment.warnings,
+                bypass_used,
+            )
+            return False
+        if bypass_used:
+            logger.warning(
+                "quality_gate_bypass_used: ticker=%s event=%s rule=%s"
+                " verdict=skipped bypass=QUALITY_GATE_SKIP_BYPASS",
+                event.ticker,
+                event.id,
+                rule.id,
+            )
+        return True
+
+    def _validate_concurrency(
+        self,
+        strategy: TradingStrategy,
+        today: date,
+        db: Session,
+    ) -> bool:
+        """Steps 4+5: daily trade count and open position limits.
+
+        Returns True if under limits (proceed), False if at capacity.
+        """
+        today_start = datetime.combine(today, datetime.min.time())
+        today_count = (
+            db.query(AutoTradeOrder)
+            .filter(
+                AutoTradeOrder.trading_strategy_id == strategy.id,
+                AutoTradeOrder.created_at >= today_start,
+                AutoTradeOrder.status.notin_(["rejected", "error", "cancelled"]),
+            )
+            .count()
+        )
+        if today_count >= strategy.max_trades_per_day:
+            logger.info(
+                f"AutoTradeExecutor: daily limit reached for strategy "
+                f"'{strategy.name}' ({today_count}/{strategy.max_trades_per_day}) — skipping"
+            )
+            return False
+
+        open_count = (
+            db.query(AutoTradeOrder)
+            .filter(
+                AutoTradeOrder.trading_strategy_id == strategy.id,
+                AutoTradeOrder.status.in_(
+                    ["submitted", "open", "pending_approval", "pending"]
+                ),
+            )
+            .count()
+        )
+        if open_count >= strategy.max_concurrent_positions:
+            logger.info(
+                f"AutoTradeExecutor: max concurrent positions reached for strategy "
+                f"'{strategy.name}' ({open_count}/{strategy.max_concurrent_positions}) — skipping"
+            )
+            return False
+
+        return True
+
+    def _validate_session(
+        self,
+        event: ScannerEvent,
+        strategy: TradingStrategy,
+    ) -> bool:
+        """Step 6: session eligibility check.
+
+        Returns True if the event session is in the strategy's allowed sessions.
+        """
+        event_session = (event.metadata_ or {}).get("session", "regular")
+        allowed = strategy.allowed_sessions or ["regular"]
+        if event_session not in allowed:
+            logger.info(
+                f"AutoTradeExecutor: session '{event_session}' not in "
+                f"allowed_sessions={allowed} — skipping"
+            )
+            return False
+        return True
+
+    def _size_position(
+        self,
+        event: ScannerEvent,
+        strategy: TradingStrategy,
+        db: Session,
+    ) -> Optional[PositionCalc]:
+        """Steps 7–10: extract trigger price, determine side, fetch equity, size position.
+
+        Returns a PositionCalc with .side set, or None if any step fails.
+        """
+        # Step 7: trigger price
+        trigger_price = self._extract_trigger_price(event)
+        if not trigger_price or trigger_price <= 0:
+            logger.warning(
+                f"AutoTradeExecutor: could not extract trigger price from "
+                f"event {event.id} {event.ticker} — skipping"
+            )
+            return None
+
+        # Step 8: trade side
+        side = self._determine_side(event, strategy)
+        if not side:
+            logger.info(
+                f"AutoTradeExecutor: direction constraint blocks trade "
+                f"for {event.ticker} — skipping"
+            )
+            return None
+
+        # Step 9: account equity
+        account_equity = self._get_account_equity(strategy, db)
+        if account_equity <= 0:
+            logger.warning(
+                "AutoTradeExecutor: could not determine account equity — skipping"
+            )
+            return None
+
+        # Step 10: position sizing
+        calc = self._calculate_position(strategy, trigger_price, side, account_equity)
+        if calc.quantity <= 0:
+            logger.info(
+                f"AutoTradeExecutor: calculated quantity=0 for "
+                f"{event.ticker} — risk too small or price too high, skipping"
+            )
+            return None
+
+        return calc
+
     # ── IBKR submission (live only) ──────────────────────────────────────
 
     def submit_existing_order(self, order: AutoTradeOrder, db: Session) -> None:
@@ -403,6 +496,7 @@ class AutoTradeExecutor:
             if order.risk_amount_usd
             else 0.0,
             stop_distance=0.0,  # not used by _submit_to_ibkr
+            side=order.side or "",
         )
         self._submit_to_ibkr(order, calc, db)
 
@@ -510,6 +604,8 @@ class AutoTradeExecutor:
             target=round(target, 2),
             risk_amount_usd=round(quantity * stop_distance, 2),
             stop_distance=stop_distance,
+            side=side,
+            trigger_price=trigger_price,
         )
 
     # ── Trigger price extraction ─────────────────────────────────────────
