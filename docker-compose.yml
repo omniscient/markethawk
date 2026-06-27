@@ -771,7 +771,7 @@ services:
   # agentmemory — spike evaluation only, never starts in default stack.
   # Evaluates rohitg00/agentmemory as a structured/indexed backend for .archon/memory/*.md.
   # Architecture: two services — init (permissions) + engine (HTTP API on port 3111).
-  # The agentmemory Node.js worker connects to the engine via host port 49134.
+  # The agentmemory Node.js worker connects to the engine via host port 6791 (mapped from container port 49134).
   #
   # Start sequence:
   #   docker compose --profile agentmemory-spike up -d agentmemory-init agentmemory-engine

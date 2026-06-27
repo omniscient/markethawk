@@ -79,9 +79,12 @@ ok "health check HTTP 200 in ${HEALTH_LATENCY}ms"
 
 # ── Step 2: Startup metadata ─────────────────────────────────────────────────
 header "Step 2: Service metadata"
+# NOTE: image tag, version, and ports below are illustrative (matched to the spike at the time
+# of writing).  They are not derived from docker-compose.yml and may silently drift if the
+# compose file is updated.  Treat them as documentation, not authoritative runtime values.
 echo "  Image:         iiidev/iii:0.11.2 (engine) + node dist/index.mjs (agentmemory worker v0.9.27)"
 echo "  Architecture:  2-process: engine container + Node.js worker (source-built)"
-echo "  Port:          3111 (REST API), 49134 (worker WebSocket)"
+echo "  Port:          3111 (REST API, container); host-mapped to 6789 | 49134 (WS, container); host-mapped to 6791"
 echo "  Auth:          ${AUTH_HEADER:-none}"
 echo "  Startup time:  ${AGENTMEMORY_STARTUP_SECONDS:-measured externally}s"
 
@@ -297,6 +300,12 @@ fi
 
 # ── Step 5: Outage / unavailable test ────────────────────────────────────────
 header "Step 5: Outage / unavailable test"
+# NOTE: $BASE_URL/agentmemory/health is served by the Node.js worker (see header, lines 9-13),
+# not by the engine container directly.  This test stops only the engine and relies on the
+# worker propagating the engine's WebSocket disconnect into a non-200 (or connection-refused)
+# response within the 3-second curl timeout.  If the worker does not surface the disconnect
+# quickly enough, the test may produce a false pass (curl exits 0).  If that occurs, stop the
+# worker process too (kill the background node job) to guarantee a non-200.
 echo "  Stopping agentmemory-engine container..."
 docker stop agentmemory-engine >/dev/null 2>&1 || true
 sleep 2
