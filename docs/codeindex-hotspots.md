@@ -1,21 +1,21 @@
-Files with blast score ≥ 5.0  (42 found)
+Files with blast score ≥ 5.0  (44 found)
 
-    74.5  frontend/src/api/client.ts  (26d / 97t)  78 loc
-    63.0  backend/app/routers/auth.py  (2d / 122t)  213 loc
-    40.0  frontend/src/api/scanner/index.ts  (29d / 22t)  53 loc
+    75.5  frontend/src/api/client.ts  (26d / 99t)  78 loc
+    64.0  backend/app/routers/auth.py  (2d / 124t)  213 loc
+    42.0  frontend/src/api/scanner/index.ts  (31d / 22t)  53 loc
+    31.5  frontend/src/api/scanner/types.ts  (5d / 53t)  333 loc
+    31.0  backend/app/routers/scanner.py  (4d / 54t)  731 loc
     31.0  frontend/src/components/ui/Card.tsx  (21d / 20t)  44 loc
-    30.5  frontend/src/api/scanner/types.ts  (5d / 51t)  316 loc
-    30.0  backend/app/routers/scanner.py  (4d / 52t)  714 loc
-    29.0  backend/app/routers/system.py  (2d / 54t)  141 loc
-    29.0  services/tweet-monitor/app/main.py  (2d / 54t)  266 loc
+    30.0  backend/app/routers/system.py  (2d / 56t)  141 loc
     28.5  frontend/src/components/ui/Button.tsx  (21d / 15t)  66 loc
-    27.0  backend/app/routers/futures.py  (1d / 52t)  188 loc
-    26.5  frontend/src/api/scanner/configs.ts  (1d / 51t)  21 loc
-    26.5  frontend/src/api/scanner/misc.ts  (1d / 51t)  99 loc
-    26.5  frontend/src/api/scanner/results.ts  (1d / 51t)  22 loc
-    26.5  frontend/src/api/scanner/reviews.ts  (1d / 51t)  35 loc
-    26.5  frontend/src/api/scanner/runs.ts  (1d / 51t)  49 loc
-    26.5  frontend/src/api/scanner/ws.ts  (1d / 51t)  26 loc
+    28.0  backend/app/routers/futures.py  (1d / 54t)  188 loc
+    28.0  services/tweet-monitor/app/main.py  (1d / 54t)  266 loc
+    27.5  frontend/src/api/scanner/configs.ts  (1d / 53t)  21 loc
+    27.5  frontend/src/api/scanner/misc.ts  (1d / 53t)  99 loc
+    27.5  frontend/src/api/scanner/results.ts  (1d / 53t)  22 loc
+    27.5  frontend/src/api/scanner/reviews.ts  (1d / 53t)  35 loc
+    27.5  frontend/src/api/scanner/runs.ts  (1d / 53t)  49 loc
+    27.5  frontend/src/api/scanner/ws.ts  (1d / 53t)  26 loc
     23.0  frontend/src/test-utils/renderWithQuery.tsx  (23d / 0t)  29 loc
     16.0  frontend/src/api/universe.ts  (14d / 4t)  317 loc
     14.5  frontend/src/components/ui/Modal.tsx  (9d / 11t)  87 loc
@@ -24,13 +24,15 @@ Files with blast score ≥ 5.0  (42 found)
     12.5  frontend/src/api/trading.ts  (9d / 7t)  244 loc
     10.0  backend/app/main.py  (1d / 18t)  533 loc
     10.0  backend/app/routers/universe.py  (1d / 18t)  488 loc
-     9.0  backend/app/routers/auto_trading.py  (1d / 16t)  365 loc
+     9.0  backend/app/routers/auto_trading.py  (1d / 16t)  380 loc
      9.0  frontend/src/components/ui/MetricCard.tsx  (6d / 6t)  71 loc
      8.5  backend/app/routers/outcomes.py  (1d / 15t)  370 loc
      8.5  frontend/src/utils/url.ts  (3d / 11t)  36 loc
      8.0  frontend/src/hooks/useScorecard.ts  (5d / 6t)  98 loc
      8.0  frontend/src/pages/AutoTrading/components.tsx  (5d / 6t)  294 loc
      7.5  frontend/src/components/ReviewControls.tsx  (2d / 11t)  154 loc
+     7.5  frontend/src/components/TrustGateSummary.tsx  (3d / 9t)  185 loc
+     7.5  frontend/src/components/verdictConfig.ts  (2d / 11t)  13 loc
      7.5  frontend/src/hooks/useWatchlistLive.ts  (6d / 3t)  182 loc
      6.5  backend/app/routers/news.py  (1d / 11t)  137 loc
      6.5  frontend/src/api/news.ts  (2d / 9t)  46 loc

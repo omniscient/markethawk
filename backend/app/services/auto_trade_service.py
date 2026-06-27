@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Optional
@@ -69,7 +69,10 @@ class PositionCalc:
     target: float
     risk_amount_usd: float
     stop_distance: float  # $ per share from entry to stop
-    side: str = ""  # "long" or "short"; set by _size_position
+    side: str  # "long" or "short"
+    trigger_price: float = (
+        0.0  # raw price used for sizing; stored to avoid recomputation
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +143,7 @@ class AutoTradeExecutor:
                 return None
 
             # ── 11. Create AutoTradeOrder ────────────────────────────────
-            trigger_price = self._extract_trigger_price(event)
+            trigger_price = calc.trigger_price
             initial_status = (
                 "pending_approval" if strategy.requires_approval else "pending"
             )
@@ -266,7 +269,7 @@ class AutoTradeExecutor:
         self,
         event: ScannerEvent,
         strategy: TradingStrategy,
-        today,
+        today: date,
         db: Session,
     ) -> bool:
         """Step 2: one order per symbol/strategy/day.
@@ -354,7 +357,7 @@ class AutoTradeExecutor:
     def _validate_concurrency(
         self,
         strategy: TradingStrategy,
-        today,
+        today: date,
         db: Session,
     ) -> bool:
         """Steps 4+5: daily trade count and open position limits.
@@ -461,7 +464,6 @@ class AutoTradeExecutor:
             )
             return None
 
-        calc.side = side
         return calc
 
     # ── IBKR submission (live only) ──────────────────────────────────────
@@ -488,6 +490,7 @@ class AutoTradeExecutor:
             if order.risk_amount_usd
             else 0.0,
             stop_distance=0.0,  # not used by _submit_to_ibkr
+            side=order.side or "",
         )
         self._submit_to_ibkr(order, calc, db)
 
@@ -595,6 +598,8 @@ class AutoTradeExecutor:
             target=round(target, 2),
             risk_amount_usd=round(quantity * stop_distance, 2),
             stop_distance=stop_distance,
+            side=side,
+            trigger_price=trigger_price,
         )
 
     # ── Trigger price extraction ─────────────────────────────────────────
