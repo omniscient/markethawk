@@ -27,3 +27,8 @@ entries as higher-confidence than source:refine entries when the two conflict.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+## Memory Lifecycle Semantics
+
+- [PATTERN] Treat supersession and invalidation as distinct memory lifecycle transitions: invalidation ([INVALID: reason]) marks a claim as factually wrong — the tombstone stays to prevent re-addition during its TTL, with no implied successor; supersession marks a claim as once-correct but now outdated, replaced by a broader/newer entry (implicit in flat-file via R4 dedup/cap-drop; explicit in a future structured backend via a supersedes pointer and status=superseded). <!-- issue:#645 date:2026-06-27 expires:2026-12-27 source:refine -->
+- [AVOID] Do not use [INVALID] for supersession cases — [INVALID] asserts the claim was factually wrong; when the older claim was correct but has been replaced by a broader entry, use the implicit supersession path (R4 cap-drop commentary 'scope covered by newer entry') instead. Conflating the two loses the 'was this ever right?' signal that agents use when deciding whether to trust historical context. <!-- issue:#645 date:2026-06-27 expires:2026-12-27 source:refine -->
