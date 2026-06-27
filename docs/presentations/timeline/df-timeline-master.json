@@ -1,0 +1,115 @@
+{
+  "meta": {
+    "title": "The Dark Factory — Feature Timeline",
+    "subtitle": "How an autonomous code factory taught itself to refine, gate, ship, and self-heal",
+    "generated": "2026-06-26",
+    "scope_rule": "Capabilities of the autonomous factory & scheduler itself (audience: the loop / operators). MarketHawk trading-app features live in a separate timeline. Tie-breaker: in-pipeline gate wiring = Dark Factory; the data-quality-gate as a product feature = MarketHawk.",
+    "date_range": ["2026-05-02", "2026-06-26"],
+    "feature_count": 54,
+    "sources": ["git history (53 milestones)", "GitHub issues/epics (85 issues + 3 epics)"],
+    "excluded_borderline": [
+      "#491 Data Quality Trust Gate epic (incl. #501 survivorship gate) — app feature → MarketHawk timeline",
+      "#483 Signal Replay Engine epic — app backtest feature → MarketHawk timeline (only pass^k bench harness #335 counts as factory)",
+      "#258/#259 app-container non-root, #88/#97 app CI/pre-commit — app-side, the factory merely relies on them"
+    ]
+  },
+  "subsystems": {
+    "pipeline":   { "label": "Pipeline / DAG",        "color": "#ff8a3d", "key": "am" },
+    "scheduler":  { "label": "Scheduler",             "color": "#3fe0c8", "key": "cy" },
+    "gates":      { "label": "Gates",                 "color": "#54d18a", "key": "gr" },
+    "infra":      { "label": "Infra / Runtime",       "color": "#a78bfa", "key": "vi" },
+    "obs":        { "label": "Tooling / Observability","color": "#ffc08a", "key": "ams" },
+    "sdd":        { "label": "SDD / Refinement",      "color": "#ff6b6b", "key": "rd" }
+  },
+  "eras": [
+    { "id": "genesis",    "name": "Genesis",                 "span": "May 2–4",   "blurb": "The whole factory lands in one burst — spec, DAG, sandbox image, preview stacks." },
+    { "id": "autonomous", "name": "Becoming Autonomous",     "span": "May 11–14", "blurb": "Board automation, OAuth/Max billing, the backlog scheduler, and the refinement front-end give it a will of its own." },
+    { "id": "resilience", "name": "Observability & Resilience","span": "May 23 – Jun 2","blurb": "It learns to report on itself and stop shipping broken work — cost reports, Seq logs, red-CI gating, image publishing, memory." },
+    { "id": "gates",      "name": "Gate & Memory Build-out", "span": "Jun 3–14",  "blurb": "The richest era — conformance, scope, code-review, blast-radius & Trivy gates, codeindex/repowise, the scorecard, replay benchmark, and the failure-to-eval flywheel. Epics #262 and #340." },
+    { "id": "autopilot",  "name": "Self-Governing Autopilot","span": "Jun 19–26", "blurb": "The factory dispatches and unblocks itself — epic autopilot, broaden-reach, green-PR rescue, and autonomous main-red recovery. Epic #548." }
+  ],
+  "epics": [
+    { "ref": "#262", "name": "Harden the self-improvement loop", "closed": "2026-06-11", "theme": "Stop the factory poisoning itself — memory hygiene, scope-enforcement accuracy, DAG trigger-rule guards.", "children": ["#213","#215","#224","#254","#264","#275","#276"] },
+    { "ref": "#340", "name": "Measurement & hardening", "closed": "2026-06-14", "theme": "Make the factory measurable and gated — scorecard, run records, baseline-green gate, layered gate seam, replay benchmark, flywheel, dispatch ceiling, tested core, single config.", "children": ["#326","#331","#332","#333","#334","#335","#336","#337","#338","#339","#346","#360","#384"] },
+    { "ref": "#548", "name": "Platform: maintenance, telemetry & autopilot", "closed": "2026-06-26", "theme": "Ongoing upkeep plus the autopilot / auto-recovery push.", "children": ["#148","#355","#394","#571","#590","#591","#522"] }
+  ],
+  "features": [
+    { "date": "2026-05-02", "title": "Founding design spec", "refs": ["spec"], "subsystem": "infra", "significance": "foundational", "era": "genesis", "marquee": true, "one_line": "Wrote the founding spec: autonomous development in a Docker sandbox with per-issue preview environments." },
+    { "date": "2026-05-02", "title": "Archon DAG workflow", "refs": [], "subsystem": "pipeline", "significance": "foundational", "era": "genesis", "marquee": true, "one_line": "The Archon DAG that drives autonomous development end-to-end, with implement and validate phases." },
+    { "date": "2026-05-02", "title": "Sandbox image + entrypoint lifecycle", "refs": [], "subsystem": "infra", "significance": "foundational", "era": "genesis", "marquee": false, "one_line": "Built the dev-toolchain sandbox image and the entrypoint.sh lifecycle dispatch." },
+    { "date": "2026-05-02", "title": "Per-issue preview stacks", "refs": [], "subsystem": "infra", "significance": "foundational", "era": "genesis", "marquee": true, "one_line": "Per-issue preview compose template + representative seed dataset for live verification." },
+    { "date": "2026-05-02", "title": "Auto-post run report to issue", "refs": [], "subsystem": "obs", "significance": "major", "era": "genesis", "marquee": false, "one_line": "Factory posts its run report back to the originating GitHub issue." },
+    { "date": "2026-05-04", "title": "Backlog ingestion + dry-run pipeline", "refs": ["#1","#7"], "subsystem": "pipeline", "significance": "foundational", "era": "genesis", "marquee": false, "one_line": "Wired the GitHub backlog into the pipeline and proved it end-to-end with a dry run." },
+    { "date": "2026-05-04", "title": "Fetch PR review comments node", "refs": ["#18"], "subsystem": "pipeline", "significance": "major", "era": "genesis", "marquee": false, "one_line": "fetch-issue node ingests PR review comments so the factory acts on review feedback." },
+
+    { "date": "2026-05-11", "title": "Board automation + OAuth/Max billing", "refs": [], "subsystem": "infra", "significance": "major", "era": "autonomous", "marquee": true, "one_line": "Project-board automation, OAuth auth (Claude Max session billing), and continue-mode feedback." },
+    { "date": "2026-05-11", "title": "Epic → sub-issue resolution", "refs": [], "subsystem": "pipeline", "significance": "major", "era": "autonomous", "marquee": false, "one_line": "Epics are decomposed into individual sub-issues instead of one monolithic run." },
+    { "date": "2026-05-13", "title": "Backlog scheduler", "refs": ["#2"], "subsystem": "scheduler", "significance": "foundational", "era": "autonomous", "marquee": true, "one_line": "Kanban flow-controller: polling priority waterfall, board-state reads, WIP limits and dependency checks." },
+    { "date": "2026-05-13", "title": "Refinement / SDD pipeline", "refs": ["#52"], "subsystem": "sdd", "significance": "foundational", "era": "autonomous", "marquee": true, "one_line": "Multi-agent refine + plan front-end auto-refines raw backlog issues before implementation." },
+    { "date": "2026-05-14", "title": "DOCUMENT phase", "refs": ["#46"], "subsystem": "pipeline", "significance": "major", "era": "autonomous", "marquee": false, "one_line": "Implement stage gains a DOCUMENT phase so changes are documented as part of the run." },
+    { "date": "2026-05-14", "title": "Plan-pending-review gate + architect dialogue", "refs": [], "subsystem": "gates", "significance": "major", "era": "autonomous", "marquee": false, "one_line": "Plans pause for review and the architect Q&A is surfaced in issue comments." },
+
+    { "date": "2026-05-23", "title": "One-container concurrency cap", "refs": [], "subsystem": "scheduler", "significance": "hardening", "era": "resilience", "marquee": false, "one_line": "Hard-limited the factory to a single running container at a time." },
+    { "date": "2026-05-27", "title": "Per-run token cost reporting", "refs": [], "subsystem": "obs", "significance": "major", "era": "resilience", "marquee": true, "one_line": "Each run posts a token/cost report comment to its GitHub issue." },
+    { "date": "2026-05-29", "title": "GELF container logs → Seq", "refs": ["#122"], "subsystem": "obs", "significance": "major", "era": "resilience", "marquee": false, "one_line": "Ship factory container logs to Seq via GELF for centralized post-mortems." },
+    { "date": "2026-05-29", "title": "Red-CI tickets gated to Blocked", "refs": ["#133"], "subsystem": "gates", "significance": "major", "era": "resilience", "marquee": false, "one_line": "In-review tickets with red CI are automatically moved to Blocked." },
+    { "date": "2026-05-29", "title": "Collision-free preview ports", "refs": ["#124"], "subsystem": "infra", "significance": "hardening", "era": "resilience", "marquee": false, "one_line": "Dynamic non-colliding preview ports so parallel previews coexist." },
+    { "date": "2026-06-02", "title": "GHCR image publish + deploy", "refs": [], "subsystem": "infra", "significance": "major", "era": "resilience", "marquee": false, "one_line": "CI publishes baked factory/app images to GHCR and adds deploy workflows." },
+    { "date": "2026-06-02", "title": "Agent self-improvement memory", "refs": ["#149"], "subsystem": "sdd", "significance": "major", "era": "resilience", "marquee": true, "one_line": "implement/refine/plan read lessons at load and write new ones post-run." },
+    { "date": "2026-06-02", "title": "Scheduler back-off + retry guards", "refs": ["#144"], "subsystem": "scheduler", "significance": "hardening", "era": "resilience", "marquee": false, "one_line": "Bounded retries with reset so stuck tickets back off instead of looping." },
+
+    { "date": "2026-06-03", "title": "Spec-conformance verification gate", "refs": ["#162"], "subsystem": "gates", "significance": "major", "era": "gates", "marquee": true, "one_line": "Plan-vs-spec and code-vs-spec fidelity checks at the plan and code stages." },
+    { "date": "2026-06-03", "title": "Scheduler circuit-breaker", "refs": ["#160"], "subsystem": "scheduler", "significance": "major", "era": "gates", "marquee": false, "one_line": "Circuit-breaker stops infinite retry loops in the scheduler." },
+    { "date": "2026-06-03", "title": "Codeindex integration", "refs": ["#159"], "subsystem": "obs", "significance": "major", "era": "gates", "marquee": true, "one_line": "Symbol index + dependency graph wired in for lookup/impact before edits." },
+    { "date": "2026-06-04", "title": "Repowise health pilot", "refs": ["#177"], "subsystem": "obs", "significance": "major", "era": "gates", "marquee": false, "one_line": "Adopted repowise for code-health scoring and hotspot queries." },
+    { "date": "2026-06-04", "title": "Scope-enforcement gate", "refs": ["#206"], "subsystem": "gates", "significance": "major", "era": "gates", "marquee": true, "one_line": "Conformance gate flags and excises out-of-scope diffs so PRs stay tight." },
+    { "date": "2026-06-04", "title": "Auto-resolve merge conflicts", "refs": ["#210"], "subsystem": "pipeline", "significance": "major", "era": "gates", "marquee": false, "one_line": "Factory auto-detects and resolves merge conflicts on its in-review PRs." },
+    { "date": "2026-06-04", "title": "Direct-to-PR mode", "refs": ["#183"], "subsystem": "pipeline", "significance": "major", "era": "gates", "marquee": false, "one_line": "Opt-in single-gate autonomous flow for low-risk tickets." },
+    { "date": "2026-06-05", "title": "Interactive pipeline production report", "refs": ["#212"], "subsystem": "obs", "significance": "major", "era": "gates", "marquee": true, "one_line": "Interactive Dark Factory metrics/production dashboard (the pipeline report)." },
+    { "date": "2026-06-05", "title": "Dedicated code-review gate", "refs": ["#218"], "subsystem": "gates", "significance": "major", "era": "gates", "marquee": false, "one_line": "A distinct AI code-review DAG node with its own reviewer prompt and config block." },
+    { "date": "2026-06-05", "title": "docker-socket-proxy sidecar", "refs": [], "subsystem": "infra", "significance": "major", "era": "gates", "marquee": false, "one_line": "Routed factory + scheduler Docker access through a hardened socket-proxy; non-root user." },
+    { "date": "2026-06-09", "title": "Memory hygiene revamp", "refs": ["#254","#262"], "subsystem": "sdd", "significance": "major", "era": "gates", "marquee": false, "one_line": "Made factory memory less eager — stop persisting unverified lessons (epic #262)." },
+    { "date": "2026-06-11", "title": "OR-join trigger-rule guard", "refs": ["#224"], "subsystem": "pipeline", "significance": "hardening", "era": "gates", "marquee": false, "one_line": "Lint/guard OR-join trigger_rule on branch-join DAG nodes (epic #262)." },
+    { "date": "2026-06-11", "title": "Configurable WIP limit", "refs": ["#347"], "subsystem": "scheduler", "significance": "major", "era": "gates", "marquee": false, "one_line": "Concurrent-run ceiling is configurable; entrypoint mutex honors FACTORY_WIP_LIMIT." },
+    { "date": "2026-06-11", "title": "Factory scorecard dashboard", "refs": ["#331"], "subsystem": "obs", "significance": "major", "era": "gates", "marquee": true, "one_line": "Merge-rate triad, rework rate, churn, success-by-size (epic #340)." },
+    { "date": "2026-06-12", "title": "Baseline-green / main-red sentinel", "refs": ["#332"], "subsystem": "gates", "significance": "major", "era": "gates", "marquee": true, "one_line": "Smoke origin/main green before any run; a main-red sentinel pauses dispatch (epic #340)." },
+    { "date": "2026-06-12", "title": "Structured run record", "refs": ["#333"], "subsystem": "obs", "significance": "major", "era": "gates", "marquee": false, "one_line": "One structured per-run record of every stage verdict → Seq + runs.jsonl (epic #340)." },
+    { "date": "2026-06-12", "title": "Layered gate + blast-radius hard gate", "refs": ["#334"], "subsystem": "gates", "significance": "major", "era": "gates", "marquee": false, "one_line": "gate_lib.sh shared library, judge calibration, and a Phase-0 blast-radius human gate (epic #340)." },
+    { "date": "2026-06-12", "title": "Size/type-aware dispatch ceiling", "refs": ["#339"], "subsystem": "scheduler", "significance": "major", "era": "gates", "marquee": false, "one_line": "Scheduler caps concurrent dispatch by ticket size/type (epic #340)." },
+    { "date": "2026-06-12", "title": "Replay benchmark (pass^k)", "refs": ["#335"], "subsystem": "obs", "significance": "major", "era": "gates", "marquee": true, "one_line": "pass^k replay of closed issues — a regression gate for prompt/DAG/threshold changes (epic #340)." },
+    { "date": "2026-06-12", "title": "Failure-to-eval flywheel", "refs": ["#336"], "subsystem": "sdd", "significance": "major", "era": "gates", "marquee": true, "one_line": "On circuit-break the factory writes a post-mortem eval record feeding self-improvement (epic #340)." },
+    { "date": "2026-06-13", "title": "config.yaml single source of policy", "refs": ["#338"], "subsystem": "infra", "significance": "major", "era": "gates", "marquee": false, "one_line": "Consolidated dispatch ceilings + gate blocks into one config.yaml (epic #340)." },
+    { "date": "2026-06-13", "title": "Trivy blocking security gate", "refs": ["#293"], "subsystem": "gates", "significance": "major", "era": "gates", "marquee": false, "one_line": "CI image scan blocks on HIGH/CRITICAL CVEs plus a password min-length policy." },
+    { "date": "2026-06-13", "title": "Tested factory core extracted", "refs": ["#337"], "subsystem": "infra", "significance": "major", "era": "gates", "marquee": false, "one_line": "Pulled the factory core out of entrypoint/scheduler bash into testable code (epic #340)." },
+    { "date": "2026-06-14", "title": "Preview-up on remote BuildKit", "refs": ["#436"], "subsystem": "infra", "significance": "major", "era": "gates", "marquee": false, "one_line": "Rebuilt preview-up on a remote BuildKit builder + one-shot migrate service, fixing the socket-proxy 403." },
+    { "date": "2026-06-14", "title": "Revise-advisory DAG node", "refs": ["#504"], "subsystem": "pipeline", "significance": "major", "era": "gates", "marquee": false, "one_line": "Factory auto-addresses advisory code-review findings via a new DAG node." },
+    { "date": "2026-06-14", "title": "Factory pytest suite in CI", "refs": ["#346"], "subsystem": "gates", "significance": "major", "era": "gates", "marquee": false, "one_line": "The factory's own pytest suite runs in CI (epic #340)." },
+
+    { "date": "2026-06-19", "title": "Scheduler board pagination", "refs": ["#527"], "subsystem": "scheduler", "significance": "hardening", "era": "autopilot", "marquee": false, "one_line": "Paginate the project board so the scheduler sees all items, not just the first page." },
+    { "date": "2026-06-20", "title": "Epic autopilot", "refs": ["#571"], "subsystem": "scheduler", "significance": "major", "era": "autopilot", "marquee": true, "one_line": "Scheduler self-unlocks the next epic ticket — bounded and gated by an Opus review (epic #548)." },
+    { "date": "2026-06-21", "title": "Autopilot broaden-reach", "refs": ["#590"], "subsystem": "scheduler", "significance": "major", "era": "autopilot", "marquee": true, "one_line": "Autopilot drains the backlog and starts the next epic when work is starved (epic #548)." },
+    { "date": "2026-06-22", "title": "Rescue green-PR Blocked tickets", "refs": ["#607"], "subsystem": "scheduler", "significance": "major", "era": "autopilot", "marquee": false, "one_line": "Priority-0.6 rescue pass promotes circuit-broken tickets whose PR is already green to In review." },
+    { "date": "2026-06-25", "title": "Main-red autonomous recovery", "refs": ["#591"], "subsystem": "scheduler", "significance": "major", "era": "autopilot", "marquee": true, "one_line": "Autonomous pipeline recovery auto-fixes a red main (ships behind MAIN_RED_AUTOFIX_ENABLED) (epic #548)." },
+    { "date": "2026-06-26", "title": "Python 3.14 dependency unblock", "refs": ["#622"], "subsystem": "infra", "significance": "hardening", "era": "autopilot", "marquee": false, "one_line": "Bumped the scientific stack to cp314 wheels to unblock every refine/implement run." },
+    { "date": "2026-06-26", "title": "Append-only memory guard", "refs": ["#522"], "subsystem": "sdd", "significance": "hardening", "era": "autopilot", "marquee": false, "one_line": "Memory writes can no longer delete valid entries (epic #548)." }
+  ],
+  "scars": [
+    { "date": "2026-06-05", "title": "OR-join trigger_rule self-skip", "refs": ["#224"], "one_line": "Branch-merge nodes silently skipped when a sibling skipped; forced none_failed_min_one_success + a structural lint guard." },
+    { "date": "2026-06-11", "title": "E2BIG bash-node inlining", "refs": ["#250"], "one_line": "Archon inlined node output into a bash argv; fixed by reading node outputs from artifact files." },
+    { "date": "2026-06-12", "title": "classify-preview silent work-discard", "refs": ["#397"], "one_line": "An unparseable when: fail-closed-skipped, letting implement exit 0 and discard work; made it fail loudly instead." },
+    { "date": "2026-06-12", "title": "compose duplicate-key regression", "refs": ["#362"], "one_line": "Two factory PRs each adding the same compose key produced an unparseable duplicate volumes: on main." },
+    { "date": "2026-06-13", "title": "Re-merged a settled migration", "refs": ["#106"], "one_line": "Factory re-introduced schema drift a migration had already fixed; restored the orphaned regime migration." },
+    { "date": "2026-06-14", "title": "BuildKit 403 through socket-proxy", "refs": ["#436"], "one_line": "preview-up died on every implement; resolved with remote BuildKit + migrate service." },
+    { "date": "2026-06-15", "title": "Scheduler strands off-board deps", "refs": ["#389"], "one_line": "dependencies_met() stranded tickets whose dependency was closed but off-board." },
+    { "date": "2026-06-19", "title": "False main-red latch", "refs": ["#560"], "one_line": "Smoke-gate import check missing REDIS_PASSWORD falsely latched main-red and paused all dispatch." },
+    { "date": "2026-06-26", "title": "Python 3.14 dep break", "refs": ["#536","#622"], "one_line": "Base-image bump made scipy source-build with no cp314 wheel, killing every run at pip install." },
+    { "date": "2026-06-26", "title": "Memory-write data loss", "refs": ["#522"], "one_line": "Memory writes could delete valid entries; added an append-only guard." }
+  ],
+  "in_flight": [
+    { "created": "2026-06-20", "title": "entrypoint ENTRYPOINT_SOURCE_ONLY guard", "ref": "#564", "subsystem": "infra", "one_line": "Guard entrypoint sourcing + arg-check hardening." },
+    { "created": "2026-06-19", "title": "Factory-image vendored-tooling CVEs", "ref": "#531", "subsystem": "infra", "one_line": "Patch CVEs in the factory image's vendored tooling (Trivy advisory)." },
+    { "created": "2026-06-25", "title": "Hermes Agent patterns", "ref": "#609", "subsystem": "pipeline", "one_line": "Adopt persistent-daemon + profiling patterns from the Hermes Agent design." },
+    { "created": "2026-06-26", "title": "Main-red autofix follow-ups", "ref": "#611", "subsystem": "scheduler", "one_line": "Dispatch guard, observability & scope hardening for the main-red auto-fixer." },
+    { "created": "2026-06-26", "title": "Session-window-aware backoff", "ref": "#618", "subsystem": "scheduler", "one_line": "Stop circuit-breaking tickets when the Max session window is exhausted." }
+  ]
+}
