@@ -23,13 +23,11 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Seed Files
 
-- [PATTERN] Seed files in `dark-factory/seed/` are named with a two-digit prefix (`00_`, `01_`, ...) so they apply in deterministic order. `docker-compose.preview.yml` mounts `./seed:/seed:ro` and runs `for f in /seed/*.sql` — only files at the root of `dark-factory/seed/` are executed; subdirectory files are NOT run. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 - [AVOID] Seed SQL that INSERTs into `scanner_configs` must always include `universe_id` in the column list (value `1` for the default universe). The column is NOT NULL with no server default; omitting it causes a NOT NULL violation on fresh preview stacks. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 ## Diff Computation
 
-- [PATTERN] When fetching base file content to compute a formatter delta for a `main...HEAD` three-dot diff, use `git merge-base main HEAD` for the base ref, then `git show "$MERGE_BASE:{filepath}"`. Using `git show "main:{filepath}"` references main's current tip — on branches where main later updated the file, the wrong base produces false positives (feature hunk mis-classified as formatter-only) or false negatives. path:dark-factory/scripts/fmt_hunk_filter.py <!-- issue:#276 date:2026-06-11 expires:2026-12-11 source:implement -->
 
 ## Scheduler Config Pattern
 
@@ -120,3 +118,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PROVISIONAL] `/opt/archon` is installed by the `dark-factory/Dockerfile` as root (not factory user) — `factory` cannot write to it; implement Archon fixes by cloning to a writable path (`GH_TOKEN=$(gh auth token) && git clone "https://${GH_TOKEN}@github.com/omniscient/Archon.git" ~/archon-fix`), then push a branch, create an Archon PR, and update the `git checkout` hash in `dark-factory/Dockerfile`. <!-- evidence:docker-build issue:#402 date:2026-06-20 expires:2026-12-20 source:implement -->
 
 - [PROVISIONAL] In the baked-image dark factory environment (no bind-mounts), `python -m alembic revision --autogenerate` fails with `OSError: [Errno 30] Read-only file system`. Workaround: (1) write the migration file manually to `/workspace/markethawk/backend/app/alembic/versions/` with the correct `revision` and `down_revision`; (2) apply the schema change via `docker compose exec backend python -c "from app.core.database import SessionLocal; from sqlalchemy import text; db=SessionLocal(); db.execute(text('ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...')); db.execute(text(\"INSERT INTO alembic_version (version_num) VALUES ('<rev_id>') ON CONFLICT DO NOTHING\")); db.commit(); db.close()"`. The workspace file will be baked into the next image build. <!-- evidence:docker-exec issue:#387 date:2026-06-21 expires:2026-12-21 source:implement -->
+- [PATTERN] When gate_lib.sh functions delegate to a sibling Python script, use $(dirname "${BASH_SOURCE[0]}")/script.py (not $0) to construct the path — gate_lib.sh is sourced by callers, so $0 resolves to the caller's shell, not gate_lib.sh itself. <!-- issue:#648 date:2026-06-27 expires:2026-12-27 source:refine path:dark-factory/scripts/ -->
+- [PATTERN] Seed files in `dark-factory/seed/` are named with a two-digit prefix (`00_`, `01_`, ...) so they apply in deterministic order. `docker-compose.preview.yml` mounts `./seed:/seed:ro` and runs `for f in /seed/*.sql` — only files at the root of `dark-factory/seed/` are executed; subdirectory files are NOT run. <!-- issue:#207 date:2026-06-04 expires:2026-12-04 source:implement -->
+- [PATTERN] When fetching base file content to compute a formatter delta for a `main...HEAD` three-dot diff, use `git merge-base main HEAD` for the base ref, then `git show "$MERGE_BASE:{filepath}"`. Using `git show "main:{filepath}"` references main's current tip — on branches where main later updated the file, the wrong base produces false positives (feature hunk mis-classified as formatter-only) or false negatives. path:dark-factory/scripts/fmt_hunk_filter.py <!-- issue:#276 date:2026-06-11 expires:2026-12-11 source:implement -->
