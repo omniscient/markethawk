@@ -1,0 +1,17 @@
+{
+  "confidence": 0.7,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "302ceb2a6f53aec7",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "architecture",
+  "source_file": "architecture.md",
+  "summary": "Extend existing services rather than adding new Docker containers. The stack already runs postgres, redis, backend, frontend, celery-worker, celery-beat, seq, prometheus, grafana, and jaeger. Each new service adds operational overhead and a new port to document.",
+  "superseded_by": null,
+  "supersedes": []
+}

@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-05",
+      "evidence_tag": null,
+      "issue": 197,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-05",
+  "id": "1b2c4f10801e101a",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "Spread `...tsPlugin.configs['flat/recommended']` directly at the top level of the ESLint export array (v8 flat-config idiom); add custom rule overrides in a separate config block after the spread so they win.",
+  "superseded_by": null,
+  "supersedes": []
+}

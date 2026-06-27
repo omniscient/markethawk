@@ -1,0 +1,17 @@
+{
+  "confidence": 1.0,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "c32269eec6e829d2",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "Reuse API response types defined in `frontend/src/api/*.ts` rather than re-declaring interfaces in components. Type imports keep the schema as the single source of truth.",
+  "superseded_by": null,
+  "supersedes": []
+}

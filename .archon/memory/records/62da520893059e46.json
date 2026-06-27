@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-13",
+      "evidence_tag": "test-output",
+      "issue": 315,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-13",
+  "id": "62da520893059e46",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "For date-sensitive Vitest tests, isolate fake timers in a sibling `describe` block: call `vi.useFakeTimers()` + `vi.setSystemTime(new Date('YYYY-MM-DDT00:00:00.000Z'))` in `beforeEach`, and `vi.useRealTimers()` in `afterEach` \u2014 this prevents timer state from leaking into adjacent tests that use real dates.",
+  "superseded_by": null,
+  "supersedes": []
+}

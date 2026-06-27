@@ -1,0 +1,17 @@
+{
+  "confidence": 1.0,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "f26d380a2ad9ad1a",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "New routes are registered in `frontend/src/App.tsx` using React Router `<Route>` elements. Match the existing pattern of lazy-loaded page components (`React.lazy` + `Suspense`).",
+  "superseded_by": null,
+  "supersedes": []
+}

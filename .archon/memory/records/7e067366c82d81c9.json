@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-03",
+      "evidence_tag": null,
+      "issue": 159,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-03",
+  "id": "7e067366c82d81c9",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Register a project-scoped MCP server in `entrypoint.sh` by writing the cloned repo's `.claude/settings.local.json` (gitignored) with the tool's absolute path: `$(which codeindex)`. Never rely on `\"command\": \"codeindex\"` \u2014 Claude Code does not inherit the shell PATH and will fail to launch the server.",
+  "superseded_by": null,
+  "supersedes": []
+}

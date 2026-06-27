@@ -1,0 +1,17 @@
+{
+  "confidence": 1.0,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "7310a12e0449f9ef",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "Use React Query (`useQuery` / `useMutation`) for all server state \u2014 never `useState` + `useEffect` + `fetch`. The existing query client is configured in `frontend/src/main.tsx`.",
+  "superseded_by": null,
+  "supersedes": []
+}

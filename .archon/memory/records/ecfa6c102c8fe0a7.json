@@ -1,0 +1,17 @@
+{
+  "confidence": 0.7,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "ecfa6c102c8fe0a7",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "architecture",
+  "source_file": "architecture.md",
+  "summary": "Do not store agent memory in CLAUDE.md \u2014 that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation.",
+  "superseded_by": null,
+  "supersedes": []
+}

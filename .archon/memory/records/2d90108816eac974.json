@@ -1,0 +1,26 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-10",
+      "evidence_tag": null,
+      "issue": 250,
+      "source": "conformance"
+    }
+  ],
+  "expires_at": "2026-12-10",
+  "id": "2d90108816eac974",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [
+    "frontend/src/"
+  ],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "Do not rely on spec line-count yield estimates to predict which priority files will be sufficient for a coverage ratchet \u2014 with `all: true` and a large untested denominator, actual coverage yield per file can be 30\u201340% lower than estimated; always run `npx vitest run --coverage` after each batch and continue past the spec's priority list per D1 until the gate clears.",
+  "superseded_by": null,
+  "supersedes": []
+}

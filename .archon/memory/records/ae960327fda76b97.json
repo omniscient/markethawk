@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-12",
+      "evidence_tag": "docker-compose-yml",
+      "issue": 90,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-12",
+  "id": "ae960327fda76b97",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "For standalone sidecar services (not reusing the backend image), place the Dockerfile at `docker/Dockerfile.<service>` and set `build: context: .` in `docker-compose.yml` so `COPY scripts/<file>` can reach files from the repo root; use a separate named `docker/` directory rather than placing service Dockerfiles at the project root.",
+  "superseded_by": null,
+  "supersedes": []
+}

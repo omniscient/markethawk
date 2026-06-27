@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-13",
+      "evidence_tag": "ci-publish-yml",
+      "issue": 261,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-13",
+  "id": "a5c740c481ddd8d7",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "When a `dark-factory/Dockerfile` layer change (e.g. user/group creation) risks being silently skipped by GitHub CI's Docker layer cache, temporarily add `no-cache: true` to the `build-push-action@v6` `with:` block in `.github/workflows/ci-publish.yml`'s `build-dark-factory` job, then revert after smoke tests confirm the layer executed (`whoami` returns `factory` not `root`).",
+  "superseded_by": null,
+  "supersedes": []
+}

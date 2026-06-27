@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-11",
+      "evidence_tag": null,
+      "issue": 250,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-11",
+  "id": "00ecbe4f5c22a011",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "codebase",
+  "source_file": "codebase-patterns.md",
+  "summary": "Use `git diff origin/main HEAD -- <file>` (two-dot) to test whether a file is truly out-of-scope relative to main \u2014 if empty, main already carries the same content. The three-dot form (`git diff origin/main...HEAD`) includes commits that main merged independently after the branch diverged, producing false-positive OOS hits on files that are net-identical to main.",
+  "superseded_by": null,
+  "supersedes": []
+}

@@ -1,0 +1,17 @@
+{
+  "confidence": 0.7,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "fc4afa5332755d50",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "architecture",
+  "source_file": "architecture.md",
+  "summary": "Do not introduce Redis for durable state \u2014 Redis is volatile (data lost on flush/restart) and not committed to git history. Reserve Redis for ephemeral queues and rate-limit counters only.",
+  "superseded_by": null,
+  "supersedes": []
+}

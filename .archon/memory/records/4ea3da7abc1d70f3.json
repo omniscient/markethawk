@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-20",
+      "evidence_tag": null,
+      "issue": 429,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-20",
+  "id": "4ea3da7abc1d70f3",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "When catching `requests.HTTPError` in a module where tests patch the entire `requests` module (via `patch(\"module.requests\")`), import the exception class directly \u2014 `from requests.exceptions import HTTPError as _RequestsHTTPError` \u2014 and use `_RequestsHTTPError` in the `except` clause. Patching `requests` replaces the module object, so `except requests.HTTPError` evaluates to a MagicMock and raises `TypeError: catching classes that do not inherit from BaseException` when any exception is raised in the try block. See `backend/tests/utils/pg_discovery.py`.",
+  "superseded_by": null,
+  "supersedes": []
+}

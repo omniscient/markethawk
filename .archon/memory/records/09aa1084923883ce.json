@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-14",
+      "evidence_tag": null,
+      "issue": 421,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-14",
+  "id": "09aa1084923883ce",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "`dedupe_oos.py` classifies each `[OOS]` conformance finding as one of three actions: `create` (no existing match \u2192 file a new scope ticket), `comment:<n>` (an open issue `<n>` already carries a matching embedded `<!-- dedup-key: <file/area>|<finding-type> -->` \u2192 post a comment instead of a duplicate ticket), or `suppress` (ruff/reformat-class noise or a within-run duplicate \u2192 drop silently). The dedup-key is `<file-or-area lowercased>|<finding-type>`; cross-run dedup matches it against `<!-- dedup-key: \u2026 -->` markers in open issue bodies, so every auto-filed scope ticket must embed its own dedup-key for later runs to find it. This replaces the older \"one ticket per finding\" behaviour. path:dark-factory/scripts/dedupe_oos.py",
+  "superseded_by": null,
+  "supersedes": []
+}

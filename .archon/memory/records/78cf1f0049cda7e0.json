@@ -1,0 +1,17 @@
+{
+  "confidence": 0.7,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "78cf1f0049cda7e0",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "architecture",
+  "source_file": "architecture.md",
+  "summary": "Use PostgreSQL for all durable application state \u2014 scanner events, memory, configs. The existing `AsyncSession` infrastructure handles connection pooling, migrations, and transactional safety.",
+  "superseded_by": null,
+  "supersedes": []
+}

@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-03",
+      "evidence_tag": null,
+      "issue": 162,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-03",
+  "id": "835645b56337b075",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "`.archon/commands/` files are read from the cloned repo at runtime (live \u2014 no image rebuild needed). `.claude/skills/refinement/` files are COPYed into the image as `/opt/refinement-skills/` at build time (requires `docker compose --profile factory build dark-factory` to pick up changes). New prompt files for pipeline agents go in `.claude/skills/refinement/`.",
+  "superseded_by": null,
+  "supersedes": []
+}

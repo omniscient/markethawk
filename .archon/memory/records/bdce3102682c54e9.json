@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-11",
+      "evidence_tag": null,
+      "issue": 299,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-11",
+  "id": "bdce3102682c54e9",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Never use a simple hex-sequence like `a1b2c3d4e5f6` as an Alembic revision ID \u2014 the existing migration set contains files with IDs following this pattern and conflicts will produce a `CycleDetected` error. Use `python -m alembic revision -m \"...\"` to generate a unique ID, or pick a random 12-char alphanumeric string that doesn't appear in `ls backend/app/alembic/versions/` output.",
+  "superseded_by": null,
+  "supersedes": []
+}

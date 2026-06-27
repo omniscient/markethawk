@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-27",
+      "evidence_tag": null,
+      "issue": 631,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-27",
+  "id": "cab914e289d24c89",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "Never raise `HTTPException` from a service module (`app/services/`) \u2014 services have no HTTP context and become untestable without FastAPI. Raise domain exceptions (`UniverseValidationError`, `UniverseNotFoundError`, etc.) and convert to `HTTPException` in the router handler (`except UniverseValidationError as e: raise HTTPException(400, detail=str(e))`). `starlette.responses` types (e.g. `StreamingResponse`) are acceptable in services since they are data-format, not control-flow, concerns.",
+  "superseded_by": null,
+  "supersedes": []
+}
