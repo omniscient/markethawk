@@ -54,14 +54,14 @@ class MemoryRecord:
     scope: str
     path_prefixes: List[str]
     summary: str
-    rationale: None
+    rationale: Optional[str]
     evidence: List[dict]
     confidence: float
     expires_at: Optional[str]
     retrieval_count: int
-    last_used_at: None
+    last_used_at: Optional[str]
     supersedes: List[str]
-    superseded_by: None
+    superseded_by: Optional[str]
     source_file: str
 
     def as_dict(self) -> dict:
@@ -159,7 +159,10 @@ def _build_evidence(tags: dict) -> List[dict]:
 
     result = []
     for i, issue_ref in enumerate(issues):
-        issue_num = int(issue_ref.lstrip("#"))
+        try:
+            issue_num = int(issue_ref.lstrip("#"))
+        except (ValueError, AttributeError):
+            issue_num = None
         date_val = dates[i] if i < len(dates) else (dates[0] if dates else None)
         result.append(
             {
@@ -169,6 +172,19 @@ def _build_evidence(tags: dict) -> List[dict]:
                 "evidence_tag": evidence_tag_map.get(i),
             }
         )
+
+    # Entries without any issue: tag — emit one evidence object from source/date
+    if not issues and (source or dates):
+        date_val = dates[0] if dates else None
+        result.append(
+            {
+                "issue": None,
+                "source": source,
+                "date": date_val,
+                "evidence_tag": evidence_tag_map.get(0),
+            }
+        )
+
     return result
 
 
@@ -350,13 +366,14 @@ def run_import(memory_dir: Path, dry_run: bool = False) -> dict:
         per_file[source_file] = counts
         all_records.extend(file_records)
 
-    update_index(all_records, index_path, dry_run)
+    index_appended = update_index(all_records, index_path, dry_run)
 
     totals = {
         "total": sum(c["entries"] for c in per_file.values()),
         "created": sum(c["created"] for c in per_file.values()),
         "skipped": sum(c["skipped"] for c in per_file.values()),
         "failed": sum(c["failed"] for c in per_file.values()),
+        "index_appended": index_appended,
     }
 
     return {"per_file": per_file, "totals": totals, "records": all_records}
@@ -380,18 +397,20 @@ def _print_report(result: dict, memory_dir: Path, dry_run: bool) -> None:
         skipped = counts["skipped"]
         failed = counts["failed"]
         if dry_run:
-            suffix = f"{entries} would-be-created"
+            suffix = f"{created} would-be-created, {skipped} already-exist, {failed} failed"
         else:
             suffix = f"{created} created, {skipped} skipped, {failed} failed"
         print(f"  {source_file:<30} {entries} entries → {suffix}")
 
     t = result["totals"]
+    index_verb = "would-append" if dry_run else "appended"
     print()
     print(
         f"  Total: {t['total']} entries"
         f" | created: {t['created']}"
         f" | skipped: {t['skipped']}"
         f" | failed: {t['failed']}"
+        f" | index {index_verb}: {t['index_appended']}"
     )
 
 
