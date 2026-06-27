@@ -290,8 +290,11 @@ def test_integration_dry_run_real_memory():
             f"{name} was modified during dry-run — should never happen"
         )
 
-    # No records directory created (dry run)
+    # No NEW record files written during dry run (records dir may already exist from prior runs)
     records_dir = memory_dir / "records"
-    assert not records_dir.exists() or not any(records_dir.iterdir()), (
-        "Record files were written during dry-run!"
+    records_before = set(records_dir.glob("*.json")) if records_dir.exists() else set()
+    result2 = mi.run_import(memory_dir, dry_run=True)
+    records_after = set(records_dir.glob("*.json")) if records_dir.exists() else set()
+    assert records_before == records_after, (
+        f"Record files were written during dry-run! New files: {records_after - records_before}"
     )
