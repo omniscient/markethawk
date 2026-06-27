@@ -167,3 +167,4 @@ Wire the MCP server in `.claude/settings.local.json` (see eval doc) to use `get_
 - **Triage labels** — five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
 - **Domain docs** — single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 - **Architecture review** — `/architecture-review` regenerates the comparable Architecture & Quality report series in `docs/architecture-reviews/` (frozen 16-dimension rubric + DORA + code-health sections). See `.claude/skills/architecture-review/SKILL.md`.
+- **Memory contract** — stable schema, lifecycle rules, and scoping matrix for `.archon/memory/*.md`. See `docs/agents/dark-factory-memory-contract.md`.
