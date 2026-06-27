@@ -15,7 +15,7 @@ from app.core.rate_limits import SCANNER_LIMIT, limiter
 from app.models.stock_universe import StockUniverse
 from app.schemas.data_quality import GateRequest
 from app.schemas.quality_gate import QualityGateAssessment
-from app.services.quality_gate import QualityGateService
+from app.services.quality_gate import quality_gate_service
 from app.utils.db import get_or_404
 
 router = APIRouter(prefix="/api/v1/data-quality", tags=["data-quality"])
@@ -30,4 +30,4 @@ def preflight_gate(
 ) -> QualityGateAssessment:
     """Return a trust assessment for a universe before running a workflow."""
     get_or_404(db, StockUniverse, body.universe_id, "Universe")
-    return QualityGateService.assess(db, body)
+    return quality_gate_service.assess(db, body)

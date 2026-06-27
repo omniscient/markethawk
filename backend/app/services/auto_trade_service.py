@@ -38,7 +38,7 @@ from app.models.scanner_run import ScannerRun
 from app.models.system_config import SystemConfig
 from app.models.trading_strategy import TradingStrategy
 from app.schemas.quality_gate import QualityGatePolicy
-from app.services.quality_gate import QualityGateService
+from app.services.quality_gate import quality_gate_service
 from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -186,7 +186,7 @@ class AutoTradeExecutor:
                 ticker=event.ticker,
                 requirements=None,
             )
-            assessment = QualityGateService.assess(db, _gate_req)
+            assessment = quality_gate_service.assess(db, _gate_req)
         except Exception as exc:
             logger.warning(
                 "quality_gate_service_error: ticker=%s event=%s rule=%s error=%s"

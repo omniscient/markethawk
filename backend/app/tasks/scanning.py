@@ -13,7 +13,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 from app.models.monitored_stock import MonitoredStock
-from app.services.quality_gate import QualityGateService
+from app.services.quality_gate import quality_gate_service
 from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -309,7 +309,7 @@ def _run_universe_scan_logic(
             ticker=None,
             requirements=None,
         )
-        _assessment = QualityGateService.assess(db, _gate_req)
+        _assessment = quality_gate_service.assess(db, _gate_req)
         run.quality_gate = json.loads(json.dumps(_assessment.model_dump(), default=str))
         gate_metadata = {
             "tier": _assessment.verdict.value,

@@ -28,7 +28,7 @@ from app.services.auto_trade_service import (
 # ── Quality-gate patch target ──────────────────────────────────────────────────
 # QualityGateService is imported into auto_trade_service's module namespace;
 # patch via the service module attribute so all tests can override it cleanly.
-GATE_PATCH = "app.services.auto_trade_service.QualityGateService.assess"
+GATE_PATCH = "app.services.auto_trade_service.quality_gate_service.assess"
 
 
 def _gate_assessment(verdict_str: str):
