@@ -1,0 +1,17 @@
+{
+  "confidence": 1.0,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "699856a5945f6d67",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "Pages (route-level views) live in `frontend/src/pages/`. Reusable UI pieces live in `frontend/src/components/`. A component that is only used by one page can live in a `components/` subdirectory named after the page.",
+  "superseded_by": null,
+  "supersedes": []
+}

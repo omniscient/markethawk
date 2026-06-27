@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-20",
+      "evidence_tag": "docker-build",
+      "issue": 402,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-20",
+  "id": "ccb7918af2cd5b7a",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "`/opt/archon` is installed by the `dark-factory/Dockerfile` as root (not factory user) \u2014 `factory` cannot write to it; implement Archon fixes by cloning to a writable path (`GH_TOKEN=$(gh auth token) && git clone \"https://${GH_TOKEN}@github.com/omniscient/Archon.git\" ~/archon-fix`), then push a branch, create an Archon PR, and update the `git checkout` hash in `dark-factory/Dockerfile`.",
+  "superseded_by": null,
+  "supersedes": []
+}

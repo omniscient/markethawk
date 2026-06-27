@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-10",
+      "evidence_tag": null,
+      "issue": 264,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-10",
+  "id": "5039d7e18cd1d5a9",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "`codeindex symbols . --inline` embeds all symbols into `codeindex.json` rather than producing a standalone file \u2014 use `codeindex symbols . --output symbolindex.json` to write the symbol index as a separate `symbolindex.json` artifact.",
+  "superseded_by": null,
+  "supersedes": []
+}

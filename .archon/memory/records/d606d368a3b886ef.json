@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-14",
+      "evidence_tag": null,
+      "issue": 436,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-14",
+  "id": "d606d368a3b886ef",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "The preview `migrate` service must override the backend entrypoint (`entrypoint: [\"python\",\"-m\",\"alembic\",\"upgrade\",\"head\"]`) because `backend/entrypoint.sh` runs `alembic check` under `set -e` and fails on an unmigrated DB. `backend` and `celery-worker` must declare `depends_on: { migrate: { condition: service_completed_successfully } }` to avoid crash-looping before the schema exists.",
+  "superseded_by": null,
+  "supersedes": []
+}

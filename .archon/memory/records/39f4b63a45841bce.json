@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-11",
+      "evidence_tag": null,
+      "issue": 224,
+      "source": "conformance"
+    }
+  ],
+  "expires_at": "2026-12-11",
+  "id": "39f4b63a45841bce",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Every OR-join node in `archon-dark-factory.yaml` \u2014 a node whose `depends_on` list contains mutually-exclusive upstream branches (one is always skipped per intent) \u2014 must declare `trigger_rule: none_failed_min_one_success` (or `one_success`). The default `all_success` treats a skipped upstream as non-success and silently skips the join and all its descendants. The four known OR-join nodes (`validate`, `de-conflict`, `status-in-review`, `report`) are enumerated in `REQUIRED_OR_JOIN_NODES` in `dark-factory/scripts/check_workflow_dag.py`; when adding a new OR-join, add its ID there too. A sync tripwire (count of trigger_rule-bearing nodes must equal `len(REQUIRED_OR_JOIN_NODES)`) fires with an \"update REQUIRED_OR_JOIN_NODES\" prompt if the count drifts.",
+  "superseded_by": null,
+  "supersedes": []
+}

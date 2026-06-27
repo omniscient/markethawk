@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-06",
+      "evidence_tag": null,
+      "issue": 198,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-06",
+  "id": "33b1ae38f602c8ec",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "Do not use `screen.getAllByRole('button')[0]` in tests \u2014 it couples to DOM order and silently targets the wrong button when the component adds new ones. Use `getByRole('button', { name: /label/i })` to target by accessible name.",
+  "superseded_by": null,
+  "supersedes": []
+}

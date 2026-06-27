@@ -1,0 +1,26 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-13",
+      "evidence_tag": null,
+      "issue": 381,
+      "source": "conformance"
+    }
+  ],
+  "expires_at": "2026-12-13",
+  "id": "dc4bd3e9d2c3f826",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [
+    "frontend/src/utils/"
+  ],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "`allowedHosts` matching in `safeExternalUrl` must use exact-host-or-subdomain logic (`host === h || host.endsWith('.' + h)`), not `Array.includes(hostname)`, which is exact-match only and silently drops subdomain support the spec requires (e.g. `mobile.twitter.com` would be rejected despite `twitter.com` being in the allowlist).",
+  "superseded_by": null,
+  "supersedes": []
+}

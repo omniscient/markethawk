@@ -1,0 +1,26 @@
+{
+  "confidence": 0.7,
+  "evidence": [
+    {
+      "date": "2026-06-13",
+      "evidence_tag": null,
+      "issue": 360,
+      "source": "code-review"
+    }
+  ],
+  "expires_at": "2026-12-13",
+  "id": "d9c0e66239c5b804",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [
+    "backend/tests/utils/"
+  ],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "codebase",
+  "source_file": "codebase-patterns.md",
+  "summary": "The probe falls back to well-known host `stockscanner-db` with database `stockscanner` \u2014 the actual dev/live stack (confirmed in docker-compose.yml). `db_engine` (session scope) calls `Base.metadata.create_all()` and `Base.metadata.drop_all()` on whatever URL the probe returns, so a test run in an environment where the real DB is reachable will DROP production/dev tables. Fix: restrict the probe to test-only databases (require a `TEST_DATABASE_URL` or a `_test`-suffixed dbname), or never run `drop_all`/`create_all` against a discovered (non-testcontainers) DB; at minimum exclude the live `stockscanner` db/host from `common_creds`/hostnames.",
+  "superseded_by": null,
+  "supersedes": []
+}

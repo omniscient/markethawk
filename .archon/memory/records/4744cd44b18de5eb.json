@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-05",
+      "evidence_tag": null,
+      "issue": 193,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-05",
+  "id": "4744cd44b18de5eb",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "`frontend/tsconfig.json` must have an `\"exclude\"` array covering `**/*.test.ts`, `**/*.test.tsx`, `src/test-utils`, and `src/test-setup.ts` so test files are never compiled by the production `tsc --noEmit` gate.",
+  "superseded_by": null,
+  "supersedes": []
+}

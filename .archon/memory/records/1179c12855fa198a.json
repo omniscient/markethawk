@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-12",
+      "evidence_tag": null,
+      "issue": 291,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-12",
+  "id": "1179c12855fa198a",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "Never use `joinedload()` with paginated queries (`LIMIT/OFFSET`) on one-to-many relationships \u2014 it produces a JOIN that row-multiplies the parent before LIMIT is applied, so paginated pages return fewer rows than `limit` when children exist. Use `selectinload()` instead, which issues a separate `SELECT \u2026 WHERE id IN (\u2026)` after the paginated parent query. See `routers/scanner.py` `joinedload(ScannerEvent.reviews)` \u2192 `selectinload` fix.",
+  "superseded_by": null,
+  "supersedes": []
+}

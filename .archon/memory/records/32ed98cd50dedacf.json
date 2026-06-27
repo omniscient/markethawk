@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-11",
+      "evidence_tag": "curl-response",
+      "issue": 287,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-11",
+  "id": "32ed98cd50dedacf",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "When `.env` is absent, retrieve the running postgres password via `curl -s \"http://docker-socket-proxy:2375/v1.54/containers/stockscanner-db/json\" | python3 -c \"import json,sys; [print(e) for e in json.load(sys.stdin)['Config']['Env'] if 'PASSWORD' in e]\"`.",
+  "superseded_by": null,
+  "supersedes": []
+}

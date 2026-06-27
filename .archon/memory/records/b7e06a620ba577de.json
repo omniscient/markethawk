@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-15",
+      "evidence_tag": null,
+      "issue": 389,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-15",
+  "id": "b7e06a620ba577de",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "In `test_scheduler.sh`, `$STUB_LOG` captures only calls to stubbed external commands (`gh`, `docker`, `set_board_status`). Scheduler functions that emit log lines via `echo` write to stdout \u2014 to assert on these in a test, capture the function's output with `_OUTPUT=$(fn_name args 2>&1) && _RET=0 || _RET=1` and grep `$_OUTPUT`, not `$STUB_LOG`.",
+  "superseded_by": null,
+  "supersedes": []
+}

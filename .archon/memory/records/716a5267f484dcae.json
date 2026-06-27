@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-14",
+      "evidence_tag": null,
+      "issue": 403,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-14",
+  "id": "716a5267f484dcae",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Archon's `when:` parser supports simple equality (`$node.output == 'value'`), same-operator chains (`$a == 'x' && $b == 'y'`), but NOT parentheses or mixed `&&`/`||`. CI enforces this via `dark-factory/scripts/check_workflow_when.py` (called from the \"Validate Archon workflow YAML\" step in `.github/workflows/ci.yml`). Adding `(` `)` or mixing `&&` with `||` will fail CI.",
+  "superseded_by": null,
+  "supersedes": []
+}

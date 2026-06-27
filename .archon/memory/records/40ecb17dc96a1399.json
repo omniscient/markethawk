@@ -1,0 +1,26 @@
+{
+  "confidence": 0.7,
+  "evidence": [
+    {
+      "date": "2026-06-15",
+      "evidence_tag": null,
+      "issue": 391,
+      "source": "code-review"
+    }
+  ],
+  "expires_at": "2026-12-15",
+  "id": "40ecb17dc96a1399",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [
+    "prometheus/"
+  ],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "codebase",
+  "source_file": "codebase-patterns.md",
+  "summary": "`PreMarketScanMissedSlot` joins on `markethawk_run_frequency_seconds` which is never exported; export that gauge (or drop the join and threshold on absolute staleness) or the alert can never fire.",
+  "superseded_by": null,
+  "supersedes": []
+}

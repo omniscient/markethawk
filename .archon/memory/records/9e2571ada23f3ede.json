@@ -1,0 +1,26 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-12",
+      "evidence_tag": null,
+      "issue": 334,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-12",
+  "id": "9e2571ada23f3ede",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [
+    ".archon/commands/"
+  ],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Gate commands (conformance, code-review, validate) that need `route_memory_file()`, `write_memory_entry()`, or `emit_verdict()` must source `dark-factory/scripts/gate_lib.sh` at Phase 1 LOAD: `REPO_ROOT=$(git rev-parse --show-toplevel); source \"${REPO_ROOT}/dark-factory/scripts/gate_lib.sh\"`. Do NOT add `set -euo pipefail` in gate_lib.sh \u2014 it is sourced, not executed, and strictness in the library would abort the caller on any non-zero grep/awk.",
+  "superseded_by": null,
+  "supersedes": []
+}

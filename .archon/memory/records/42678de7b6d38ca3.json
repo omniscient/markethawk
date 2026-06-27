@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-21",
+      "evidence_tag": "docker-exec",
+      "issue": 387,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-21",
+  "id": "42678de7b6d38ca3",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "In the baked-image dark factory environment (no bind-mounts), `python -m alembic revision --autogenerate` fails with `OSError: [Errno 30] Read-only file system`. Workaround: (1) write the migration file manually to `/workspace/markethawk/backend/app/alembic/versions/` with the correct `revision` and `down_revision`; (2) apply the schema change via `docker compose exec backend python -c \"from app.core.database import SessionLocal; from sqlalchemy import text; db=SessionLocal(); db.execute(text('ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...')); db.execute(text(\\\"INSERT INTO alembic_version (version_num) VALUES ('<rev_id>') ON CONFLICT DO NOTHING\\\")); db.commit(); db.close()\"`. The workspace file will be baked into the next image build.",
+  "superseded_by": null,
+  "supersedes": []
+}

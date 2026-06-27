@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-14",
+      "evidence_tag": null,
+      "issue": 436,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-14",
+  "id": "884303dde134c3c7",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Preview builds in the factory must use `docker buildx build --builder remote tcp://buildkit:1234 --load` (not `compose up --build`). BuildKit's gRPC build session needs an HTTP connection-hijack that the HAProxy `docker-socket-proxy` cannot forward (\u2192 403 on any `--build` over the proxy). A dedicated `moby/buildkit` sidecar on `factory-network` exposed over plain TCP is the only proxy-compatible build path. `--load` imports via `POST /images/load` (allowed: `POST:1 IMAGES:1`).",
+  "superseded_by": null,
+  "supersedes": []
+}

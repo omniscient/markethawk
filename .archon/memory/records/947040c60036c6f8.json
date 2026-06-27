@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-05",
+      "evidence_tag": null,
+      "issue": 197,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-05",
+  "id": "947040c60036c6f8",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "When fixing `eslint.config.js` to enforce warning-level rules that produce many pre-existing warnings, update the pre-commit hook in `.pre-commit-config.yaml` to use `npx eslint . --report-unused-disable-directives-severity error` (errors only) rather than `npm run lint` \u2014 otherwise the hook blocks all commits until every warning is cleaned up.",
+  "superseded_by": null,
+  "supersedes": []
+}
