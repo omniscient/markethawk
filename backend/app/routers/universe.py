@@ -341,6 +341,8 @@ def export_universe_aggregates(
         return universe_export.export_aggregates(universe_id, request, db)
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
+    except UniverseValidationError as e:
+        raise HTTPException(status_code=400, detail=e.args[0])
 
 
 @router.get("/{universe_id}/stocks", response_model=List[MonitoredStockResponse])
@@ -484,4 +486,4 @@ def trigger_normalization(
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
     except UniverseValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=e.args[0])
