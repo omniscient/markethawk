@@ -27,3 +27,9 @@ entries as higher-confidence than source:refine entries when the two conflict.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+
+## Dark Factory Memory Retrieval (issue #646)
+
+- [PATTERN] memory_retrieve.py is flat-file only: no agentmemory library, no HTTP client, no vector DB. Two-layer filter: (1) file selection by area+phase, (2) entry-level filter on source:/agent_id + path: tag + status. When index.jsonl (#649) is present, use it for Layer 2 and ranking (path specificity > recency); when absent, scan .archon/memory/*.md with same logic. <!-- issue:#646 date:2026-06-27 expires:2026-12-27 source:refine -->
+- [AVOID] Do not use the agentmemory Python library for Dark Factory memory retrieval — no agentmemory backend exists or is planned (#644 spike verdict). The structured memory store is index.jsonl (produced by memory_import.py from #649) consumed directly via stdlib file reads. <!-- issue:#646 date:2026-06-27 expires:2026-12-27 source:refine -->
+- [PATTERN] Phase→source mapping for memory role-segregation: refine→source:refine, plan→source:refine (plans consume design decisions), implement→source:implement, validate→source:conformance, review→source:code-review. Entries in codebase-patterns.md and architecture.md are global and pass unconditionally regardless of source. Area-specific files (backend-patterns.md, frontend-patterns.md, dark-factory-ops.md) apply the source filter fully. <!-- issue:#646 date:2026-06-27 expires:2026-12-27 source:refine -->
