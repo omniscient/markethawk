@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi.responses import StreamingResponse
+from starlette.responses import StreamingResponse
 
 
 def _make_db(universe_obj=None):
