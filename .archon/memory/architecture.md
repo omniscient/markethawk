@@ -27,3 +27,5 @@ entries as higher-confidence than source:refine entries when the two conflict.
      Do not rely on these as authoritative guidance. They are excluded from
      plan/implement prompt injection except as advisory context.
      Each will be promoted to [PATTERN] on second-run confirmation (different issue number) or dropped at TTL. -->
+- [PATTERN] For one-shot spike/evaluation runs, install third-party tools to a non-PATH path inside $ARTIFACTS_DIR (throwaway venv or --target dir) so no agent config files (~/.claude, settings.local.json) are mutated; the container's --rm flag makes the install ephemeral. This is distinct from adopted tools like Repowise that use a persistent ~/.venvs/ venv for repeated cross-session use. <!-- issue:#675 date:2026-06-28 expires:2026-12-28 source:refine -->
+- [AVOID] Do not install a spike/evaluation tool to a persistent venv (e.g. ~/.venvs/<tool>/) -- persistent install implies adoption, which spikes explicitly defer. Use $ARTIFACTS_DIR for the install path so the evaluation artifacts and the install are co-located and ephemeral. <!-- issue:#675 date:2026-06-28 expires:2026-12-28 source:refine -->
