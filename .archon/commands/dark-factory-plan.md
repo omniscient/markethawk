@@ -31,13 +31,25 @@ Implementation belongs to the `Fix issue #N` workflow on a `feat/issue-N-*` bran
 ```bash
 AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
 
-# load_memory: reads a memory file; path-tagged entries are filtered against AFFECTED.
-# Entries without a path: tag are always included (backward-compatible).
+REPO_ROOT=$(git rev-parse --show-toplevel)
+source "${REPO_ROOT}/dark-factory/scripts/agent_roles.sh"
+AGENT_ID="${AGENT_ID_PLANNING}"
+
+# load_memory: reads a memory file; project-tagged entries for other projects are excluded;
+# path-tagged entries are filtered against AFFECTED; entries with neither tag are always included.
 # When AFFECTED is empty (new branch, spec not yet implemented), all entries are included.
 load_memory() {
   local MEMFILE=".archon/memory/$1"
   [ -f "$MEMFILE" ] || return
   while IFS= read -r line; do
+    # Project filter: skip entries tagged for a different project.
+    # Entries without any project: tag are always included (legacy backward compat).
+    if echo "$line" | grep -q 'project:'; then
+      if ! echo "$line" | grep -q "project:${MEMORY_PROJECT}"; then
+        continue
+      fi
+    fi
+    # Path filter: existing behavior unchanged.
     if echo "$line" | grep -q 'path:'; then
       PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
       if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then

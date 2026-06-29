@@ -31,14 +31,25 @@ Read the project rules:
 ```bash
 AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
 
-# load_memory: reads a memory file, including entries without a path: tag unconditionally,
-# and path-tagged entries only when their prefix matches an affected file.
-# Uses sed (POSIX) for tag extraction and grep -q "^PREFIX" for prefix matching.
+REPO_ROOT=$(git rev-parse --show-toplevel)
+source "${REPO_ROOT}/dark-factory/scripts/agent_roles.sh"
+AGENT_ID="${AGENT_ID_IMPLEMENTATION}"
+
+# load_memory: reads a memory file; project-tagged entries for other projects are excluded;
+# path-tagged entries are filtered against AFFECTED; entries with neither tag are always included.
 # When AFFECTED is empty (new branch), all path-tagged entries are included.
 load_memory() {
   local MEMFILE=".archon/memory/$1"
   [ -f "$MEMFILE" ] || return
   while IFS= read -r line; do
+    # Project filter: skip entries tagged for a different project.
+    # Entries without any project: tag are always included (legacy backward compat).
+    if echo "$line" | grep -q 'project:'; then
+      if ! echo "$line" | grep -q "project:${MEMORY_PROJECT}"; then
+        continue
+      fi
+    fi
+    # Path filter: existing behavior unchanged.
     if echo "$line" | grep -q 'path:'; then
       PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
       if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then

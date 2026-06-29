@@ -14,6 +14,7 @@ argument-hint: (no arguments - reads issue context from workflow)
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)
 source "${REPO_ROOT}/dark-factory/scripts/gate_lib.sh"
+AGENT_ID="${AGENT_ID_DECONFLICT}"
 ```
 
 1. Read `.claude/skills/refinement/config.yaml` and extract the `conformance` block.

@@ -39,13 +39,25 @@ Do NOT create or modify any other files. Do NOT implement code, write tests, or 
 ```bash
 AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
 
-# load_memory: reads a memory file; path-tagged entries are filtered against AFFECTED.
-# Entries without a path: tag are always included (backward-compatible).
+REPO_ROOT=$(git rev-parse --show-toplevel)
+source "${REPO_ROOT}/dark-factory/scripts/agent_roles.sh"
+AGENT_ID="${AGENT_ID_REFINEMENT}"
+
+# load_memory: reads a memory file; project-tagged entries for other projects are excluded;
+# path-tagged entries are filtered against AFFECTED; entries with neither tag are always included.
 # When AFFECTED is empty (new branch, nothing implemented yet), all entries are included.
 load_memory() {
   local MEMFILE=".archon/memory/$1"
   [ -f "$MEMFILE" ] || return
   while IFS= read -r line; do
+    # Project filter: skip entries tagged for a different project.
+    # Entries without any project: tag are always included (legacy backward compat).
+    if echo "$line" | grep -q 'project:'; then
+      if ! echo "$line" | grep -q "project:${MEMORY_PROJECT}"; then
+        continue
+      fi
+    fi
+    # Path filter: existing behavior unchanged.
     if echo "$line" | grep -q 'path:'; then
       PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
       if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then
@@ -170,8 +182,8 @@ Follow the process in `orchestrator-prompt.md`:
 
    a. For each architectural decision made during Phase 4 Q&A where a trade-off was explicitly weighed (why approach X over approach Y): append a PATTERN+AVOID pair to `.archon/memory/architecture.md`:
       ```
-      - [PATTERN] <the chosen approach and why it is correct> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
-      - [AVOID] <the rejected approach and the concrete reason it was rejected> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
+      - [PATTERN] <the chosen approach and why it is correct> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine project:${MEMORY_PROJECT} agentId:${AGENT_ID} -->
+      - [AVOID] <the rejected approach and the concrete reason it was rejected> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine project:${MEMORY_PROJECT} agentId:${AGENT_ID} -->
       ```
 
    **Append-only rule:** New memory entries must be written with shell appends:
@@ -204,7 +216,7 @@ Follow the process in `orchestrator-prompt.md`:
    fi
    ```
 
-   b. For any codebase convention discovered during Phase 3 context assembly that is absent from `CLAUDE.md` and absent from `ARCHITECTURE.md`: append a `[PATTERN]` entry to the relevant area file (`backend-patterns.md`, `frontend-patterns.md`, or `dark-factory-ops.md`) with `source:refine`.
+   b. For any codebase convention discovered during Phase 3 context assembly that is absent from `CLAUDE.md` and absent from `ARCHITECTURE.md`: append a `[PATTERN]` entry to the relevant area file (`backend-patterns.md`, `frontend-patterns.md`, or `dark-factory-ops.md`) with `source:refine`, `project:${MEMORY_PROJECT}`, and `agentId:${AGENT_ID}` in the inline comment.
 
    c. Before appending any entry, check for duplicates: `grep -F "<core sentence of the new entry>" .archon/memory/architecture.md`. If a matching line exists, skip that entry.
 

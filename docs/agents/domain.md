@@ -37,3 +37,36 @@ If the concept you need isn't in the glossary yet, that's a signal — either yo
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-0007 (event-sourced orders) — but worth reopening because…_
+
+## Memory Isolation and Agent Role Scoping
+
+Dark Factory memory entries carry `project:` and `agentId:` tags:
+
+- `project:markethawk` — all entries in this repo belong to this project; a future multi-project deployment can filter by project without modifying the files.
+- `agentId:<role>` — the role identity that wrote the entry (e.g. `planning-agent`, `implementation-agent`). Distinct from `source:` which records the pipeline phase.
+
+### Cross-agent read convention
+
+**Validation, security, and gate agents MUST NOT call `load_memory()` for entries written by `implementation-agent` or `planning-agent` unless the caller explicitly declares the need.**
+
+Today, `dark-factory-validate.md` and `dark-factory-conformance.md` do not read memory at all, so no leak is possible. When a validation or security agent begins reading memory, a follow-up ticket must add an `allow_agent_ids=` parameter to `load_memory()` that filters by `agentId:` at load time. Until that ticket is implemented, validation/security agents must not call `load_memory()`.
+
+Role ID constants are defined in `dark-factory/scripts/agent_roles.sh`. The current 13 stable roles are:
+
+| Constant | Value |
+|---|---|
+| `AGENT_ID_FACTORY_DIRECTOR` | `factory-director` |
+| `AGENT_ID_INTAKE_TRIAGE` | `intake-triage-agent` |
+| `AGENT_ID_REFINEMENT` | `refinement-agent` |
+| `AGENT_ID_PLANNING` | `planning-agent` |
+| `AGENT_ID_IMPLEMENTATION` | `implementation-agent` |
+| `AGENT_ID_VALIDATION` | `validation-agent` |
+| `AGENT_ID_CODE_REVIEW` | `code-review-agent` |
+| `AGENT_ID_SECURITY` | `security-agent` |
+| `AGENT_ID_DECONFLICT` | `deconflict-agent` |
+| `AGENT_ID_CI_RESCUE` | `ci-rescue-agent` |
+| `AGENT_ID_MERGE_GATE` | `merge-gate-agent` |
+| `AGENT_ID_COST_TELEMETRY` | `cost-telemetry-agent` |
+| `AGENT_ID_HUMAN_LIAISON` | `human-liaison-agent` |
+
+Adding a new role requires a code change to `agent_roles.sh`; there is no dynamic registration.
