@@ -3,6 +3,10 @@
 # Do not add gate-specific logic here — only the three shared primitives.
 # Do NOT add set -euo pipefail: this file is sourced and must not alter caller shell options.
 
+GATE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=dark-factory/scripts/agent_roles.sh
+source "${GATE_LIB_DIR}/agent_roles.sh"
+
 route_memory_file() {
   local FILE="$1"
   case "$FILE" in
@@ -15,8 +19,9 @@ route_memory_file() {
 }
 
 write_memory_entry() {
-  # Usage: write_memory_entry TARGET PATH_PREFIX VIOLATION_TEXT SOURCE ISSUE_NUM
+  # Usage: write_memory_entry TARGET PATH_PREFIX VIOLATION_TEXT SOURCE ISSUE_NUM [AGENT_ROLE]
   local TARGET="$1" PATH_PREFIX="$2" TEXT="$3" SOURCE="$4" ISSUE="$5"
+  local ROLE="${6:-${AGENT_ID:-unknown}}"
 
   # Dedup: skip if core sentence already present
   if grep -qF "$TEXT" "$TARGET" 2>/dev/null; then
@@ -42,7 +47,7 @@ write_memory_entry() {
   fi
 
   EXPIRES=$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d)
-  ENTRY="- [AVOID] $TEXT <!-- issue:#$ISSUE date:$(date +%Y-%m-%d) expires:$EXPIRES source:$SOURCE path:$PATH_PREFIX -->"
+  ENTRY="- [AVOID] $TEXT <!-- project:${MEMORY_PROJECT} agentId:${ROLE} issue:#$ISSUE date:$(date +%Y-%m-%d) expires:$EXPIRES source:$SOURCE path:$PATH_PREFIX -->"
 
   # Insert before the PROVISIONAL section delimiter (or append if no delimiter)
   if grep -q '^---$' "$TARGET" 2>/dev/null; then
