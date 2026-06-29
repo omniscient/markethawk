@@ -138,3 +138,4 @@
 {"issue":650,"title":"unknown","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5pm (UTC) ","promoted_at":"2026-06-27T14:41:22Z"}
 {"issue":651,"title":"Add agent role and project scoping to Dark Factory memory calls","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5pm (UTC) ","promoted_at":"2026-06-27T14:54:17Z"}
 {"issue":651,"title":"Add agent role and project scoping to Dark Factory memory calls","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 5pm (UTC) ","promoted_at":"2026-06-27T14:54:30Z"}
+{"issue":646,"title":"Build read-through memory retrieval adapter for Dark Factory","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 7pm (UTC) ","promoted_at":"2026-06-29T16:45:42Z"}
