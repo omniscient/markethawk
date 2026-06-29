@@ -15,11 +15,23 @@ assert() {
 }
 
 AFFECTED="backend/app/routers/scanner.py"
+MEMORY_PROJECT="markethawk"
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+source "${REPO_ROOT}/dark-factory/scripts/agent_roles.sh"
 
 load_memory() {
   local MEMFILE="$1"
   [ -f "$MEMFILE" ] || return
   while IFS= read -r line; do
+    # Project filter: skip entries tagged for a different project.
+    # Entries without any project: tag are always included (legacy backward compat).
+    if echo "$line" | grep -q 'project:'; then
+      if ! echo "$line" | grep -q "project:${MEMORY_PROJECT}"; then
+        continue
+      fi
+    fi
+    # Path filter: existing behavior unchanged.
     if echo "$line" | grep -q 'path:'; then
       PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
       if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then
@@ -93,6 +105,30 @@ assert "exact frontend/src/pages/ prefix matches Scanner page" \
 
 assert "dark-factory/ prefix excluded when no affected file matches" \
   "$(echo "$OUTPUT4" | grep -q 'No-match entry' && echo 1 || echo 0)"
+
+# ---- Project filter tests (R3) ----
+
+MEMORY_PROJECT="markethawk"
+AFFECTED="backend/app/routers/scanner.py"
+
+TMPFILE5=$(mktemp /tmp/test_load_memory_XXXXXX.md)
+cat > "$TMPFILE5" << 'MEMEOF'
+- [PATTERN] Project-tagged markethawk <!-- project:markethawk issue:#651 source:implement -->
+- [AVOID] Other project entry <!-- project:otherproject issue:#1 source:implement -->
+- [PATTERN] Legacy entry without project tag
+MEMEOF
+
+OUTPUT5=$(load_memory "$TMPFILE5")
+rm -f "$TMPFILE5"
+
+assert "project:markethawk entry is included" \
+  "$(echo "$OUTPUT5" | grep -q 'Project-tagged markethawk' && echo 0 || echo 1)"
+
+assert "project:otherproject entry is excluded" \
+  "$(echo "$OUTPUT5" | grep -q 'Other project entry' && echo 1 || echo 0)"
+
+assert "entry without project: tag passes through (legacy compat)" \
+  "$(echo "$OUTPUT5" | grep -q 'Legacy entry without project tag' && echo 0 || echo 1)"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
