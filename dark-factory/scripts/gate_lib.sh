@@ -23,10 +23,18 @@ write_memory_entry() {
   local TARGET="$1" PATH_PREFIX="$2" TEXT="$3" SOURCE="$4" ISSUE="$5"
   local ROLE="${6:-${AGENT_ID:-unknown}}"
 
-  # Dedup: skip if core sentence already present
-  if grep -qF "$TEXT" "$TARGET" 2>/dev/null; then
-    echo "memory-write: duplicate entry skipped — already in $TARGET"
-    return 0
+  # Dedup: skip if the same TEXT from the same project+agent is already present.
+  # Including project/agentId in the key allows different projects or agents to
+  # write the same prose without the first writer's scope suppressing later ones.
+  if grep -qF "$TEXT" "$TARGET" 2>/dev/null && \
+     grep -qF "project:${MEMORY_PROJECT}" "$TARGET" 2>/dev/null && \
+     grep -qF "agentId:${ROLE}" "$TARGET" 2>/dev/null; then
+    local match
+    match=$(grep -F "$TEXT" "$TARGET" 2>/dev/null | grep -F "project:${MEMORY_PROJECT}" | grep -F "agentId:${ROLE}" | head -1)
+    if [ -n "$match" ]; then
+      echo "memory-write: duplicate entry skipped — already in $TARGET"
+      return 0
+    fi
   fi
 
   # Expiry cleanup (mawk-compatible two-argument match form)
@@ -47,7 +55,12 @@ write_memory_entry() {
   fi
 
   EXPIRES=$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d)
-  ENTRY="- [AVOID] $TEXT <!-- project:${MEMORY_PROJECT} agentId:${ROLE} issue:#$ISSUE date:$(date +%Y-%m-%d) expires:$EXPIRES source:$SOURCE path:$PATH_PREFIX -->"
+  # Sanitize values that are inlined into the HTML comment to prevent --> or
+  # newline characters from breaking the metadata structure.
+  local SAFE_PROJECT SAFE_ROLE
+  SAFE_PROJECT=$(printf '%s' "${MEMORY_PROJECT}" | tr -d '\n\r' | sed 's/-->//g')
+  SAFE_ROLE=$(printf '%s' "${ROLE}" | tr -d '\n\r' | sed 's/-->//g')
+  ENTRY="- [AVOID] $TEXT <!-- project:${SAFE_PROJECT} agentId:${SAFE_ROLE} issue:#$ISSUE date:$(date +%Y-%m-%d) expires:$EXPIRES source:$SOURCE path:$PATH_PREFIX -->"
 
   # Insert before the PROVISIONAL section delimiter (or append if no delimiter)
   if grep -q '^---$' "$TARGET" 2>/dev/null; then

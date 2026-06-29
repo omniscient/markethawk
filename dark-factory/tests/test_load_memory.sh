@@ -15,7 +15,6 @@ assert() {
 }
 
 AFFECTED="backend/app/routers/scanner.py"
-MEMORY_PROJECT="markethawk"
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
 source "${REPO_ROOT}/dark-factory/scripts/agent_roles.sh"
@@ -25,9 +24,13 @@ load_memory() {
   [ -f "$MEMFILE" ] || return
   while IFS= read -r line; do
     # Project filter: skip entries tagged for a different project.
+    # Restrict detection to the <!-- ... --> metadata comment only, to avoid
+    # false matches on "project:" appearing in the human-readable TEXT.
     # Entries without any project: tag are always included (legacy backward compat).
-    if echo "$line" | grep -q 'project:'; then
-      if ! echo "$line" | grep -q "project:${MEMORY_PROJECT}"; then
+    local meta
+    meta=$(echo "$line" | grep -o '<!--[^>]*-->' | head -1)
+    if echo "$meta" | grep -q 'project:'; then
+      if ! echo "$meta" | grep -qE "project:${MEMORY_PROJECT}([[:space:]]|-->)"; then
         continue
       fi
     fi
@@ -108,7 +111,6 @@ assert "dark-factory/ prefix excluded when no affected file matches" \
 
 # ---- Project filter tests (R3) ----
 
-MEMORY_PROJECT="markethawk"
 AFFECTED="backend/app/routers/scanner.py"
 
 TMPFILE5=$(mktemp /tmp/test_load_memory_XXXXXX.md)
