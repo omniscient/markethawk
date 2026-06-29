@@ -195,8 +195,9 @@ class TestPassesLine:
     def test_wrong_source_excluded(self):
         assert not self._call("PATTERN", {"source": "conformance", "expires": FUTURE})
 
-    def test_missing_source_excluded(self):
-        assert not self._call("PATTERN", {"expires": FUTURE})
+    def test_missing_source_passes(self):
+        """Spec assumption: entries without source: tag pass unconditionally (backward compat)."""
+        assert self._call("PATTERN", {"expires": FUTURE})
 
     # --- Global-file exemption ---
     def test_global_codebase_passes_any_source(self):
@@ -259,8 +260,9 @@ class TestPassesLine:
     def test_fix_kind_passes(self):
         assert self._call("FIX", {"source": "implement", "expires": FUTURE})
 
-    def test_unknown_kind_excluded(self):
-        assert not self._call("NOTE", {"source": "implement", "expires": FUTURE})
+    def test_non_provisional_non_invalid_kind_passes(self):
+        """Spec §6 only excludes PROVISIONAL/INVALID; other kinds like NOTE pass through."""
+        assert self._call("NOTE", {"source": "implement", "expires": FUTURE})
 
 
 # ── TestScanMarkdownFiles ──────────────────────────────────────────────────
@@ -443,12 +445,12 @@ class TestFormatOutput:
         out = mr.format_index_output(candidates)
         assert out.index("High") < out.index("Low")
 
-    def test_index_format_sorts_by_expires_at_as_tiebreaker(self):
+    def test_index_format_sorts_by_created_at_as_tiebreaker(self):
         candidates = [
             {"source_file": "backend-patterns.md", "text": "- [PATTERN] Older.",
-             "specificity": 5, "expires_at": "2026-06-01"},
+             "specificity": 5, "created_at": "2026-01-01"},
             {"source_file": "backend-patterns.md", "text": "- [PATTERN] Newer.",
-             "specificity": 5, "expires_at": "2027-01-01"},
+             "specificity": 5, "created_at": "2027-01-01"},
         ]
         out = mr.format_index_output(candidates)
         assert out.index("Newer") < out.index("Older")
@@ -736,3 +738,40 @@ class TestMainCLI:
         for phase in ["refine", "plan", "implement", "validate", "review"]:
             result = self._run(["--phase", phase], memory_dir=mem_dir)
             assert result.returncode == 0, f"Phase {phase!r} failed: {result.stderr}"
+
+
+# ── Conformance fix verification tests ──────────────────────────────────────
+# These tests assert spec-correct behavior. They fail on the pre-fix code
+# and pass after the three material deviations are corrected.
+
+class TestConformanceFixes:
+    ALLOWED = {"implement"}
+    FILES = ["backend/app/services/scanner.py"]
+
+    def _call(self, tag, meta, source_file="backend-patterns.md", files=None, allowed=None):
+        return mr.passes_line_filters(
+            tag,
+            meta,
+            source_file,
+            files if files is not None else self.FILES,
+            allowed if allowed is not None else self.ALLOWED,
+        )
+
+    def test_missing_source_passes_backward_compat(self):
+        """Spec assumption: entries without source: tag pass unconditionally."""
+        assert self._call("PATTERN", {"expires": FUTURE})
+
+    def test_non_provisional_non_invalid_kind_passes(self):
+        """Spec §6 only excludes PROVISIONAL/INVALID; other kinds like NOTE should pass."""
+        assert self._call("NOTE", {"source": "implement", "expires": FUTURE})
+
+    def test_index_ranking_uses_created_at(self):
+        """Spec §7.3: tiebreak by created_at/updated_at descending, not expires_at."""
+        candidates = [
+            {"source_file": "backend-patterns.md", "text": "- [PATTERN] Older.",
+             "specificity": 5, "created_at": "2026-01-01"},
+            {"source_file": "backend-patterns.md", "text": "- [PATTERN] Newer.",
+             "specificity": 5, "created_at": "2027-01-01"},
+        ]
+        out = mr.format_index_output(candidates)
+        assert out.index("Newer") < out.index("Older")

@@ -123,17 +123,17 @@ def passes_line_filters(tag, meta, source_file, files, allowed_sources):
 
     Excludes PROVISIONAL/INVALID/expired entries, applies source filter
     (global files are exempt), and path-tag filter.
+    Entries without a source: tag pass the source filter unconditionally
+    (backward-compatible with pre-scoping corpus entries).
     """
     tag_upper = tag.upper()
     if tag_upper == "PROVISIONAL" or tag_upper.startswith("INVALID"):
-        return False
-    if tag not in AUTHORITATIVE_KINDS:
         return False
     if is_expired(meta.get("expires", "")):
         return False
     if source_file not in GLOBAL_FILES:
         src = meta.get("source", "")
-        if src not in allowed_sources:
+        if src and src not in allowed_sources:
             return False
     path_tag = meta.get("path", "")
     if path_tag:
@@ -244,7 +244,7 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
             "source_file": source_file,
             "text": text,
             "specificity": spec,
-            "expires_at": entry.get("expires_at", ""),
+            "created_at": entry.get("created_at", ""),
         })
 
     return candidates
@@ -265,7 +265,7 @@ def format_index_output(candidates):
             continue
         entries = sorted(
             grouped[fname],
-            key=lambda x: (x["specificity"], x.get("expires_at", "")),
+            key=lambda x: (x["specificity"], x.get("created_at", "")),
             reverse=True,
         )
         parts.append(f"### Memory: {fname}")
