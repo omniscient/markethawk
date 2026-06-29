@@ -14,6 +14,7 @@ argument-hint: (no arguments - reads issue/PR context from the workflow)
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)
 source "${REPO_ROOT}/dark-factory/scripts/gate_lib.sh"
+AGENT_ID="${AGENT_ID_CODE_REVIEW}"
 ```
 
 1. Read the `code_review` block from `.claude/skills/refinement/config.yaml`.

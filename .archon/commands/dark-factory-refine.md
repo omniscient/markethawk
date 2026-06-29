@@ -182,8 +182,8 @@ Follow the process in `orchestrator-prompt.md`:
 
    a. For each architectural decision made during Phase 4 Q&A where a trade-off was explicitly weighed (why approach X over approach Y): append a PATTERN+AVOID pair to `.archon/memory/architecture.md`:
       ```
-      - [PATTERN] <the chosen approach and why it is correct> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
-      - [AVOID] <the rejected approach and the concrete reason it was rejected> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine -->
+      - [PATTERN] <the chosen approach and why it is correct> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine project:${MEMORY_PROJECT} agentId:${AGENT_ID} -->
+      - [AVOID] <the rejected approach and the concrete reason it was rejected> <!-- issue:#$ISSUE_NUM date:$(date +%Y-%m-%d) expires:$(date -d '+6 months' +%Y-%m-%d 2>/dev/null || date -v+6m +%Y-%m-%d) source:refine project:${MEMORY_PROJECT} agentId:${AGENT_ID} -->
       ```
 
    **Append-only rule:** New memory entries must be written with shell appends:
@@ -216,7 +216,7 @@ Follow the process in `orchestrator-prompt.md`:
    fi
    ```
 
-   b. For any codebase convention discovered during Phase 3 context assembly that is absent from `CLAUDE.md` and absent from `ARCHITECTURE.md`: append a `[PATTERN]` entry to the relevant area file (`backend-patterns.md`, `frontend-patterns.md`, or `dark-factory-ops.md`) with `source:refine`.
+   b. For any codebase convention discovered during Phase 3 context assembly that is absent from `CLAUDE.md` and absent from `ARCHITECTURE.md`: append a `[PATTERN]` entry to the relevant area file (`backend-patterns.md`, `frontend-patterns.md`, or `dark-factory-ops.md`) with `source:refine`, `project:${MEMORY_PROJECT}`, and `agentId:${AGENT_ID}` in the inline comment.
 
    c. Before appending any entry, check for duplicates: `grep -F "<core sentence of the new entry>" .archon/memory/architecture.md`. If a matching line exists, skip that entry.
 
