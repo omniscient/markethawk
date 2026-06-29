@@ -493,8 +493,8 @@ class TestScanIndex:
             "expires_at": FUTURE,
         }
 
-    def test_provisional_kind_excluded(self, tmp_path):
-        entry = self._basic_entry(id="aabb0001", kind="PROVISIONAL")
+    def test_provisional_status_excluded(self, tmp_path):
+        entry = self._basic_entry(id="aabb0001", status="provisional", agent_id="implement")
         mem_dir = _build_index_dir(
             tmp_path,
             [json.dumps(entry)],
@@ -503,8 +503,8 @@ class TestScanIndex:
         result = mr.scan_index(mem_dir, ["backend-patterns.md"], [], {"implement"})
         assert result == []
 
-    def test_invalid_kind_excluded(self, tmp_path):
-        entry = self._basic_entry(id="aabb0002", kind="INVALID")
+    def test_invalid_status_excluded(self, tmp_path):
+        entry = self._basic_entry(id="aabb0002", status="invalid", agent_id="implement")
         mem_dir = _build_index_dir(
             tmp_path,
             [json.dumps(entry)],
@@ -534,17 +534,17 @@ class TestScanIndex:
         assert result == []
 
     def test_source_filter_applied_for_area_file(self, tmp_path):
-        entry = self._basic_entry(id="aabb0005")
+        entry = self._basic_entry(id="aabb0005", agent_id="conformance")
         mem_dir = _build_index_dir(
             tmp_path,
             [json.dumps(entry)],
-            {"aabb0005": self._basic_record("aabb0005", sources=("conformance",))},
+            {"aabb0005": self._basic_record("aabb0005", sources=("implement",))},
         )
         result = mr.scan_index(mem_dir, ["backend-patterns.md"], [], {"implement"})
         assert result == []
 
     def test_correct_source_passes(self, tmp_path):
-        entry = self._basic_entry(id="aabb0006")
+        entry = self._basic_entry(id="aabb0006", agent_id="implement")
         mem_dir = _build_index_dir(
             tmp_path,
             [json.dumps(entry)],
@@ -568,7 +568,7 @@ class TestScanIndex:
         assert len(result) == 1
 
     def test_path_prefix_filter(self, tmp_path):
-        entry = self._basic_entry(id="aabb0008", path_prefixes=["frontend/src/"])
+        entry = self._basic_entry(id="aabb0008", path_prefixes=["frontend/src/"], agent_id="implement")
         mem_dir = _build_index_dir(
             tmp_path,
             [json.dumps(entry)],
@@ -580,7 +580,7 @@ class TestScanIndex:
         assert result == []
 
     def test_path_prefix_match_sets_specificity(self, tmp_path):
-        entry = self._basic_entry(id="aabb0009", path_prefixes=["backend/app/"])
+        entry = self._basic_entry(id="aabb0009", path_prefixes=["backend/app/"], agent_id="implement")
         mem_dir = _build_index_dir(
             tmp_path,
             [json.dumps(entry)],
@@ -593,7 +593,7 @@ class TestScanIndex:
         assert result[0]["specificity"] == len("backend/app/")
 
     def test_zero_specificity_for_empty_path_prefixes(self, tmp_path):
-        entry = self._basic_entry(id="aabb0010")
+        entry = self._basic_entry(id="aabb0010", agent_id="implement")
         mem_dir = _build_index_dir(
             tmp_path,
             [json.dumps(entry)],
@@ -604,6 +604,41 @@ class TestScanIndex:
         )
         assert len(result) == 1
         assert result[0]["specificity"] == 0
+
+    def test_index_non_authoritative_kind_passes(self, tmp_path):
+        """Spec §6 (index path): only status=provisional/invalid excluded, not by kind."""
+        entry = self._basic_entry(id="aabb0020", kind="NOTE", agent_id="implement")
+        mem_dir = _build_index_dir(
+            tmp_path,
+            [json.dumps(entry)],
+            {"aabb0020": self._basic_record("aabb0020")},
+        )
+        result = mr.scan_index(mem_dir, ["backend-patterns.md"], [], {"implement"})
+        assert len(result) == 1
+
+    def test_index_source_filter_uses_agent_id_not_evidence(self, tmp_path):
+        """Spec: agent_id from index entry drives source filter, not evidence[].source."""
+        entry = self._basic_entry(id="aabb0021", agent_id="implement")
+        rec = {
+            "id": "aabb0021", "kind": "PATTERN",
+            "summary": "Agent-id path.",
+            "evidence": [{"source": "conformance", "date": "2026-01-01", "issue": 1}],
+            "path_prefixes": [], "expires_at": FUTURE,
+        }
+        mem_dir = _build_index_dir(tmp_path, [json.dumps(entry)], {"aabb0021": rec})
+        result = mr.scan_index(mem_dir, ["backend-patterns.md"], [], {"implement"})
+        assert len(result) == 1
+
+    def test_index_source_filter_excludes_wrong_agent_id(self, tmp_path):
+        """Spec: index entry with wrong agent_id excluded even if record evidence matches."""
+        entry = self._basic_entry(id="aabb0022", agent_id="conformance")
+        mem_dir = _build_index_dir(
+            tmp_path,
+            [json.dumps(entry)],
+            {"aabb0022": self._basic_record("aabb0022", sources=("implement",))},
+        )
+        result = mr.scan_index(mem_dir, ["backend-patterns.md"], [], {"implement"})
+        assert result == []
 
 
 # ── TestRetrieveMemory ─────────────────────────────────────────────────────
@@ -627,6 +662,7 @@ class TestRetrieveMemory:
             "id": "abc123",
             "kind": "PATTERN",
             "source_file": "backend-patterns.md",
+            "agent_id": "implement",
             "path_prefixes": [],
             "expires_at": FUTURE,
             "confidence": 1.0,
@@ -775,3 +811,4 @@ class TestConformanceFixes:
         ]
         out = mr.format_index_output(candidates)
         assert out.index("Newer") < out.index("Older")
+

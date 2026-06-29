@@ -191,7 +191,9 @@ def format_markdown_output(results):
 def scan_index(memory_dir, area_files, files, allowed_sources):
     """Scan index.jsonl and records/ to build ranked entry list.
 
-    Returns list of dicts: {source_file, text, specificity, expires_at}.
+    Returns list of dicts: {source_file, text, specificity, created_at}.
+    Source filter uses agent_id from the index entry per spec §6.
+    Record files are read for full summary text (implementation-time decision, spec Open Q #3).
     """
     memory_dir = Path(memory_dir)
     index_path = memory_dir / "index.jsonl"
@@ -209,7 +211,7 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
         except json.JSONDecodeError:
             continue
 
-        if entry.get("kind") not in AUTHORITATIVE_KINDS:
+        if entry.get("status") in ("provisional", "invalid"):
             continue
         if is_expired(entry.get("expires_at", ""), today):
             continue
@@ -222,23 +224,25 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
         if not passes_path_filter(path_prefixes, files):
             continue
 
+        # Source filter: use agent_id from index entry (global files exempt)
+        if source_file not in GLOBAL_FILES:
+            agent_id = entry.get("agent_id", "")
+            if agent_id not in allowed_sources:
+                continue
+
+        # Read record for full summary (fail-open: fallback to summary_snippet)
         record_path = records_dir / f"{entry['id']}.json"
         if record_path.exists():
             try:
                 record = json.loads(record_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
-                continue
-            summary = record.get("summary", entry.get("summary_snippet", ""))
-            evidence_sources = {e.get("source", "") for e in record.get("evidence") or []}
+                summary = entry.get("summary_snippet", "")
+            else:
+                summary = record.get("summary", entry.get("summary_snippet", ""))
         else:
             summary = entry.get("summary_snippet", "")
-            evidence_sources = set()
 
-        if source_file not in GLOBAL_FILES:
-            if not (evidence_sources & allowed_sources):
-                continue
-
-        text = f"- [{entry['kind']}] {summary}"
+        text = f"- [{entry.get('kind', 'PATTERN')}] {summary}"
         spec = path_specificity(path_prefixes, files)
         candidates.append({
             "source_file": source_file,
