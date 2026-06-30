@@ -232,7 +232,10 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
                 continue
 
         # Read record for full summary (fail-open: fallback to summary_snippet)
-        record_path = records_dir / f"{entry['id']}.json"
+        entry_id = entry.get("id")
+        if not entry_id:
+            continue
+        record_path = records_dir / f"{entry_id}.json"
         if record_path.exists():
             try:
                 record = json.loads(record_path.read_text(encoding="utf-8"))
@@ -258,7 +261,7 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
 def format_index_output(candidates):
     """Format scan_index output, grouped by source_file in ALL_MEMORY_FILES order.
 
-    Within each group: ranked by path specificity (desc) then expires_at (desc).
+    Within each group: ranked by path specificity (desc) then created_at (desc).
     """
     grouped = {}
     for c in candidates:
@@ -270,7 +273,7 @@ def format_index_output(candidates):
             continue
         entries = sorted(
             grouped[fname],
-            key=lambda x: (x["specificity"], x.get("created_at", "")),
+            key=lambda x: (x["specificity"], x.get("created_at") or ""),
             reverse=True,
         )
         parts.append(f"### Memory: {fname}")
@@ -293,7 +296,7 @@ def retrieve_memory(memory_dir, phase, files):
     if index_path.exists():
         try:
             candidates = scan_index(memory_dir, area_files, files, allowed_sources)
-        except OSError:
+        except (OSError, ValueError):
             candidates = []
         if candidates:
             return format_index_output(candidates)

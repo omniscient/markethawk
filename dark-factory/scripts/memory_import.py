@@ -317,8 +317,15 @@ def update_index(
     new_lines = []
     for record in records:
         if record.id not in existing_ids:
-            agent_id = record.evidence[0].get("source") if record.evidence else None
-            created_at = record.evidence[0].get("date") if record.evidence else None
+            # Collect agent_id and created_at across all evidence sources so that
+            # source-filtering in scan_index can match entries whose primary source
+            # is not at index 0.
+            agent_id = next(
+                (e.get("source") for e in record.evidence if e.get("source")), None
+            ) if record.evidence else None
+            created_at = next(
+                (e.get("date") for e in record.evidence if e.get("date")), None
+            ) if record.evidence else None
             compact = {
                 "id": record.id,
                 "agent_id": agent_id,
