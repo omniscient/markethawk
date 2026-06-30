@@ -224,10 +224,11 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
         if not passes_path_filter(path_prefixes, files):
             continue
 
-        # Source filter: use agent_id from index entry (global files exempt)
+        # Source filter: use agent_id from index entry (global files exempt).
+        # Entries without agent_id pass unconditionally (backward compat with pre-import corpus).
         if source_file not in GLOBAL_FILES:
-            agent_id = entry.get("agent_id", "")
-            if agent_id not in allowed_sources:
+            agent_id = entry.get("agent_id") or ""
+            if agent_id and agent_id not in allowed_sources:
                 continue
 
         # Read record for full summary (fail-open: fallback to summary_snippet)
@@ -290,7 +291,10 @@ def retrieve_memory(memory_dir, phase, files):
 
     index_path = memory_dir / "index.jsonl"
     if index_path.exists():
-        candidates = scan_index(memory_dir, area_files, files, allowed_sources)
+        try:
+            candidates = scan_index(memory_dir, area_files, files, allowed_sources)
+        except OSError:
+            candidates = []
         if candidates:
             return format_index_output(candidates)
 

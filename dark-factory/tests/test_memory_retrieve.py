@@ -687,7 +687,7 @@ class TestRetrieveMemory:
         mem_dir.mkdir()
         records_dir = mem_dir / "records"
         records_dir.mkdir()
-        # Index entry that will be filtered out (wrong source)
+        # Index entry filtered out by wrong agent_id (source filter)
         rec = {
             "id": "xyz999",
             "kind": "PATTERN",
@@ -701,6 +701,7 @@ class TestRetrieveMemory:
             "id": "xyz999",
             "kind": "PATTERN",
             "source_file": "backend-patterns.md",
+            "agent_id": "conformance",
             "path_prefixes": [],
             "expires_at": FUTURE,
             "confidence": 1.0,
@@ -713,6 +714,17 @@ class TestRetrieveMemory:
         out = mr.retrieve_memory(mem_dir, "implement", ["backend/app/foo.py"])
         assert "Fallback appears" in out
         assert "Should not appear" not in out
+
+    def test_falls_back_when_index_unreadable(self, tmp_path):
+        mem_dir = tmp_path / "memory"
+        mem_dir.mkdir()
+        # A directory named index.jsonl triggers OSError on read_text
+        (mem_dir / "index.jsonl").mkdir()
+        content = "- [PATTERN] Fallback appears. <!-- issue:#2 expires:{f} source:implement -->\n".format(f=FUTURE)
+        (mem_dir / "backend-patterns.md").write_text(content, encoding="utf-8")
+
+        out = mr.retrieve_memory(mem_dir, "implement", ["backend/app/foo.py"])
+        assert "Fallback appears" in out
 
 
 # ── TestMainCLI ────────────────────────────────────────────────────────────

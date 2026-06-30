@@ -317,8 +317,10 @@ def update_index(
     new_lines = []
     for record in records:
         if record.id not in existing_ids:
+            agent_id = record.evidence[0].get("source") if record.evidence else None
             compact = {
                 "id": record.id,
+                "agent_id": agent_id,
                 "kind": record.kind,
                 "scope": record.scope,
                 "path_prefixes": record.path_prefixes,
