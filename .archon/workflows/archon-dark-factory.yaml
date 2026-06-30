@@ -415,7 +415,11 @@ nodes:
       ISSUE=$(jq -r '.resolved_number' "$ARTIFACTS_DIR/issue.json")
       ARTIFACTS_DIR="${ARTIFACTS_DIR:-/tmp/artifacts/${ISSUE}}"
       mkdir -p "$ARTIFACTS_DIR"
-      python3 "$CLONE_DIR/dark-factory/scripts/factory_core/cli.py" \
+      # $CLONE_DIR is not exported into archon DAG bash nodes (sibling nodes use
+      # paths relative to CWD, which is the clone root); fall back to "." so the
+      # deconflict CLI resolves instead of hitting a nonexistent /dark-factory/...
+      # path (exit 2). Recurring spurious-Blocked cause: #403/#391/#570/#394/#648.
+      python3 "${CLONE_DIR:-.}/dark-factory/scripts/factory_core/cli.py" \
         deconflict --issue "$ISSUE"
     depends_on: [regen-codeindex, setup-branch-resolve]
     # OR-join of mutually-exclusive branches (continue vs resolve); the always-skipped
