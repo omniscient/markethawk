@@ -824,3 +824,177 @@ class TestConformanceFixes:
         out = mr.format_index_output(candidates)
         assert out.index("Newer") < out.index("Older")
 
+
+# ── TestEmitMemoryTrace ────────────────────────────────────────────────────
+
+import subprocess  # noqa: E402
+
+
+class TestEmitMemoryTrace:
+    """Tests for emit_memory_trace() and --emit-trace-to CLI flag (issue #647)."""
+
+    def _make_mem_dir(self, tmp_path, content="- [PATTERN] Foo. <!-- source:implement expires:2099-12-31 -->\n- [PATTERN] Bar. <!-- source:implement expires:2099-12-31 -->\n"):
+        mem_dir = tmp_path / "memory"
+        mem_dir.mkdir()
+        for fname in mr.ALL_MEMORY_FILES:
+            (mem_dir / fname).write_text(content)
+        return mem_dir
+
+    def test_emit_writes_valid_json(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        assert trace_path.exists()
+        data = json.loads(trace_path.read_text())
+        assert isinstance(data, dict)
+
+    def test_emit_schema_version(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert data["schema_version"] == 1
+
+    def test_emit_retrieval_mechanism(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert data["retrieval_mechanism"] == "flatfile-pathtag"
+
+    def test_emit_phase_field(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "plan", [], mem_dir, mr.ALL_MEMORY_FILES, {"refine"})
+        data = json.loads(trace_path.read_text())
+        assert data["phase"] == "plan"
+
+    def test_emit_affected_files(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        files = ["backend/app/services/scanner.py", "dark-factory/scripts/memory_retrieve.py"]
+        mr.emit_memory_trace(trace_path, "implement", files, mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert data["affected_files"] == files
+
+    def test_emit_files_loaded_structure(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert "files_loaded" in data
+        assert isinstance(data["files_loaded"], list)
+        for entry in data["files_loaded"]:
+            assert "path" in entry
+            assert "entries_total" in entry
+            assert "entries_included" in entry
+            assert "entries_filtered_out" in entry
+
+    def test_emit_counts_match(self, tmp_path):
+        content = (
+            "- [PATTERN] P1. <!-- source:implement expires:2099-12-31 -->\n"
+            "- [PATTERN] P2. <!-- source:implement expires:2099-12-31 -->\n"
+            "- [PROVISIONAL] Skip. <!-- source:implement expires:2099-12-31 -->\n"
+        )
+        mem_dir = self._make_mem_dir(tmp_path, content=content)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, ["backend-patterns.md"], {"implement"})
+        data = json.loads(trace_path.read_text())
+        entry = next(e for e in data["files_loaded"] if e["path"].endswith("backend-patterns.md"))
+        assert entry["entries_total"] == 3
+        assert entry["entries_included"] == 2
+        assert entry["entries_filtered_out"] == 1
+
+    def test_emit_fallback_false_on_success(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert data["fallback_used"] is False
+
+    def test_emit_nonfatal_on_write_error(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        bad_path = Path("/nonexistent/directory/memory-trace.json")
+        # Should not raise
+        mr.emit_memory_trace(bad_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+
+    def test_cli_emit_trace_to_flag_accepted(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "trace.json"
+        result = subprocess.run(
+            [sys.executable, str(Path(mr.__file__).resolve()),
+             "--phase", "implement",
+             "--memory-dir", str(mem_dir),
+             "--emit-trace-to", str(trace_path)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        assert trace_path.exists()
+        data = json.loads(trace_path.read_text())
+        assert data["schema_version"] == 1
+
+    def test_cli_no_trace_when_flag_absent(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "trace.json"
+        result = subprocess.run(
+            [sys.executable, str(Path(mr.__file__).resolve()),
+             "--phase", "implement",
+             "--memory-dir", str(mem_dir)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        assert not trace_path.exists()
+
+    def test_emit_issue_field(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"}, issue=123)
+        data = json.loads(trace_path.read_text())
+        assert data["issue"] == 123
+
+    def test_emit_issue_defaults_to_zero(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert data["issue"] == 0
+
+    def test_emit_agent_id_field(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"}, agent_id="implementation-agent")
+        data = json.loads(trace_path.read_text())
+        assert data["agent_id"] == "implementation-agent"
+
+    def test_emit_project_field(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert data["project"] == "markethawk"
+
+    def test_phase_agent_id_map_exists(self, tmp_path):
+        assert hasattr(mr, "PHASE_AGENT_ID")
+        assert mr.PHASE_AGENT_ID["implement"] == "implementation-agent"
+        assert mr.PHASE_AGENT_ID["plan"] == "plan-agent"
+        assert mr.PHASE_AGENT_ID["refine"] == "refine-agent"
+        assert mr.PHASE_AGENT_ID["validate"] == "validate-agent"
+
+    def test_cli_includes_issue_agent_project(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "trace.json"
+        result = subprocess.run(
+            [sys.executable, str(Path(mr.__file__).resolve()),
+             "--phase", "implement",
+             "--memory-dir", str(mem_dir),
+             "--issue", "647",
+             "--emit-trace-to", str(trace_path)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        assert trace_path.exists()
+        data = json.loads(trace_path.read_text())
+        assert data["issue"] == 647
+        assert data["agent_id"] == "implementation-agent"
+        assert data["project"] == "markethawk"
+

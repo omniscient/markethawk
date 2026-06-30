@@ -46,6 +46,14 @@ AREA_PREFIX_MAP = [
     (("docker-compose", "Dockerfile", "dark-factory/", ".archon/"), "dark-factory-ops.md"),
 ]
 
+PHASE_AGENT_ID = {
+    "refine":    "refine-agent",
+    "plan":      "plan-agent",
+    "implement": "implementation-agent",
+    "validate":  "validate-agent",
+    "review":    "review-agent",
+}
+
 # Only these kind tags are considered authoritative
 AUTHORITATIVE_KINDS = {"PATTERN", "AVOID", "FIX"}
 
@@ -305,6 +313,71 @@ def retrieve_memory(memory_dir, phase, files):
     return format_markdown_output(results)
 
 
+# ── Trace emission ────────────────────────────────────────────────────────
+
+def _count_entries(fpath, files, allowed_sources, source_file_name):
+    """Count total and included entries in a memory .md file."""
+    try:
+        text = fpath.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    total = 0
+    included = 0
+    for line in text.splitlines():
+        if line.strip() == "---":
+            break
+        m = _ENTRY_RE.match(line)
+        if not m:
+            continue
+        total += 1
+        tag = m.group("tag")
+        meta = parse_meta(m.group("meta") or "")
+        if passes_line_filters(tag, meta, source_file_name, files, allowed_sources):
+            included += 1
+
+    return {"total": total, "included": included}
+
+
+def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_sources, issue=0, agent_id=None):
+    """Write memory-trace.json to trace_path. Best-effort: never raises."""
+    try:
+        memory_dir = Path(memory_dir)
+        files_loaded = []
+        fallback_used = False
+
+        for fname in area_files:
+            fpath = memory_dir / fname
+            counts = _count_entries(fpath, files, allowed_sources, fname) if fpath.exists() else None
+            if counts is None:
+                fallback_used = True
+                continue
+            files_loaded.append({
+                "path": str(fpath),
+                "entries_total": counts["total"],
+                "entries_included": counts["included"],
+                "entries_filtered_out": counts["total"] - counts["included"],
+            })
+
+        trace = {
+            "schema_version": 1,
+            "retrieval_mechanism": "flatfile-pathtag",
+            "issue": issue or 0,
+            "phase": phase,
+            "agent_id": agent_id or PHASE_AGENT_ID.get(phase, phase + "-agent"),
+            "project": "markethawk",
+            "affected_files": list(files),
+            "files_loaded": files_loaded,
+            "fallback_used": fallback_used,
+        }
+
+        trace_path = Path(trace_path)
+        trace_path.parent.mkdir(parents=True, exist_ok=True)
+        trace_path.write_text(json.dumps(trace, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────
 
 def main():
@@ -329,6 +402,12 @@ def main():
         default=".archon/memory",
         help="Path to the memory directory (default: .archon/memory)",
     )
+    parser.add_argument(
+        "--emit-trace-to",
+        default=None,
+        metavar="PATH",
+        help="Write memory-trace.json to this path (best-effort, non-blocking)",
+    )
     args = parser.parse_args()
 
     memory_dir = Path(args.memory_dir)
@@ -337,9 +416,19 @@ def main():
         sys.exit(1)
 
     files = [f.strip() for f in args.files.splitlines() if f.strip()]
+    allowed_sources = PHASE_SOURCE_MAP.get(args.phase, set())
+    area_files = select_area_files(files)
+
     output = retrieve_memory(memory_dir, args.phase, files)
     if output:
         print(output)
+
+    if args.emit_trace_to:
+        emit_memory_trace(
+            args.emit_trace_to, args.phase, files, memory_dir, area_files, allowed_sources,
+            issue=args.issue or 0,
+            agent_id=PHASE_AGENT_ID.get(args.phase, args.phase + "-agent"),
+        )
 
 
 if __name__ == "__main__":

@@ -114,7 +114,8 @@ MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" 
   --phase validate \
   --files "$AFFECTED" \
   $ISSUE_ARG \
-  --memory-dir "${REPO_ROOT}/.archon/memory" 2>/dev/null || true)
+  --memory-dir "${REPO_ROOT}/.archon/memory" \
+  --emit-trace-to "$ARTIFACTS_DIR/memory-trace.json" 2>/dev/null || true)
 
 mkdir -p "$ARTIFACTS_DIR"
 printf '%s\n' "$MEMORY_CONTEXT" > "$ARTIFACTS_DIR/memory-context.md"
