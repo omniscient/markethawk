@@ -283,3 +283,70 @@ def test_assemble_emits_jsonl_per_stage(tmp_path, monkeypatch):
     stages = [json.loads(l)["stage"] for l in lines]
     assert "validation" in stages
     assert "conformance" in stages
+
+
+# ── memory-trace pickup tests (issue #647) ─────────────────────────────────
+
+def test_assemble_picks_up_memory_trace(tmp_path, monkeypatch):
+    monkeypatch.setattr(rr, "JSONL_PATH", tmp_path / "runs.jsonl")
+    monkeypatch.setattr(rr, "_post_seq", lambda r: None)
+
+    trace = {
+        "schema_version": 1,
+        "retrieval_mechanism": "flatfile-pathtag",
+        "phase": "implement",
+        "affected_files": [],
+        "files_loaded": [],
+        "fallback_used": False,
+    }
+    (tmp_path / "memory-trace.json").write_text(json.dumps(trace))
+
+    out = tmp_path / "run-record.json"
+    args = _AssembleArgs(tmp_path, out)
+    rr.cmd_assemble(args)
+
+    rec = json.loads(out.read_text())
+    assert "memory_trace" in rec
+    assert rec["memory_trace"]["schema_version"] == 1
+    assert rec["memory_trace"]["retrieval_mechanism"] == "flatfile-pathtag"
+
+
+def test_assemble_no_memory_trace_key_when_absent(tmp_path, monkeypatch):
+    monkeypatch.setattr(rr, "JSONL_PATH", tmp_path / "runs.jsonl")
+    monkeypatch.setattr(rr, "_post_seq", lambda r: None)
+
+    out = tmp_path / "run-record.json"
+    args = _AssembleArgs(tmp_path, out)
+    rr.cmd_assemble(args)
+
+    rec = json.loads(out.read_text())
+    assert "memory_trace" not in rec
+
+
+def test_assemble_tolerates_malformed_memory_trace(tmp_path, monkeypatch):
+    monkeypatch.setattr(rr, "JSONL_PATH", tmp_path / "runs.jsonl")
+    monkeypatch.setattr(rr, "_post_seq", lambda r: None)
+
+    (tmp_path / "memory-trace.json").write_text("not valid json {{{")
+
+    out = tmp_path / "run-record.json"
+    args = _AssembleArgs(tmp_path, out)
+    rr.cmd_assemble(args)  # must not raise
+
+    rec = json.loads(out.read_text())
+    assert "memory_trace" not in rec
+
+
+def test_assemble_tolerates_unreadable_memory_trace(tmp_path, monkeypatch):
+    monkeypatch.setattr(rr, "JSONL_PATH", tmp_path / "runs.jsonl")
+    monkeypatch.setattr(rr, "_post_seq", lambda r: None)
+
+    # Create a directory where the file is expected — causes read failure
+    (tmp_path / "memory-trace.json").mkdir()
+
+    out = tmp_path / "run-record.json"
+    args = _AssembleArgs(tmp_path, out)
+    rr.cmd_assemble(args)  # must not raise
+
+    rec = json.loads(out.read_text())
+    assert "memory_trace" not in rec

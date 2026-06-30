@@ -299,6 +299,13 @@ def cmd_assemble(args) -> None:
         },
     }
 
+    trace_path = artifacts_dir / "memory-trace.json"
+    if trace_path.exists():
+        try:
+            run_record["memory_trace"] = json.loads(trace_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
     out_file.parent.mkdir(parents=True, exist_ok=True)
     out_file.write_text(json.dumps(run_record, indent=2), encoding="utf-8")
 
