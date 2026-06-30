@@ -39,43 +39,32 @@ assert "catch-all docs/ routes to codebase-patterns.md" \
 assert "catch-all root file routes to codebase-patterns.md" \
   "$([ "$(route_memory_file 'CLAUDE.md')" = '.archon/memory/codebase-patterns.md' ] && echo 0 || echo 1)"
 
-# ---- write_memory_entry() tag tests (R1/R2) ----
+# ---- write_memory_entry() tag tests (#648 new format: scope:/source:/agent:/path: per #645) ----
 
-# Test: written entry includes project:markethawk and agentId: from explicit 6th param
-TMPWM1=$(mktemp /tmp/test_write_memory_XXXXXX.md)
-printf '# Test\n' > "$TMPWM1"
-AGENT_ID="" write_memory_entry "$TMPWM1" "dark-factory/scripts/" "Test avoidance text for 651" "test" "651" "planning-agent"
+# Test: written entry has scope:/source:/agent:/path: tags (replaces project:/agentId:)
+TMPDIR_WM=$(mktemp -d /tmp/test_write_memory_XXXXXX)
+trap "rm -rf $TMPDIR_WM" EXIT
+MD_WM="$TMPDIR_WM/dark-factory-ops.md"
+printf '# Test\n\n---\n' > "$MD_WM"
+write_memory_entry "$MD_WM" "dark-factory/scripts/" "Test avoidance text for 651" "conformance" "651"
 
-assert "written entry includes project:markethawk (explicit 6th param)" \
-  "$(grep -q 'project:markethawk' "$TMPWM1" && echo 0 || echo 1)"
+assert "written entry includes scope: tag" \
+  "$(grep -q 'scope:dark-factory' "$MD_WM" && echo 0 || echo 1)"
 
-assert "written entry includes agentId:planning-agent (explicit 6th param)" \
-  "$(grep -q 'agentId:planning-agent' "$TMPWM1" && echo 0 || echo 1)"
+assert "written entry includes source: tag" \
+  "$(grep -q 'source:conformance' "$MD_WM" && echo 0 || echo 1)"
 
-rm -f "$TMPWM1"
+assert "written entry includes agent:<source> tag" \
+  "$(grep -q 'agent:conformance' "$MD_WM" && echo 0 || echo 1)"
 
-# Test: falls back to AGENT_ID env var when no 6th param
-TMPWM2=$(mktemp /tmp/test_write_memory_XXXXXX.md)
-printf '# Test\n' > "$TMPWM2"
-AGENT_ID="refinement-agent" write_memory_entry "$TMPWM2" "dark-factory/" "Env var fallback text for 651" "test" "651"
+assert "written entry includes path: tag" \
+  "$(grep -q 'path:dark-factory/scripts/' "$MD_WM" && echo 0 || echo 1)"
 
-assert "written entry includes agentId from AGENT_ID env var (no 6th param)" \
-  "$(grep -q 'agentId:refinement-agent' "$TMPWM2" && echo 0 || echo 1)"
+assert "written entry does NOT include legacy project: tag" \
+  "$(grep -qv 'project:' "$MD_WM" && echo 0 || echo 1)"
 
-assert "written entry includes project:markethawk (env var fallback path)" \
-  "$(grep -q 'project:markethawk' "$TMPWM2" && echo 0 || echo 1)"
-
-rm -f "$TMPWM2"
-
-# Test: defaults to "unknown" when neither 6th param nor AGENT_ID set
-TMPWM3=$(mktemp /tmp/test_write_memory_XXXXXX.md)
-printf '# Test\n' > "$TMPWM3"
-AGENT_ID="" write_memory_entry "$TMPWM3" "dark-factory/" "Unknown agent text for 651" "test" "651"
-
-assert "written entry defaults agentId to unknown when no 6th param and no env var" \
-  "$(grep -q 'agentId:unknown' "$TMPWM3" && echo 0 || echo 1)"
-
-rm -f "$TMPWM3"
+assert "written entry does NOT include legacy agentId: tag" \
+  "$(grep -qv 'agentId:' "$MD_WM" && echo 0 || echo 1)"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
