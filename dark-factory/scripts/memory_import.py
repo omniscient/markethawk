@@ -318,9 +318,11 @@ def update_index(
     for record in records:
         if record.id not in existing_ids:
             agent_id = record.evidence[0].get("source") if record.evidence else None
+            created_at = record.evidence[0].get("date") if record.evidence else None
             compact = {
                 "id": record.id,
                 "agent_id": agent_id,
+                "created_at": created_at,
                 "kind": record.kind,
                 "scope": record.scope,
                 "path_prefixes": record.path_prefixes,
