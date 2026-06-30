@@ -50,6 +50,21 @@ def md_at_cap(tmp_path):
 
 
 @pytest.fixture
+def md_at_cap_mixed(tmp_path):
+    """Markdown file with 29 [PATTERN] entries (cap must count PATTERN/AVOID/FIX)."""
+    f = tmp_path / "backend-patterns.md"
+    lines = ["# Backend Patterns\n\n"]
+    for i in range(29):
+        lines.append(
+            f"- [PATTERN] Pattern {i} "
+            f"<!-- issue:#1 date:2026-01-01 expires:2027-01-01 source:refine -->\n"
+        )
+    lines.append("---\n<!-- PROVISIONAL -->\n")
+    f.write_text("".join(lines))
+    return f
+
+
+@pytest.fixture
 def md_with_expired(tmp_path):
     """Markdown file with one expired entry and one valid entry."""
     f = tmp_path / "codebase-patterns.md"
@@ -239,6 +254,19 @@ class TestCapEnforcement:
                      "--issue", "648")
         assert result.returncode == 0
         assert md_at_cap.read_text().count("[AVOID]") == 30
+
+    def test_pattern_entries_count_toward_cap(self, md_at_cap_mixed):
+        # 29 [PATTERN] entries are already at the floor; the 30th write (AVOID) must succeed.
+        run("--target", str(md_at_cap_mixed), "--path-prefix", "backend/app/",
+            "--text", "entry 30", "--source", "conformance", "--issue", "648")
+        assert md_at_cap_mixed.read_text().count("[AVOID]") == 1
+
+        # 31st write must be rejected — total authoritative entries ([PATTERN]+[AVOID]) == 30.
+        result = run("--target", str(md_at_cap_mixed), "--path-prefix", "backend/app/",
+                     "--text", "entry 31 — completely unique", "--source", "conformance",
+                     "--issue", "648")
+        assert result.returncode == 0
+        assert md_at_cap_mixed.read_text().count("[AVOID]") == 1  # still only 1 AVOID written
 
 
 # ── expiry cleanup ──────────────────────────────────────────────────────────

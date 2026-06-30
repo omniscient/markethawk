@@ -177,10 +177,9 @@ def main():
             skip_index = True
             break
     else:
-        # Step 3: Cap check (30 [AVOID] entries per file).
-        # Only [AVOID] entries are written by this script, so count only those
-        # to avoid the cap being reached prematurely by [PATTERN]/[FIX] entries.
-        count = sum(1 for l in lines if l.startswith("- [AVOID] "))
+        # Step 3: Cap check (30 authoritative entries per file).
+        # Count all [PATTERN]/[AVOID]/[FIX] entries, matching the bash floor behavior.
+        count = sum(1 for l in lines if _ENTRY_RE.match(l))
         if count >= 30:
             print(f"memory-write: cap reached ({count} entries) in {target} — skipping write")
             skip_index = True
