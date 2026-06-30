@@ -26,50 +26,29 @@ Implementation belongs to the `Fix issue #N` workflow on a `feat/issue-N-*` bran
 3. Read `/opt/refinement-skills/architect-prompt.md` — you will pass this to the review subagent
 4. Find the spec file: look in `docs/superpowers/specs/` for a file matching this issue's topic, or check the issue comments for a "Refinement Pipeline — Spec Generated" report that names the spec path
 5. Read the spec file
-6. Compute the affected file set and define `load_memory` for path-tag filtering:
+6. Compute the affected file set and load memory context:
 
 ```bash
 AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
-
 REPO_ROOT=$(git rev-parse --show-toplevel)
-source "${REPO_ROOT}/dark-factory/scripts/agent_roles.sh"
-AGENT_ID="${AGENT_ID_PLANNING}"
 
-# load_memory: reads a memory file; project-tagged entries for other projects are excluded;
-# path-tagged entries are filtered against AFFECTED; entries with neither tag are always included.
-# When AFFECTED is empty (new branch, spec not yet implemented), all entries are included.
-load_memory() {
-  local MEMFILE=".archon/memory/$1"
-  [ -f "$MEMFILE" ] || return
-  while IFS= read -r line; do
-    # Project filter: skip entries tagged for a different project.
-    # Entries without any project: tag are always included (legacy backward compat).
-    if echo "$line" | grep -q 'project:'; then
-      if ! echo "$line" | grep -q "project:${MEMORY_PROJECT}"; then
-        continue
-      fi
-    fi
-    # Path filter: existing behavior unchanged.
-    if echo "$line" | grep -q 'path:'; then
-      PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
-      if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then
-        echo "$line"
-      fi
-    else
-      echo "$line"
-    fi
-  done < "$MEMFILE"
-}
+MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" \
+  --phase plan \
+  --files "$AFFECTED" \
+  --issue "$ISSUE_NUM" \
+  --memory-dir "${REPO_ROOT}/.archon/memory" 2>/dev/null || true)
+
+mkdir -p "$ARTIFACTS_DIR"
+printf '%s\n' "$MEMORY_CONTEXT" > "$ARTIFACTS_DIR/memory-context.md"
 ```
 
-7. Run `load_memory codebase-patterns.md` and include its filtered output in context — global lessons applicable to any change.
-8. Run `load_memory architecture.md` and include its filtered output in context — prior architectural decisions (if the file exists). If a memory entry marks an approach as AVOID, do not plan steps that use that approach.
-9. Run area-specific memory filtering based on the spec's `Component` field:
-   - Component touches `backend/app/models/`, `routers/`, `services/`, or `tasks/` → run `load_memory backend-patterns.md`
-   - Component touches `frontend/src/` → run `load_memory frontend-patterns.md`
-   - Component touches `docker-compose`, `Dockerfile`, or `dark-factory/` → run `load_memory dark-factory-ops.md`
+7. Include `$MEMORY_CONTEXT` in the context for this phase. If empty, proceed without memory context.
+   If a memory entry marks an approach as AVOID, do not plan steps that use that approach.
 
-  Bake relevant memory lessons directly into the plan task steps — do not leave them as a separate advisory section. For example, if `backend-patterns.md` contains a `[PATTERN]` about the `__init__.py` import requirement, the plan's "add model" task must explicitly include an `__init__.py` import step.
+   Bake relevant memory lessons directly into the plan task steps — do not leave them as a
+   separate advisory section. For example, if `backend-patterns.md` contains a `[PATTERN]`
+   about the `__init__.py` import requirement, the plan's "add model" task must explicitly
+   include an `__init__.py` import step.
 
 ## Phase 2: PLAN WRITING
 
@@ -84,38 +63,9 @@ Write a full implementation plan following these conventions:
 
 ## Phase 3: ARCHITECT REVIEW
 
-Before spawning the architect subagent, build `$MEMORY_CONTEXT` by selecting the memory files whose area matches the spec's `Component` field:
-
-```bash
-MEMORY_CONTEXT=""
-
-# Filter out [PROVISIONAL] and [INVALID] lines so unverified/invalidated entries
-# are excluded from authoritative prompt context (R6).
-_filter_memory() {
-  grep -v '^\- \[PROVISIONAL\]\|^\- \[INVALID\]' "$1"
-}
-
-# architecture.md is always included if it exists
-if [ -f ".archon/memory/architecture.md" ]; then
-  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/architecture.md\n$(_filter_memory .archon/memory/architecture.md)"
-fi
-
-# Backend area — extract the Component field from the spec file header
-SPEC_COMPONENT=$(grep -m1 '^\*\*Component' "$SPEC_FILE" | sed 's/.*: //')
-if echo "$SPEC_COMPONENT" | grep -qE "models/|routers/|services/|tasks/"; then
-  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/backend-patterns.md\n$(_filter_memory .archon/memory/backend-patterns.md)"
-fi
-
-# Frontend area
-if echo "$SPEC_COMPONENT" | grep -q "frontend/src/"; then
-  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/frontend-patterns.md\n$(_filter_memory .archon/memory/frontend-patterns.md)"
-fi
-
-# Docker / infrastructure area
-if echo "$SPEC_COMPONENT" | grep -qE "docker-compose|Dockerfile|dark-factory/"; then
-  MEMORY_CONTEXT="$MEMORY_CONTEXT\n\n### From .archon/memory/dark-factory-ops.md\n$(_filter_memory .archon/memory/dark-factory-ops.md)"
-fi
-```
+Before spawning the architect subagent, reuse `$MEMORY_CONTEXT` loaded in Phase 1 (it was
+already populated by `memory_retrieve.py --phase plan` and scoped to the changed file set).
+`[PROVISIONAL]` and `[INVALID]` entries are excluded automatically by the retrieval script.
 
 Prepend `$MEMORY_CONTEXT` to the architect prompt as a "## Memory: Accumulated Patterns" section immediately before the Spec and Plan content. If `$MEMORY_CONTEXT` is empty (no relevant files exist yet), omit the section entirely.
 

@@ -26,53 +26,26 @@ Read the project rules:
 2. Read `ARCHITECTURE.md` for service topology and module map.
 3. The issue context has been fetched by the workflow. It is available in the conversation.
 4. **Check the `intent` field** in the issue context: `"new"` or `"continue"`.
-5. Compute the affected file set and define `load_memory` for path-tag filtering:
+5. Compute the affected file set and load memory context:
 
 ```bash
 AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
-
 REPO_ROOT=$(git rev-parse --show-toplevel)
-source "${REPO_ROOT}/dark-factory/scripts/agent_roles.sh"
-AGENT_ID="${AGENT_ID_IMPLEMENTATION}"
 
-# load_memory: reads a memory file; project-tagged entries for other projects are excluded;
-# path-tagged entries are filtered against AFFECTED; entries with neither tag are always included.
-# When AFFECTED is empty (new branch), all path-tagged entries are included.
-load_memory() {
-  local MEMFILE=".archon/memory/$1"
-  [ -f "$MEMFILE" ] || return
-  while IFS= read -r line; do
-    # Project filter: skip entries tagged for a different project.
-    # Entries without any project: tag are always included (legacy backward compat).
-    if echo "$line" | grep -q 'project:'; then
-      if ! echo "$line" | grep -q "project:${MEMORY_PROJECT}"; then
-        continue
-      fi
-    fi
-    # Path filter: existing behavior unchanged.
-    if echo "$line" | grep -q 'path:'; then
-      PATH_TAG=$(echo "$line" | sed 's/.*path:\([^ >]*\).*/\1/')
-      if [ -z "$AFFECTED" ] || echo "$AFFECTED" | grep -q "^${PATH_TAG}"; then
-        echo "$line"
-      fi
-    else
-      echo "$line"
-    fi
-  done < "$MEMFILE"
-}
+MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" \
+  --phase implement \
+  --files "$AFFECTED" \
+  --issue "$ISSUE_NUM" \
+  --memory-dir "${REPO_ROOT}/.archon/memory" 2>/dev/null || true)
+
+mkdir -p "$ARTIFACTS_DIR"
+printf '%s\n' "$MEMORY_CONTEXT" > "$ARTIFACTS_DIR/memory-context.md"
 ```
 
-6. Run `load_memory codebase-patterns.md` and include its filtered output in context — global lessons from past runs.
-7. Run `load_memory architecture.md` and include its filtered output in context — prior architectural decisions (if the file exists).
-8. If the issue touches backend code (`backend/app/models/`, `routers/`, `services/`, `tasks/`): run `load_memory backend-patterns.md` and include its filtered output in context.
-9. If the issue touches frontend code (`frontend/src/`): run `load_memory frontend-patterns.md` and include its filtered output in context.
-10. If the issue touches Docker or infrastructure files (`docker-compose`, `Dockerfile`, `dark-factory/`): run `load_memory dark-factory-ops.md` and include its filtered output in context.
+6. Include `$MEMORY_CONTEXT` in the context for this phase. Apply these lessons as strong hints throughout implementation. If a lesson conflicts with `CLAUDE.md` or `ARCHITECTURE.md`, follow those documents instead and note the conflict in `$ARTIFACTS_DIR/implementation.md`.
 
-Apply these lessons as strong hints throughout implementation. If a lesson conflicts with `CLAUDE.md` or `ARCHITECTURE.md`, follow those documents instead and note the conflict in `$ARTIFACTS_DIR/implementation.md`.
-
-When reading memory files, skip entries tagged `[PROVISIONAL]` and `[INVALID]` — they are
-unverified or invalidated and must not be used as authoritative guidance. Treat the
-`<!-- PROVISIONAL -->` fenced section as advisory context only, never as settled fact.
+`[PROVISIONAL]` and `[INVALID]` entries are excluded automatically by the retrieval script.
+Treat any advisory context that surfaces as non-authoritative — it is informational only.
 
 ### If intent is "continue"
 

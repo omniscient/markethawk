@@ -100,6 +100,25 @@ Read the implementation context:
 - Read `$ARTIFACTS_DIR/implementation.md` for what was implemented
 - Read `CLAUDE.md` for validation rules
 
+Load conformance memory (entries tagged `source:conformance` only — implementation reasoning
+is excluded automatically):
+
+```bash
+AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" \
+  --phase validate \
+  --files "$AFFECTED" \
+  --issue "$ISSUE_NUM" \
+  --memory-dir "${REPO_ROOT}/.archon/memory" 2>/dev/null || true)
+
+mkdir -p "$ARTIFACTS_DIR"
+printf '%s\n' "$MEMORY_CONTEXT" > "$ARTIFACTS_DIR/memory-context.md"
+```
+
+Include `$MEMORY_CONTEXT` as additional conformance context for this phase. If empty, proceed without memory context.
+
 ## Phase 1.5: RESOLVE PREVIEW STATE
 
 The `preview-up` step wrote the preview URLs (and skip marker) to `$ARTIFACTS_DIR/preview_env.sh`.
