@@ -29,7 +29,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Diff Computation
 
-- [PATTERN] When fetching base file content to compute a formatter delta for a `main...HEAD` three-dot diff, use `git merge-base main HEAD` for the base ref, then `git show "$MERGE_BASE:{filepath}"`. Using `git show "main:{filepath}"` references main's current tip — on branches where main later updated the file, the wrong base produces false positives (feature hunk mis-classified as formatter-only) or false negatives. path:dark-factory/scripts/fmt_hunk_filter.py <!-- issue:#276 date:2026-06-11 expires:2026-12-11 source:implement -->
 
 ## Scheduler Config Pattern
 
@@ -70,11 +69,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Refine-Branch Pre-Implementation
 
-- [PATTERN] When the architect subagent implements plan tasks during validation (indicated by "Verdict: Approved (implemented directly...)" in the issue comment), cherry-pick those commits from `origin/refine/issue-NNN-...` onto the feat branch rather than reimplementing from scratch: `git log --oneline main..origin/refine/<branch>` to find the commits, then `git cherry-pick <hashes>` in chronological order. <!-- issue:#173 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 ## Conflict Resolution
 
-- [PATTERN] `check_pr_mergeable()` calls `gh pr view --json mergeable --jq '.mergeable'`; GitHub returns the string "CONFLICTING", "MERGEABLE", or "UNKNOWN". Always skip UNKNOWN — GitHub hasn't computed mergeability yet and will compute it on the next poll. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
 
 - [PATTERN] After `git merge` returns non-zero, `git diff --name-only --diff-filter=U` lists files with unresolved conflict markers. Once resolved and `git add`-ed, the file disappears from this list. Add a hard `find . -exec grep -l '^<<<<<<' {}` safety grep AFTER all resolutions as a final marker check before committing. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
 
@@ -96,7 +93,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Path-Tag Memory Filtering
 
-- [PATTERN] Path-tag filtering in Phase 1 LOAD extracts the `path:` prefix with `sed 's/.*path:\([^ >]*\).*/\1/'` (POSIX-compatible; not `grep -oP`) and matches via `echo "$AFFECTED" | grep -q "^${PATH_TAG}"` against the affected file list; empty `AFFECTED` means "include all" — correct fallback for new branches. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
 
 - [INVALID: functions moved to dark-factory/scripts/gate_lib.sh — source instead of inline-define] Gate commands (conformance, code-review) that need to write `[AVOID]` memory entries should define `route_memory_file()` and `write_memory_entry()` as inline shell functions using: dedup via `grep -qF`, 30-entry cap check, mawk-compatible two-arg awk expiry cleanup, and `sed -i "/^---$/i ENTRY"` to insert before the PROVISIONAL section delimiter. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
 
@@ -121,3 +117,9 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [PROVISIONAL] In the baked-image dark factory environment (no bind-mounts), `python -m alembic revision --autogenerate` fails with `OSError: [Errno 30] Read-only file system`. Workaround: (1) write the migration file manually to `/workspace/markethawk/backend/app/alembic/versions/` with the correct `revision` and `down_revision`; (2) apply the schema change via `docker compose exec backend python -c "from app.core.database import SessionLocal; from sqlalchemy import text; db=SessionLocal(); db.execute(text('ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...')); db.execute(text(\"INSERT INTO alembic_version (version_num) VALUES ('<rev_id>') ON CONFLICT DO NOTHING\")); db.commit(); db.close()"`. The workspace file will be baked into the next image build. <!-- evidence:docker-exec issue:#387 date:2026-06-21 expires:2026-12-21 source:implement -->
 - [AVOID] After applying advisory fixes that change an entry format (e.g. removing a tag field), always update test assertions in all test files that verify the removed field — stale assertions cause silent failures on the next run <!-- issue:#648 date:2026-06-30 expires:2026-12-30 source:implement scope:dark-factory path:dark-factory/tests/ -->
+- [PATTERN] In Dark Factory gate commands (.archon/commands/), load memory with a single `python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" --phase <role> --files "$AFFECTED" --issue "$ISSUE_NUM" --memory-dir "${REPO_ROOT}/.archon/memory"` call; it handles area-file routing and source/path filtering internally — do not inline load_memory() bash functions. <!-- issue:#652 date:2026-06-30 expires:2026-12-30 source:implement path:.archon/commands/ -->
+- [AVOID] memory_write.py hardcodes the [AVOID] tag (line 192 of dark-factory/scripts/memory_write.py); both chosen-approach and rejected-approach entries from the refine gate write path are written as [AVOID]. Do not expect [PATTERN] entries from memory_write.py until the tag is parameterized. <!-- issue:#652 date:2026-06-30 expires:2026-12-30 source:implement path:dark-factory/scripts/memory_write.py -->
+- [PATTERN] When fetching base file content to compute a formatter delta for a `main...HEAD` three-dot diff, use `git merge-base main HEAD` for the base ref, then `git show "$MERGE_BASE:{filepath}"`. Using `git show "main:{filepath}"` references main's current tip — on branches where main later updated the file, the wrong base produces false positives (feature hunk mis-classified as formatter-only) or false negatives. path:dark-factory/scripts/fmt_hunk_filter.py <!-- issue:#276 date:2026-06-11 expires:2026-12-11 source:implement -->
+- [PATTERN] When the architect subagent implements plan tasks during validation (indicated by "Verdict: Approved (implemented directly...)" in the issue comment), cherry-pick those commits from `origin/refine/issue-NNN-...` onto the feat branch rather than reimplementing from scratch: `git log --oneline main..origin/refine/<branch>` to find the commits, then `git cherry-pick <hashes>` in chronological order. <!-- issue:#173 date:2026-06-04 expires:2026-12-04 source:implement -->
+- [PATTERN] `check_pr_mergeable()` calls `gh pr view --json mergeable --jq '.mergeable'`; GitHub returns the string "CONFLICTING", "MERGEABLE", or "UNKNOWN". Always skip UNKNOWN — GitHub hasn't computed mergeability yet and will compute it on the next poll. <!-- issue:#210 date:2026-06-04 expires:2026-12-04 source:implement -->
+- [PATTERN] Path-tag filtering in Phase 1 LOAD extracts the `path:` prefix with `sed 's/.*path:\([^ >]*\).*/\1/'` (POSIX-compatible; not `grep -oP`) and matches via `echo "$AFFECTED" | grep -q "^${PATH_TAG}"` against the affected file list; empty `AFFECTED` means "include all" — correct fallback for new branches. <!-- issue:#213 date:2026-06-09 expires:2026-12-09 source:implement -->
