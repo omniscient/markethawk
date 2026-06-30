@@ -249,6 +249,62 @@ def test_dry_run_writes_nothing():
 
 
 # ---------------------------------------------------------------------------
+# agent_id in compact index
+# ---------------------------------------------------------------------------
+
+def test_update_index_writes_agent_id():
+    """update_index must write agent_id to each compact line so scan_index can filter by source."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        index_path = Path(tmpdir) / "index.jsonl"
+        record = mi.parse_entry(
+            "- [PATTERN] Source filter check <!-- issue:#646 date:2026-06-30 expires:2026-12-30 source:implement -->",
+            "backend-patterns.md",
+        )
+        mi.update_index([record], index_path, dry_run=False)
+        line = json.loads(index_path.read_text().strip())
+        assert line["agent_id"] == "implement"
+
+
+def test_update_index_agent_id_none_when_no_source():
+    """Entries without a source: tag get agent_id=null in the compact index."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        index_path = Path(tmpdir) / "index.jsonl"
+        record = mi.parse_entry(
+            "- [PATTERN] No source tag <!-- issue:#1 date:2026-01-01 expires:2026-12-31 -->",
+            "codebase-patterns.md",
+        )
+        mi.update_index([record], index_path, dry_run=False)
+        line = json.loads(index_path.read_text().strip())
+        assert line["agent_id"] is None
+
+
+def test_update_index_writes_created_at():
+    """update_index must write created_at from evidence[0]['date'] for ranking tiebreaker."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        index_path = Path(tmpdir) / "index.jsonl"
+        record = mi.parse_entry(
+            "- [PATTERN] Created-at check <!-- issue:#646 date:2026-06-30 expires:2026-12-30 source:implement -->",
+            "backend-patterns.md",
+        )
+        mi.update_index([record], index_path, dry_run=False)
+        line = json.loads(index_path.read_text().strip())
+        assert line["created_at"] == "2026-06-30"
+
+
+def test_update_index_created_at_none_when_no_date():
+    """Entries without a date: tag get created_at=null in the compact index."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        index_path = Path(tmpdir) / "index.jsonl"
+        record = mi.parse_entry(
+            "- [PATTERN] No date tag <!-- issue:#1 expires:2026-12-31 source:implement -->",
+            "codebase-patterns.md",
+        )
+        mi.update_index([record], index_path, dry_run=False)
+        line = json.loads(index_path.read_text().strip())
+        assert line["created_at"] is None
+
+
+# ---------------------------------------------------------------------------
 # Integration test (runs against real .archon/memory/)
 # ---------------------------------------------------------------------------
 
