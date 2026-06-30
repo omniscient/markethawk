@@ -125,7 +125,6 @@ class TestMarkdownWrite:
             "--text", "avoid mocks in tests", "--source", "conformance", "--issue", "648")
         content = md_empty.read_text()
         today = date.today().strftime("%Y-%m-%d")
-        assert "agent:conformance" in content
         assert "scope:backend" in content
         assert "path:backend/app/" in content
         assert "source:conformance" in content
@@ -336,8 +335,7 @@ class TestSanitization:
         run("--target", str(md_empty), "--path-prefix", "backend/app/",
             "--text", "avoid --> pattern in code", "--source", "conformance", "--issue", "648")
         content = md_empty.read_text()
-        # The full comment must still be closed properly — agent:/scope:/path: must all appear.
-        assert "agent:" in content
+        # The full comment must still be closed properly — scope:/path: must all appear.
         assert "scope:" in content
         assert "path:" in content
         # Exactly one entry written (not multiple fragments)

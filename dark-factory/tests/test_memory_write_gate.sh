@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Integration test: write_memory_entry() in gate_lib.sh delegates to memory_write.py.
-# Tests that the delegation produces entries with agent:/scope: tags (new behaviour).
+# Tests that the delegation produces entries with scope:/path: tags (new behaviour).
 set -euo pipefail
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
@@ -20,7 +20,7 @@ assert() {
 TMP=$(mktemp -d)
 trap "rm -rf $TMP" EXIT
 
-# ── Test 1: entry written with agent: tag ────────────────────────────────────
+# ── Test 1: entry written with scope:/path: tags ─────────────────────────────
 MD="$TMP/dark-factory-ops.md"
 printf "# Dark Factory Ops\n\n---\n<!-- PROVISIONAL -->\n" > "$MD"
 
@@ -28,8 +28,6 @@ write_memory_entry "$MD" "dark-factory/scripts/" "avoid bad pattern" "conformanc
 
 assert "[AVOID] entry written" \
   "$(grep -q '\[AVOID\]' "$MD" && echo 0 || echo 1)"
-assert "agent: tag present" \
-  "$(grep -q 'agent:conformance' "$MD" && echo 0 || echo 1)"
 assert "scope: tag present" \
   "$(grep -q 'scope:dark-factory' "$MD" && echo 0 || echo 1)"
 assert "path: tag present" \
