@@ -190,3 +190,7 @@ notice and migration plan:
 3. Validate that the structured store produces identical `load_memory()` output for a representative `AFFECTED` file set.
 4. Update `gate_lib.sh` reader and writer functions to use the structured backend.
 5. Update this document's status to `migrated` and point to the new backend's schema doc.
+
+---
+
+See also: [Dark Factory Memory v2 — Rollout & Fallback](dark-factory-memory-v2.md) for the operator runbook (rollout status, fallback behaviour, rollback steps, maintenance CLI, cost/perf, and security).

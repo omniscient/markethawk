@@ -166,3 +166,8 @@ Preview URLs are included in the PR body. The preview persists after the factory
 ### Architecture
 
 See [dark factory design spec](archive/2026-05-02-dark-factory-design.md) for the full architecture, security model, and container topology.
+
+### Memory
+
+- **Memory contract** — stable schema, lifecycle, and writer-role rules: [`docs/agents/dark-factory-memory-contract.md`](agents/dark-factory-memory-contract.md)
+- **Memory v2 operator guide** — rollout, fallback, maintenance, security: [`docs/agents/dark-factory-memory-v2.md`](agents/dark-factory-memory-v2.md)
