@@ -326,3 +326,69 @@ class TestIndexJsonl:
             assert "index.jsonl" in result.stderr
         finally:
             index.chmod(0o644)
+
+
+# ── sanitization ────────────────────────────────────────────────────────────
+
+class TestSanitization:
+    def test_arrow_in_text_does_not_break_comment(self, md_empty):
+        """text containing --> must not close the HTML comment early."""
+        run("--target", str(md_empty), "--path-prefix", "backend/app/",
+            "--text", "avoid --> pattern in code", "--source", "conformance", "--issue", "648")
+        content = md_empty.read_text()
+        # The full comment must still be closed properly — agent:/scope:/path: must all appear.
+        assert "agent:" in content
+        assert "scope:" in content
+        assert "path:" in content
+        # Exactly one entry written (not multiple fragments)
+        assert content.count("[AVOID]") == 1
+
+    def test_newline_in_text_is_collapsed_to_space(self, md_empty):
+        """text containing \\n must be collapsed to a single line before writing."""
+        run("--target", str(md_empty), "--path-prefix", "backend/app/",
+            "--text", "avoid this\npattern", "--source", "conformance", "--issue", "648")
+        content = md_empty.read_text()
+        # Entry must appear on a single line so _ENTRY_RE matches it correctly.
+        entry_line = next((l for l in content.splitlines() if "[AVOID]" in l), None)
+        assert entry_line is not None, "entry line not found"
+        assert "avoid this pattern" in entry_line
+
+    def test_newline_text_dedup_still_works(self, md_empty):
+        """Two writes with equivalent text differing only by embedded newline must dedup."""
+        run("--target", str(md_empty), "--path-prefix", "backend/app/",
+            "--text", "avoid this pattern", "--source", "conformance", "--issue", "648")
+        # Second write has embedded newline — after collapse it equals first write.
+        run("--target", str(md_empty), "--path-prefix", "backend/app/",
+            "--text", "avoid this\npattern", "--source", "conformance", "--issue", "648")
+        assert md_empty.read_text().count("[AVOID]") == 1
+
+    def test_arrow_in_path_prefix_is_stripped(self, md_empty):
+        """path-prefix containing --> must be stripped so the comment closes exactly once."""
+        run("--target", str(md_empty), "--path-prefix", "dark-->factory/",
+            "--text", "avoid this", "--source", "conformance", "--issue", "648")
+        entry_line = next(
+            (l for l in md_empty.read_text().splitlines() if "[AVOID]" in l), None
+        )
+        assert entry_line is not None
+        comment_start = entry_line.find("<!--")
+        assert comment_start != -1
+        # The comment portion must contain exactly one --> (the closing one at the end).
+        comment_part = entry_line[comment_start:]
+        assert comment_part.count("-->") == 1, (
+            f"comment was closed early; found {comment_part.count('-->')} occurrences: {comment_part!r}"
+        )
+
+    def test_arrow_in_source_is_stripped(self, md_empty):
+        """source containing mid-value --> must be stripped so the comment closes exactly once."""
+        run("--target", str(md_empty), "--path-prefix", "backend/app/",
+            "--text", "avoid this", "--source", "conform-->ance", "--issue", "648")
+        entry_line = next(
+            (l for l in md_empty.read_text().splitlines() if "[AVOID]" in l), None
+        )
+        assert entry_line is not None
+        comment_start = entry_line.find("<!--")
+        assert comment_start != -1
+        comment_part = entry_line[comment_start:]
+        assert comment_part.count("-->") == 1, (
+            f"comment was closed early; found {comment_part.count('-->')} occurrences: {comment_part!r}"
+        )

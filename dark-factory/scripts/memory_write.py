@@ -114,6 +114,11 @@ def main():
         print("memory-write: error: --text is empty", file=sys.stderr)
         sys.exit(1)
 
+    # Sanitize: collapse whitespace (removes embedded newlines) and strip -->
+    # (same as the prior bash pipeline: tr -d '\n\r' | sed 's/-->//g').
+    args.text = re.sub(r"\s+", " ", args.text).strip()
+    args.text = args.text.replace("-->", "")
+
     # Load existing content (treat missing file as empty)
     try:
         raw = target.read_text(encoding="utf-8") if target.exists() else ""
@@ -156,12 +161,15 @@ def main():
             print(f"memory-write: cap reached ({count} entries) in {target} — skipping write")
             skip_index = True
         else:
-            # Step 4: Build entry with full tag set per #645 contract
+            # Step 4: Build entry with full tag set per #645 contract.
+            # Strip --> and newlines from metadata fields to prevent early comment closure.
+            safe_source = args.source.replace("-->", "").replace("\n", "").replace("\r", "")
+            safe_path = args.path_prefix.replace("-->", "").replace("\n", "").replace("\r", "")
             entry = (
                 f"- [AVOID] {args.text} "
                 f"<!-- issue:#{args.issue} date:{today_str} expires:{expires_str} "
-                f"source:{args.source} agent:{agent_id} scope:{scope} "
-                f"path:{args.path_prefix} -->"
+                f"source:{safe_source} agent:{safe_source} scope:{scope} "
+                f"path:{safe_path} -->"
             )
 
             # Step 5: Insert before --- delimiter, or append if absent
