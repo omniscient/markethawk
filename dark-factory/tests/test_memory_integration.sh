@@ -2,6 +2,7 @@
 # Smoke test: memory_retrieve.py integrates correctly with all 4 Dark Factory phases.
 # Asserts exit 0 for each phase, validates phase→source filter, and confirms
 # the --issue flag passes through cleanly.
+# Run manually: bash dark-factory/tests/test_memory_integration.sh
 set -euo pipefail
 
 REPO_ROOT=$(git rev-parse --show-toplevel)
@@ -22,17 +23,14 @@ assert() {
 # ── Phase exit-0 tests ────────────────────────────────────────────────────
 
 for phase in refine plan implement validate; do
-  rc=0
-  python3 "$SCRIPT" --phase "$phase" --memory-dir "$MEMORY_DIR" > /dev/null 2>&1 && rc=0 || rc=$?
+  python3 "$SCRIPT" --phase "$phase" --memory-dir "$MEMORY_DIR" > /dev/null 2>&1; rc=$?
   assert "phase=$phase exits 0 (no --files)" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 done
 
 # ── --issue flag passes cleanly ──────────────────────────────────────────
 
 for phase in refine plan implement validate; do
-  rc=0
-  python3 "$SCRIPT" --phase "$phase" --issue 652 --memory-dir "$MEMORY_DIR" > /dev/null 2>&1 \
-    && rc=0 || rc=$?
+  python3 "$SCRIPT" --phase "$phase" --issue 652 --memory-dir "$MEMORY_DIR" > /dev/null 2>&1; rc=$?
   assert "phase=$phase with --issue 652 exits 0" "$([ "$rc" -eq 0 ] && echo 0 || echo 1)"
 done
 
@@ -44,7 +42,7 @@ done
 # exempt from the source filter).
 
 TMP=$(mktemp -d)
-trap "rm -rf $TMP" EXIT
+trap 'rm -rf "$TMP"' EXIT
 
 # Minimal codebase-patterns.md so the script has a global file to scan
 cat > "$TMP/codebase-patterns.md" << 'MEMEOF'

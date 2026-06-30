@@ -32,10 +32,13 @@ Read the project rules:
 AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
 REPO_ROOT=$(git rev-parse --show-toplevel)
 
+ISSUE_ARG=""
+[[ "$ISSUE_NUM" =~ ^[0-9]+$ ]] && ISSUE_ARG="--issue $ISSUE_NUM"
+
 MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" \
   --phase implement \
   --files "$AFFECTED" \
-  --issue "$ISSUE_NUM" \
+  $ISSUE_ARG \
   --memory-dir "${REPO_ROOT}/.archon/memory" 2>/dev/null || true)
 
 mkdir -p "$ARTIFACTS_DIR"
