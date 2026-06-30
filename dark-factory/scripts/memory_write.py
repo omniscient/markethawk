@@ -59,9 +59,20 @@ def _add_months(d, months):
 
 
 def _extract_body(line):
-    """Extract lesson text from a [PATTERN]/[AVOID]/[FIX] line (before <!-- comment)."""
-    m = re.match(r"^\- \[(?:PATTERN|AVOID|FIX)\] (.*?)(?:\s*<!--.*)?$", line)
-    return m.group(1).strip() if m else ""
+    """Extract lesson text from a [PATTERN]/[AVOID]/[FIX] line (before <!-- comment).
+
+    Splits on the LAST occurrence of ' <!--' so that body text containing '<!--'
+    is not prematurely truncated.
+    """
+    m = re.match(r"^\- \[(?:PATTERN|AVOID|FIX)\] (.+)$", line)
+    if not m:
+        return ""
+    body = m.group(1)
+    # Split on the LAST '<!--' to avoid truncating body text that contains '<!--'
+    idx = body.rfind("<!--")
+    if idx != -1:
+        body = body[:idx]
+    return body.strip()
 
 
 def _is_expired(line, today_str):
@@ -114,12 +125,17 @@ def main():
         print("memory-write: error: --text is empty", file=sys.stderr)
         sys.exit(1)
 
-    # Sanitize: collapse whitespace (removes embedded newlines) and strip -->
-    # (same as the prior bash pipeline: tr -d '\n\r' | sed 's/-->//g').
+    # Sanitize: collapse whitespace (removes embedded newlines) and strip HTML
+    # comment delimiters (same as the prior bash pipeline: tr -d '\n\r' | sed 's/-->//g').
+    # Both '<!--' and '-->' are stripped so prose containing either cannot break
+    # the metadata comment appended to each entry.
     args.text = re.sub(r"\s+", " ", args.text).strip()
-    args.text = args.text.replace("-->", "")
+    args.text = args.text.replace("<!--", "").replace("-->", "")
 
     # Load existing content (treat missing file as empty)
+    if target.is_dir():
+        print(f"memory-write: error: --target is a directory, not a file: {target}", file=sys.stderr)
+        sys.exit(1)
     try:
         raw = target.read_text(encoding="utf-8") if target.exists() else ""
     except OSError as exc:
@@ -145,6 +161,12 @@ def main():
             # REINFORCE: update date: and expires: in-place; one-line diff
             updated = re.sub(r"date:\d{4}-\d{2}-\d{2}", f"date:{today_str}", line)
             updated = re.sub(r"expires:\d{4}-\d{2}-\d{2}", f"expires:{expires_str}", updated)
+            # Handle legacy/manually added entries that have no date:/expires: tags:
+            # append a new metadata comment so reinforcement is always recorded.
+            if "date:" not in updated:
+                trailing_newline = "\n" if updated.endswith("\n") else ""
+                updated = updated.rstrip("\n")
+                updated += f" <!-- date:{today_str} expires:{expires_str} -->{trailing_newline}"
             lines[i] = updated
             try:
                 target.write_text("".join(lines), encoding="utf-8")
@@ -155,8 +177,10 @@ def main():
             skip_index = True
             break
     else:
-        # Step 3: Cap check (30 authoritative entries per file)
-        count = sum(1 for l in lines if _ENTRY_RE.match(l))
+        # Step 3: Cap check (30 [AVOID] entries per file).
+        # Only [AVOID] entries are written by this script, so count only those
+        # to avoid the cap being reached prematurely by [PATTERN]/[FIX] entries.
+        count = sum(1 for l in lines if l.startswith("- [AVOID] "))
         if count >= 30:
             print(f"memory-write: cap reached ({count} entries) in {target} — skipping write")
             skip_index = True
@@ -168,7 +192,7 @@ def main():
             entry = (
                 f"- [AVOID] {args.text} "
                 f"<!-- issue:#{args.issue} date:{today_str} expires:{expires_str} "
-                f"source:{safe_source} agent:{safe_source} scope:{scope} "
+                f"source:{safe_source} scope:{scope} "
                 f"path:{safe_path} -->"
             )
 
