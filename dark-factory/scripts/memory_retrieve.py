@@ -46,6 +46,14 @@ AREA_PREFIX_MAP = [
     (("docker-compose", "Dockerfile", "dark-factory/", ".archon/"), "dark-factory-ops.md"),
 ]
 
+PHASE_AGENT_ID = {
+    "refine":    "refine-agent",
+    "plan":      "plan-agent",
+    "implement": "implementation-agent",
+    "validate":  "validate-agent",
+    "review":    "review-agent",
+}
+
 # Only these kind tags are considered authoritative
 AUTHORITATIVE_KINDS = {"PATTERN", "AVOID", "FIX"}
 
@@ -331,7 +339,7 @@ def _count_entries(fpath, files, allowed_sources, source_file_name):
     return {"total": total, "included": included}
 
 
-def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_sources):
+def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_sources, issue=0, agent_id=None):
     """Write memory-trace.json to trace_path. Best-effort: never raises."""
     try:
         memory_dir = Path(memory_dir)
@@ -354,7 +362,10 @@ def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_
         trace = {
             "schema_version": 1,
             "retrieval_mechanism": "flatfile-pathtag",
+            "issue": issue or 0,
             "phase": phase,
+            "agent_id": agent_id or PHASE_AGENT_ID.get(phase, phase + "-agent"),
+            "project": "markethawk",
             "affected_files": list(files),
             "files_loaded": files_loaded,
             "fallback_used": fallback_used,
@@ -413,7 +424,11 @@ def main():
         print(output)
 
     if args.emit_trace_to:
-        emit_memory_trace(args.emit_trace_to, args.phase, files, memory_dir, area_files, allowed_sources)
+        emit_memory_trace(
+            args.emit_trace_to, args.phase, files, memory_dir, area_files, allowed_sources,
+            issue=args.issue or 0,
+            agent_id=PHASE_AGENT_ID.get(args.phase, args.phase + "-agent"),
+        )
 
 
 if __name__ == "__main__":

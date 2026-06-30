@@ -945,3 +945,56 @@ class TestEmitMemoryTrace:
         assert result.returncode == 0
         assert not trace_path.exists()
 
+    def test_emit_issue_field(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"}, issue=123)
+        data = json.loads(trace_path.read_text())
+        assert data["issue"] == 123
+
+    def test_emit_issue_defaults_to_zero(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert data["issue"] == 0
+
+    def test_emit_agent_id_field(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"}, agent_id="implementation-agent")
+        data = json.loads(trace_path.read_text())
+        assert data["agent_id"] == "implementation-agent"
+
+    def test_emit_project_field(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "memory-trace.json"
+        mr.emit_memory_trace(trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"})
+        data = json.loads(trace_path.read_text())
+        assert data["project"] == "markethawk"
+
+    def test_phase_agent_id_map_exists(self, tmp_path):
+        assert hasattr(mr, "PHASE_AGENT_ID")
+        assert mr.PHASE_AGENT_ID["implement"] == "implementation-agent"
+        assert mr.PHASE_AGENT_ID["plan"] == "plan-agent"
+        assert mr.PHASE_AGENT_ID["refine"] == "refine-agent"
+        assert mr.PHASE_AGENT_ID["validate"] == "validate-agent"
+
+    def test_cli_includes_issue_agent_project(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "trace.json"
+        result = subprocess.run(
+            [sys.executable, str(Path(mr.__file__).resolve()),
+             "--phase", "implement",
+             "--memory-dir", str(mem_dir),
+             "--issue", "647",
+             "--emit-trace-to", str(trace_path)],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        assert trace_path.exists()
+        data = json.loads(trace_path.read_text())
+        assert data["issue"] == 647
+        assert data["agent_id"] == "implementation-agent"
+        assert data["project"] == "markethawk"
+
