@@ -39,9 +39,9 @@ assert "catch-all docs/ routes to codebase-patterns.md" \
 assert "catch-all root file routes to codebase-patterns.md" \
   "$([ "$(route_memory_file 'CLAUDE.md')" = '.archon/memory/codebase-patterns.md' ] && echo 0 || echo 1)"
 
-# ---- write_memory_entry() tag tests (#648 new format: scope:/source:/path: per #645) ----
+# ---- write_memory_entry() tag tests (#648 new format: scope:/source:/agent:/path: per #645) ----
 
-# Test: written entry has scope:/source:/path: tags (replaces project:/agentId:)
+# Test: written entry has scope:/source:/agent:/path: tags (replaces project:/agentId:)
 TMPDIR_WM=$(mktemp -d /tmp/test_write_memory_XXXXXX)
 trap "rm -rf $TMPDIR_WM" EXIT
 MD_WM="$TMPDIR_WM/dark-factory-ops.md"
@@ -53,6 +53,9 @@ assert "written entry includes scope: tag" \
 
 assert "written entry includes source: tag" \
   "$(grep -q 'source:conformance' "$MD_WM" && echo 0 || echo 1)"
+
+assert "written entry includes agent:<source> tag" \
+  "$(grep -q 'agent:conformance' "$MD_WM" && echo 0 || echo 1)"
 
 assert "written entry includes path: tag" \
   "$(grep -q 'path:dark-factory/scripts/' "$MD_WM" && echo 0 || echo 1)"

@@ -192,7 +192,7 @@ def main():
             entry = (
                 f"- [AVOID] {args.text} "
                 f"<!-- issue:#{args.issue} date:{today_str} expires:{expires_str} "
-                f"source:{safe_source} scope:{scope} "
+                f"source:{safe_source} agent:{safe_source} scope:{scope} "
                 f"path:{safe_path} -->"
             )
 

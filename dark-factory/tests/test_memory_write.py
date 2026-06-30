@@ -128,6 +128,7 @@ class TestMarkdownWrite:
         assert "scope:backend" in content
         assert "path:backend/app/" in content
         assert "source:conformance" in content
+        assert "agent:conformance" in content
         assert "issue:#648" in content
         assert f"date:{today}" in content
 

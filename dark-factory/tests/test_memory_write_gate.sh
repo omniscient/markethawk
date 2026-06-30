@@ -30,6 +30,8 @@ assert "[AVOID] entry written" \
   "$(grep -q '\[AVOID\]' "$MD" && echo 0 || echo 1)"
 assert "scope: tag present" \
   "$(grep -q 'scope:dark-factory' "$MD" && echo 0 || echo 1)"
+assert "agent: tag present" \
+  "$(grep -q 'agent:conformance' "$MD" && echo 0 || echo 1)"
 assert "path: tag present" \
   "$(grep -q 'path:dark-factory/scripts/' "$MD" && echo 0 || echo 1)"
 assert "entry is before --- delimiter" \
