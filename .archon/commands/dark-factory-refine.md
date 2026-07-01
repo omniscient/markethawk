@@ -37,21 +37,8 @@ Do NOT create or modify any other files. Do NOT implement code, write tests, or 
 7. Compute the affected file set and load memory context:
 
 ```bash
-AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
 REPO_ROOT=$(git rev-parse --show-toplevel)
-
-ISSUE_ARG=""
-[[ "$ISSUE_NUM" =~ ^[0-9]+$ ]] && ISSUE_ARG="--issue $ISSUE_NUM"
-
-MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" \
-  --phase refine \
-  --files "$AFFECTED" \
-  $ISSUE_ARG \
-  --memory-dir "${REPO_ROOT}/.archon/memory" \
-  --emit-trace-to "$ARTIFACTS_DIR/memory-trace.json" 2>/dev/null || true)
-
-mkdir -p "$ARTIFACTS_DIR"
-printf '%s\n' "$MEMORY_CONTEXT" > "$ARTIFACTS_DIR/memory-context.md"
+MEMORY_CONTEXT=$(bash "${REPO_ROOT}/dark-factory/scripts/load_memory_context.sh" refine)
 ```
 
 Include `$MEMORY_CONTEXT` in the context for this phase. If empty, proceed without memory context.
@@ -110,29 +97,7 @@ Follow the process in `orchestrator-prompt.md`:
 4. Self-review: placeholder scan, consistency check, scope check, ambiguity check. Fix inline.
 5. Run the OOS gate — detect and revert any files committed outside the refine allowlist:
    ```bash
-   ALLOWED_PREFIXES="docs/superpowers/specs/ .archon/memory/"
-   OOS_FILES=$(git diff --name-only origin/main HEAD 2>/dev/null | while read -r f; do
-     ALLOWED=false
-     for prefix in $ALLOWED_PREFIXES; do
-       case "$f" in "$prefix"*) ALLOWED=true; break;; esac
-     done
-     $ALLOWED || echo "$f"
-   done)
-   if [ -n "$OOS_FILES" ]; then
-     echo "OOS gate: excising out-of-scope files: $OOS_FILES"
-     for f in $OOS_FILES; do
-       if git show origin/main:"$f" > /dev/null 2>&1; then
-         git checkout origin/main -- "$f"
-       else
-         git rm -f --cached "$f" 2>/dev/null; rm -f "$f"
-       fi
-     done
-     git commit -m "chore: excise out-of-scope files from refine run (#$ISSUE_NUM)" --allow-empty
-     mkdir -p "$ARTIFACTS_DIR"
-     echo "$OOS_FILES" | while read -r f; do
-       echo "- $f: removed by refine OOS gate (should not have been created/modified)" >> "$ARTIFACTS_DIR/out-of-scope.md"
-     done
-   fi
+   OOS_FILES=$(bash "${REPO_ROOT}/dark-factory/scripts/oos_excise.sh" "docs/superpowers/specs/ .archon/memory/" refine)
    ```
    Retain `$OOS_FILES` for use in the Phase 6 comment.
 6. Commit the spec
