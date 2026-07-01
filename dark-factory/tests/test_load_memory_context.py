@@ -9,7 +9,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "dark-factory" / "scripts" / "load_memory_context.sh"
 
 
-def run_script(phase: str, env: dict, tmp_path: Path) -> subprocess.CompletedProcess:
+def run_script(phase: str, env: dict) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["bash", str(SCRIPT), phase],
         capture_output=True,
@@ -37,12 +37,12 @@ class TestLoadMemoryContextScript:
 
     def test_happy_path_exits_zero(self, tmp_path):
         env = base_env(tmp_path)
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         assert result.returncode == 0, f"Script failed: {result.stderr}"
 
     def test_outputs_to_stdout(self, tmp_path):
         env = base_env(tmp_path)
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         assert result.returncode == 0
         # stdout may be empty if no relevant memory — that's fine; the key is it exits 0
         # and the stdout is the memory context string (may be empty)
@@ -50,14 +50,14 @@ class TestLoadMemoryContextScript:
 
     def test_writes_memory_context_md(self, tmp_path):
         env = base_env(tmp_path)
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         assert result.returncode == 0
         ctx_file = tmp_path / "memory-context.md"
         assert ctx_file.exists(), "memory-context.md was not created"
 
     def test_memory_context_md_matches_stdout(self, tmp_path):
         env = base_env(tmp_path)
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         assert result.returncode == 0
         ctx_file = tmp_path / "memory-context.md"
         # The file content should match stdout (stdout has trailing newline from printf)
@@ -67,7 +67,7 @@ class TestLoadMemoryContextScript:
 
     def test_writes_memory_trace_json(self, tmp_path):
         env = base_env(tmp_path)
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         assert result.returncode == 0
         trace_file = tmp_path / "memory-trace.json"
         assert trace_file.exists(), "memory-trace.json was not created"
@@ -75,7 +75,7 @@ class TestLoadMemoryContextScript:
     def test_trace_json_is_valid_json(self, tmp_path):
         import json
         env = base_env(tmp_path)
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         assert result.returncode == 0
         trace_file = tmp_path / "memory-trace.json"
         data = json.loads(trace_file.read_text())
@@ -86,14 +86,14 @@ class TestLoadMemoryContextScript:
             tp = tmp_path / phase
             tp.mkdir()
             env = base_env(tp)
-            result = run_script(phase, env, tp)
+            result = run_script(phase, env)
             assert result.returncode == 0, f"Failed for phase={phase}: {result.stderr}"
 
     def test_issue_num_passed_when_set(self, tmp_path):
         import json
         env = base_env(tmp_path)
         env["ISSUE_NUM"] = "670"
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         assert result.returncode == 0
         trace_file = tmp_path / "memory-trace.json"
         data = json.loads(trace_file.read_text())
@@ -116,7 +116,7 @@ class TestLoadMemoryContextScript:
         env["REPO_ROOT"] = str(fake_root)
         env["ARTIFACTS_DIR"] = str(tmp_path / "artifacts")
         (tmp_path / "artifacts").mkdir()
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         # Must exit 0 (fail-soft) even when memory_retrieve.py is absent
         assert result.returncode == 0, f"Script aborted instead of failing soft: {result.stderr}"
 
@@ -124,7 +124,7 @@ class TestLoadMemoryContextScript:
         env = base_env(tmp_path)
         missing_dir = tmp_path / "not_yet_created"
         env["ARTIFACTS_DIR"] = str(missing_dir)
-        result = run_script("implement", env, tmp_path)
+        result = run_script("implement", env)
         assert result.returncode == 0
         assert missing_dir.exists(), "ARTIFACTS_DIR was not created by the script"
 

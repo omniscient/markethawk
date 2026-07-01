@@ -29,13 +29,18 @@ done)
 
 if [ -n "$OOS_FILES" ]; then
   echo "OOS gate: excising out-of-scope files: $OOS_FILES" >&2
-  for f in $OOS_FILES; do
+  # Note: space-in-prefix is unsupported by design (callers pass ALLOWED_PREFIXES as a
+  # space-separated string; splitting on spaces is the intended delimiter for prefixes).
+  while IFS= read -r f; do
+    # Two branches:
+    #   (a) File exists in origin/main → restore it to its origin state (revert modification).
+    #   (b) File is new (not in origin/main) → remove it entirely from the index and working tree.
     if git show origin/main:"$f" > /dev/null 2>&1; then
       git checkout origin/main -- "$f" >/dev/null 2>&1
     else
       git rm -f --cached "$f" >/dev/null 2>&1; rm -f "$f"
     fi
-  done
+  done <<< "$OOS_FILES"
   git commit -m "chore: excise out-of-scope files from ${COMMIT_NOUN} run (#${ISSUE_NUM})" --allow-empty >/dev/null 2>&1
   mkdir -p "$ARTIFACTS_DIR"
   echo "$OOS_FILES" | while read -r f; do
