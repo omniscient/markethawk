@@ -2,7 +2,10 @@
 set -euo pipefail
 
 # --- Configuration (non-policy infrastructure) ---
-SKIP_LABELS="needs-discussion,epic"
+# ready-for-human marks a ticket a human has taken over; the factory must leave it alone
+# everywhere (dispatch, retry, rescue, and the orphaned-in-progress sweep) — an In-progress
+# ready-for-human ticket has no container because a HUMAN is on it, not because a run died.
+SKIP_LABELS="needs-discussion,epic,ready-for-human"
 SCHEDULER_STATE_DIR="${SCHEDULER_STATE_DIR:-/var/lib/dark-factory}"
 STATE_FILE="${SCHEDULER_STATE_DIR}/scheduler-state.json"
 RECHECK_STAMP_FILE="${SCHEDULER_STATE_DIR}/main-red-last-recheck"
