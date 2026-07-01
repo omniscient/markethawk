@@ -22,6 +22,7 @@ const ActiveWatchlist = lazy(() => import('./pages/ActiveWatchlist'));
 const AutoTrading = lazy(() => import('./pages/AutoTrading'));
 const ScorecardOverview = lazy(() => import('./pages/ScorecardOverview'));
 const ScorecardDetail = lazy(() => import('./pages/ScorecardDetail'));
+const Replay = lazy(() => import('./pages/Replay'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +69,7 @@ function App() {
                         <Route path="/edge-explorer" element={<EdgeExplorer />} />
                         <Route path="/scorecard" element={<ScorecardOverview />} />
                         <Route path="/scorecard/:scannerType" element={<ScorecardDetail />} />
+                        <Route path="/replay" element={<Replay />} />
                         <Route path="/movers/pre-market" element={<PreMarketMovers />} />
                         <Route path="/watchlist" element={<ActiveWatchlist />} />
                         <Route path="/trading" element={<AutoTrading />} />

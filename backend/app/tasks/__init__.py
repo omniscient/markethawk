@@ -6,6 +6,7 @@ from app.tasks.quality import (
     normalize_universe_quality,
 )
 from app.tasks.regime import backfill_regime_labels, update_regime_model
+from app.tasks.replay import run_signal_replay
 from app.tasks.scanning import (
     evaluate_scanner_alerts,
     run_liquidity_hunt_scheduled,
@@ -32,6 +33,7 @@ from app.tasks.trading import (
 __all__ = [
     # backtest
     "run_backtest",
+    "run_signal_replay",
     # sync
     "sync_tickers_batch",
     "sync_ticker_details",
