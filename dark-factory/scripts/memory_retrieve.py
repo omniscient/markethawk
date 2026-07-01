@@ -482,7 +482,7 @@ def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_
             "fallback_used": fallback_used,
         }
 
-        if cap_counts is not None and not cap_counts.get("fallback_used"):
+        if cap_counts and not cap_counts.get("fallback_used"):
             trace["entries_selected_total"] = cap_counts.get("entries_selected", 0)
             trace["entries_dropped_by_cap_total"] = cap_counts.get("entries_dropped_by_cap", 0)
 
