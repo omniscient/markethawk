@@ -313,7 +313,7 @@ class TestMemoryContextCapCounts:
         assert "memory_context" in result["sections"]
 
     def test_dropped_memory_file_no_trace_no_crash(self, tmp_path):
-        """When memory_file is missing (pre-run call), trace read is not attempted."""
+        """When memory_file is None, the memory_context section is dropped (status=dropped)."""
         issue_json = make_issue_json(tmp_path)
         write_memory_trace(str(tmp_path), entries_selected=5, entries_dropped=3)
         result = run_budget(tmp_path, "plan", issue_json=issue_json, memory_file=None)

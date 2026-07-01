@@ -68,7 +68,11 @@ AUTHORITATIVE_KINDS = {"PATTERN", "AVOID", "FIX"}
 TOP_K_DEFAULT = 8
 TOKEN_BUDGET_DEFAULT = 1500
 
-# Issue label → source_file boost mapping (mirrors architecture_slice._LABEL_COMPONENT_MAP)
+# Issue label → source_file boost mapping.
+# Intentionally independent from architecture_slice._LABEL_COMPONENT_MAP: that map
+# routes labels to component paths for code navigation, whereas this map routes labels
+# to memory source_file names for retrieval ranking. The keys and values deliberately
+# differ; do not merge or derive one from the other.
 _LABEL_SOURCE_BOOST_MAP = {
     "dark factory":     "dark-factory-ops.md",
     "dark-factory":     "dark-factory-ops.md",
@@ -337,6 +341,10 @@ def format_index_output(candidates, labels=None, _cap_out=None):
         # Always admit the first entry even if it alone exceeds the token budget,
         # so a single large memory never silently yields an empty block.
         if len(selected) >= TOP_K_DEFAULT or (selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT):
+            if selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT and len(selected) < TOP_K_DEFAULT:
+                sys.stderr.write(
+                    f"memory-cap: dropped oversized entry ({token_cost} tokens) from {c['source_file']}\n"
+                )
             dropped.append(c)
         else:
             selected.append(c)
@@ -455,6 +463,13 @@ def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_
                 "entries_dropped_by_cap": per_file_dropped.get(fname, 0),
             })
 
+        # When the index path ran and provided cap_counts, use fallback_used from
+        # cap_counts (which reflects the actual retrieval path) rather than the
+        # markdown-file existence check above, so the two signals stay consistent.
+        index_path_ran = cap_counts is not None and not cap_counts.get("fallback_used")
+        if index_path_ran:
+            fallback_used = cap_counts.get("fallback_used", False)
+
         trace = {
             "schema_version": 1,
             "retrieval_mechanism": "flatfile-pathtag",
@@ -467,7 +482,7 @@ def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_
             "fallback_used": fallback_used,
         }
 
-        if cap_counts:
+        if cap_counts is not None and not cap_counts.get("fallback_used"):
             trace["entries_selected_total"] = cap_counts.get("entries_selected", 0)
             trace["entries_dropped_by_cap_total"] = cap_counts.get("entries_dropped_by_cap", 0)
 
