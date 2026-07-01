@@ -192,3 +192,63 @@ def test_memory_context_absent_is_dropped(tmp_path):
     sec = result["sections"].get("memory_context", {})
     assert sec["status"] == "dropped"
     assert sec.get("reason") == "empty_or_missing"
+
+
+# ── Integration: architecture_slice wired into context_budget ─────────────────
+
+def make_arch_file(tmp_path):
+    p = tmp_path / "ARCHITECTURE.md"
+    p.write_text(
+        "# Architecture\n\n"
+        "## Backend Module Map\n\nBackend content.\n\n"
+        "## Frontend Architecture\n\nFrontend content.\n\n"
+        "## Service Topology\n\nTopology content.\n\n"
+        "## Scan Execution Flow\n\nScan flow content.\n\n"
+        "## Error Tracking System\n\nError tracking content.\n\n"
+        "## IB Gateway Integration\n\nIBKR content.\n\n"
+        "## Live Scanner\n\nLive scanner content.\n\n"
+        "## Celery Task Architecture\n\nCelery content.\n\n"
+        "## Catch Up Feature (Universe Aggregate Backfill)\n\nCatch up content.\n\n"
+        "## Metrics and Observability\n\nMetrics content.\n\n"
+        "## Test Architecture\n\nTest content.\n\n"
+    )
+    return str(p)
+
+
+def run_budget_with_arch(tmp_path, scenario, spec_component=None, changed_files=None, **kwargs):
+    make_arch_file(tmp_path)
+    out_path = str(tmp_path / "context-budget.json")
+    cb.build_budget(
+        scenario=scenario,
+        issue_num=664,
+        run_id="test-run-arch",
+        artifacts_dir=str(tmp_path),
+        clone_dir=str(tmp_path),
+        out=out_path,
+        spec_component=spec_component,
+        changed_files=changed_files,
+        **kwargs,
+    )
+    import json
+    return json.loads(Path(out_path).read_text())
+
+
+def test_architecture_md_slice_status_when_component_known(tmp_path):
+    result = run_budget_with_arch(tmp_path, "implement", spec_component="backend")
+    sec = result["sections"]["architecture_md"]
+    assert sec["status"] == "included_slice"
+    assert sec["component"] == "backend"
+    assert "included_sections" in sec
+    assert "omitted_sections" in sec
+    assert sec["fallback"] is False
+    assert "Backend Module Map" in sec["included_sections"]
+    assert "Frontend Architecture" in sec["omitted_sections"]
+
+
+def test_architecture_md_fallback_status_when_component_unknown(tmp_path):
+    result = run_budget_with_arch(tmp_path, "refine",
+                                  spec_component=None, changed_files=[])
+    sec = result["sections"]["architecture_md"]
+    assert sec["status"] == "included"
+    assert sec["fallback"] is True
+    assert sec["fallback_reason"] == "component_unresolved"
