@@ -11,9 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.scanner_config import ScannerConfig
 from app.models.replay_run import ReplayRun
 from app.models.replay_trade import ReplayTrade
+from app.models.scanner_config import ScannerConfig
 from app.models.stock_universe import StockUniverse
 from app.models.stock_universe_ticker import StockUniverseTicker
 from app.models.trading_strategy import TradingStrategy

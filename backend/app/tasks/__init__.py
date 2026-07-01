@@ -1,5 +1,4 @@
 from app.tasks.backtest import run_backtest
-from app.tasks.replay import run_signal_replay
 from app.tasks.quality import (
     analyze_signal_features,
     analyze_universe_quality,
@@ -7,6 +6,7 @@ from app.tasks.quality import (
     normalize_universe_quality,
 )
 from app.tasks.regime import backfill_regime_labels, update_regime_model
+from app.tasks.replay import run_signal_replay
 from app.tasks.scanning import (
     evaluate_scanner_alerts,
     run_liquidity_hunt_scheduled,

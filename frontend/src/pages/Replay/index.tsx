@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, GitCompare, History, RefreshCw } from 'lucide-react';
 import Card from '../../components/ui/Card';
@@ -48,17 +48,12 @@ const ReplayPage: React.FC = () => {
   const { data: strategies = [] } = useStrategies(true);
   const runsQuery = useReplayRuns({ limit: 50 });
   const runs = runsQuery.data ?? [];
-  const selectedRunQuery = useReplayRun(selectedRunUuid);
-  const selectedRun = selectedRunQuery.data ?? runs.find((run) => run.uuid === selectedRunUuid) ?? null;
-  const tradesQuery = useReplayTrades(selectedRunUuid);
-  const analyticsQuery = useReplayAnalytics(selectedRunUuid);
+  const effectiveRunUuid = selectedRunUuid ?? runs[0]?.uuid ?? null;
+  const selectedRunQuery = useReplayRun(effectiveRunUuid);
+  const selectedRun = selectedRunQuery.data ?? runs.find((run) => run.uuid === effectiveRunUuid) ?? null;
+  const tradesQuery = useReplayTrades(effectiveRunUuid);
+  const analyticsQuery = useReplayAnalytics(effectiveRunUuid);
   const compareRuns = useCompareReplayRuns();
-
-  useEffect(() => {
-    if (!selectedRunUuid && runs.length > 0) {
-      setSelectedRunUuid(runs[0].uuid);
-    }
-  }, [runs, selectedRunUuid]);
 
   const selectedTradeChart = useQuery({
     queryKey: ['replay', 'trade-chart', selectedTrade?.ticker],
@@ -128,7 +123,7 @@ const ReplayPage: React.FC = () => {
         >
           <div className="divide-y divide-gray-800">
             {runs.map((run) => {
-              const active = selectedRunUuid === run.uuid;
+              const active = effectiveRunUuid === run.uuid;
               return (
                 <div
                   key={run.uuid}

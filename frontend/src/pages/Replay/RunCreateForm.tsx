@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Play } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import type { ScannerConfig } from '../../api/scanner';
@@ -42,27 +42,17 @@ const RunCreateForm: React.FC<RunCreateFormProps> = ({
   const [benchmarkSymbol, setBenchmarkSymbol] = useState('SPY');
 
   const createRun = useCreateReplayRun();
-  const canSubmit = Boolean(scannerType.trim()) && universeId !== '' && start <= end && maxHoldDays > 0;
-
-  useEffect(() => {
-    if (!scannerType && scannerOptions.length > 0) {
-      setScannerType(scannerOptions[0]);
-    }
-  }, [scannerOptions, scannerType]);
-
-  useEffect(() => {
-    if (universeId === '' && universes.length > 0) {
-      setUniverseId(universes[0].id);
-    }
-  }, [universes, universeId]);
+  const effectiveScannerType = scannerType || scannerOptions[0] || '';
+  const effectiveUniverseId = universeId === '' ? universes[0]?.id ?? null : universeId;
+  const canSubmit = Boolean(effectiveScannerType.trim()) && effectiveUniverseId !== null && start <= end && maxHoldDays > 0;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!canSubmit) return;
-    const selectedUniverseId = Number(universeId);
+    if (!canSubmit || effectiveUniverseId === null) return;
+    const selectedUniverseId = effectiveUniverseId;
 
     const run = await createRun.mutateAsync({
-      scanner_type: scannerType.trim(),
+      scanner_type: effectiveScannerType.trim(),
       universe_id: selectedUniverseId,
       trading_strategy_id: strategyId === '' ? null : strategyId,
       start_date: start,
@@ -80,7 +70,7 @@ const RunCreateForm: React.FC<RunCreateFormProps> = ({
         <span className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Scanner</span>
         <input
           list="replay-scanner-types"
-          value={scannerType}
+          value={effectiveScannerType}
           onChange={(event) => setScannerType(event.target.value)}
           className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-financial-blue"
           placeholder="scanner_type"
@@ -96,7 +86,7 @@ const RunCreateForm: React.FC<RunCreateFormProps> = ({
       <label className="xl:col-span-2">
         <span className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Universe</span>
         <select
-          value={universeId}
+          value={effectiveUniverseId ?? ''}
           onChange={(event) => setUniverseId(Number(event.target.value))}
           className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-financial-blue"
           required
