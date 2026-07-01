@@ -22,6 +22,8 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+- [AVOID] [AVOID] Do not introduce category subdirectories (e.g. phase/ or reference/) between .claude/skills/ and skill folders — Claude Code's skill loader discovers skills by scanning for SKILL.md files in the immediate child of .claude/skills/; nesting a category directory there breaks discovery. Encode the phase-vs-reference distinction in frontmatter (disable-model-invocation, user-invocable) instead. <!-- issue:#693 date:2026-07-01 expires:2027-01-01 source:refine agent:refine scope:architecture path:.claude/skills/ -->
+- [AVOID] [AVOID] Do not promote factory subagent persona files (product-owner-prompt.md, architect-prompt.md) to standalone skills with their own invocable frontmatter — promotion adds new description-match surfaces for auto-triggering and expands the review footprint. These files are variable-substituted prompt templates; they live in the parent skill's templates/ directory and are never independently invocable. <!-- issue:#693 date:2026-07-01 expires:2027-01-01 source:refine agent:refine scope:architecture path:.claude/skills/ -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
