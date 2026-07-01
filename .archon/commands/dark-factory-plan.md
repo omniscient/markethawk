@@ -29,21 +29,8 @@ Implementation belongs to the `Fix issue #N` workflow on a `feat/issue-N-*` bran
 6. Compute the affected file set and load memory context:
 
 ```bash
-AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
 REPO_ROOT=$(git rev-parse --show-toplevel)
-
-ISSUE_ARG=""
-[[ "$ISSUE_NUM" =~ ^[0-9]+$ ]] && ISSUE_ARG="--issue $ISSUE_NUM"
-
-MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" \
-  --phase plan \
-  --files "$AFFECTED" \
-  $ISSUE_ARG \
-  --memory-dir "${REPO_ROOT}/.archon/memory" \
-  --emit-trace-to "$ARTIFACTS_DIR/memory-trace.json" 2>/dev/null || true)
-
-mkdir -p "$ARTIFACTS_DIR"
-printf '%s\n' "$MEMORY_CONTEXT" > "$ARTIFACTS_DIR/memory-context.md"
+MEMORY_CONTEXT=$(bash "${REPO_ROOT}/dark-factory/scripts/load_memory_context.sh" plan)
 ```
 
 7. Include `$MEMORY_CONTEXT` in the context for this phase. If empty, proceed without memory context.
@@ -68,7 +55,7 @@ Write a full implementation plan following these conventions:
 ## Phase 3: ARCHITECT REVIEW
 
 Before spawning the architect subagent, reuse `$MEMORY_CONTEXT` loaded in Phase 1 (it was
-already populated by `memory_retrieve.py --phase plan` and scoped to the changed file set).
+already populated by `load_memory_context.sh plan` and scoped to the changed file set).
 `[PROVISIONAL]` and `[INVALID]` entries are excluded automatically by the retrieval script.
 
 Prepend `$MEMORY_CONTEXT` to the architect prompt as a "## Memory: Accumulated Patterns" section immediately before the Spec and Plan content. If `$MEMORY_CONTEXT` is empty (no relevant files exist yet), omit the section entirely.
@@ -157,29 +144,7 @@ If `conformance.enabled` is `false`, skip this phase entirely and proceed to Pha
    > ⏩ **Auto-advancing in ~`$PLAN_GRACE` min** unless you comment — the scheduler will move this to **Ready** automatically. Leave a comment to re-run the plan or redirect.
 4. Run the OOS gate — detect and revert any files committed outside the plan allowlist:
    ```bash
-   ALLOWED_PREFIXES="docs/superpowers/plans/"
-   OOS_FILES=$(git diff --name-only origin/main HEAD 2>/dev/null | while read -r f; do
-     ALLOWED=false
-     for prefix in $ALLOWED_PREFIXES; do
-       case "$f" in "$prefix"*) ALLOWED=true; break;; esac
-     done
-     $ALLOWED || echo "$f"
-   done)
-   if [ -n "$OOS_FILES" ]; then
-     echo "OOS gate: excising out-of-scope files: $OOS_FILES"
-     for f in $OOS_FILES; do
-       if git show origin/main:"$f" > /dev/null 2>&1; then
-         git checkout origin/main -- "$f"
-       else
-         git rm -f --cached "$f" 2>/dev/null; rm -f "$f"
-       fi
-     done
-     git commit -m "chore: excise out-of-scope files from plan run (#$ISSUE_NUM)" --allow-empty
-     mkdir -p "$ARTIFACTS_DIR"
-     echo "$OOS_FILES" | while read -r f; do
-       echo "- $f: removed by plan OOS gate (should not have been created/modified)" >> "$ARTIFACTS_DIR/out-of-scope.md"
-     done
-   fi
+   OOS_FILES=$(bash "${REPO_ROOT}/dark-factory/scripts/oos_excise.sh" "docs/superpowers/plans/" plan)
    ```
 5. Commit the plan
 6. Post a summary comment on the issue:

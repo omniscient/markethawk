@@ -29,21 +29,8 @@ Read the project rules:
 5. Compute the affected file set and load memory context:
 
 ```bash
-AFFECTED=$(git diff --name-only origin/main...HEAD 2>/dev/null || echo "")
 REPO_ROOT=$(git rev-parse --show-toplevel)
-
-ISSUE_ARG=""
-[[ "$ISSUE_NUM" =~ ^[0-9]+$ ]] && ISSUE_ARG="--issue $ISSUE_NUM"
-
-MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" \
-  --phase implement \
-  --files "$AFFECTED" \
-  $ISSUE_ARG \
-  --memory-dir "${REPO_ROOT}/.archon/memory" \
-  --emit-trace-to "$ARTIFACTS_DIR/memory-trace.json" 2>/dev/null || true)
-
-mkdir -p "$ARTIFACTS_DIR"
-printf '%s\n' "$MEMORY_CONTEXT" > "$ARTIFACTS_DIR/memory-context.md"
+MEMORY_CONTEXT=$(bash "${REPO_ROOT}/dark-factory/scripts/load_memory_context.sh" implement)
 ```
 
 6. Include `$MEMORY_CONTEXT` in the context for this phase. Apply these lessons as strong hints throughout implementation. If a lesson conflicts with `CLAUDE.md` or `ARCHITECTURE.md`, follow those documents instead and note the conflict in `$ARTIFACTS_DIR/implementation.md`.
