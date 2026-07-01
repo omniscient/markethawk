@@ -18,8 +18,12 @@ import sys
 from datetime import date
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-import token_estimate as te  # 4 chars/token estimator
+try:
+    import token_estimate as te  # 4 chars/token estimator (package-relative)
+except ImportError:
+    # Fallback: add parent dir to sys.path when running as a standalone script.
+    sys.path.insert(0, str(Path(__file__).parent))
+    import token_estimate as te  # noqa: E402
 
 # ── Constants ──────────────────────────────────────────────────────────────
 
@@ -299,17 +303,25 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
     return candidates
 
 
-def format_index_output(candidates, labels=None, _cap_out=None):
+def format_index_output(candidates, labels=None, cap_out=None):
     """Format scan_index output with dual cap and label-boost ranking.
 
     Sort key: (path_specificity + label_boost, created_at DESC) globally.
     Cap: stop at TOP_K_DEFAULT entries OR TOKEN_BUDGET_DEFAULT tokens, whichever first.
     Groups selected entries by source_file in ALL_MEMORY_FILES order.
-    _cap_out: if provided, populated with entries_selected, entries_dropped_by_cap,
-              per_file_selected, per_file_dropped.
+
+    cap_out: optional dict mutated in-place with cap telemetry keys:
+        entries_selected, entries_dropped_by_cap, per_file_selected, per_file_dropped.
+        Prefer passing an empty dict and reading it after the call; a future refactor
+        could return a (text, cap_counts) tuple instead.
     """
+    # Internal alias kept for back-compat with direct callers using _cap_out kwarg.
+    _cap_out = cap_out
     labels = labels or []
 
+    # Tiebreaker: entries without created_at sort as "" which, under reverse=True,
+    # ranks them last within equal specificity+boost (i.e. oldest/undated are lowest
+    # priority). This is intentional: undated entries lose recency tiebreaks.
     ranked = sorted(
         candidates,
         key=lambda c: (
@@ -324,7 +336,9 @@ def format_index_output(candidates, labels=None, _cap_out=None):
     token_total = 0
     for c in ranked:
         token_cost = te.estimate_tokens(c["text"])
-        if len(selected) >= TOP_K_DEFAULT or token_total + token_cost > TOKEN_BUDGET_DEFAULT:
+        # Always admit the first entry even if it alone exceeds the token budget,
+        # so a single large memory never silently yields an empty block.
+        if len(selected) >= TOP_K_DEFAULT or (selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT):
             dropped.append(c)
         else:
             selected.append(c)
@@ -373,9 +387,17 @@ def retrieve_memory(memory_dir, phase, files, labels=None, _cap_out=None):
         except (OSError, ValueError):
             candidates = []
         if candidates:
-            return format_index_output(candidates, labels=labels, _cap_out=_cap_out)
+            return format_index_output(candidates, labels=labels, cap_out=_cap_out)
 
     results = scan_markdown_files(memory_dir, area_files, files, allowed_sources)
+    # Markdown fallback: populate _cap_out with zero counts so downstream consumers
+    # can distinguish "no cap applied" (fallback_used=True) from absent telemetry.
+    if _cap_out is not None:
+        _cap_out["entries_selected"] = 0
+        _cap_out["entries_dropped_by_cap"] = 0
+        _cap_out["per_file_selected"] = {}
+        _cap_out["per_file_dropped"] = {}
+        _cap_out["fallback_used"] = True
     return format_markdown_output(results)
 
 
@@ -476,7 +498,16 @@ def main():
         help="Newline-separated list of changed or anticipated file paths",
     )
     parser.add_argument("--issue", type=int, default=None, help="Issue number (informational)")
-    parser.add_argument("--labels", nargs="*", default=None, help="Issue labels for memory ranking label boost")
+    parser.add_argument(
+        "--labels",
+        nargs="*",
+        default=None,
+        # IMPORTANT: nargs="*" requires space-separated tokens, NOT comma-separated.
+        # Correct:   --labels backend frontend
+        # Wrong:     --labels "backend,frontend"  (treated as one label, matches nothing)
+        # All callers must pass individual tokens separated by spaces.
+        help="Issue labels for memory ranking label boost (space-separated, e.g. --labels backend frontend)",
+    )
     parser.add_argument(
         "--memory-dir",
         default=".archon/memory",
