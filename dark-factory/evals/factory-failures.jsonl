@@ -153,3 +153,4 @@
 {"issue":484,"title":"Replay engine: data model + manifest resolver + data hash","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:38:54Z"}
 {"issue":667,"title":"Add top-k memory retrieval cap compatible with Dark Factory memory v2","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:39:07Z"}
 {"issue":667,"title":"Add top-k memory retrieval cap compatible with Dark Factory memory v2","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:39:17Z"}
+{"issue":484,"title":"Replay engine: data model + manifest resolver + data hash","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:41:48Z"}
