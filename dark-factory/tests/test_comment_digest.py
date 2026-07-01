@@ -192,6 +192,92 @@ def test_all_six_bot_markers_detected():
         assert "before comment" not in result, f"Comment before marker not excluded for: {marker}"
 
 
+# ── PR review / inline boundary filtering ─────────────────────────────────────
+
+def test_pr_review_before_boundary_excluded():
+    """PR review submitted before the factory boundary timestamp is excluded."""
+    issue_data = {
+        "comments": [
+            {"body": "---\n*Posted by MarketHawk Dark Factory*", "author": {"login": "bot"}, "createdAt": "2026-01-05T00:00:00Z"},
+        ],
+        "pr_reviews": {
+            "reviews": [
+                {"body": "old-review-before-factory", "author": {"login": "reviewer"}, "submittedAt": "2026-01-04T00:00:00Z", "state": "CHANGES_REQUESTED"},
+            ]
+        },
+        "pr_inline_comments": [],
+    }
+    result = cd.build_digest(issue_data)
+    assert result.strip() == "<!-- no-human-feedback -->"
+    assert "old-review-before-factory" not in result
+
+
+def test_pr_review_after_boundary_included():
+    """PR review submitted after the factory boundary timestamp is included."""
+    issue_data = {
+        "comments": [
+            {"body": "---\n*Posted by MarketHawk Dark Factory*", "author": {"login": "bot"}, "createdAt": "2026-01-03T00:00:00Z"},
+        ],
+        "pr_reviews": {
+            "reviews": [
+                {"body": "new-review-after-factory", "author": {"login": "reviewer"}, "submittedAt": "2026-01-04T00:00:00Z", "state": "APPROVED"},
+            ]
+        },
+        "pr_inline_comments": [],
+    }
+    result = cd.build_digest(issue_data)
+    assert "new-review-after-factory" in result
+
+
+def test_inline_comment_before_boundary_excluded():
+    """Inline comment with created_at before boundary timestamp is excluded."""
+    issue_data = {
+        "comments": [
+            {"body": "---\n*Posted by MarketHawk Dark Factory*", "author": {"login": "bot"}, "createdAt": "2026-01-05T00:00:00Z"},
+        ],
+        "pr_reviews": {},
+        "pr_inline_comments": [
+            {"path": "backend/app/main.py", "line": 10, "body": "old-inline-before-factory", "created_at": "2026-01-04T00:00:00Z"},
+        ],
+    }
+    result = cd.build_digest(issue_data)
+    assert result.strip() == "<!-- no-human-feedback -->"
+    assert "old-inline-before-factory" not in result
+
+
+def test_inline_comment_after_boundary_included():
+    """Inline comment with created_at after boundary timestamp is included."""
+    issue_data = {
+        "comments": [
+            {"body": "---\n*Posted by MarketHawk Dark Factory*", "author": {"login": "bot"}, "createdAt": "2026-01-03T00:00:00Z"},
+        ],
+        "pr_reviews": {},
+        "pr_inline_comments": [
+            {"path": "backend/app/main.py", "line": 10, "body": "new-inline-after-factory", "created_at": "2026-01-04T00:00:00Z"},
+        ],
+    }
+    result = cd.build_digest(issue_data)
+    assert "new-inline-after-factory" in result
+
+
+def test_no_boundary_includes_all_pr_reviews_and_inline():
+    """When no factory boundary exists, all PR reviews and inline comments are included."""
+    issue_data = {
+        "comments": [],
+        "pr_reviews": {
+            "reviews": [
+                {"body": "unbounded-review", "author": {"login": "reviewer"}, "submittedAt": "2026-01-01T00:00:00Z", "state": "APPROVED"},
+            ]
+        },
+        "pr_inline_comments": [
+            {"path": "backend/app/main.py", "line": 5, "body": "unbounded-inline", "created_at": "2026-01-01T00:00:00Z"},
+        ],
+    }
+    result = cd.build_digest(issue_data)
+    assert "unbounded-review" in result
+    assert "unbounded-inline" in result
+
+
 # ── CLI round-trip ────────────────────────────────────────────────────────────
 
 def test_cli_roundtrip(tmp_path):

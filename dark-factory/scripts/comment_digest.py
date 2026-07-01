@@ -36,8 +36,8 @@ def build_digest(issue_data: dict) -> str:
     """Build a comment digest from parsed issue.json data.
 
     Finds the latest factory boundary marker in the comments array, then
-    extracts human-authored comments after that boundary.  Also includes
-    all PR reviews and inline comments (not filtered by boundary).
+    extracts human-authored comments, PR reviews, and inline comments after
+    that boundary.  Filters by timestamp > boundary for reviews and inline.
 
     Returns a markdown string, or the no-feedback sentinel if nothing human is found.
     """
@@ -45,12 +45,14 @@ def build_digest(issue_data: dict) -> str:
     pr_reviews_data: dict = issue_data.get("pr_reviews") or {}
     inline_comments: list[dict] = issue_data.get("pr_inline_comments") or []
 
-    # Find index of the last factory boundary marker
+    # Find index and timestamp of the last factory boundary marker
     last_factory_idx = -1
+    boundary_ts: str = ""
     for i, comment in enumerate(comments):
         body = comment.get("body") or ""
         if _is_factory_comment(body):
             last_factory_idx = i
+            boundary_ts = comment.get("createdAt") or ""
 
     # Human comments are those after the latest factory marker that aren't bots
     human_comments = [
@@ -58,10 +60,21 @@ def build_digest(issue_data: dict) -> str:
         if not _is_factory_comment(c.get("body") or "")
     ]
 
-    # PR top-level reviews — not filtered by boundary (they're from the PR, not issue)
-    reviews: list[dict] = pr_reviews_data.get("reviews") or []
+    # PR reviews — filtered by timestamp > boundary and bot body detection
+    all_reviews: list[dict] = pr_reviews_data.get("reviews") or []
+    reviews = [
+        r for r in all_reviews
+        if (not boundary_ts or (r.get("submittedAt") or "") > boundary_ts)
+        and not _is_factory_comment(r.get("body") or "")
+    ]
 
-    if not human_comments and not reviews and not inline_comments:
+    # Inline comments — filtered by timestamp > boundary
+    inline = [
+        c for c in inline_comments
+        if not boundary_ts or (c.get("created_at") or "") > boundary_ts
+    ]
+
+    if not human_comments and not reviews and not inline:
         return _NO_FEEDBACK_SENTINEL
 
     parts: list[str] = ["# Comment Digest\n"]
@@ -84,10 +97,10 @@ def build_digest(issue_data: dict) -> str:
             state_label = f" ({state})" if state else ""
             parts.append(f"### @{author} — {submitted_at}{state_label}\n\n{body}\n\n---\n")
 
-    if inline_comments:
+    if inline:
         parts.append("## Inline Code Review Comments\n")
         by_path: dict[str, list[dict]] = {}
-        for c in inline_comments:
+        for c in inline:
             path = c.get("path") or "unknown"
             by_path.setdefault(path, []).append(c)
 
