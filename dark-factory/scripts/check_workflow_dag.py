@@ -26,7 +26,7 @@ import yaml
 # Any intent run skips exactly one of their upstreams, so they MUST declare a
 # skip-tolerant trigger_rule.
 REQUIRED_OR_JOIN_NODES: frozenset[str] = frozenset(
-    {"validate", "de-conflict", "status-in-review", "report"}
+    {"validate", "de-conflict", "status-in-review", "report", "budget-implement", "implement"}
 )
 
 # Accepted skip-tolerant rule values.
