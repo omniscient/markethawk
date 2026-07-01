@@ -90,6 +90,26 @@ class TestConstants:
     def test_authoritative_kinds(self):
         assert mr.AUTHORITATIVE_KINDS == {"PATTERN", "AVOID", "FIX"}
 
+    def test_top_k_default(self):
+        assert mr.TOP_K_DEFAULT == 8
+
+    def test_token_budget_default(self):
+        assert mr.TOKEN_BUDGET_DEFAULT == 1500
+
+    def test_label_source_boost_map_exists(self):
+        assert hasattr(mr, "_LABEL_SOURCE_BOOST_MAP")
+
+    def test_label_source_boost_map_dark_factory_keys(self):
+        assert mr._LABEL_SOURCE_BOOST_MAP.get("dark factory") == "dark-factory-ops.md"
+        assert mr._LABEL_SOURCE_BOOST_MAP.get("dark-factory") == "dark-factory-ops.md"
+
+    def test_label_source_boost_map_frontend_backend(self):
+        assert mr._LABEL_SOURCE_BOOST_MAP.get("frontend") == "frontend-patterns.md"
+        assert mr._LABEL_SOURCE_BOOST_MAP.get("backend") == "backend-patterns.md"
+
+    def test_label_source_boost_map_four_keys(self):
+        assert len(mr._LABEL_SOURCE_BOOST_MAP) == 4
+
 
 # ── TestSelectAreaFiles ────────────────────────────────────────────────────
 
@@ -998,3 +1018,306 @@ class TestEmitMemoryTrace:
         assert data["agent_id"] == "implementation-agent"
         assert data["project"] == "markethawk"
 
+
+# ── TestComputeLabelBoost ──────────────────────────────────────────────────
+
+class TestComputeLabelBoost:
+    def test_no_labels_returns_zero(self):
+        assert mr.compute_label_boost("backend-patterns.md", []) == 0
+
+    def test_none_labels_returns_zero(self):
+        assert mr.compute_label_boost("backend-patterns.md", None) == 0
+
+    def test_backend_label_boosts_backend_patterns(self):
+        assert mr.compute_label_boost("backend-patterns.md", ["backend"]) == 1
+
+    def test_frontend_label_boosts_frontend_patterns(self):
+        assert mr.compute_label_boost("frontend-patterns.md", ["frontend"]) == 1
+
+    def test_dark_factory_label_boosts_ops_patterns(self):
+        assert mr.compute_label_boost("dark-factory-ops.md", ["Dark Factory"]) == 1
+
+    def test_dark_factory_hyphen_label_boosts_ops_patterns(self):
+        assert mr.compute_label_boost("dark-factory-ops.md", ["dark-factory"]) == 1
+
+    def test_label_match_is_case_insensitive(self):
+        assert mr.compute_label_boost("backend-patterns.md", ["BACKEND"]) == 1
+
+    def test_label_no_map_match_returns_zero(self):
+        assert mr.compute_label_boost("backend-patterns.md", ["performance"]) == 0
+
+    def test_mismatched_file_returns_zero(self):
+        assert mr.compute_label_boost("codebase-patterns.md", ["backend"]) == 0
+
+    def test_global_file_never_boosted(self):
+        assert mr.compute_label_boost("codebase-patterns.md", ["frontend", "backend"]) == 0
+        assert mr.compute_label_boost("architecture.md", ["dark factory"]) == 0
+
+    def test_returns_one_not_more(self):
+        assert mr.compute_label_boost("dark-factory-ops.md", ["dark factory", "dark-factory"]) == 1
+
+    def test_multiple_labels_one_matching(self):
+        assert mr.compute_label_boost("frontend-patterns.md", ["performance", "frontend", "backend"]) == 1
+
+
+# ── TestMainCLI labels_nargs addition ──────────────────────────────────────
+
+class TestMainCLILabelNargs:
+    def _run(self, args, memory_dir=None):
+        import subprocess
+        script = str(Path(__file__).resolve().parents[1] / "scripts" / "memory_retrieve.py")
+        cmd = [sys.executable, script] + args
+        if memory_dir:
+            cmd += ["--memory-dir", str(memory_dir)]
+        return subprocess.run(cmd, capture_output=True, text=True)
+
+    def _make_mem_dir(self, tmp_path):
+        mem_dir = tmp_path / "memory"
+        mem_dir.mkdir()
+        content = "- [PATTERN] CLI test. <!-- issue:#1 expires:{f} source:implement -->\n".format(f=FUTURE)
+        (mem_dir / "backend-patterns.md").write_text(content, encoding="utf-8")
+        return mem_dir
+
+    def test_labels_nargs_accepts_multiple(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        result = self._run(
+            ["--phase", "implement", "--labels", "Dark Factory", "performance"],
+            memory_dir=mem_dir,
+        )
+        assert result.returncode == 0
+
+
+# ── TestFormatIndexOutputCap ───────────────────────────────────────────────
+
+class TestFormatIndexOutputCap:
+    """Tests for dual cap and label-boost sort in format_index_output()."""
+
+    def _make_candidate(self, text, specificity=0, created_at="2026-01-01", source_file="backend-patterns.md"):
+        return {
+            "source_file": source_file,
+            "text": f"- [PATTERN] {text}",
+            "specificity": specificity,
+            "created_at": created_at,
+        }
+
+    def _candidates(self, n, source_file="backend-patterns.md"):
+        return [self._make_candidate(f"Entry {i}", source_file=source_file) for i in range(n)]
+
+    def test_nine_candidates_capped_to_eight(self):
+        caps = {}
+        out = mr.format_index_output(self._candidates(9), _cap_out=caps)
+        assert caps["entries_selected"] == 8
+        assert caps["entries_dropped_by_cap"] == 1
+
+    def test_eight_candidates_no_drop(self):
+        caps = {}
+        mr.format_index_output(self._candidates(8), _cap_out=caps)
+        assert caps["entries_selected"] == 8
+        assert caps["entries_dropped_by_cap"] == 0
+
+    def test_two_candidates_no_drop(self):
+        caps = {}
+        mr.format_index_output(self._candidates(2), _cap_out=caps)
+        assert caps["entries_selected"] == 2
+        assert caps["entries_dropped_by_cap"] == 0
+
+    def test_token_budget_cap_stops_early(self):
+        long_text = "x" * 590
+        candidates = [self._make_candidate(long_text + f"_{i}") for i in range(20)]
+        caps = {}
+        mr.format_index_output(candidates, _cap_out=caps)
+        assert caps["entries_selected"] <= 10
+        assert caps["entries_dropped_by_cap"] >= 10
+
+    def test_count_cap_takes_priority_over_token_cap(self):
+        caps = {}
+        mr.format_index_output(self._candidates(12), _cap_out=caps)
+        assert caps["entries_selected"] == 8
+        assert caps["entries_dropped_by_cap"] == 4
+
+    def test_cap_out_none_no_error(self):
+        out = mr.format_index_output(self._candidates(2))
+        assert "### Memory:" in out
+
+    def test_cap_out_per_file_selected(self):
+        caps = {}
+        candidates = (
+            [self._make_candidate(f"B{i}", source_file="backend-patterns.md") for i in range(5)] +
+            [self._make_candidate(f"F{i}", source_file="frontend-patterns.md") for i in range(5)]
+        )
+        mr.format_index_output(candidates, _cap_out=caps)
+        assert caps["entries_selected"] == 8
+        total_per_file = sum(caps["per_file_selected"].values())
+        assert total_per_file == 8
+
+    def test_cap_out_per_file_dropped(self):
+        caps = {}
+        candidates = (
+            [self._make_candidate(f"B{i}", source_file="backend-patterns.md") for i in range(5)] +
+            [self._make_candidate(f"F{i}", source_file="frontend-patterns.md") for i in range(5)]
+        )
+        mr.format_index_output(candidates, _cap_out=caps)
+        total_dropped = sum(caps["per_file_dropped"].values())
+        assert total_dropped == 2
+
+    def test_label_boost_promotes_matching_file(self):
+        candidates = [
+            {"source_file": "backend-patterns.md", "text": "- [PATTERN] Low spec backend.",
+             "specificity": 0, "created_at": "2026-01-01"},
+            {"source_file": "frontend-patterns.md", "text": "- [PATTERN] High spec frontend.",
+             "specificity": 100, "created_at": "2026-01-01"},
+        ]
+        out = mr.format_index_output(candidates, labels=["backend"])
+        assert "Low spec backend" in out
+        assert "High spec frontend" in out
+
+    def test_only_selected_entries_in_output(self):
+        candidates = [
+            self._make_candidate(f"Entry {i}", specificity=9 - i) for i in range(9)
+        ]
+        out = mr.format_index_output(candidates)
+        assert "Entry 8" not in out
+
+    def test_markdown_fallback_unchanged_by_cap(self, tmp_path):
+        mem_dir = tmp_path / "memory"
+        mem_dir.mkdir()
+        lines = [
+            f"- [PATTERN] Entry {i}. <!-- source:implement expires:2099-12-31 -->"
+            for i in range(10)
+        ]
+        (mem_dir / "backend-patterns.md").write_text("\n".join(lines), encoding="utf-8")
+        out = mr.retrieve_memory(str(mem_dir), "implement", ["backend/app/foo.py"])
+        for i in range(10):
+            assert f"Entry {i}" in out
+
+
+# ── TestEmitMemoryTraceCap ─────────────────────────────────────────────────
+
+class TestEmitMemoryTraceCap:
+    """Tests for cap-count fields in emit_memory_trace()."""
+
+    def _make_mem_dir(self, tmp_path):
+        mem_dir = tmp_path / "memory"
+        mem_dir.mkdir()
+        content = "- [PATTERN] Foo. <!-- source:implement expires:2099-12-31 -->\n"
+        for fname in mr.ALL_MEMORY_FILES:
+            (mem_dir / fname).write_text(content)
+        return mem_dir
+
+    def test_cap_counts_in_trace_root(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "trace.json"
+        cap_counts = {
+            "entries_selected": 6,
+            "entries_dropped_by_cap": 10,
+            "per_file_selected": {"backend-patterns.md": 3, "codebase-patterns.md": 3},
+            "per_file_dropped": {"frontend-patterns.md": 5, "dark-factory-ops.md": 5},
+        }
+        mr.emit_memory_trace(
+            trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"},
+            cap_counts=cap_counts,
+        )
+        data = json.loads(trace_path.read_text())
+        assert data["entries_selected_total"] == 6
+        assert data["entries_dropped_by_cap_total"] == 10
+
+    def test_per_file_selected_in_files_loaded(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "trace.json"
+        cap_counts = {
+            "entries_selected": 3,
+            "entries_dropped_by_cap": 0,
+            "per_file_selected": {"backend-patterns.md": 3},
+            "per_file_dropped": {},
+        }
+        mr.emit_memory_trace(
+            trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"},
+            cap_counts=cap_counts,
+        )
+        data = json.loads(trace_path.read_text())
+        backend_entry = next(
+            (e for e in data["files_loaded"] if e["path"].endswith("backend-patterns.md")), None
+        )
+        assert backend_entry is not None
+        assert backend_entry["entries_selected"] == 3
+        assert backend_entry["entries_dropped_by_cap"] == 0
+
+    def test_per_file_dropped_zero_when_not_in_cap_counts(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "trace.json"
+        cap_counts = {
+            "entries_selected": 0,
+            "entries_dropped_by_cap": 0,
+            "per_file_selected": {},
+            "per_file_dropped": {},
+        }
+        mr.emit_memory_trace(
+            trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"},
+            cap_counts=cap_counts,
+        )
+        data = json.loads(trace_path.read_text())
+        frontend_entry = next(
+            (e for e in data["files_loaded"] if e["path"].endswith("frontend-patterns.md")), None
+        )
+        if frontend_entry:
+            assert frontend_entry["entries_selected"] == 0
+            assert frontend_entry["entries_dropped_by_cap"] == 0
+
+    def test_empty_cap_counts_omits_root_totals(self, tmp_path):
+        mem_dir = self._make_mem_dir(tmp_path)
+        trace_path = tmp_path / "trace.json"
+        mr.emit_memory_trace(
+            trace_path, "implement", [], mem_dir, mr.ALL_MEMORY_FILES, {"implement"},
+            cap_counts={},
+        )
+        data = json.loads(trace_path.read_text())
+        assert "entries_selected_total" not in data
+        assert "entries_dropped_by_cap_total" not in data
+
+    def test_cli_cap_counts_in_trace_via_index_path(self, tmp_path):
+        """Integration: CLI with index path emits cap count fields in trace."""
+        mem_dir = tmp_path / "memory"
+        mem_dir.mkdir()
+        records_dir = mem_dir / "records"
+        records_dir.mkdir()
+        index_lines = []
+        for i in range(10):
+            entry_id = f"aabb{i:04d}"
+            entry = {
+                "id": entry_id,
+                "kind": "PATTERN",
+                "source_file": "backend-patterns.md",
+                "agent_id": "implement",
+                "path_prefixes": [],
+                "expires_at": "2099-12-31",
+                "created_at": f"2026-01-{i+1:02d}",
+                "confidence": 1.0,
+                "summary_snippet": f"Entry {i}.",
+            }
+            index_lines.append(json.dumps(entry))
+            record = {
+                "id": entry_id,
+                "kind": "PATTERN",
+                "summary": f"Entry {i} full summary.",
+                "evidence": [{"source": "implement", "date": "2026-01-01", "issue": 667}],
+                "path_prefixes": [],
+                "expires_at": "2099-12-31",
+            }
+            (records_dir / f"{entry_id}.json").write_text(json.dumps(record), encoding="utf-8")
+        (mem_dir / "index.jsonl").write_text("\n".join(index_lines), encoding="utf-8")
+
+        trace_path = tmp_path / "trace.json"
+        result = subprocess.run(
+            [
+                sys.executable, str(Path(mr.__file__).resolve()),
+                "--phase", "implement",
+                "--memory-dir", str(mem_dir),
+                "--emit-trace-to", str(trace_path),
+            ],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        assert trace_path.exists()
+        data = json.loads(trace_path.read_text())
+        assert data.get("entries_selected_total") == 8
+        assert data.get("entries_dropped_by_cap_total") == 2

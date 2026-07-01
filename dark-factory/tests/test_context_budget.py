@@ -252,3 +252,70 @@ def test_architecture_md_fallback_status_when_component_unknown(tmp_path):
     assert sec["status"] == "included"
     assert sec["fallback"] is True
     assert sec["fallback_reason"] == "component_unresolved"
+
+
+# ── memory_context cap counts from trace ─────────────────────────────────────
+
+import json as _json
+from pathlib import Path as _Path
+
+
+def write_memory_trace(artifacts_dir, entries_selected, entries_dropped):
+    """Write a minimal memory-trace.json with run-level cap totals."""
+    trace = {
+        "schema_version": 1,
+        "entries_selected_total": entries_selected,
+        "entries_dropped_by_cap_total": entries_dropped,
+    }
+    (_Path(artifacts_dir) / "memory-trace.json").write_text(
+        _json.dumps(trace), encoding="utf-8"
+    )
+
+
+def make_memory_file(tmp_path, content="Memory block content here.\n"):
+    p = tmp_path / "memory-context.md"
+    p.write_text(content)
+    return str(p)
+
+
+class TestMemoryContextCapCounts:
+    def test_entries_selected_from_trace(self, tmp_path):
+        issue_json = make_issue_json(tmp_path)
+        mem_file = make_memory_file(tmp_path)
+        write_memory_trace(str(tmp_path), entries_selected=6, entries_dropped=10)
+        result = run_budget(tmp_path, "plan", issue_json=issue_json, memory_file=mem_file)
+        mc = result["sections"]["memory_context"]
+        assert mc.get("entries_selected") == 6
+
+    def test_entries_dropped_from_trace(self, tmp_path):
+        issue_json = make_issue_json(tmp_path)
+        mem_file = make_memory_file(tmp_path)
+        write_memory_trace(str(tmp_path), entries_selected=3, entries_dropped=25)
+        result = run_budget(tmp_path, "plan", issue_json=issue_json, memory_file=mem_file)
+        mc = result["sections"]["memory_context"]
+        assert mc.get("entries_dropped") == 25
+
+    def test_no_trace_no_cap_fields(self, tmp_path):
+        """When trace is absent, cap fields are absent (not 0)."""
+        issue_json = make_issue_json(tmp_path)
+        mem_file = make_memory_file(tmp_path)
+        result = run_budget(tmp_path, "plan", issue_json=issue_json, memory_file=mem_file)
+        mc = result["sections"]["memory_context"]
+        assert "entries_selected" not in mc
+        assert "entries_dropped" not in mc
+
+    def test_corrupt_trace_does_not_raise(self, tmp_path):
+        """Corrupt trace JSON → fail-open, no exception."""
+        issue_json = make_issue_json(tmp_path)
+        mem_file = make_memory_file(tmp_path)
+        (_Path(tmp_path) / "memory-trace.json").write_text("not valid json", encoding="utf-8")
+        result = run_budget(tmp_path, "plan", issue_json=issue_json, memory_file=mem_file)
+        assert "memory_context" in result["sections"]
+
+    def test_dropped_memory_file_no_trace_no_crash(self, tmp_path):
+        """When memory_file is None, the memory_context section is dropped (status=dropped)."""
+        issue_json = make_issue_json(tmp_path)
+        write_memory_trace(str(tmp_path), entries_selected=5, entries_dropped=3)
+        result = run_budget(tmp_path, "plan", issue_json=issue_json, memory_file=None)
+        mc = result["sections"]["memory_context"]
+        assert mc["status"] == "dropped"
