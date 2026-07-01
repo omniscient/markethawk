@@ -101,3 +101,28 @@ main_red_autofix:
   max_attempts: 3             # fix→CI cycles per red event (container default; env MAIN_RED_AUTOFIX_MAX_ATTEMPTS)
   throttle_minutes: 15        # min minutes between fixer dispatches (scheduler; env MAIN_RED_AUTOFIX_THROTTLE_MIN)
   ci_wait_minutes: 20         # bounded wait for branch CI (container default; env MAIN_RED_AUTOFIX_CI_WAIT_MINUTES)
+
+token_optimization:
+  enabled: true               # measure token usage per run; env: TOKEN_OPTIMIZATION_ENABLED overrides
+  enforce_budgets: false      # false = measure-only (no enforcement); env: TOKEN_OPTIMIZATION_ENFORCE_BUDGETS overrides
+  default_budget_tokens: 24000  # per-scenario budget when no override is set; env: TOKEN_OPTIMIZATION_DEFAULT_BUDGET_TOKENS overrides
+  architecture:
+    mode: slice               # slice = emit only the changed file excerpt + its direct callers
+    max_tokens: 3000          # token ceiling for architecture context per scenario (baked — no env override)
+  memory:
+    mode: top_k               # top_k = emit only the K highest-scored memory entries
+    max_entries: 8            # max memory entries surfaced per phase (baked — no env override)
+    max_tokens: 1500          # token ceiling for memory context per phase (baked — no env override)
+  comments:
+    digest_after_factory_marker: true  # collapse comment blocks below the factory marker into a one-line digest
+    max_tokens: 2000          # token ceiling for comment context per scenario (baked — no env override)
+  diff:
+    max_review_tokens: 6000   # token ceiling for diff context fed to the code-review sub-stage (baked — no env override)
+  escalation:
+    cheap_model_first: true   # route to haiku/sonnet before opus for non-sensitive scenarios; env: TOKEN_OPTIMIZATION_CHEAP_MODEL_FIRST overrides
+    opus_only_for:            # scenario tags matched by factory command files (dark-factory-implement.md, etc.); always escalate to opus regardless of cheap_model_first
+      - security
+      - trading
+      - auth
+      - high_blast_radius
+      - material_conformance_uncertainty
