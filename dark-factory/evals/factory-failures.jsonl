@@ -162,3 +162,4 @@
 {"issue":485,"title":"Replay engine: intraday-accurate exit simulator","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:45:33Z"}
 {"issue":485,"title":"Replay engine: intraday-accurate exit simulator","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:45:43Z"}
 {"issue":667,"title":"Add top-k memory retrieval cap compatible with Dark Factory memory v2","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T15:23:52Z"}
+{"issue":667,"title":"Add top-k memory retrieval cap compatible with Dark Factory memory v2","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T15:24:08Z"}
