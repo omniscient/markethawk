@@ -126,10 +126,8 @@ def test_plan_spec_dropped_when_absent(tmp_path):
 
 def test_code_review_diff_included_when_under_cap(tmp_path):
     diff = make_diff_file(tmp_path, lines=50)
-    spec = make_spec_file(tmp_path)
     manifest, md = run_pack(tmp_path, "code-review",
                             issue_json=make_issue_json(tmp_path),
-                            spec_file=spec,
                             diff_file=diff)
     sec = manifest["sections"]["diff"]
     assert sec["status"] == "included"

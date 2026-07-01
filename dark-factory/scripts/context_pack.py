@@ -64,7 +64,11 @@ def _read_issue_context(issue_json: str | None) -> tuple[dict, str | None]:
         return _dropped("empty_or_missing")
     try:
         body = json.loads(raw).get("body") or ""
-        return _included(body) if body.strip() else _dropped("empty_body")
+        if not body.strip():
+            return _dropped("empty_body")
+        # Prefix with a blank line so any leading "## " in untrusted content
+        # does not inject a spurious section header into the assembled prompt.
+        return _included("\n" + body)
     except (json.JSONDecodeError, AttributeError):
         return _dropped("invalid_json")
 
@@ -76,7 +80,11 @@ def _read_comments(issue_json: str | None) -> tuple[dict, str | None]:
     try:
         comments = json.loads(raw).get("comments") or []
         combined = "\n".join(c.get("body", "") for c in comments if isinstance(c, dict))
-        return _included(combined) if combined.strip() else _dropped("no_comments")
+        if not combined.strip():
+            return _dropped("no_comments")
+        # Prefix with a blank line so any leading "## " in untrusted content
+        # does not inject a spurious section header into the assembled prompt.
+        return _included("\n" + combined)
     except (json.JSONDecodeError, AttributeError):
         return _dropped("invalid_json")
 
@@ -102,14 +110,16 @@ def _read_diff(diff_file: str | None) -> tuple[dict, str | None]:
     lines = text.splitlines()
     truncated = len(lines) > DIFF_LINE_CAP
     effective = "\n".join(lines[:DIFF_LINE_CAP]) if truncated else text
-    entry: dict = {"tokens": te.estimate_tokens(effective)}
     if truncated:
-        entry["status"] = "included_partial"
-        entry["truncated_at_lines"] = DIFF_LINE_CAP
         content = effective + f"\n<!-- truncated at {DIFF_LINE_CAP} lines -->"
+        entry: dict = {
+            "status": "included_partial",
+            "tokens": te.estimate_tokens(content),
+            "truncated_at_lines": DIFF_LINE_CAP,
+        }
     else:
-        entry["status"] = "included"
         content = effective
+        entry = {"status": "included", "tokens": te.estimate_tokens(content)}
     if diff_file:
         h = te.hash_file(diff_file)
         if h:
@@ -161,20 +171,41 @@ def assemble_pack(
                 labels=labels,
                 clone_dir=clone_dir,
             )
-            # included_slice = targeted slice; included = full fallback
-            slice_status = "included" if result.fallback else "included_slice"
-            tokens = te.estimate_tokens(result.text)
-            status_entry = {
-                "status": slice_status,
-                "tokens": tokens,
-                "component": result.component,
-                "included_sections": result.included_sections,
-                "omitted_sections": result.omitted_sections,
-                "section_hashes": result.section_hashes,
-                "fallback": result.fallback,
-                "fallback_reason": result.fallback_reason,
-            }
-            content = result.text if result.text and result.text.strip() else None
+            # Detect comment-only fallback text (e.g. "<!-- ... -->" with no real content).
+            _raw = result.text or ""
+            _non_comment_lines = [
+                ln for ln in _raw.splitlines()
+                if ln.strip() and not ln.strip().startswith("<!--") and not ln.strip().startswith("-->")
+            ]
+            _is_comment_only = bool(_raw.strip()) and not _non_comment_lines
+            if _is_comment_only or not _raw.strip():
+                status_entry = {
+                    "status": "dropped",
+                    "tokens": 0,
+                    "reason": "empty_fallback",
+                    "component": result.component,
+                    "included_sections": result.included_sections,
+                    "omitted_sections": result.omitted_sections,
+                    "section_hashes": result.section_hashes,
+                    "fallback": result.fallback,
+                    "fallback_reason": result.fallback_reason,
+                }
+                content = None
+            else:
+                # included_slice = targeted slice; included = full fallback
+                slice_status = "included" if result.fallback else "included_slice"
+                tokens = te.estimate_tokens(_raw)
+                status_entry = {
+                    "status": slice_status,
+                    "tokens": tokens,
+                    "component": result.component,
+                    "included_sections": result.included_sections,
+                    "omitted_sections": result.omitted_sections,
+                    "section_hashes": result.section_hashes,
+                    "fallback": result.fallback,
+                    "fallback_reason": result.fallback_reason,
+                }
+                content = _raw
             h = te.hash_file(arch_path)
             if h:
                 source_hashes["ARCHITECTURE.md"] = h
