@@ -18,6 +18,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+import token_estimate as te  # 4 chars/token estimator
+
 # ── Constants ──────────────────────────────────────────────────────────────
 
 GLOBAL_FILES = {"codebase-patterns.md", "architecture.md"}
@@ -57,12 +60,42 @@ PHASE_AGENT_ID = {
 # Only these kind tags are considered authoritative
 AUTHORITATIVE_KINDS = {"PATTERN", "AVOID", "FIX"}
 
+# Cap defaults for the index retrieval path
+TOP_K_DEFAULT = 8
+TOKEN_BUDGET_DEFAULT = 1500
+
+# Issue label → source_file boost mapping (mirrors architecture_slice._LABEL_COMPONENT_MAP)
+_LABEL_SOURCE_BOOST_MAP = {
+    "dark factory":     "dark-factory-ops.md",
+    "dark-factory":     "dark-factory-ops.md",
+    "frontend":         "frontend-patterns.md",
+    "backend":          "backend-patterns.md",
+}
+
 # Parse: - [TAG] body <!-- meta -->
 _ENTRY_RE = re.compile(
     r"^- \[(?P<tag>[^\]]+)\]\s+(?P<body>.+?)(?:\s*<!--(?P<meta>[^>]*)-->)?\s*$"
 )
 # Parse key:value pairs in metadata comment
 _TAG_RE = re.compile(r"(\w+\d*):([^\s>]+)")
+
+
+# ── Label boost ───────────────────────────────────────────────────────────
+
+def compute_label_boost(source_file, labels):
+    """Return +1 if source_file maps to a domain matched by any issue label; 0 otherwise.
+
+    Global files (codebase-patterns.md, architecture.md) are never boosted.
+    Match is case-insensitive: key in label.lower().
+    """
+    if not labels or source_file in GLOBAL_FILES:
+        return 0
+    for label_text in labels:
+        label_lower = label_text.lower()
+        for key, target_file in _LABEL_SOURCE_BOOST_MAP.items():
+            if key in label_lower and source_file == target_file:
+                return 1
+    return 0
 
 
 # ── Area selection ─────────────────────────────────────────────────────────
@@ -266,26 +299,59 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
     return candidates
 
 
-def format_index_output(candidates):
-    """Format scan_index output, grouped by source_file in ALL_MEMORY_FILES order.
+def format_index_output(candidates, labels=None, _cap_out=None):
+    """Format scan_index output with dual cap and label-boost ranking.
 
-    Within each group: ranked by path specificity (desc) then created_at (desc).
+    Sort key: (path_specificity + label_boost, created_at DESC) globally.
+    Cap: stop at TOP_K_DEFAULT entries OR TOKEN_BUDGET_DEFAULT tokens, whichever first.
+    Groups selected entries by source_file in ALL_MEMORY_FILES order.
+    _cap_out: if provided, populated with entries_selected, entries_dropped_by_cap,
+              per_file_selected, per_file_dropped.
     """
-    grouped = {}
-    for c in candidates:
+    labels = labels or []
+
+    ranked = sorted(
+        candidates,
+        key=lambda c: (
+            c["specificity"] + compute_label_boost(c["source_file"], labels),
+            c.get("created_at") or "",
+        ),
+        reverse=True,
+    )
+
+    selected = []
+    dropped = []
+    token_total = 0
+    for c in ranked:
+        token_cost = te.estimate_tokens(c["text"])
+        if len(selected) >= TOP_K_DEFAULT or token_total + token_cost > TOKEN_BUDGET_DEFAULT:
+            dropped.append(c)
+        else:
+            selected.append(c)
+            token_total += token_cost
+
+    if _cap_out is not None:
+        per_file_selected: dict = {}
+        per_file_dropped: dict = {}
+        for c in selected:
+            per_file_selected[c["source_file"]] = per_file_selected.get(c["source_file"], 0) + 1
+        for c in dropped:
+            per_file_dropped[c["source_file"]] = per_file_dropped.get(c["source_file"], 0) + 1
+        _cap_out["entries_selected"] = len(selected)
+        _cap_out["entries_dropped_by_cap"] = len(dropped)
+        _cap_out["per_file_selected"] = per_file_selected
+        _cap_out["per_file_dropped"] = per_file_dropped
+
+    grouped: dict = {}
+    for c in selected:
         grouped.setdefault(c["source_file"], []).append(c)
 
     parts = []
     for fname in ALL_MEMORY_FILES:
         if fname not in grouped:
             continue
-        entries = sorted(
-            grouped[fname],
-            key=lambda x: (x["specificity"], x.get("created_at") or ""),
-            reverse=True,
-        )
         parts.append(f"### Memory: {fname}")
-        for e in entries:
+        for e in grouped[fname]:
             parts.append(e["text"])
         parts.append("")
 
@@ -294,7 +360,7 @@ def format_index_output(candidates):
 
 # ── Dispatch ───────────────────────────────────────────────────────────────
 
-def retrieve_memory(memory_dir, phase, files):
+def retrieve_memory(memory_dir, phase, files, labels=None, _cap_out=None):
     """Return a markdown memory block for the given phase and changed files."""
     allowed_sources = PHASE_SOURCE_MAP.get(phase, set())
     area_files = select_area_files(files)
@@ -307,7 +373,7 @@ def retrieve_memory(memory_dir, phase, files):
         except (OSError, ValueError):
             candidates = []
         if candidates:
-            return format_index_output(candidates)
+            return format_index_output(candidates, labels=labels, _cap_out=_cap_out)
 
     results = scan_markdown_files(memory_dir, area_files, files, allowed_sources)
     return format_markdown_output(results)
@@ -339,12 +405,20 @@ def _count_entries(fpath, files, allowed_sources, source_file_name):
     return {"total": total, "included": included}
 
 
-def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_sources, issue=0, agent_id=None):
-    """Write memory-trace.json to trace_path. Best-effort: never raises."""
+def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_sources, issue=0, agent_id=None, cap_counts=None):
+    """Write memory-trace.json to trace_path. Best-effort: never raises.
+
+    cap_counts: dict from format_index_output() _cap_out, containing:
+        entries_selected, entries_dropped_by_cap, per_file_selected, per_file_dropped.
+        Empty dict or None means markdown fallback ran (no cap applied).
+    """
     try:
         memory_dir = Path(memory_dir)
         files_loaded = []
         fallback_used = False
+
+        per_file_selected = (cap_counts or {}).get("per_file_selected", {})
+        per_file_dropped = (cap_counts or {}).get("per_file_dropped", {})
 
         for fname in area_files:
             fpath = memory_dir / fname
@@ -357,6 +431,8 @@ def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_
                 "entries_total": counts["total"],
                 "entries_included": counts["included"],
                 "entries_filtered_out": counts["total"] - counts["included"],
+                "entries_selected": per_file_selected.get(fname, 0),
+                "entries_dropped_by_cap": per_file_dropped.get(fname, 0),
             })
 
         trace = {
@@ -370,6 +446,10 @@ def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_
             "files_loaded": files_loaded,
             "fallback_used": fallback_used,
         }
+
+        if cap_counts:
+            trace["entries_selected_total"] = cap_counts.get("entries_selected", 0)
+            trace["entries_dropped_by_cap_total"] = cap_counts.get("entries_dropped_by_cap", 0)
 
         trace_path = Path(trace_path)
         trace_path.parent.mkdir(parents=True, exist_ok=True)
@@ -396,7 +476,7 @@ def main():
         help="Newline-separated list of changed or anticipated file paths",
     )
     parser.add_argument("--issue", type=int, default=None, help="Issue number (informational)")
-    parser.add_argument("--labels", default="", help="Issue labels (reserved, unused)")
+    parser.add_argument("--labels", nargs="*", default=None, help="Issue labels for memory ranking label boost")
     parser.add_argument(
         "--memory-dir",
         default=".archon/memory",
@@ -419,7 +499,9 @@ def main():
     allowed_sources = PHASE_SOURCE_MAP.get(args.phase, set())
     area_files = select_area_files(files)
 
-    output = retrieve_memory(memory_dir, args.phase, files)
+    labels = args.labels or []
+    cap_counts: dict = {}
+    output = retrieve_memory(memory_dir, args.phase, files, labels=labels, _cap_out=cap_counts)
     if output:
         print(output)
 
@@ -428,6 +510,7 @@ def main():
             args.emit_trace_to, args.phase, files, memory_dir, area_files, allowed_sources,
             issue=args.issue or 0,
             agent_id=PHASE_AGENT_ID.get(args.phase, args.phase + "-agent"),
+            cap_counts=cap_counts if cap_counts else None,
         )
 
 
