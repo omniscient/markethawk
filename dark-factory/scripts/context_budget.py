@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(__file__))
 import token_estimate as te
+import architecture_slice as aslice
 
 BUDGET_TOKENS = 200_000
 DIFF_LINE_CAP = 1000
@@ -24,7 +25,7 @@ DIFF_LINE_CAP = 1000
 # Sections active per scenario; order determines iteration order in JSON output.
 _SECTION_REGISTRY: dict[str, list[str]] = {
     "refine":      ["claude_md", "architecture_md", "skill_prompts", "issue_context", "comments", "memory_context"],
-    "plan":        ["claude_md", "skill_prompts", "issue_context", "comments", "memory_context", "spec"],
+    "plan":        ["claude_md", "architecture_md", "skill_prompts", "issue_context", "comments", "memory_context", "spec"],
     "implement":   ["claude_md", "architecture_md", "issue_context", "comments", "memory_context"],
     "continue":    ["claude_md", "architecture_md", "issue_context", "comments", "memory_context", "pr_reviews"],
     "conformance": ["skill_prompts", "spec", "implementation_md", "diff"],
@@ -147,6 +148,9 @@ def build_budget(
     issue_json: str | None = None,
     impl_file: str | None = None,
     diff_file: str | None = None,
+    spec_component: str | None = None,
+    changed_files: list[str] | None = None,
+    labels: list[str] | None = None,
 ) -> None:
     active = _SECTION_REGISTRY.get(scenario, [])
     sections: dict[str, dict] = {}
@@ -161,9 +165,29 @@ def build_budget(
                 source_hashes["CLAUDE.md"] = h
 
         elif sec == "architecture_md":
-            path = os.path.join(clone_dir, "ARCHITECTURE.md")
-            sections[sec] = _included(_read_text(path), path)
-            h = te.hash_file(path)
+            arch_path = os.path.join(clone_dir, "ARCHITECTURE.md")
+            result = aslice.slice_architecture(
+                arch_path=arch_path,
+                scenario=scenario,
+                spec_component=spec_component,
+                spec_file=spec_file,
+                changed_files=changed_files,
+                labels=labels,
+                clone_dir=clone_dir,
+            )
+            status = "included" if result.fallback else "included_slice"
+            tokens = te.estimate_tokens(result.text)
+            sections[sec] = {
+                "status": status,
+                "tokens": tokens,
+                "component": result.component,
+                "included_sections": result.included_sections,
+                "omitted_sections": result.omitted_sections,
+                "section_hashes": result.section_hashes,
+                "fallback": result.fallback,
+                "fallback_reason": result.fallback_reason,
+            }
+            h = te.hash_file(arch_path)
             if h:
                 source_hashes["ARCHITECTURE.md"] = h
 
