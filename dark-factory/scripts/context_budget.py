@@ -67,6 +67,17 @@ def _dropped(reason: str) -> dict:
     return {"status": "dropped", "tokens": 0, "reason": reason}
 
 
+def _read_json(path: str | None) -> dict | None:
+    """Read and parse a JSON file. Returns None on missing file, OSError, or parse error."""
+    raw = _read_text(path)
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 def _probe_skill_prompts() -> dict:
     parts = []
     for name in _SKILL_PROMPT_FILES:
@@ -209,6 +220,14 @@ def build_budget(
                 h = te.hash_file(memory_file)
                 if h:
                     source_hashes["memory-context.md"] = h
+            # Best-effort: surface cap counts from memory-trace.json when available.
+            # Pre-run budget calls will not have the trace; post-run calls will.
+            if artifacts_dir:
+                trace_path = os.path.join(artifacts_dir, "memory-trace.json")
+                trace = _read_json(trace_path)
+                if trace:
+                    sections[sec]["entries_selected"] = trace.get("entries_selected_total", 0)
+                    sections[sec]["entries_dropped"] = trace.get("entries_dropped_by_cap_total", 0)
 
         elif sec == "pr_reviews":
             sections[sec] = _probe_pr_reviews(issue_json)
