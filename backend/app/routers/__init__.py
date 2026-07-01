@@ -13,6 +13,7 @@ from app.routers.journal import router as journal_router
 from app.routers.live_data import router as live_data_router
 from app.routers.news import router as news_router
 from app.routers.outcomes import router as outcomes_router
+from app.routers.replay import router as replay_router
 from app.routers.scanner import router as scanner_router
 from app.routers.stocks import router as stocks_router
 from app.routers.system import router as system_router
@@ -34,6 +35,7 @@ __all__ = [
     "watchlist_router",
     "auto_trading_router",
     "outcomes_router",
+    "replay_router",
     "auth_router",
     "data_quality_router",
 ]
