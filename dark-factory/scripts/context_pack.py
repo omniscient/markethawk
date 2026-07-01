@@ -103,6 +103,13 @@ def _read_pr_reviews(issue_json: str | None) -> tuple[dict, str | None]:
         return _dropped("invalid_json")
 
 
+def _read_comment_digest(digest_file: str | None) -> tuple[dict, str | None]:
+    text = _read_text(digest_file)
+    if not text or not text.strip():
+        return _dropped("empty_or_missing")
+    return _included(text, digest_file)
+
+
 def _read_diff(diff_file: str | None) -> tuple[dict, str | None]:
     text = _read_text(diff_file)
     if not text or not text.strip():
@@ -143,6 +150,7 @@ def assemble_pack(
     spec_component: str | None = None,
     changed_files: list[str] | None = None,
     labels: list[str] | None = None,
+    comment_digest_file: str | None = None,
 ) -> None:
     active = _SECTION_REGISTRY.get(scenario, [])
     sections: dict[str, dict] = {}
@@ -228,6 +236,9 @@ def assemble_pack(
 
         elif sec == "pr_reviews":
             status_entry, content = _read_pr_reviews(issue_json)
+
+        elif sec == "comment_digest":
+            status_entry, content = _read_comment_digest(comment_digest_file)
 
         elif sec == "spec":
             status_entry, content = _included(_read_text(spec_file), spec_file)
@@ -322,6 +333,8 @@ def main() -> None:
                         help="Changed file paths, used to infer the architecture-slice component")
     parser.add_argument("--labels", nargs="*", default=None,
                         help="Issue labels, used for architecture-slice component inference")
+    parser.add_argument("--comment-digest-file",
+                        help="Path to comment-digest.md (used for continue scenario)")
     parser.add_argument("--out-md",
                         help="Output path for context-pack.md "
                              "(default: <artifacts-dir>/context-pack.md)")
@@ -349,6 +362,7 @@ def main() -> None:
         spec_component=args.spec_component,
         changed_files=args.changed_files,
         labels=args.labels,
+        comment_digest_file=args.comment_digest_file,
     )
     print(f"context-pack.md written to {out_md}", file=sys.stderr)
     print(f"context-pack.json written to {out_json}", file=sys.stderr)

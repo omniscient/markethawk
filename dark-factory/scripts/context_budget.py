@@ -27,7 +27,7 @@ _SECTION_REGISTRY: dict[str, list[str]] = {
     "refine":      ["claude_md", "architecture_md", "skill_prompts", "issue_context", "comments", "memory_context"],
     "plan":        ["claude_md", "architecture_md", "skill_prompts", "issue_context", "comments", "memory_context", "spec"],
     "implement":   ["claude_md", "architecture_md", "issue_context", "comments", "memory_context"],
-    "continue":    ["claude_md", "architecture_md", "issue_context", "comments", "memory_context", "pr_reviews"],
+    "continue":    ["claude_md", "architecture_md", "issue_context", "memory_context", "comment_digest"],
     "conformance": ["skill_prompts", "spec", "implementation_md", "diff"],
     "code-review": ["skill_prompts", "issue_context", "diff"],
 }
@@ -129,6 +129,13 @@ def _probe_pr_reviews(issue_json: str | None) -> dict:
         return _dropped("invalid_json")
 
 
+def _probe_comment_digest(digest_file: str | None) -> dict:
+    text = _read_text(digest_file)
+    if not text or not text.strip():
+        return _dropped("empty_or_missing")
+    return _included(text, digest_file)
+
+
 def _probe_diff(diff_file: str | None) -> dict:
     text = _read_text(diff_file)
     if not text or not text.strip():
@@ -165,6 +172,7 @@ def build_budget(
     spec_component: str | None = None,
     changed_files: list[str] | None = None,
     labels: list[str] | None = None,
+    comment_digest_file: str | None = None,
 ) -> None:
     active = _SECTION_REGISTRY.get(scenario, [])
     sections: dict[str, dict] = {}
@@ -235,6 +243,9 @@ def build_budget(
         elif sec == "pr_reviews":
             sections[sec] = _probe_pr_reviews(issue_json)
 
+        elif sec == "comment_digest":
+            sections[sec] = _probe_comment_digest(comment_digest_file)
+
         elif sec == "spec":
             sections[sec] = _included(_read_text(spec_file), spec_file)
             if spec_file and sections[sec]["status"] == "included":
@@ -304,6 +315,8 @@ def main() -> None:
                         help="Changed file paths, used to infer the architecture-slice component")
     parser.add_argument("--labels", nargs="*", default=None,
                         help="Issue labels, used for architecture-slice component inference and safety fallback")
+    parser.add_argument("--comment-digest-file",
+                        help="Path to comment-digest.md (used for continue scenario)")
     parser.add_argument("--out", required=True,
                         help="Output path for context-budget.json")
     args = parser.parse_args()
@@ -324,6 +337,7 @@ def main() -> None:
         spec_component=args.spec_component,
         changed_files=args.changed_files,
         labels=args.labels,
+        comment_digest_file=args.comment_digest_file,
     )
     print(f"context-budget.json written to {args.out}", file=sys.stderr)
 

@@ -165,10 +165,25 @@ def test_conformance_excludes_inapplicable_sections(tmp_path):
         assert sec not in result["sections"], f"Section {sec!r} should be absent for conformance"
 
 
-def test_continue_scenario_includes_pr_reviews(tmp_path):
-    issue_json = make_issue_json(tmp_path, with_pr=True)
-    result = run_budget(tmp_path, "continue", issue_json=issue_json)
-    assert "pr_reviews" in result["sections"]
+def test_continue_scenario_includes_comment_digest(tmp_path):
+    """continue scenario uses comment_digest instead of comments/pr_reviews."""
+    digest_file = tmp_path / "comment-digest.md"
+    digest_file.write_text("# Comment Digest\n\n## Issue Comments\n\nsome feedback\n")
+    result = run_budget(tmp_path, "continue",
+                        issue_json=make_issue_json(tmp_path, with_pr=True),
+                        comment_digest_file=str(digest_file))
+    assert "comment_digest" in result["sections"]
+    assert result["sections"]["comment_digest"]["status"] == "included"
+    assert "pr_reviews" not in result["sections"]
+    assert "comments" not in result["sections"]
+
+
+def test_continue_scenario_comment_digest_absent_is_dropped(tmp_path):
+    """continue scenario reports comment_digest as dropped when file is absent."""
+    result = run_budget(tmp_path, "continue", issue_json=make_issue_json(tmp_path))
+    sec = result["sections"].get("comment_digest", {})
+    assert sec["status"] == "dropped"
+    assert sec.get("reason") == "empty_or_missing"
 
 
 def test_implement_scenario_excludes_pr_reviews(tmp_path):
