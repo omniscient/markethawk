@@ -1,4 +1,6 @@
 """Pure-stdlib token estimation helpers for Dark Factory context budget telemetry."""
+from __future__ import annotations
+
 import hashlib
 
 CHARS_PER_TOKEN = 4.0
@@ -8,7 +10,7 @@ def estimate_tokens(text: str) -> int:
     return int(len(text) / CHARS_PER_TOKEN)
 
 
-def hash_file(path: str) -> "str | None":
+def hash_file(path: str) -> str | None:
     try:
         with open(path, "rb") as f:
             return hashlib.sha256(f.read()).hexdigest()[:12]

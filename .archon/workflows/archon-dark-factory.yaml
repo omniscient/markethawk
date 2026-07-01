@@ -429,6 +429,12 @@ nodes:
       INTENT=$(jq -r '.intent' "$ARTIFACTS_DIR/issue.json")
       _CLONE="${CLONE_DIR:-.}"
       _RUN="${RUN_ID:-$(basename "${ARTIFACTS_DIR:-/tmp/budget}")}"
+      # Assert INTENT is a known scenario before invoking context_budget.py so that
+      # an unexpected value produces a visible error rather than a silent no-op.
+      case "$INTENT" in
+        new|continue) ;;
+        *) echo "budget-implement: unexpected INTENT='$INTENT'; expected new or continue" >&2; exit 1 ;;
+      esac
       # memory-context.md is written inside the command session by memory_retrieve.py (Phase 1
       # load). This applies to all of refine, plan, implement, continue — budget nodes always
       # run before the command. Reported as dropped/empty_or_missing; this is expected.

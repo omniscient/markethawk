@@ -138,7 +138,6 @@ def build_budget(
     scenario: str,
     issue_num: int,
     run_id: str,
-    artifacts_dir: str,
     clone_dir: str,
     out: str,
     spec_file: str | None = None,
@@ -195,9 +194,6 @@ def build_budget(
                 h = te.hash_file(spec_file)
                 if h:
                     source_hashes["spec"] = h
-
-        elif sec == "plan":
-            sections[sec] = _included(_read_text(plan_file), plan_file)
 
         elif sec == "implementation_md":
             sections[sec] = _included(_read_text(impl_file), impl_file)
@@ -262,7 +258,6 @@ def main() -> None:
         scenario=args.scenario,
         issue_num=args.issue_num,
         run_id=args.run_id,
-        artifacts_dir=args.artifacts_dir,
         clone_dir=args.clone_dir,
         out=args.out,
         spec_file=args.spec_file,
