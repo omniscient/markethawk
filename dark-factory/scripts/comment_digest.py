@@ -2,7 +2,8 @@
 
 Reads issue.json, finds the latest factory-posted comment (using the same
 6-marker bot_re as scheduler.sh), then extracts human-authored comments after
-that boundary plus all PR reviews and inline comments.  No LLM involved.
+that boundary plus PR reviews and inline comments filtered by timestamp.
+No LLM involved.
 
 Usage:
   python3 comment_digest.py --issue-json /path/to/issue.json \
@@ -25,36 +26,78 @@ _BOT_RE = re.compile(
     r"|Posted by MarketHawk Epic Autopilot",
 )
 
-_NO_FEEDBACK_SENTINEL = "<!-- no-human-feedback -->\n"
-
 
 def _is_factory_comment(body: str) -> bool:
     return bool(_BOT_RE.search(body))
+
+
+def _matched_marker(body: str) -> str:
+    m = _BOT_RE.search(body)
+    return m.group(0) if m else ""
+
+
+def _feedback_sections(human_comments: list[dict], reviews: list[dict], inline: list[dict]) -> str:
+    parts: list[str] = []
+
+    if human_comments:
+        parts.append("\n### Issue comments\n\n")
+        for c in human_comments:
+            created_at = c.get("createdAt") or ""
+            body = c.get("body") or ""
+            parts.append(f"- [{created_at}] {body}\n")
+
+    if reviews:
+        parts.append("\n### PR review comments\n\n")
+        for r in reviews:
+            submitted_at = r.get("submittedAt") or ""
+            body = r.get("body") or ""
+            parts.append(f"- [{submitted_at}] {body}\n")
+
+    if inline:
+        parts.append("\n### Inline review comments by file\n\n")
+        by_path: dict[str, list[dict]] = {}
+        for c in inline:
+            path = c.get("path") or "unknown"
+            by_path.setdefault(path, []).append(c)
+        for path in sorted(by_path):
+            parts.append(f"#### {path}\n")
+            for c in by_path[path]:
+                line = c.get("line")
+                body = c.get("body") or ""
+                line_label = f"Line {line}" if line else "Unanchored"
+                parts.append(f"- {line_label}: {body}\n")
+            parts.append("\n")
+
+    return "".join(parts)
 
 
 def build_digest(issue_data: dict) -> str:
     """Build a comment digest from parsed issue.json data.
 
     Finds the latest factory boundary marker in the comments array, then
-    extracts human-authored comments, PR reviews, and inline comments after
-    that boundary.  Filters by timestamp > boundary for reviews and inline.
-
-    Returns a markdown string, or the no-feedback sentinel if nothing human is found.
+    extracts human-authored comments, PR reviews (filtered by submittedAt >
+    boundary AND non-bot body), and inline comments (filtered by created_at >
+    boundary). Returns a spec-format markdown string, or a sentinel if nothing
+    human is found.
     """
     comments: list[dict] = issue_data.get("comments") or []
     pr_reviews_data: dict = issue_data.get("pr_reviews") or {}
     inline_comments: list[dict] = issue_data.get("pr_inline_comments") or []
 
-    # Find index and timestamp of the last factory boundary marker
+    # Find index, timestamp, matched marker, and body of the last factory boundary
     last_factory_idx = -1
     boundary_ts: str = ""
+    boundary_marker: str = ""
+    boundary_body: str = ""
     for i, comment in enumerate(comments):
         body = comment.get("body") or ""
         if _is_factory_comment(body):
             last_factory_idx = i
             boundary_ts = comment.get("createdAt") or ""
+            boundary_marker = _matched_marker(body)
+            boundary_body = body
 
-    # Human comments are those after the latest factory marker that aren't bots
+    # Human comments: after latest factory marker, non-bot
     human_comments = [
         c for c in comments[last_factory_idx + 1:]
         if not _is_factory_comment(c.get("body") or "")
@@ -74,47 +117,37 @@ def build_digest(issue_data: dict) -> str:
         if not boundary_ts or (c.get("created_at") or "") > boundary_ts
     ]
 
+    no_boundary = last_factory_idx == -1
+
+    # No-boundary case: all human content with a note, or empty sentinel
+    if no_boundary:
+        all_human = [c for c in comments if not _is_factory_comment(c.get("body") or "")]
+        all_reviews_nb = [r for r in all_reviews if not _is_factory_comment(r.get("body") or "")]
+        all_inline = inline_comments
+        if not all_human and not all_reviews_nb and not all_inline:
+            return "<!-- no-human-feedback -->\n"
+        sections = _feedback_sections(all_human, all_reviews_nb, all_inline)
+        return f"<!-- no-boundary: true -->\n## Human feedback since last factory run\n{sections}"
+
+    # With boundary
+    header = f'<!-- comment-digest: cutoff={boundary_ts} marker="{boundary_marker}" -->'
+
     if not human_comments and not reviews and not inline:
-        return _NO_FEEDBACK_SENTINEL
+        return (
+            f"{header}\n"
+            "<!-- no-feedback: true -->\n"
+            "No human feedback found after last factory marker.\n"
+        )
 
-    parts: list[str] = ["# Comment Digest\n"]
-
-    if human_comments:
-        parts.append("## Issue Comments\n")
-        for comment in human_comments:
-            author = (comment.get("author") or {}).get("login") or "unknown"
-            created_at = comment.get("createdAt") or ""
-            body = comment.get("body") or ""
-            parts.append(f"### @{author} — {created_at}\n\n{body}\n\n---\n")
-
-    if reviews:
-        parts.append("## PR Reviews\n")
-        for review in reviews:
-            author = (review.get("author") or {}).get("login") or "unknown"
-            submitted_at = review.get("submittedAt") or ""
-            state = review.get("state") or ""
-            body = review.get("body") or ""
-            state_label = f" ({state})" if state else ""
-            parts.append(f"### @{author} — {submitted_at}{state_label}\n\n{body}\n\n---\n")
-
-    if inline:
-        parts.append("## Inline Code Review Comments\n")
-        by_path: dict[str, list[dict]] = {}
-        for c in inline:
-            path = c.get("path") or "unknown"
-            by_path.setdefault(path, []).append(c)
-
-        for path in sorted(by_path):
-            parts.append(f"### `{path}`\n")
-            for c in by_path[path]:
-                line = c.get("line")
-                created_at = c.get("created_at") or ""
-                body = c.get("body") or ""
-                line_label = f"**Line {line}**" if line else "**Unanchored**"
-                parts.append(f"{line_label} — {created_at}:\n{body}\n")
-            parts.append("")
-
-    return "\n".join(parts)
+    snippet = boundary_body[:80] + ("…" if len(boundary_body) > 80 else "")
+    sections = _feedback_sections(human_comments, reviews, inline)
+    return (
+        f"{header}\n"
+        f"## Marker\n\n"
+        f'Latest factory comment at {boundary_ts}: "{snippet}"\n\n'
+        f"## Human feedback since last factory run\n"
+        f"{sections}"
+    )
 
 
 def main() -> None:

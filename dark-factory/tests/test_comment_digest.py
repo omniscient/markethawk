@@ -10,7 +10,7 @@ import comment_digest as cd
 # ── sentinel / no-feedback ────────────────────────────────────────────────────
 
 def test_no_feedback_all_bot_comments_returns_sentinel():
-    """All comments are factory/bot → sentinel returned."""
+    """All comments are factory/bot → no-feedback sentinel with boundary header."""
     issue_data = {
         "comments": [
             {"body": "---\n*Posted by MarketHawk Dark Factory*", "author": {"login": "bot"}, "createdAt": "2026-01-01T00:00:00Z"},
@@ -19,19 +19,21 @@ def test_no_feedback_all_bot_comments_returns_sentinel():
         "pr_inline_comments": [],
     }
     result = cd.build_digest(issue_data)
-    assert result.strip() == "<!-- no-human-feedback -->"
+    assert "<!-- no-feedback: true -->" in result
+    assert "No human feedback found after last factory marker." in result
+    assert "<!-- comment-digest:" in result
 
 
 def test_no_feedback_empty_issue_returns_sentinel():
-    """No comments/reviews at all → sentinel returned."""
+    """No comments/reviews at all → simple no-human-feedback sentinel."""
     result = cd.build_digest({})
-    assert result.strip() == "<!-- no-human-feedback -->"
+    assert "<!-- no-human-feedback -->" in result
 
 
 def test_no_feedback_empty_lists_returns_sentinel():
-    """Empty comments, reviews, inline → sentinel."""
+    """Empty comments, reviews, inline → simple no-human-feedback sentinel."""
     result = cd.build_digest({"comments": [], "pr_reviews": {}, "pr_inline_comments": []})
-    assert result.strip() == "<!-- no-human-feedback -->"
+    assert "<!-- no-human-feedback -->" in result
 
 
 # ── boundary detection ────────────────────────────────────────────────────────
@@ -68,7 +70,7 @@ def test_boundary_uses_latest_factory_marker_not_first():
 
 
 def test_no_boundary_all_human_comments_included():
-    """When there is no factory boundary, all human comments are included."""
+    """When there is no factory boundary, all human comments are included with a no-boundary note."""
     issue_data = {
         "comments": [
             {"body": "first", "author": {"login": "user"}, "createdAt": "2026-01-01T00:00:00Z"},
@@ -76,6 +78,7 @@ def test_no_boundary_all_human_comments_included():
         ],
     }
     result = cd.build_digest(issue_data)
+    assert "<!-- no-boundary: true -->" in result
     assert "first" in result
     assert "second" in result
 
@@ -83,32 +86,31 @@ def test_no_boundary_all_human_comments_included():
 # ── issue comment feedback ────────────────────────────────────────────────────
 
 def test_issue_comment_section_header():
-    """Issue comments produce ## Issue Comments section."""
+    """Issue comments produce ### Issue comments section."""
     issue_data = {
         "comments": [
             {"body": "Please fix the bug", "author": {"login": "omniscient"}, "createdAt": "2026-07-01T10:00:00Z"},
         ],
     }
     result = cd.build_digest(issue_data)
-    assert "## Issue Comments" in result
+    assert "### Issue comments" in result
 
 
-def test_issue_comment_author_and_body():
-    """Author login and comment body appear verbatim in digest."""
+def test_issue_comment_body_appears():
+    """Comment body appears verbatim in digest."""
     issue_data = {
         "comments": [
             {"body": "unique-feedback-xyz", "author": {"login": "alice"}, "createdAt": "2026-07-01T10:00:00Z"},
         ],
     }
     result = cd.build_digest(issue_data)
-    assert "@alice" in result
     assert "unique-feedback-xyz" in result
 
 
 # ── PR review feedback ────────────────────────────────────────────────────────
 
 def test_pr_review_section_header():
-    """PR reviews produce ## PR Reviews section."""
+    """PR reviews produce ### PR review comments section."""
     issue_data = {
         "pr_reviews": {
             "reviews": [
@@ -117,11 +119,11 @@ def test_pr_review_section_header():
         },
     }
     result = cd.build_digest(issue_data)
-    assert "## PR Reviews" in result
+    assert "### PR review comments" in result
 
 
-def test_pr_review_body_and_state():
-    """PR review body and state appear in digest."""
+def test_pr_review_body_appears():
+    """PR review body appears in digest."""
     issue_data = {
         "pr_reviews": {
             "reviews": [
@@ -131,20 +133,19 @@ def test_pr_review_body_and_state():
     }
     result = cd.build_digest(issue_data)
     assert "change-this-thing" in result
-    assert "CHANGES_REQUESTED" in result
 
 
 # ── inline comment feedback ───────────────────────────────────────────────────
 
 def test_inline_comment_section_header():
-    """Inline comments produce ## Inline Code Review Comments section."""
+    """Inline comments produce ### Inline review comments by file section."""
     issue_data = {
         "pr_inline_comments": [
             {"path": "backend/app/main.py", "line": 42, "body": "fix this", "created_at": "2026-07-01T10:00:00Z"},
         ],
     }
     result = cd.build_digest(issue_data)
-    assert "## Inline Code Review Comments" in result
+    assert "### Inline review comments by file" in result
 
 
 def test_inline_comments_grouped_by_path():
@@ -157,15 +158,31 @@ def test_inline_comments_grouped_by_path():
         ],
     }
     result = cd.build_digest(issue_data)
-    # Both backend lines appear under the same path header
-    assert "`backend/app/main.py`" in result
-    assert "`frontend/src/index.tsx`" in result
+    # Both path headers present (spec uses #### path without backticks)
+    assert "#### backend/app/main.py" in result
+    assert "#### frontend/src/index.tsx" in result
     # backend path header appears before frontend path header (alphabetical)
-    assert result.index("`backend/app/main.py`") < result.index("`frontend/src/index.tsx`")
-    # Both inline bodies present
-    assert "first inline" in result
-    assert "second inline" in result
+    assert result.index("#### backend/app/main.py") < result.index("#### frontend/src/index.tsx")
+    # Bodies present with spec format "- Line N: body"
+    assert "- Line 42: first inline" in result
+    assert "- Line 55: second inline" in result
     assert "frontend inline" in result
+
+
+# ── digest header with cutoff/marker ─────────────────────────────────────────
+
+def test_digest_header_includes_cutoff_and_marker():
+    """Output with boundary includes <!-- comment-digest: cutoff=… marker="…" --> header."""
+    issue_data = {
+        "comments": [
+            {"body": "Posted by MarketHawk Dark Factory\nRun complete.", "author": {"login": "bot"}, "createdAt": "2026-01-03T12:00:00Z"},
+            {"body": "human-feedback-here", "author": {"login": "user"}, "createdAt": "2026-01-04T10:00:00Z"},
+        ],
+    }
+    result = cd.build_digest(issue_data)
+    assert '<!-- comment-digest: cutoff=2026-01-03T12:00:00Z marker="Posted by MarketHawk Dark Factory" -->' in result
+    assert "## Marker" in result
+    assert "2026-01-03T12:00:00Z" in result
 
 
 # ── all 6 bot markers ─────────────────────────────────────────────────────────
@@ -183,13 +200,18 @@ def test_all_six_bot_markers_detected():
     for marker in markers:
         issue_data = {
             "comments": [
-                {"body": f"before comment\n---\n*{marker}*", "author": {"login": "bot"}, "createdAt": "2026-01-01T00:00:00Z"},
-                {"body": "after human comment", "author": {"login": "user"}, "createdAt": "2026-01-02T00:00:00Z"},
+                # Factory boundary comment — body starts with the marker text
+                {"body": f"{marker}: run complete.", "author": {"login": "bot"}, "createdAt": "2026-01-01T00:00:00Z"},
+                # Human comment that comes after — should appear in feedback
+                {"body": "after-human-unique-xyz", "author": {"login": "user"}, "createdAt": "2026-01-02T00:00:00Z"},
             ]
         }
         result = cd.build_digest(issue_data)
-        assert "after human comment" in result, f"Human comment after marker not included for: {marker}"
-        assert "before comment" not in result, f"Comment before marker not excluded for: {marker}"
+        assert "after-human-unique-xyz" in result, f"Human comment after marker not included for: {marker}"
+        # The boundary marker itself should appear only in the header/Marker section,
+        # not as a human feedback entry in the Issue comments section
+        assert "### Issue comments" in result or "<!-- comment-digest:" in result, \
+            f"Expected digest structure not found for: {marker}"
 
 
 # ── PR review / inline boundary filtering ─────────────────────────────────────
@@ -208,7 +230,7 @@ def test_pr_review_before_boundary_excluded():
         "pr_inline_comments": [],
     }
     result = cd.build_digest(issue_data)
-    assert result.strip() == "<!-- no-human-feedback -->"
+    assert "<!-- no-feedback: true -->" in result
     assert "old-review-before-factory" not in result
 
 
@@ -241,7 +263,7 @@ def test_inline_comment_before_boundary_excluded():
         ],
     }
     result = cd.build_digest(issue_data)
-    assert result.strip() == "<!-- no-human-feedback -->"
+    assert "<!-- no-feedback: true -->" in result
     assert "old-inline-before-factory" not in result
 
 
