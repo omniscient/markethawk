@@ -275,6 +275,13 @@ def main() -> None:
     parser.add_argument("--issue-json")
     parser.add_argument("--impl-file")
     parser.add_argument("--diff-file")
+    parser.add_argument("--spec-component",
+                        help="Explicit component for architecture slicing "
+                             "(backend|frontend|dark-factory|infrastructure); inferred if omitted")
+    parser.add_argument("--changed-files", nargs="*", default=None,
+                        help="Changed file paths, used to infer the architecture-slice component")
+    parser.add_argument("--labels", nargs="*", default=None,
+                        help="Issue labels, used for architecture-slice component inference and safety fallback")
     parser.add_argument("--out", required=True,
                         help="Output path for context-budget.json")
     args = parser.parse_args()
@@ -292,6 +299,9 @@ def main() -> None:
         issue_json=args.issue_json,
         impl_file=args.impl_file,
         diff_file=args.diff_file,
+        spec_component=args.spec_component,
+        changed_files=args.changed_files,
+        labels=args.labels,
     )
     print(f"context-budget.json written to {args.out}", file=sys.stderr)
 
