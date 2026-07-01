@@ -340,6 +340,8 @@ def format_index_output(candidates, labels=None, _cap_out=None):
         token_cost = te.estimate_tokens(c["text"])
         # Always admit the first entry even if it alone exceeds the token budget,
         # so a single large memory never silently yields an empty block.
+        # Over-budget entries are skipped individually (not a hard stop); a later
+        # smaller entry may still be admitted if it fits within the remaining budget.
         if len(selected) >= TOP_K_DEFAULT or (selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT):
             if selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT and len(selected) < TOP_K_DEFAULT:
                 sys.stderr.write(
@@ -467,8 +469,6 @@ def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_
         # cap_counts (which reflects the actual retrieval path) rather than the
         # markdown-file existence check above, so the two signals stay consistent.
         index_path_ran = cap_counts is not None and not cap_counts.get("fallback_used")
-        if index_path_ran:
-            fallback_used = cap_counts.get("fallback_used", False)
 
         trace = {
             "schema_version": 1,

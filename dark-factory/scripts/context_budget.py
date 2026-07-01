@@ -68,14 +68,17 @@ def _dropped(reason: str) -> dict:
 
 
 def _read_json(path: str | None) -> dict | None:
-    """Read and parse a JSON file. Returns None on missing file, OSError, or parse error."""
+    """Read and parse a JSON file. Returns None on missing file, OSError, parse error, or non-object JSON."""
     raw = _read_text(path)
     if not raw:
         return None
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
     except (json.JSONDecodeError, ValueError):
         return None
+    if not isinstance(parsed, dict):
+        return None
+    return parsed
 
 
 def _probe_skill_prompts() -> dict:
@@ -222,7 +225,7 @@ def build_budget(
                     source_hashes["memory-context.md"] = h
             # Best-effort: surface cap counts from memory-trace.json when available.
             # Pre-run budget calls will not have the trace; post-run calls will.
-            if artifacts_dir:
+            if artifacts_dir and sections[sec]["status"] != "dropped":
                 trace_path = os.path.join(artifacts_dir, "memory-trace.json")
                 trace = _read_json(trace_path)
                 if trace:
