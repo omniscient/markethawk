@@ -303,20 +303,18 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
     return candidates
 
 
-def format_index_output(candidates, labels=None, cap_out=None):
+def format_index_output(candidates, labels=None, _cap_out=None):
     """Format scan_index output with dual cap and label-boost ranking.
 
     Sort key: (path_specificity + label_boost, created_at DESC) globally.
     Cap: stop at TOP_K_DEFAULT entries OR TOKEN_BUDGET_DEFAULT tokens, whichever first.
     Groups selected entries by source_file in ALL_MEMORY_FILES order.
 
-    cap_out: optional dict mutated in-place with cap telemetry keys:
+    _cap_out: optional dict mutated in-place with cap telemetry keys:
         entries_selected, entries_dropped_by_cap, per_file_selected, per_file_dropped.
         Prefer passing an empty dict and reading it after the call; a future refactor
         could return a (text, cap_counts) tuple instead.
     """
-    # Internal alias kept for back-compat with direct callers using _cap_out kwarg.
-    _cap_out = cap_out
     labels = labels or []
 
     # Tiebreaker: entries without created_at sort as "" which, under reverse=True,
@@ -387,7 +385,7 @@ def retrieve_memory(memory_dir, phase, files, labels=None, _cap_out=None):
         except (OSError, ValueError):
             candidates = []
         if candidates:
-            return format_index_output(candidates, labels=labels, cap_out=_cap_out)
+            return format_index_output(candidates, labels=labels, _cap_out=_cap_out)
 
     results = scan_markdown_files(memory_dir, area_files, files, allowed_sources)
     # Markdown fallback: populate _cap_out with zero counts so downstream consumers
