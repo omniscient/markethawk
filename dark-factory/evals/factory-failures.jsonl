@@ -157,3 +157,4 @@
 {"issue":484,"title":"Replay engine: data model + manifest resolver + data hash","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:42:02Z"}
 {"issue":485,"title":"Replay engine: intraday-accurate exit simulator","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:43:07Z"}
 {"issue":485,"title":"Replay engine: intraday-accurate exit simulator","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:43:24Z"}
+{"issue":484,"title":"Replay engine: data model + manifest resolver + data hash","phase":"fix","exit_code":1,"postmortem":"You've hit your session limit · resets 6pm (UTC) ","promoted_at":"2026-07-01T14:44:26Z"}
