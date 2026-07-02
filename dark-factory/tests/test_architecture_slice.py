@@ -299,3 +299,42 @@ def test_section_hashes_present_for_included_sections(arch_file, tmp_path):
     for sec in result.included_sections:
         assert sec in result.section_hashes
         assert len(result.section_hashes[sec]) == 12
+
+
+# ── T3: feature-disabled bypass (R1/R4) ─────────────────────────────────────
+
+def test_slice_bypasses_when_feature_disabled(arch_file, tmp_path):
+    """slice_architecture() must return full-doc fallback when architecture.enabled is false."""
+    cfg_dir = tmp_path / ".claude" / "skills" / "refinement"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "config.yaml").write_text(textwrap.dedent("""\
+        token_optimization:
+          architecture:
+            enabled: false
+    """))
+    result = aslice.slice_architecture(
+        arch_path=arch_file,
+        scenario="implement",
+        spec_file="backend/app/services/scanner.py",
+        clone_dir=str(tmp_path),
+    )
+    assert result.fallback is True
+    assert result.fallback_reason == "feature_disabled"
+
+
+def test_slice_proceeds_when_feature_enabled(arch_file, tmp_path):
+    """slice_architecture() must NOT bypass slicing when architecture.enabled is true."""
+    cfg_dir = tmp_path / ".claude" / "skills" / "refinement"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "config.yaml").write_text(textwrap.dedent("""\
+        token_optimization:
+          architecture:
+            enabled: true
+    """))
+    result = aslice.slice_architecture(
+        arch_path=arch_file,
+        scenario="implement",
+        spec_file="backend/app/services/scanner.py",
+        clone_dir=str(tmp_path),
+    )
+    assert result.fallback_reason != "feature_disabled"

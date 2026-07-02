@@ -315,6 +315,7 @@ def build_budget(
         "issue_number": issue_num,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "budget_tokens": BUDGET_TOKENS,
+        "baseline_input_tokens": baseline_total,
         "estimated_input_tokens": estimated,
         "utilization_pct": utilization,
         "savings_tokens": savings_tokens,
