@@ -70,9 +70,9 @@ def test_required_fields_present(tmp_path):
         assert field in result, f"Missing required field: {field}"
 
 
-def test_schema_version_is_1(tmp_path):
+def test_schema_version_is_2(tmp_path):
     result = run_budget(tmp_path, "refine", issue_json=make_issue_json(tmp_path))
-    assert result["schema_version"] == 1
+    assert result["schema_version"] == 2
 
 
 def test_budget_tokens_is_200000(tmp_path):
@@ -334,3 +334,148 @@ class TestMemoryContextCapCounts:
         result = run_budget(tmp_path, "plan", issue_json=issue_json, memory_file=None)
         mc = result["sections"]["memory_context"]
         assert mc["status"] == "dropped"
+
+
+# ── schema v2 savings tests ───────────────────────────────────────────────────
+
+class TestSchemaV2Savings:
+    """Schema v2 adds savings_tokens, savings_pct, and fallback_events at the top level."""
+
+    def test_savings_fields_present(self, tmp_path):
+        result = run_budget(tmp_path, "refine", issue_json=make_issue_json(tmp_path))
+        assert "savings_tokens" in result
+        assert "savings_pct" in result
+        assert "fallback_events" in result
+
+    def test_savings_tokens_is_non_negative(self, tmp_path):
+        result = run_budget(tmp_path, "refine", issue_json=make_issue_json(tmp_path))
+        assert result["savings_tokens"] >= 0
+
+    def test_fallback_events_is_list(self, tmp_path):
+        result = run_budget(tmp_path, "refine", issue_json=make_issue_json(tmp_path))
+        assert isinstance(result["fallback_events"], list)
+
+    def test_diff_section_has_baseline_tokens_from_ranking_sidecar(self, tmp_path):
+        """When diff-ranking.json has raw_diff_tokens, it should appear as baseline_tokens in diff section."""
+        import json as _json
+        diff_file = make_diff_file(tmp_path, lines=50)
+        ranking_path = tmp_path / "diff-ranking.json"
+        ranking_path.write_text(_json.dumps({"raw_diff_tokens": 999, "files": []}), encoding="utf-8")
+        result = run_budget(tmp_path, "code-review",
+                            issue_json=make_issue_json(tmp_path),
+                            diff_file=diff_file)
+        diff_sec = result["sections"].get("diff", {})
+        if diff_sec.get("status") in ("included", "included_partial"):
+            assert diff_sec.get("baseline_tokens") == 999
+
+    def test_memory_uncapped_tokens_feeds_baseline(self, tmp_path):
+        """uncapped_tokens in memory-trace.json → baseline_tokens in memory_context section."""
+        import json as _json
+        from pathlib import Path as _Path
+        issue_json = make_issue_json(tmp_path)
+        mem_file = make_memory_file(tmp_path)
+        trace = {
+            "schema_version": 1,
+            "entries_selected_total": 3,
+            "entries_dropped_by_cap_total": 2,
+            "uncapped_tokens": 2500,
+        }
+        (_Path(tmp_path) / "memory-trace.json").write_text(_json.dumps(trace), encoding="utf-8")
+        result = run_budget(tmp_path, "plan", issue_json=issue_json, memory_file=mem_file)
+        mc = result["sections"]["memory_context"]
+        assert mc.get("baseline_tokens") == 2500
+
+    def test_architecture_section_has_baseline_tokens(self, tmp_path):
+        """architecture_md section always has baseline_tokens (full doc size)."""
+        arch_path = tmp_path / "ARCHITECTURE.md"
+        arch_path.write_text("## Section A\ncontent\n" * 10)
+        result = run_budget(tmp_path, "refine", issue_json=make_issue_json(tmp_path))
+        arch_sec = result["sections"].get("architecture_md", {})
+        if arch_sec.get("status") not in ("dropped",):
+            assert "baseline_tokens" in arch_sec
+
+
+# ── architecture slice feature-disabled tests ─────────────────────────────────
+
+class TestArchitectureFeatureDisabled:
+    """When TOKEN_OPTIMIZATION_ARCHITECTURE_ENABLED=false, slice_architecture returns full doc."""
+
+    def test_feature_disabled_env_returns_full_doc(self, tmp_path, monkeypatch):
+        import architecture_slice as aslice
+        arch_path = tmp_path / "ARCHITECTURE.md"
+        arch_path.write_text("## Section A\ncontent\n## Section B\nmore\n")
+        monkeypatch.setenv("TOKEN_OPTIMIZATION_ARCHITECTURE_ENABLED", "false")
+        result = aslice.slice_architecture(
+            arch_path=str(arch_path),
+            scenario="implement",
+            changed_files=["backend/app/routers/health.py"],
+        )
+        assert result.fallback is True
+        assert result.fallback_reason == "feature_disabled"
+
+    def test_feature_enabled_env_still_slices(self, tmp_path, monkeypatch):
+        import architecture_slice as aslice
+        arch_path = tmp_path / "ARCHITECTURE.md"
+        arch_path.write_text("## Section A\ncontent\n")
+        monkeypatch.setenv("TOKEN_OPTIMIZATION_ARCHITECTURE_ENABLED", "true")
+        result = aslice.slice_architecture(
+            arch_path=str(arch_path),
+            scenario="implement",
+            changed_files=["backend/app/routers/health.py"],
+        )
+        # Should not be feature_disabled (may be other fallback reasons)
+        assert result.fallback_reason != "feature_disabled"
+
+
+# ── diff rank feature-disabled tests ─────────────────────────────────────────
+
+class TestDiffRankFeatureDisabled:
+    """When diff_enabled=False, build_ranked_diff returns full diff without truncation."""
+
+    def test_disabled_returns_full_diff(self):
+        import diff_rank as dr
+        diff_text = "diff --git a/foo.py b/foo.py\n+++ b/foo.py\n+line\n"
+        result, info = dr.build_ranked_diff(
+            diff_text, token_cap=10, hotspot_paths=set(), hotspot_scores={},
+            spec_names=set(), score_floor=5.0, diff_enabled=False,
+        )
+        assert result == diff_text
+        assert info["diff_enabled"] is False
+
+    def test_disabled_records_raw_diff_tokens(self):
+        import diff_rank as dr
+        diff_text = "diff --git a/foo.py b/foo.py\n+++ b/foo.py\n+line\n"
+        _, info = dr.build_ranked_diff(
+            diff_text, token_cap=10, hotspot_paths=set(), hotspot_scores={},
+            spec_names=set(), score_floor=5.0, diff_enabled=False,
+        )
+        expected = dr.estimate_tokens(diff_text)
+        assert info["raw_diff_tokens"] == expected
+        assert info["estimated_tokens_emitted"] == expected
+
+    def test_enabled_produces_ranking_header(self):
+        import diff_rank as dr
+        diff_text = "diff --git a/foo.py b/foo.py\n+++ b/foo.py\n+line\n"
+        result, _ = dr.build_ranked_diff(
+            diff_text, token_cap=9999, hotspot_paths=set(), hotspot_scores={},
+            spec_names=set(), score_floor=5.0, diff_enabled=True,
+        )
+        assert result.startswith("# [diff-rank:")
+
+    def test_load_config_returns_3_tuple(self, tmp_path):
+        import diff_rank as dr
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("token_optimization:\n  diff:\n    enabled: true\n    max_review_tokens: 4000\nblast_radius:\n  hotspot_score_floor: 3.0\n")
+        result = dr.load_config(str(cfg))
+        assert len(result) == 3
+        token_cap, score_floor, diff_enabled = result
+        assert token_cap == 4000
+        assert score_floor == 3.0
+        assert diff_enabled is True
+
+    def test_load_config_diff_disabled_flag(self, tmp_path):
+        import diff_rank as dr
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("token_optimization:\n  diff:\n    enabled: false\n    max_review_tokens: 6000\nblast_radius:\n  hotspot_score_floor: 5.0\n")
+        _, _, diff_enabled = dr.load_config(str(cfg))
+        assert diff_enabled is False

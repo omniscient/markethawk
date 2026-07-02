@@ -199,9 +199,13 @@ def build_budget(
             )
             status = "included" if result.fallback else "included_slice"
             tokens = te.estimate_tokens(result.text)
+            # baseline_tokens: full-doc token count for savings computation
+            full_arch_text = _read_text(arch_path) or ""
+            baseline_tokens = te.estimate_tokens(full_arch_text)
             sections[sec] = {
                 "status": status,
                 "tokens": tokens,
+                "baseline_tokens": baseline_tokens,
                 "component": result.component,
                 "included_sections": result.included_sections,
                 "omitted_sections": result.omitted_sections,
@@ -239,6 +243,9 @@ def build_budget(
                 if trace:
                     sections[sec]["entries_selected"] = trace.get("entries_selected_total", 0)
                     sections[sec]["entries_dropped"] = trace.get("entries_dropped_by_cap_total", 0)
+                    # baseline_tokens from uncapped_tokens in trace (schema v2)
+                    if "uncapped_tokens" in trace:
+                        sections[sec]["baseline_tokens"] = trace["uncapped_tokens"]
 
         elif sec == "pr_reviews":
             sections[sec] = _probe_pr_reviews(issue_json)
@@ -266,15 +273,43 @@ def build_budget(
                 h = te.hash_file(diff_file)
                 if h:
                     source_hashes["diff"] = h
+            # baseline_tokens from diff-ranking.json raw_diff_tokens when available
+            if artifacts_dir:
+                ranking_path = os.path.join(artifacts_dir, "diff-ranking.json")
+                ranking = _read_json(ranking_path)
+                if ranking and "raw_diff_tokens" in ranking:
+                    sections[sec]["baseline_tokens"] = ranking["raw_diff_tokens"]
 
     estimated = sum(v.get("tokens", 0) for v in sections.values())
     utilization = round(estimated / BUDGET_TOKENS * 100, 1)
 
-    included_sections = [k for k, v in sections.items() if v.get("status") in ("included", "included_partial")]
+    # Compute aggregate savings across all sections with baseline_tokens (schema v2)
+    savings_tokens = sum(
+        max(0, v.get("baseline_tokens", v.get("tokens", 0)) - v.get("tokens", 0))
+        for v in sections.values()
+        if v.get("status") not in ("dropped",)
+    )
+    baseline_total = sum(
+        v.get("baseline_tokens", v.get("tokens", 0))
+        for v in sections.values()
+        if v.get("status") not in ("dropped",)
+    )
+    savings_pct = round(savings_tokens / baseline_total * 100, 1) if baseline_total > 0 else 0.0
+
+    # Collect fallback events for display in the cost report
+    fallback_events = []
+    for sec_name, sec_val in sections.items():
+        if sec_val.get("fallback_reason"):
+            fallback_events.append({
+                "section": sec_name,
+                "reason": sec_val["fallback_reason"],
+            })
+
+    included_sections = [k for k, v in sections.items() if v.get("status") in ("included", "included_slice", "included_partial")]
     dropped_sections = [k for k, v in sections.items() if v.get("status") == "dropped"]
 
     artifact = {
-        "schema_version": 1,
+        "schema_version": 2,
         "scenario": scenario,
         "run_id": run_id,
         "issue_number": issue_num,
@@ -282,6 +317,9 @@ def build_budget(
         "budget_tokens": BUDGET_TOKENS,
         "estimated_input_tokens": estimated,
         "utilization_pct": utilization,
+        "savings_tokens": savings_tokens,
+        "savings_pct": savings_pct,
+        "fallback_events": fallback_events,
         "sections": sections,
         "included_sections": included_sections,
         "dropped_sections": dropped_sections,
