@@ -96,6 +96,10 @@ read_config() {
   _set_cfg MAIN_RED_AUTOFIX_MODEL          '.main_red_autofix.model'
   _set_cfg MAIN_RED_AUTOFIX_MAX_ATTEMPTS   '.main_red_autofix.max_attempts'
   _set_cfg MAIN_RED_AUTOFIX_THROTTLE_MIN   '.main_red_autofix.throttle_minutes'
+  _set_cfg TOKEN_OPTIMIZATION_ARCHITECTURE_ENABLED '.token_optimization.architecture.enabled'
+  _set_cfg TOKEN_OPTIMIZATION_MEMORY_ENABLED       '.token_optimization.memory.enabled'
+  _set_cfg TOKEN_OPTIMIZATION_COMMENTS_ENABLED     '.token_optimization.comments.enabled'
+  _set_cfg TOKEN_OPTIMIZATION_DIFF_ENABLED         '.token_optimization.diff.enabled'
 
   echo "[config] loaded from ${cfg}"
 }
