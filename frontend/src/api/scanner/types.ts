@@ -20,10 +20,48 @@ export interface ScannerEvent {
   indicators: Record<string, unknown>;
   criteria_met: Record<string, unknown>;
   metadata: Record<string, unknown>;
+  explanation?: ScannerExplanation | null;
 
   created_at: string;
   updated_at: string;
   latest_review?: SignalReview | null;
+}
+
+export interface ScannerCriterionExplanation {
+  label: string;
+  observed?: unknown;
+  threshold?: unknown;
+  operator: '>' | '>=' | '<' | '<=' | '==' | '!=' | 'exists';
+  unit?: string | null;
+  source?: string | null;
+  lookback?: string | null;
+  importance?: number | null;
+}
+
+export interface ScannerDataQualityWarning {
+  code: string;
+  severity: 'low' | 'medium' | 'high';
+  message: string;
+  affected_inputs: string[];
+}
+
+export interface ScannerExplanationEvidence {
+  reconstructed: boolean;
+  reconstruction_quality?: 'best_effort' | 'partial' | null;
+  generated_at?: string | null;
+  generator_version?: string | null;
+  market_data_asof?: string | null;
+  provider?: string | null;
+}
+
+export interface ScannerExplanation {
+  schema_version: 'scanner_explanation.v1';
+  why: string[];
+  criteria_passed: Record<string, ScannerCriterionExplanation>;
+  criteria_failed: Record<string, ScannerCriterionExplanation>;
+  confidence_inputs: Record<string, unknown>;
+  data_quality_warnings: ScannerDataQualityWarning[];
+  evidence: ScannerExplanationEvidence;
 }
 
 export interface SignalReview {
