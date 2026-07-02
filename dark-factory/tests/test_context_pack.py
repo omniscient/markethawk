@@ -150,6 +150,31 @@ def test_code_review_diff_partial_when_over_cap(tmp_path):
     assert "<!-- truncated at 1000 lines -->" in md
 
 
+# ── continue scenario — comment_digest replaces comments/pr_reviews ──────────
+
+def test_continue_scenario_includes_comment_digest(tmp_path):
+    """continue scenario uses comment_digest; comments and pr_reviews are absent."""
+    digest_file = tmp_path / "comment-digest.md"
+    digest_file.write_text("# Comment Digest\n\n## Issue Comments\n\nsome feedback\n")
+    manifest, md = run_pack(tmp_path, "continue",
+                            issue_json=make_issue_json(tmp_path, with_pr=True),
+                            comment_digest_file=str(digest_file))
+    assert "comment_digest" in manifest["sections"]
+    assert manifest["sections"]["comment_digest"]["status"] == "included"
+    assert "pr_reviews" not in manifest["sections"]
+    assert "comments" not in manifest["sections"]
+    assert "## comment_digest" in md
+
+
+def test_continue_scenario_comment_digest_absent_is_dropped(tmp_path):
+    """continue scenario reports comment_digest as dropped when file is absent."""
+    manifest, _ = run_pack(tmp_path, "continue",
+                           issue_json=make_issue_json(tmp_path))
+    sec = manifest["sections"].get("comment_digest", {})
+    assert sec["status"] == "dropped"
+    assert sec.get("reason") == "empty_or_missing"
+
+
 # ── over_budget flag ──────────────────────────────────────────────────────────
 
 def test_over_budget_true_and_stderr_warning_when_exceeds(tmp_path, monkeypatch):

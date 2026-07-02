@@ -39,12 +39,16 @@ def _write_tmp(tmp_path: Path, content: str) -> Path:
     return p
 
 
-# Four OR-join nodes with correct rules — used as a baseline in several fixtures.
+# Six OR-join nodes with correct rules — used as a baseline in several fixtures.
+# budget-implement and implement join the (when: continue) digest-comments branch
+# with the always-present (when: new|continue) update-codeindex/fetch-issue branches.
 _KNOWN_OR_JOINS = [
-    {"id": "validate",         "trigger_rule": "none_failed_min_one_success", "depends_on": ["a", "b"]},
-    {"id": "de-conflict",      "trigger_rule": "none_failed_min_one_success", "depends_on": ["c", "d"]},
-    {"id": "status-in-review", "trigger_rule": "none_failed_min_one_success", "depends_on": ["e", "f"]},
-    {"id": "report",           "trigger_rule": "none_failed_min_one_success", "depends_on": ["g", "h"]},
+    {"id": "validate",          "trigger_rule": "none_failed_min_one_success", "depends_on": ["a", "b"]},
+    {"id": "de-conflict",       "trigger_rule": "none_failed_min_one_success", "depends_on": ["c", "d"]},
+    {"id": "status-in-review",  "trigger_rule": "none_failed_min_one_success", "depends_on": ["e", "f"]},
+    {"id": "report",            "trigger_rule": "none_failed_min_one_success", "depends_on": ["g", "h"]},
+    {"id": "budget-implement",  "trigger_rule": "none_failed_min_one_success", "depends_on": ["i", "j"]},
+    {"id": "implement",         "trigger_rule": "none_failed_min_one_success", "depends_on": ["k", "l"]},
 ]
 
 
@@ -128,6 +132,8 @@ def test_one_success_is_accepted(tmp_path):
         {"id": "de-conflict",       "trigger_rule": "one_success"},
         {"id": "status-in-review",  "trigger_rule": "one_success"},
         {"id": "report",            "trigger_rule": "one_success"},
+        {"id": "budget-implement",  "trigger_rule": "one_success"},
+        {"id": "implement",         "trigger_rule": "one_success"},
     ]
     path = _write_tmp(tmp_path, _make_workflow(nodes))
     errors = check(path)
@@ -139,7 +145,7 @@ def test_one_success_is_accepted(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_sync_tripwire_catches_extra_trigger_rule_node(tmp_path):
-    """A fifth node with trigger_rule (beyond the 4 known OR-joins) must trigger the
+    """A seventh node with trigger_rule (beyond the 6 known OR-joins) must trigger the
     sync tripwire, prompting the developer to update REQUIRED_OR_JOIN_NODES.
 
     This is the scenario the count tripwire is designed for: a new OR-join node
@@ -150,7 +156,9 @@ def test_sync_tripwire_catches_extra_trigger_rule_node(tmp_path):
         {"id": "de-conflict",       "trigger_rule": "none_failed_min_one_success"},
         {"id": "status-in-review",  "trigger_rule": "none_failed_min_one_success"},
         {"id": "report",            "trigger_rule": "none_failed_min_one_success"},
-        # Fifth node with trigger_rule, not in the allowlist:
+        {"id": "budget-implement",  "trigger_rule": "none_failed_min_one_success"},
+        {"id": "implement",         "trigger_rule": "none_failed_min_one_success"},
+        # Seventh node with trigger_rule, not in the allowlist:
         {"id": "new-node",          "trigger_rule": "none_failed_min_one_success"},
     ]
     path = _write_tmp(tmp_path, _make_workflow(nodes))
