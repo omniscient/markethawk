@@ -213,8 +213,17 @@ def _check_safety_rules(baseline_text: str, opt_text: str) -> dict:
     return results
 
 
-def safety_verdict(safety: dict) -> str:
-    """Return '✅ PASS', '⚠️ GAP', or '🔴 REGRESSION'."""
+def safety_verdict(safety: dict, section_check: dict | None = None) -> str:
+    """Return '✅ PASS', '⚠️ GAP', or '🔴 REGRESSION'.
+
+    The primary slice-regression signal is section_check: a component-required
+    ARCHITECTURE.md section that the optimized (sliced) pack dropped ("missing")
+    is a real regression on the ACTUAL optimized surface. The SAFETY_RULES
+    strings live in CLAUDE.md, which is never sliced, so they can only ever be a
+    supplementary sanity check — they cannot detect slice-induced content loss.
+    """
+    if section_check and any(v == "missing" for v in section_check.values()):
+        return "🔴 REGRESSION"
     if any(v == "gap:regression" for v in safety.values()):
         return "🔴 REGRESSION"
     if any(v == "gap:pre-existing" for v in safety.values()):
@@ -301,7 +310,7 @@ def run_eval(
                 print(f"  scenario={scenario} ...", end="", flush=True)
                 try:
                     result = eval_issue_scenario(issue, scenario, clone_dir, tmp_dir)
-                    verdict = safety_verdict(result["safety"])
+                    verdict = safety_verdict(result["safety"], result.get("section_check"))
                     savings = result["savings_pct"]
                     print(
                         f" baseline={result['baseline_tokens']:,}"
@@ -364,7 +373,7 @@ def generate_scorecard(eval_data: dict, output_dir: str, clone_dir: str) -> str:
             baseline = r.get("baseline_tokens", 0)
             opt = r.get("opt_tokens", 0)
             savings = r.get("savings_pct", 0.0)
-            verdict = safety_verdict(r.get("safety", {}))
+            verdict = safety_verdict(r.get("safety", {}), r.get("section_check"))
             sliced = "no (fallback)" if r.get("fallback") else "yes"
             lines.append(
                 f"| #{num} | {component} | {scenario} | {baseline:,} | {opt:,} | {savings}% | {verdict} | {sliced} |"
@@ -425,7 +434,7 @@ def generate_scorecard(eval_data: dict, output_dir: str, clone_dir: str) -> str:
             continue
         s = r.get("scenario", "")
         if s in scenario_safety:
-            scenario_safety[s].append(safety_verdict(r["safety"]))
+            scenario_safety[s].append(safety_verdict(r["safety"], r.get("section_check")))
             scenario_savings[s].append(r.get("savings_pct", 0.0))
 
     safe_to_enforce = []

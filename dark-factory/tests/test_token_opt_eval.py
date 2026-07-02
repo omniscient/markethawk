@@ -29,6 +29,19 @@ def test_eval_script_importable():
     assert hasattr(mod, "TIER1_SCENARIOS")
 
 
+def test_verdict_flags_dropped_required_section_as_regression():
+    """The verdict must be driven by section_check (the sliced surface), not just the
+    CLAUDE.md-anchored SAFETY_RULES. A component-required ARCHITECTURE.md section that the
+    optimized slice dropped ('missing') is a real regression the eval must catch — even when
+    every SAFETY_RULES string is present (they live in CLAUDE.md, which is never sliced)."""
+    mod = _load_module()
+    all_rules_pass = {rule: "pass" for rule in mod.SAFETY_RULES}
+    # SAFETY_RULES all pass but a required section was dropped by the slice → REGRESSION.
+    assert mod.safety_verdict(all_rules_pass, {"Backend Module Map": "missing"}) == "🔴 REGRESSION"
+    # All required sections present → the (passing) rules yield PASS.
+    assert mod.safety_verdict(all_rules_pass, {"Backend Module Map": "present"}) == "✅ PASS"
+
+
 def test_reports_dir_exists():
     reports_dir = os.path.join(
         os.path.dirname(__file__), "..", "evals", "reports"
