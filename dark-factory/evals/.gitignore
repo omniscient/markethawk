@@ -1,0 +1,4 @@
+# Per-run result JSONs are not committed (only scorecard reports are committed)
+results/
+__pycache__/
+*.pyc
