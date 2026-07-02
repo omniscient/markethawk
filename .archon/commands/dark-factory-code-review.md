@@ -43,16 +43,27 @@ AGENT_ID="${AGENT_ID_CODE_REVIEW}"
 Build the review diff with the SAME pre-triage exclusions the conformance gate uses, and save it:
 
 ```bash
+RANK_IN=$(mktemp /tmp/rank_in_XXXXXX.txt)
 git diff main...HEAD \
   -- ':!*.lock' ':!*.md' \
   ':!.archon/memory/**' \
   ':!codeindex.json' ':!symbolindex.json' \
-  ':!docs/codeindex-hotspots.md' \
-  ':!docs/database-schema.md' \
-  2>/dev/null | head -1000 > "$ARTIFACTS_DIR/review_diff.txt"
+  ':!docs/codeindex-hotspots.md' ':!docs/database-schema.md' \
+  2>/dev/null > "$RANK_IN"
+python3 dark-factory/scripts/diff_rank.py \
+  --diff "$RANK_IN" \
+  --artifacts-dir "$ARTIFACTS_DIR" \
+  --config ".claude/skills/refinement/config.yaml" \
+  --hotspots "docs/codeindex-hotspots.md" \
+  2>/tmp/diff_rank_err.txt > "$ARTIFACTS_DIR/review_diff.txt" \
+  || {
+    echo "diff_rank: ranking failed ($(cat /tmp/diff_rank_err.txt)) — using raw diff"
+    cp "$RANK_IN" "$ARTIFACTS_DIR/review_diff.txt"
+  }
+rm -f "$RANK_IN"
 ```
 
-- If the diff was truncated at 1000 lines (`wc -l` reports exactly 1000), log: "code-review: diff truncated to 1000 lines — some lines may not be anchorable."
+- The `diff-ranking.json` artifact in `$ARTIFACTS_DIR` records the budget allocation and which files were summarized.
 - If `$ARTIFACTS_DIR/review_diff.txt` is empty, write `STATUS: PASS\nBLOCKERS: 0\nADVISORY: 0` to `$ARTIFACTS_DIR/review.md` and exit `0` (nothing to review).
 
 ## Phase 3: REVIEW

@@ -43,6 +43,14 @@ gh issue view $ISSUE_NUM --json comments \
 
 Parse the **Spec:** or **Plan:** line from that comment to find the spec file path. The Plan comment typically links the plan file; look for any linked file under `docs/superpowers/specs/`.
 
+```bash
+# Extract the first docs/superpowers/specs/ path from the "Plan Generated" comment
+PLAN_COMMENT=$(gh issue view "$ISSUE_NUM" --repo omniscient/markethawk --json comments \
+  | jq -r '[.comments[] | select(.body | test("Refinement Pipeline — Plan Generated"))] | last | .body // ""')
+SPEC_FILE=$(printf '%s' "$PLAN_COMMENT" \
+  | grep -oP 'docs/superpowers/specs/[^\s\])"]+' | head -1)
+```
+
 ### 2b. Check $ARTIFACTS_DIR/refinement-status.md
 
 ```bash
@@ -50,6 +58,11 @@ cat "$ARTIFACTS_DIR/refinement-status.md" 2>/dev/null || true
 ```
 
 Look for a `SPEC_PATH:` or `PLAN_PATH:` line that points to a spec.
+
+```bash
+SPEC_FILE=$(grep '^SPEC_PATH:' "$ARTIFACTS_DIR/refinement-status.md" 2>/dev/null \
+  | sed 's/^SPEC_PATH: //' | head -1)
+```
 
 ### 2c. Scan docs/superpowers/specs/
 
@@ -59,6 +72,14 @@ ls docs/superpowers/specs/ 2>/dev/null | sort -r | head -10
 
 Look for a file whose name contains keywords from the issue title. Pick the most recently created file that matches.
 
+```bash
+ISSUE_KEYWORDS=$(gh issue view "$ISSUE_NUM" --repo omniscient/markethawk --json title \
+  --jq '.title' | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+SPEC_MATCH=$(ls docs/superpowers/specs/ 2>/dev/null | sort -r | head -10 \
+  | grep -im1 "$(echo "$ISSUE_KEYWORDS" | cut -c1-20)" || true)
+[ -n "$SPEC_MATCH" ] && SPEC_FILE="docs/superpowers/specs/$SPEC_MATCH" || SPEC_FILE=""
+```
+
 ### 2d. No-spec fallback
 
 If no spec file is found after all three steps:
@@ -66,6 +87,10 @@ If no spec file is found after all three steps:
 - The review will run against the issue body (advisory-only, never blocks)
 - Fetch the issue body: `gh issue view $ISSUE_NUM --json body --jq '.body'`
 - Log: "No spec found — running advisory-only review against issue body"
+
+```bash
+SPEC_FILE=""
+```
 
 ## Phase 3: PRE-TRIAGE AND CONFORMANCE REVIEW
 
@@ -82,7 +107,7 @@ RAW_DIFF=$(git diff main...HEAD \
   ':!codeindex.json' ':!symbolindex.json' \
   ':!docs/codeindex-hotspots.md' \
   ':!docs/database-schema.md' \
-  2>/dev/null | head -1000)
+  2>/dev/null)
 ```
 
 **3.0.2 — Strip formatter-only hunks from .py files (hunk-level, not file-level):**
@@ -126,6 +151,28 @@ fi
 `$TRIAGED_DIFF` is the formatter-stripped diff (or the raw diff if no .py files or ruff is
 absent). `$FILTER_ANNOTATION` is the one-line informational note (empty if no stripping).
 
+> **Annotation ordering note:** `$FILTER_ANNOTATION` is extracted from `$TRIAGED_DIFF` at the
+> `head -1 | grep '^[Pre-triage]'` line *before* the ranking step runs. After ranking,
+> `$TRIAGED_DIFF` is overwritten with the ranked diff (which begins with `# [diff-rank: ...]`
+> and does not contain the `[Pre-triage]` line). `$FILTER_ANNOTATION` retains its value from
+> the fmt-filtered diff and is independently included in `$ARTIFACT_CONTENT` in Step 3.1.2.
+
+```bash
+# Rank and chunk the fmt-filtered diff (fail-open)
+RANK_IN=$(mktemp /tmp/rank_in_XXXXXX.txt)
+printf '%s' "$TRIAGED_DIFF" > "$RANK_IN"
+RANKED=$(python3 dark-factory/scripts/diff_rank.py \
+  --diff "$RANK_IN" \
+  --artifacts-dir "$ARTIFACTS_DIR" \
+  --config ".claude/skills/refinement/config.yaml" \
+  ${SPEC_FILE:+--spec-file "$SPEC_FILE"} \
+  --hotspots "docs/codeindex-hotspots.md" \
+  2>/tmp/diff_rank_err.txt) \
+  && TRIAGED_DIFF="$RANKED" \
+  || echo "diff_rank: ranking failed ($(cat /tmp/diff_rank_err.txt)) — using fmt-filtered diff"
+rm -f "$RANK_IN"
+```
+
 Also check for an `out-of-scope.md` recorded by the implement agent (preserved from original Step 3.0):
 ```bash
 OOS_LOG=""
@@ -147,7 +194,7 @@ fi
    ### Out-of-Scope Log (from implement agent)
    <contents of $ARTIFACTS_DIR/out-of-scope.md, or "None recorded.">
 
-   ### Diff (pre-triaged, truncated to 1000 lines)
+   ### Diff (pre-triaged, ranked by risk tier)
    $FILTER_ANNOTATION
    $TRIAGED_DIFF
    ```
