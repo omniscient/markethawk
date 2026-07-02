@@ -383,6 +383,7 @@ def save_event(
     closing_price: float = None,
     ranker_config: Optional[Dict[str, Any]] = None,
     gate_metadata: Optional[Dict[str, Any]] = None,
+    explanation: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Persist a ScannerEvent and enqueue alert evaluation for new events."""
     from app.services.event_helpers import (
@@ -402,6 +403,8 @@ def save_event(
     _validate_jsonb_dict(indicators, "indicators")
     _validate_jsonb_dict(criteria_met, "criteria_met")
     _validate_jsonb_dict(enrichment, "enrichment")
+    if explanation is not None:
+        _validate_jsonb_dict(explanation, "explanation")
 
     score = None
     if ranker_config and ranker_config.get("enabled") and ranker_config.get("weights"):
@@ -432,6 +435,8 @@ def save_event(
         "signal_quality_score": score,
         "regime": regime,
     }
+    if explanation is not None:
+        event_dict["explanation"] = explanation
 
     existing = (
         db.query(ScannerEvent)

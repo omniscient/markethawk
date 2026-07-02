@@ -1,4 +1,5 @@
 from app.tasks.backtest import run_backtest
+from app.tasks.explanations import backfill_scanner_explanations
 from app.tasks.quality import (
     analyze_signal_features,
     analyze_universe_quality,
@@ -34,6 +35,7 @@ __all__ = [
     # backtest
     "run_backtest",
     "run_signal_replay",
+    "backfill_scanner_explanations",
     # sync
     "sync_tickers_batch",
     "sync_ticker_details",

@@ -143,6 +143,7 @@ class ScannerService:
         closing_price: float = None,
         ranker_config: Optional[Dict[str, Any]] = None,
         gate_metadata: Optional[Dict[str, Any]] = None,
+        explanation: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         from app.services.alert_service import save_event
 
@@ -159,6 +160,7 @@ class ScannerService:
             closing_price=closing_price,
             ranker_config=ranker_config,
             gate_metadata=gate_metadata,
+            explanation=explanation,
         )
 
     # ------------------------------------------------------------------ #

@@ -15,6 +15,7 @@ from fastapi import (
     Request,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
 from sqlalchemy.orm import Session, selectinload
 
@@ -430,6 +431,21 @@ def get_scanner_results(
     results = query.limit(limit).offset(offset).all()
 
     return results
+
+
+@router.post("/explanations/backfill", status_code=status.HTTP_202_ACCEPTED)
+def queue_scanner_explanation_backfill(
+    scanner_type: Optional[str] = None,
+    limit: int = Query(500, ge=1, le=5000),
+):
+    """Queue a best-effort explanation backfill for historical scanner events."""
+    from app.tasks.explanations import backfill_scanner_explanations
+
+    task = backfill_scanner_explanations.delay(
+        scanner_type=scanner_type,
+        limit=limit,
+    )
+    return {"status": "queued", "task_id": task.id}
 
 
 @router.get("/signal-quality-distribution")

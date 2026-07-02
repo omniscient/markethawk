@@ -216,3 +216,31 @@ def test_save_event_accepts_valid_payload(mock_trigger, db: Session):
     assert "id" in result
     assert result["ticker"] == "AAPL"
     mock_trigger.assert_called_once_with(result["id"])
+
+
+@patch("app.services.alert_service.trigger_scanner_alert")
+def test_save_event_persists_explanation_payload(mock_trigger, db: Session):
+    explanation = {
+        "schema_version": "scanner_explanation.v1",
+        "why": ["Pre-market volume was 5.2x the 20-day average."],
+        "criteria_passed": {},
+        "criteria_failed": {},
+        "confidence_inputs": {},
+        "data_quality_warnings": [],
+        "evidence": {"reconstructed": False},
+    }
+
+    result = save_event(
+        db,
+        ticker="AAPL",
+        event_date=date.today(),
+        scanner_type="pre_market_volume_spike",
+        indicators={"relative_volume": 5.0},
+        criteria_met={"volume_ok": True},
+        enrichment={"source": "test"},
+        explanation=explanation,
+    )
+
+    event = db.query(ScannerEvent).filter(ScannerEvent.id == result["id"]).one()
+    assert event.explanation == explanation
+    mock_trigger.assert_called_once_with(result["id"])

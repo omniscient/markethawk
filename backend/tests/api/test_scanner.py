@@ -37,6 +37,26 @@ def test_results_returns_all_events(db: Session):
     assert all("scanner_type" in e for e in data)
 
 
+def test_results_returns_explanation_payload(db: Session):
+    event = seed_scanner_events(db, tickers=["AAPL"])[0]
+    event.explanation = {
+        "schema_version": "scanner_explanation.v1",
+        "why": ["Pre-market volume was 5.2x the 20-day average."],
+        "criteria_passed": {},
+        "criteria_failed": {},
+        "confidence_inputs": {},
+        "data_quality_warnings": [],
+        "evidence": {"reconstructed": False},
+    }
+    db.flush()
+
+    response = client.get("/api/v1/scanner/results?ticker=AAPL&limit=1")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["explanation"]["schema_version"] == "scanner_explanation.v1"
+
+
 def test_results_filter_by_ticker(db: Session):
     seed_scanner_events(db)
 
@@ -107,6 +127,21 @@ def test_results_accepts_allowlisted_sort_by(db: Session):
     response = client.get("/api/v1/scanner/results?sort_by=ticker")
 
     assert response.status_code == 200
+
+
+def test_explanation_backfill_endpoint_queues_task(db: Session):
+    from unittest.mock import patch
+
+    with patch("app.tasks.explanations.backfill_scanner_explanations.delay") as delay:
+        delay.return_value.id = "task-123"
+        response = client.post(
+            "/api/v1/scanner/explanations/backfill"
+            "?scanner_type=pre_market_volume_spike&limit=25"
+        )
+
+    assert response.status_code == 202
+    assert response.json() == {"status": "queued", "task_id": "task-123"}
+    delay.assert_called_once_with(scanner_type="pre_market_volume_spike", limit=25)
 
 
 # ---------------------------------------------------------------------------
