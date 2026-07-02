@@ -176,24 +176,26 @@ def derive_caps(
         BudgetResult with breakdown and derived caps.
     """
     to = config.get("token_optimization", _HARDCODED["token_optimization"])
+    if not isinstance(to, dict):
+        to = _HARDCODED["token_optimization"]
     ic_floor = int(to.get("issue_context", {}).get("reserve_tokens", 2000))
 
     # --- Reserved (un-trimmable) set ---
     claude_md_tokens = 0
     claude_sec = sections.get("claude_md", {})
-    if claude_sec.get("status", "dropped") not in ("dropped",):
+    if claude_sec.get("status", "dropped") != "dropped":
         claude_md_tokens = max(0, int(claude_sec.get("tokens", 0)))
 
     issue_context_tokens = 0
     ic_sec = sections.get("issue_context", {})
-    if ic_sec.get("status", "dropped") not in ("dropped",):
+    if ic_sec.get("status", "dropped") != "dropped":
         actual = max(0, int(ic_sec.get("tokens", 0)))
         issue_context_tokens = max(actual, ic_floor)
 
     arch_reserved = 0
     if arch_fallback:
         arch_sec = sections.get("architecture_md", {})
-        if arch_sec.get("status", "dropped") not in ("dropped",):
+        if arch_sec.get("status", "dropped") != "dropped":
             arch_reserved = max(0, int(arch_sec.get("tokens", 0)))
 
     reserved_tokens = claude_md_tokens + issue_context_tokens + arch_reserved
@@ -212,7 +214,7 @@ def derive_caps(
         found_key: str | None = None
         for alias in aliases:
             sec = sections.get(alias, {})
-            if sec.get("status", "dropped") not in ("dropped",):
+            if sec.get("status", "dropped") != "dropped":
                 found_key = alias
                 break
 
@@ -310,11 +312,18 @@ def run_cli(argv: list[str] | None = None) -> BudgetResult:
     )
 
     if args.mode == "enforce":
-        # Deduplicate by env_var (comment_digest and comments share one env var)
+        # Deduplicate by env_var (comment_digest and comments share one env var).
+        # If two present sections resolve to the same env var, raise rather than
+        # silently overwriting — would indicate a new scenario emitting both aliases.
         env_lines: dict[str, int] = {}
         for sec_key, cap in result.derived_caps.items():
             env_var = _SECTION_ENV_VAR.get(sec_key)
             if env_var:
+                if env_var in env_lines:
+                    raise RuntimeError(
+                        f"budget_enforce: collision — two sections map to {env_var!r}; "
+                        f"update _SLOTS to resolve the conflict before proceeding."
+                    )
                 env_lines[env_var] = cap
         for env_var in sorted(env_lines):
             print(f"{env_var}={env_lines[env_var]}")

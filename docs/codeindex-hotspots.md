@@ -1,21 +1,21 @@
 Files with blast score ≥ 5.0  (47 found)
 
-    79.5  frontend/src/api/client.ts  (27d / 105t)  78 loc
-    67.5  backend/app/routers/auth.py  (2d / 131t)  213 loc
-    44.0  frontend/src/api/scanner/index.ts  (33d / 22t)  53 loc
+    80.0  frontend/src/api/client.ts  (27d / 106t)  78 loc
+    68.0  backend/app/routers/auth.py  (2d / 132t)  213 loc
+    45.0  frontend/src/api/scanner/index.ts  (34d / 22t)  53 loc
+    33.0  frontend/src/api/scanner/types.ts  (5d / 56t)  371 loc
     33.0  frontend/src/components/ui/Card.tsx  (23d / 20t)  44 loc
-    32.5  frontend/src/api/scanner/types.ts  (5d / 55t)  333 loc
-    32.0  backend/app/routers/scanner.py  (4d / 56t)  731 loc
-    31.0  backend/app/routers/system.py  (2d / 58t)  141 loc
+    32.5  backend/app/routers/scanner.py  (4d / 57t)  747 loc
+    31.5  backend/app/routers/system.py  (2d / 59t)  141 loc
     30.5  frontend/src/components/ui/Button.tsx  (23d / 15t)  66 loc
-    29.0  backend/app/routers/futures.py  (1d / 56t)  188 loc
-    29.0  services/tweet-monitor/app/main.py  (1d / 56t)  266 loc
-    28.5  frontend/src/api/scanner/configs.ts  (1d / 55t)  21 loc
-    28.5  frontend/src/api/scanner/misc.ts  (1d / 55t)  99 loc
-    28.5  frontend/src/api/scanner/results.ts  (1d / 55t)  22 loc
-    28.5  frontend/src/api/scanner/reviews.ts  (1d / 55t)  35 loc
-    28.5  frontend/src/api/scanner/runs.ts  (1d / 55t)  49 loc
-    28.5  frontend/src/api/scanner/ws.ts  (1d / 55t)  26 loc
+    29.5  backend/app/routers/futures.py  (1d / 57t)  188 loc
+    29.5  services/tweet-monitor/app/main.py  (1d / 57t)  266 loc
+    29.0  frontend/src/api/scanner/configs.ts  (1d / 56t)  21 loc
+    29.0  frontend/src/api/scanner/misc.ts  (1d / 56t)  99 loc
+    29.0  frontend/src/api/scanner/results.ts  (1d / 56t)  22 loc
+    29.0  frontend/src/api/scanner/reviews.ts  (1d / 56t)  35 loc
+    29.0  frontend/src/api/scanner/runs.ts  (1d / 56t)  49 loc
+    29.0  frontend/src/api/scanner/ws.ts  (1d / 56t)  26 loc
     23.0  frontend/src/test-utils/renderWithQuery.tsx  (23d / 0t)  29 loc
     18.0  frontend/src/api/universe.ts  (16d / 4t)  317 loc
     15.5  frontend/src/components/ui/Modal.tsx  (10d / 11t)  87 loc
