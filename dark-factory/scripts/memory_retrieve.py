@@ -13,6 +13,7 @@ Stdout: markdown memory block for insertion into Archon command prompts.
 """
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import date
@@ -86,6 +87,38 @@ _ENTRY_RE = re.compile(
 )
 # Parse key:value pairs in metadata comment
 _TAG_RE = re.compile(r"(\w+\d*):([^\s>]+)")
+
+
+# ── Config helpers ────────────────────────────────────────────────────────
+
+_MEMORY_CONFIG_PATHS = [
+    "/workspace/project/.claude/skills/refinement/config.yaml",
+    "/opt/refinement-skills/config.yaml",
+]
+
+
+def _is_memory_enabled(clone_dir: str | None = None) -> bool:
+    """Return False only when explicitly disabled via env or config; default True (fail-safe)."""
+    env_val = os.environ.get("TOKEN_OPTIMIZATION_MEMORY_ENABLED", "").strip().lower()
+    if env_val in ("false", "0", "no"):
+        return False
+    if env_val in ("true", "1", "yes"):
+        return True
+    candidates = list(_MEMORY_CONFIG_PATHS)
+    if clone_dir:
+        candidates.insert(0, Path(clone_dir) / ".claude" / "skills" / "refinement" / "config.yaml")
+    for path in candidates:
+        try:
+            import yaml  # type: ignore[import]
+            with open(path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            val = (data or {}).get("token_optimization", {}).get("memory", {}).get("enabled")
+            if val is False:
+                return False
+            break
+        except Exception:
+            continue
+    return True
 
 
 # ── Label boost ───────────────────────────────────────────────────────────
@@ -307,12 +340,15 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
     return candidates
 
 
-def format_index_output(candidates, labels=None, _cap_out=None):
+def format_index_output(candidates, labels=None, _cap_out=None, config_path=None):
     """Format scan_index output with dual cap and label-boost ranking.
 
     Sort key: (path_specificity + label_boost, created_at DESC) globally.
     Cap: stop at TOP_K_DEFAULT entries OR TOKEN_BUDGET_DEFAULT tokens, whichever first.
     Groups selected entries by source_file in ALL_MEMORY_FILES order.
+
+    When memory optimization is disabled (TOKEN_OPTIMIZATION_MEMORY_ENABLED=false or
+    config flag false), the top-k cap is bypassed and all matching entries are emitted.
 
     _cap_out: optional dict mutated in-place with cap telemetry keys:
         entries_selected, entries_dropped_by_cap, per_file_selected, per_file_dropped.
@@ -320,6 +356,7 @@ def format_index_output(candidates, labels=None, _cap_out=None):
         could return a (text, cap_counts) tuple instead.
     """
     labels = labels or []
+    memory_enabled = _is_memory_enabled()
 
     # Tiebreaker: entries without created_at sort as "" which, under reverse=True,
     # ranks them last within equal specificity+boost (i.e. oldest/undated are lowest
@@ -336,21 +373,28 @@ def format_index_output(candidates, labels=None, _cap_out=None):
     selected = []
     dropped = []
     token_total = 0
+    uncapped_tokens = sum(te.estimate_tokens(c["text"]) for c in ranked)
+
     for c in ranked:
         token_cost = te.estimate_tokens(c["text"])
-        # Always admit the first entry even if it alone exceeds the token budget,
-        # so a single large memory never silently yields an empty block.
-        # Over-budget entries are skipped individually (not a hard stop); a later
-        # smaller entry may still be admitted if it fits within the remaining budget.
-        if len(selected) >= TOP_K_DEFAULT or (selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT):
-            if selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT and len(selected) < TOP_K_DEFAULT:
-                sys.stderr.write(
-                    f"memory-cap: dropped oversized entry ({token_cost} tokens) from {c['source_file']}\n"
-                )
-            dropped.append(c)
-        else:
+        if not memory_enabled:
+            # Feature disabled: emit all matching entries (fail-safe widening)
             selected.append(c)
             token_total += token_cost
+        else:
+            # Always admit the first entry even if it alone exceeds the token budget,
+            # so a single large memory never silently yields an empty block.
+            # Over-budget entries are skipped individually (not a hard stop); a later
+            # smaller entry may still be admitted if it fits within the remaining budget.
+            if len(selected) >= TOP_K_DEFAULT or (selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT):
+                if selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT and len(selected) < TOP_K_DEFAULT:
+                    sys.stderr.write(
+                        f"memory-cap: dropped oversized entry ({token_cost} tokens) from {c['source_file']}\n"
+                    )
+                dropped.append(c)
+            else:
+                selected.append(c)
+                token_total += token_cost
 
     if _cap_out is not None:
         per_file_selected: dict = {}
@@ -363,6 +407,8 @@ def format_index_output(candidates, labels=None, _cap_out=None):
         _cap_out["entries_dropped_by_cap"] = len(dropped)
         _cap_out["per_file_selected"] = per_file_selected
         _cap_out["per_file_dropped"] = per_file_dropped
+        _cap_out["uncapped_tokens"] = uncapped_tokens
+        _cap_out["memory_enabled"] = memory_enabled
 
     grouped: dict = {}
     for c in selected:
@@ -485,6 +531,10 @@ def emit_memory_trace(trace_path, phase, files, memory_dir, area_files, allowed_
         if cap_counts and not cap_counts.get("fallback_used"):
             trace["entries_selected_total"] = cap_counts.get("entries_selected", 0)
             trace["entries_dropped_by_cap_total"] = cap_counts.get("entries_dropped_by_cap", 0)
+            if "uncapped_tokens" in cap_counts:
+                trace["uncapped_tokens"] = cap_counts["uncapped_tokens"]
+            if "memory_enabled" in cap_counts:
+                trace["memory_enabled"] = cap_counts["memory_enabled"]
 
         trace_path = Path(trace_path)
         trace_path.parent.mkdir(parents=True, exist_ok=True)
