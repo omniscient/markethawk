@@ -34,6 +34,7 @@ from app.models.stock_split import StockSplit
 from app.models.ticker_reference import TickerReference
 from app.services.alert_service import save_event as _save_event
 from app.services.catalyst_parser import CatalystParser
+from app.services.scanner_explanations import build_liquidity_hunt_explanation
 from app.utils.session import get_market_today
 from app.utils.time import to_utc_naive
 
@@ -553,6 +554,13 @@ async def run_liquidity_hunt_scan(
                             opening_price=session_metrics["regular_open"],
                             closing_price=session_metrics["regular_close"],
                             gate_metadata=gate_metadata,
+                            explanation=build_liquidity_hunt_explanation(
+                                scanner_type="liquidity_hunt_pre",
+                                indicators=indicators_pre,
+                                criteria_met=criteria_pre,
+                                gate_metadata=gate_metadata,
+                                config=config,
+                            ),
                         )
                         results.append(event_dict)
                         counts["fired_pre"] += 1
@@ -596,6 +604,13 @@ async def run_liquidity_hunt_scan(
                                 opening_price=session_metrics["regular_open"],
                                 closing_price=session_metrics["regular_close"],
                                 gate_metadata=gate_metadata,
+                                explanation=build_liquidity_hunt_explanation(
+                                    scanner_type="liquidity_hunt_post",
+                                    indicators=indicators_post,
+                                    criteria_met=criteria_post,
+                                    gate_metadata=gate_metadata,
+                                    config=config,
+                                ),
                             )
                             results.append(event_dict)
                             counts["fired_post"] += 1
