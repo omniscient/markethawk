@@ -251,20 +251,24 @@ def test_pr_review_after_boundary_included():
     assert "new-review-after-factory" in result
 
 
-def test_inline_comment_before_boundary_excluded():
-    """Inline comment with created_at before boundary timestamp is excluded."""
+def test_inline_comment_before_boundary_kept_as_finding():
+    """Inline comments are kept in FULL even before the factory boundary. Line-level PR
+    comments are code-review FINDINGS — the AI reviewer posts them just before its factory
+    'Code Review — Blocked' comment — and a fix-Continue run must act on them. Filtering
+    them out by the boundary timestamp would strand exactly the findings the run exists to
+    fix (regression guard for the digest's fix-Continue support)."""
     issue_data = {
         "comments": [
             {"body": "---\n*Posted by MarketHawk Dark Factory*", "author": {"login": "bot"}, "createdAt": "2026-01-05T00:00:00Z"},
         ],
         "pr_reviews": {},
         "pr_inline_comments": [
-            {"path": "backend/app/main.py", "line": 10, "body": "old-inline-before-factory", "created_at": "2026-01-04T00:00:00Z"},
+            {"path": "backend/app/main.py", "line": 10, "body": "review-finding-before-factory", "created_at": "2026-01-04T00:00:00Z"},
         ],
     }
     result = cd.build_digest(issue_data)
-    assert "<!-- no-feedback: true -->" in result
-    assert "old-inline-before-factory" not in result
+    assert "review-finding-before-factory" in result
+    assert "<!-- no-feedback: true -->" not in result
 
 
 def test_inline_comment_after_boundary_included():

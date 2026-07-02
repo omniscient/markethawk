@@ -93,9 +93,14 @@ def build_digest(issue_data: dict) -> str:
         body = comment.get("body") or ""
         if _is_factory_comment(body):
             last_factory_idx = i
-            boundary_ts = comment.get("createdAt") or ""
             boundary_marker = _matched_marker(body)
             boundary_body = body
+            # Cutoff = NEWEST factory createdAt, not just the last-by-index comment's
+            # (which may be missing/empty). An empty createdAt must not collapse the cutoff
+            # to "" and let stale pre-boundary reviews leak in (AI code-review finding).
+            ts = comment.get("createdAt") or ""
+            if ts > boundary_ts:
+                boundary_ts = ts
 
     # Human comments: after latest factory marker, non-bot
     human_comments = [
@@ -111,11 +116,12 @@ def build_digest(issue_data: dict) -> str:
         and not _is_factory_comment(r.get("body") or "")
     ]
 
-    # Inline comments — filtered by timestamp > boundary
-    inline = [
-        c for c in inline_comments
-        if not boundary_ts or (c.get("created_at") or "") > boundary_ts
-    ]
+    # Inline comments — kept in FULL, never boundary-filtered. Line-level PR comments are
+    # code-review FINDINGS (the signal a fix-Continue must act on), not bot noise: the AI
+    # reviewer posts them just before its factory "Code Review — Blocked" comment, so a
+    # timestamp>boundary filter would drop exactly the findings the run exists to fix.
+    # Bot noise lives in issue-level comments (filtered above), not inline threads.
+    inline = list(inline_comments)
 
     no_boundary = last_factory_idx == -1
 
