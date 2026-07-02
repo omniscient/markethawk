@@ -554,6 +554,63 @@ def test_scan_fires_both_variants():
     assert "liquidity_hunt_post" in saved_types
 
 
+def test_scan_persists_explanations_for_both_liquidity_hunt_variants():
+    """Both saved events carry scanner_explanation.v1 payloads."""
+    db = MagicMock()
+    with (
+        patch(
+            "app.services.liquidity_hunt._get_session_metrics",
+            return_value=_CLEAN_METRICS,
+        ),
+        patch("app.services.liquidity_hunt._get_prior_day_close", return_value=11.00),
+        patch(
+            "app.services.liquidity_hunt._get_event_date_regular_close",
+            return_value=11.10,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_rolling_baselines",
+            return_value=_SCAN_BASELINES,
+        ),
+        patch(
+            "app.services.liquidity_hunt._get_enrichment",
+            return_value=_mock_enrichment(),
+        ),
+        patch(
+            "app.services.liquidity_hunt._save_event", return_value={"id": 1}
+        ) as mock_save,
+    ):
+        _run(
+            run_liquidity_hunt_scan(
+                ["TEST"],
+                db,
+                start_date=EVENT_DATE,
+                end_date=EVENT_DATE,
+                gate_metadata={
+                    "tier": "warning",
+                    "warnings": [
+                        {
+                            "code": "provider_gaps",
+                            "severity": "warning",
+                            "message": "Provider gaps were detected.",
+                        }
+                    ],
+                },
+            )
+        )
+
+    by_type = {c.kwargs["scanner_type"]: c.kwargs for c in mock_save.call_args_list}
+    pre_explanation = by_type["liquidity_hunt_pre"]["explanation"]
+    post_explanation = by_type["liquidity_hunt_post"]["explanation"]
+
+    assert pre_explanation["schema_version"] == "scanner_explanation.v1"
+    assert "liquidity_hunt_pre.volume_ratio" in pre_explanation["criteria_passed"]
+    assert "Provider gaps were detected." in [
+        warning["message"] for warning in pre_explanation["data_quality_warnings"]
+    ]
+    assert post_explanation["schema_version"] == "scanner_explanation.v1"
+    assert "liquidity_hunt_post.session_spike" in post_explanation["criteria_passed"]
+
+
 def test_scan_skips_ticker_when_sparse_history():
     """No events emitted when _get_rolling_baselines returns None."""
     db = MagicMock()
