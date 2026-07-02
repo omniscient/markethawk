@@ -150,6 +150,19 @@ def _get_exclude_paths(cfg: dict) -> list[str]:
     return list(_DEFAULT_EXCLUDE_PATHS)
 
 
+def _is_architecture_enabled(cfg: dict) -> bool:
+    """Return False only when explicitly disabled; default True (fail-safe)."""
+    env_val = os.environ.get("TOKEN_OPTIMIZATION_ARCHITECTURE_ENABLED", "").strip().lower()
+    if env_val in ("false", "0", "no"):
+        return False
+    if env_val in ("true", "1", "yes"):
+        return True
+    val = (cfg.get("token_optimization") or {}).get("architecture", {}).get("enabled")
+    if val is False:
+        return False
+    return True
+
+
 # ── Section parsing ────────────────────────────────────────────────────────────
 
 def _parse_sections(path: str) -> dict[str, str]:
@@ -320,6 +333,11 @@ def slice_architecture(
     cfg = _load_config(clone_dir)
     all_sections = _parse_sections(arch_path)
     all_section_names = list(all_sections.keys())
+
+    # 0. Feature-disabled check — widen to full doc (fail-safe)
+    if not _is_architecture_enabled(cfg):
+        return _full_doc_result(arch_path, all_sections, all_section_names,
+                                scenario, None, "feature_disabled")
 
     # 1. Resolve component
     component = spec_component or infer_component(spec_file, changed_files, labels)

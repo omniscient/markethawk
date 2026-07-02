@@ -18,6 +18,7 @@ exits non-zero so the caller's '&&' falls back to the unranked diff.
 """
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -85,11 +86,16 @@ ELEVATED_BLAST_FLOOR = 2.0
 # ---------------------------------------------------------------------------
 
 def load_config(path: str) -> tuple:
-    """Return (token_cap: int, score_floor: float) from config yaml.
+    """Return (token_cap: int, score_floor: float, diff_enabled: bool) from config yaml.
 
     Keys read:
-      token_optimization.diff.max_review_tokens  → token_cap  (default 6000)
-      blast_radius.hotspot_score_floor           → score_floor (default 5.0)
+      token_optimization.diff.max_review_tokens  → token_cap    (default 6000)
+      blast_radius.hotspot_score_floor           → score_floor  (default 5.0)
+      token_optimization.diff.enabled            → diff_enabled (default True)
+
+    When diff_enabled is False, build_ranked_diff() emits the full diff without
+    ranking or truncation. The env var TOKEN_OPTIMIZATION_DIFF_ENABLED overrides
+    the config value; missing/unknown values default to True (fail-safe).
     """
     try:
         import yaml  # type: ignore
@@ -103,9 +109,17 @@ def load_config(path: str) -> tuple:
         score_floor = float(
             data.get("blast_radius", {}).get("hotspot_score_floor", 5.0)
         )
-        return token_cap, score_floor
+        env_val = os.environ.get("TOKEN_OPTIMIZATION_DIFF_ENABLED", "").strip().lower()
+        if env_val in ("false", "0", "no"):
+            diff_enabled = False
+        elif env_val in ("true", "1", "yes"):
+            diff_enabled = True
+        else:
+            cfg_val = data.get("token_optimization", {}).get("diff", {}).get("enabled")
+            diff_enabled = cfg_val is not False
+        return token_cap, score_floor, diff_enabled
     except Exception:
-        return 6000, 5.0
+        return 6000, 5.0, True
 
 
 # ---------------------------------------------------------------------------
@@ -277,23 +291,33 @@ def build_ranked_diff(
     hotspot_scores: dict,
     spec_names: set,
     score_floor: float,
+    diff_enabled: bool = True,
 ) -> tuple:
     """Return (ranked_diff_str, ranking_info_dict).
 
     ranked_diff_str is empty when diff_text is empty.
+    When diff_enabled is False, the full diff is returned without ranking or
+    truncation; raw_diff_tokens is recorded in the sidecar for savings comparison.
     """
     files = parse_diff_files(diff_text)
+    raw_diff_tokens = estimate_tokens(diff_text)
 
     ranking_base = {
         "token_cap": token_cap,
         "estimated_tokens_emitted": 0,
         "critical_tokens": 0,
         "residual_tokens": 0,
+        "raw_diff_tokens": raw_diff_tokens,
         "files": [],
     }
 
     if not files:
         return "", ranking_base
+
+    if not diff_enabled:
+        ranking_base["estimated_tokens_emitted"] = raw_diff_tokens
+        ranking_base["diff_enabled"] = False
+        return diff_text, ranking_base
 
     # Classify every file
     classified = []
@@ -462,6 +486,7 @@ def build_ranked_diff(
         "estimated_tokens_emitted": total_tokens,
         "critical_tokens": critical_tokens,
         "residual_tokens": residual_tokens,
+        "raw_diff_tokens": raw_diff_tokens,
         "files": file_records,
     }
 
@@ -494,13 +519,14 @@ def main():
     args = parse_args()
 
     diff_text = Path(args.diff).read_text(errors="replace")
-    token_cap, score_floor = load_config(args.config)
+    token_cap, score_floor, diff_enabled = load_config(args.config)
     hotspot_paths = parse_hotspots(args.hotspots, score_floor)  # set (fail-open in parse_hotspots)
     hotspot_scores = _read_hotspot_scores(args.hotspots)         # dict for JSON + elevated blast
     spec_names = _extract_spec_names(args.spec_file)
 
     ranked_diff, ranking_info = build_ranked_diff(
-        diff_text, token_cap, hotspot_paths, hotspot_scores, spec_names, score_floor
+        diff_text, token_cap, hotspot_paths, hotspot_scores, spec_names, score_floor,
+        diff_enabled=diff_enabled,
     )
 
     # Write diff-ranking.json

@@ -444,3 +444,64 @@ def test_parse_hotspots_import_agrees_with_gate_blast_radius():
     assert result_dr == result_gbr
     assert "backend/app/services/scanner.py" in result_dr
     assert "frontend/src/api/client.ts" not in result_dr  # score 3.1 < 5.0 floor
+
+
+# ── T4: diff_enabled flag — load_config 3-tuple and build_ranked_diff bypass ─
+
+def _make_raw_diff():
+    return (
+        "diff --git a/backend/app/routers/scanner.py b/backend/app/routers/scanner.py\n"
+        "index aaa..bbb 100644\n"
+        "--- a/backend/app/routers/scanner.py\n"
+        "+++ b/backend/app/routers/scanner.py\n"
+        "@@ -1,3 +1,4 @@\n"
+        " import os\n"
+        "+import sys\n"
+        " def foo(): pass\n"
+        " def bar(): pass\n"
+    )
+
+
+def test_load_config_returns_enabled_true_by_default():
+    """load_config() must return diff_enabled=True when key is absent."""
+    token_cap, score_floor, diff_enabled = dr.load_config("/nonexistent/path.yaml")
+    assert diff_enabled is True
+
+
+def test_load_config_reads_enabled_false(tmp_path):
+    """load_config() must return diff_enabled=False when config sets it false."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("token_optimization:\n  diff:\n    enabled: false\n    max_review_tokens: 6000\n")
+    token_cap, score_floor, diff_enabled = dr.load_config(str(cfg))
+    assert diff_enabled is False
+
+
+def test_build_ranked_diff_bypasses_when_disabled():
+    """When diff_enabled=False, build_ranked_diff returns the raw diff unchanged."""
+    raw = _make_raw_diff()
+    ranked, info = dr.build_ranked_diff(
+        diff_text=raw,
+        token_cap=6000,
+        hotspot_paths=set(),
+        hotspot_scores={},
+        spec_names=set(),
+        score_floor=5.0,
+        diff_enabled=False,
+    )
+    assert ranked == raw
+    assert info.get("diff_enabled") is False
+
+
+def test_build_ranked_diff_includes_raw_diff_tokens():
+    """ranking_info must include raw_diff_tokens (baseline for savings computation)."""
+    raw = _make_raw_diff()
+    _, info = dr.build_ranked_diff(
+        diff_text=raw,
+        token_cap=6000,
+        hotspot_paths=set(),
+        hotspot_scores={},
+        spec_names=set(),
+        score_floor=5.0,
+    )
+    assert "raw_diff_tokens" in info
+    assert info["raw_diff_tokens"] >= 0

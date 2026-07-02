@@ -322,7 +322,35 @@ post_cost_report() {
     fi
   }
 
-  # Build the full comment body (same format as before)
+  # Build context savings line from context-budget.json (schema v2, best-effort)
+  local SAVINGS_LINE="" FALLBACKS_LINE=""
+  local BUDGET_FILE="${ARTIFACTS_DIR:-}/context-budget.json"
+  if [ -f "$BUDGET_FILE" ]; then
+    local SCHEMA_VER SAVINGS_TOKENS SAVINGS_PCT FALLBACK_COUNT
+    SCHEMA_VER=$(jq -r '.schema_version // 1' "$BUDGET_FILE" 2>/dev/null || echo "1")
+    if [[ "$SCHEMA_VER" =~ ^[0-9]+$ ]] && [ "$SCHEMA_VER" -ge 2 ]; then
+      SAVINGS_TOKENS=$(jq -r '.savings_tokens // 0' "$BUDGET_FILE" 2>/dev/null || echo "0")
+      SAVINGS_PCT=$(jq -r '.savings_pct // 0' "$BUDGET_FILE" 2>/dev/null || echo "0")
+      if [ "${SAVINGS_TOKENS:-0}" -gt 0 ] 2>/dev/null; then
+        SAVINGS_LINE="**Context savings: $(fmt_tokens "$SAVINGS_TOKENS") tokens (${SAVINGS_PCT}%)**"
+      fi
+      FALLBACK_COUNT=$(jq -r '(.fallback_events // []) | length' "$BUDGET_FILE" 2>/dev/null || echo "0")
+      if [ "${FALLBACK_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+        FALLBACKS_LINE=$(jq -r '
+          "**Fallbacks:** " + ([ (.fallback_events // [])[] | "\(.section): \(.reason)" ] | join(", "))
+        ' "$BUDGET_FILE" 2>/dev/null || true)
+      fi
+    fi
+  fi
+
+  # Build the full comment body
+  local SAVINGS_BLOCK=""
+  if [ -n "$SAVINGS_LINE" ] || [ -n "$FALLBACKS_LINE" ]; then
+    SAVINGS_BLOCK="
+${SAVINGS_LINE}${SAVINGS_LINE:+
+}${FALLBACKS_LINE}"
+  fi
+
   local BODY
   BODY="${COST_MARKER}
 <!-- cumulative: cost=${CUM_COST} in=${CUM_IN} out=${CUM_OUT} -->
@@ -332,7 +360,7 @@ post_cost_report() {
 
 ${PRIOR_RUNS}
 ### Run: ${TIMESTAMP} (${INTENT:-fix}, ${RUN_STATUS})
-
+${SAVINGS_BLOCK}
 | Step | Model | In tokens | Out tokens | Cost | Duration |
 |------|-------|-----------|------------|------|----------|
 ${RUN_ROWS}

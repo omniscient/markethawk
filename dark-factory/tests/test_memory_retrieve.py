@@ -1321,3 +1321,43 @@ class TestEmitMemoryTraceCap:
         data = json.loads(trace_path.read_text())
         assert data.get("entries_selected_total") == 8
         assert data.get("entries_dropped_by_cap_total") == 2
+
+
+# ── T5: uncapped_tokens + memory feature-disabled bypass (R1/R4) ─────────────
+
+def _make_candidates(n, source_file="codebase-patterns.md"):
+    return [
+        {
+            "id": f"id{i:04d}",
+            "kind": "PATTERN",
+            "text": f"- [PATTERN] Entry {i} description text. <!-- dedup-key:entry{i} -->",
+            "source_file": source_file,
+            "specificity": 0,
+            "created_at": "",
+        }
+        for i in range(n)
+    ]
+
+
+def test_format_index_output_emits_uncapped_tokens():
+    """format_index_output() must populate cap_out['uncapped_tokens'] with total
+    token cost of all ranked candidates before the k/budget cap is applied."""
+    candidates = _make_candidates(2)
+    cap_out = {}
+    mr.format_index_output(candidates, _cap_out=cap_out)
+    assert "uncapped_tokens" in cap_out
+    assert cap_out["uncapped_tokens"] > 0
+
+
+def test_format_index_output_bypasses_cap_when_disabled(monkeypatch, tmp_path):
+    """When memory.enabled is false in config, ALL candidates must be returned
+    (no top-k cap) and entries_selected must equal len(candidates)."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("token_optimization:\n  memory:\n    enabled: false\n")
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_MEMORY_ENABLED", "false")
+
+    candidates = _make_candidates(12)
+    cap_out = {}
+    mr.format_index_output(candidates, _cap_out=cap_out)
+    assert cap_out.get("entries_selected") == 12
+    assert cap_out.get("entries_dropped_by_cap") == 0

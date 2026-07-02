@@ -131,6 +131,13 @@ nodes:
   - id: digest-comments
     bash: |
       _CLONE="${CLONE_DIR:-.}"
+      # Feature gate: skip digesting when TOKEN_OPTIMIZATION_COMMENTS_ENABLED=false
+      # (fail-safe: unknown/missing → digest runs as normal)
+      _COMMENTS_ENABLED="${TOKEN_OPTIMIZATION_COMMENTS_ENABLED:-true}"
+      if [ "$_COMMENTS_ENABLED" = "false" ] || [ "$_COMMENTS_ENABLED" = "0" ]; then
+        echo "[token-opt] comment digest skipped (TOKEN_OPTIMIZATION_COMMENTS_ENABLED=false)" >&2
+        exit 0
+      fi
       python3 "$_CLONE/dark-factory/scripts/comment_digest.py" \
         --issue-json "$ARTIFACTS_DIR/issue.json" \
         --out "$ARTIFACTS_DIR/comment-digest.md"
