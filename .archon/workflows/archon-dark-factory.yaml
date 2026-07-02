@@ -131,10 +131,21 @@ nodes:
   - id: digest-comments
     bash: |
       _CLONE="${CLONE_DIR:-.}"
-      python3 "$_CLONE/dark-factory/scripts/comment_digest.py" \
-        --issue-json "$ARTIFACTS_DIR/issue.json" \
-        --out "$ARTIFACTS_DIR/comment-digest.md"
-      cat "$ARTIFACTS_DIR/comment-digest.md"
+      # Feature gate: skip digesting when TOKEN_OPTIMIZATION_COMMENTS_ENABLED=false
+      # (fail-safe: unknown/missing → digest runs as normal)
+      _COMMENTS_ENABLED="${TOKEN_OPTIMIZATION_COMMENTS_ENABLED:-true}"
+      if [ "$_COMMENTS_ENABLED" = "false" ] || [ "$_COMMENTS_ENABLED" = "0" ]; then
+        echo "comment-digest: skipped (TOKEN_OPTIMIZATION_COMMENTS_ENABLED=false)" >&2
+        # Write empty digest so downstream nodes that read the file don't fail
+        mkdir -p "$ARTIFACTS_DIR"
+        echo "" > "$ARTIFACTS_DIR/comment-digest.md"
+        cat "$ARTIFACTS_DIR/comment-digest.md"
+      else
+        python3 "$_CLONE/dark-factory/scripts/comment_digest.py" \
+          --issue-json "$ARTIFACTS_DIR/issue.json" \
+          --out "$ARTIFACTS_DIR/comment-digest.md"
+        cat "$ARTIFACTS_DIR/comment-digest.md"
+      fi
     depends_on: [fetch-issue]
     when: "$parse-intent.output.intent == 'continue'"
     timeout: 15000
