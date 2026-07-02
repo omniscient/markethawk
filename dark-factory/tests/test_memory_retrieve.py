@@ -1361,3 +1361,60 @@ def test_format_index_output_bypasses_cap_when_disabled(monkeypatch, tmp_path):
     mr.format_index_output(candidates, _cap_out=cap_out)
     assert cap_out.get("entries_selected") == 12
     assert cap_out.get("entries_dropped_by_cap") == 0
+
+
+# ── T6: _get_memory_max_tokens + format_index_output budget override ──────────
+
+def test_get_memory_max_tokens_env_override(monkeypatch):
+    """TOKEN_OPTIMIZATION_MEMORY_MAX_TOKENS env var overrides the token budget."""
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_MEMORY_MAX_TOKENS", "500")
+    assert mr._get_memory_max_tokens() == 500
+
+
+def test_get_memory_max_tokens_config_fallback(monkeypatch, tmp_path):
+    """When no env var, _get_memory_max_tokens reads config value."""
+    monkeypatch.delenv("TOKEN_OPTIMIZATION_MEMORY_MAX_TOKENS", raising=False)
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("token_optimization:\n  memory:\n    max_tokens: 300\n")
+    # Patch _MEMORY_CONFIG_PATHS to use our tmp config
+    original = mr._MEMORY_CONFIG_PATHS[:]
+    mr._MEMORY_CONFIG_PATHS.insert(0, str(cfg))
+    try:
+        result = mr._get_memory_max_tokens()
+    finally:
+        mr._MEMORY_CONFIG_PATHS[:] = original
+    assert result == 300
+
+
+def test_format_index_output_env_cap_honored(monkeypatch):
+    """A tighter env cap causes entries to be dropped that would otherwise fit."""
+    monkeypatch.delenv("TOKEN_OPTIMIZATION_MEMORY_ENABLED", raising=False)
+    # Each candidate text is ~50 chars → ~12 tokens. With a 20-token budget,
+    # only 1 entry fits (the first always admitted even if over budget).
+    candidates = _make_candidates(5)
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_MEMORY_MAX_TOKENS", "20")
+    cap_out = {}
+    mr.format_index_output(candidates, _cap_out=cap_out)
+    # Must have dropped some entries due to tight cap
+    assert cap_out.get("entries_dropped_by_cap", 0) > 0
+
+
+def test_markdown_fallback_is_cap_immune(tmp_path, monkeypatch):
+    """scan_markdown_files + format_markdown_output are not affected by the max_tokens env var."""
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_MEMORY_MAX_TOKENS", "1")
+    mem_dir = tmp_path / "memory"
+    mem_dir.mkdir()
+    (mem_dir / "codebase-patterns.md").write_text(
+        "- [PATTERN] Entry A. <!-- issue:#1 date:2026-01-01 expires:2099-12-31 source:implement -->\n"
+        "- [PATTERN] Entry B. <!-- issue:#2 date:2026-01-01 expires:2099-12-31 source:implement -->\n"
+    )
+    results = mr.scan_markdown_files(
+        str(mem_dir),
+        ["codebase-patterns.md"],
+        [],
+        {"implement"},
+    )
+    output = mr.format_markdown_output(results)
+    # Both entries present — markdown fallback has no token cap
+    assert "Entry A" in output
+    assert "Entry B" in output

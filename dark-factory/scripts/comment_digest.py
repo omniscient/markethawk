@@ -16,6 +16,44 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
+
+_COMMENT_CONFIG_PATHS = [
+    "/workspace/project/.claude/skills/refinement/config.yaml",
+    "/opt/refinement-skills/config.yaml",
+]
+
+_COMMENT_DEFAULT_MAX_TOKENS = 2000
+
+
+def _get_comments_max_tokens() -> int:
+    """Return the max_tokens cap for comment digest output.
+
+    Priority: TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS env var → config value → 2000.
+    """
+    env_val = os.environ.get("TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS", "").strip()
+    if env_val:
+        try:
+            v = int(env_val)
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+    try:
+        import yaml  # type: ignore[import]
+        for path in _COMMENT_CONFIG_PATHS:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                val = (data or {}).get("token_optimization", {}).get("comments", {}).get("max_tokens")
+                if val is not None:
+                    return int(val)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return _COMMENT_DEFAULT_MAX_TOKENS
+
 
 _BOT_RE = re.compile(
     r"Posted by MarketHawk Refinement Pipeline"
@@ -175,6 +213,11 @@ def main() -> None:
         sys.exit(1)
 
     digest = build_digest(issue_data)
+    max_tokens = _get_comments_max_tokens()
+    max_chars = max_tokens * 4
+    if len(digest) > max_chars:
+        dropped = len(digest) - max_chars
+        digest = digest[:max_chars] + f"\n<!-- truncated: {dropped} chars dropped (cap={max_tokens} tokens) -->\n"
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(digest)

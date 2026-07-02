@@ -96,6 +96,7 @@ def load_config(path: str) -> tuple:
     When diff_enabled is False, build_ranked_diff() emits the full diff without
     ranking or truncation. The env var TOKEN_OPTIMIZATION_DIFF_ENABLED overrides
     the config value; missing/unknown values default to True (fail-safe).
+    TOKEN_OPTIMIZATION_DIFF_MAX_REVIEW_TOKENS overrides token_cap after config load.
     """
     try:
         import yaml  # type: ignore
@@ -117,9 +118,19 @@ def load_config(path: str) -> tuple:
         else:
             cfg_val = data.get("token_optimization", {}).get("diff", {}).get("enabled")
             diff_enabled = cfg_val is not False
-        return token_cap, score_floor, diff_enabled
     except Exception:
-        return 6000, 5.0, True
+        token_cap, score_floor, diff_enabled = 6000, 5.0, True
+
+    env_cap = os.environ.get("TOKEN_OPTIMIZATION_DIFF_MAX_REVIEW_TOKENS", "").strip()
+    if env_cap:
+        try:
+            v = int(env_cap)
+            if v > 0:
+                token_cap = v
+        except ValueError:
+            pass
+
+    return token_cap, score_floor, diff_enabled
 
 
 # ---------------------------------------------------------------------------

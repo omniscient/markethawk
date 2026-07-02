@@ -327,3 +327,72 @@ def test_cli_roundtrip(tmp_path):
 
     content = out_path.read_text()
     assert "cli-roundtrip-feedback" in content
+
+
+# ── T2: TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS cap override ──────────────────
+
+def test_comments_cap_env_override_honored(tmp_path, monkeypatch):
+    """TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS env var truncates digest output."""
+    import sys as _sys
+    # Build a digest that is definitely longer than 4 chars (1 token)
+    issue_data = {
+        "comments": [
+            {"body": "A" * 200, "author": {"login": "user"}, "createdAt": "2026-07-01T10:00:00Z"},
+        ],
+    }
+    issue_json = tmp_path / "issue.json"
+    issue_json.write_text(json.dumps(issue_data))
+    out_path = tmp_path / "comment-digest.md"
+
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS", "1")
+    old_argv = _sys.argv[:]
+    try:
+        _sys.argv = ["comment_digest.py", "--issue-json", str(issue_json), "--out", str(out_path)]
+        cd.main()
+    finally:
+        _sys.argv = old_argv
+
+    content = out_path.read_text()
+    # Output should be truncated (max 4 chars for 1 token) + truncation marker
+    assert "<!-- truncated:" in content
+    assert "chars dropped" in content
+
+
+def test_comments_cap_unset_no_truncation(tmp_path, monkeypatch):
+    """When TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS is unset, digest is not truncated."""
+    import sys as _sys
+    monkeypatch.delenv("TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS", raising=False)
+    issue_data = {
+        "comments": [
+            {"body": "short feedback", "author": {"login": "user"}, "createdAt": "2026-07-01T10:00:00Z"},
+        ],
+    }
+    issue_json = tmp_path / "issue.json"
+    issue_json.write_text(json.dumps(issue_data))
+    out_path = tmp_path / "comment-digest.md"
+
+    old_argv = _sys.argv[:]
+    try:
+        _sys.argv = ["comment_digest.py", "--issue-json", str(issue_json), "--out", str(out_path)]
+        cd.main()
+    finally:
+        _sys.argv = old_argv
+
+    content = out_path.read_text()
+    # No truncation marker expected since content is well under default 2000 tokens
+    assert "<!-- truncated:" not in content
+    assert "short feedback" in content
+
+
+def test_comments_cap_build_digest_stays_pure(monkeypatch):
+    """build_digest() must not apply any truncation — cap is only in main()."""
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS", "1")
+    issue_data = {
+        "comments": [
+            {"body": "X" * 500, "author": {"login": "user"}, "createdAt": "2026-07-01T10:00:00Z"},
+        ],
+    }
+    # build_digest should return the full content, not truncated
+    result = cd.build_digest(issue_data)
+    assert len(result) > 4  # env cap of 1 token = 4 chars; build_digest ignores it
+    assert "<!-- truncated:" not in result
