@@ -107,15 +107,16 @@ def _is_memory_enabled(clone_dir: str | None = None) -> bool:
     candidates = list(_MEMORY_CONFIG_PATHS)
     if clone_dir:
         candidates.insert(0, Path(clone_dir) / ".claude" / "skills" / "refinement" / "config.yaml")
+    import yaml  # type: ignore[import]
     for path in candidates:
         try:
-            import yaml  # type: ignore[import]
             with open(path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             val = (data or {}).get("token_optimization", {}).get("memory", {}).get("enabled")
             if val is False:
                 return False
-            break
+            if val is not None:
+                break
         except Exception:
             continue
     return True
@@ -340,7 +341,7 @@ def scan_index(memory_dir, area_files, files, allowed_sources):
     return candidates
 
 
-def format_index_output(candidates, labels=None, _cap_out=None, config_path=None):
+def format_index_output(candidates, labels=None, _cap_out=None, config_path=None, clone_dir=None):
     """Format scan_index output with dual cap and label-boost ranking.
 
     Sort key: (path_specificity + label_boost, created_at DESC) globally.
@@ -356,7 +357,7 @@ def format_index_output(candidates, labels=None, _cap_out=None, config_path=None
         could return a (text, cap_counts) tuple instead.
     """
     labels = labels or []
-    memory_enabled = _is_memory_enabled()
+    memory_enabled = _is_memory_enabled(clone_dir)
 
     # Tiebreaker: entries without created_at sort as "" which, under reverse=True,
     # ranks them last within equal specificity+boost (i.e. oldest/undated are lowest
@@ -428,7 +429,7 @@ def format_index_output(candidates, labels=None, _cap_out=None, config_path=None
 
 # ── Dispatch ───────────────────────────────────────────────────────────────
 
-def retrieve_memory(memory_dir, phase, files, labels=None, _cap_out=None):
+def retrieve_memory(memory_dir, phase, files, labels=None, _cap_out=None, clone_dir=None):
     """Return a markdown memory block for the given phase and changed files."""
     allowed_sources = PHASE_SOURCE_MAP.get(phase, set())
     area_files = select_area_files(files)
@@ -441,7 +442,7 @@ def retrieve_memory(memory_dir, phase, files, labels=None, _cap_out=None):
         except (OSError, ValueError):
             candidates = []
         if candidates:
-            return format_index_output(candidates, labels=labels, _cap_out=_cap_out)
+            return format_index_output(candidates, labels=labels, _cap_out=_cap_out, clone_dir=clone_dir)
 
     results = scan_markdown_files(memory_dir, area_files, files, allowed_sources)
     # Markdown fallback: populate _cap_out with zero counts so downstream consumers
@@ -582,6 +583,12 @@ def main():
         metavar="PATH",
         help="Write memory-trace.json to this path (best-effort, non-blocking)",
     )
+    parser.add_argument(
+        "--clone-dir",
+        default=None,
+        metavar="DIR",
+        help="Path to the project clone directory (used to resolve per-run config.yaml)",
+    )
     args = parser.parse_args()
 
     memory_dir = Path(args.memory_dir)
@@ -595,7 +602,7 @@ def main():
 
     labels = args.labels or []
     cap_counts: dict = {}
-    output = retrieve_memory(memory_dir, args.phase, files, labels=labels, _cap_out=cap_counts)
+    output = retrieve_memory(memory_dir, args.phase, files, labels=labels, _cap_out=cap_counts, clone_dir=args.clone_dir)
     if output:
         print(output)
 

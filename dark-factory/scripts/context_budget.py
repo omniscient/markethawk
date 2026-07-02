@@ -199,9 +199,14 @@ def build_budget(
             )
             status = "included" if result.fallback else "included_slice"
             tokens = te.estimate_tokens(result.text)
-            # baseline_tokens: full-doc token count for savings computation
-            full_arch_text = _read_text(arch_path) or ""
-            baseline_tokens = te.estimate_tokens(full_arch_text)
+            # baseline_tokens: full-doc token count for savings computation.
+            # When fallback is True the full doc was returned, so baseline == actual (no savings).
+            # Avoid a redundant re-read in that case.
+            if result.fallback:
+                baseline_tokens = tokens
+            else:
+                full_arch_text = _read_text(arch_path) or ""
+                baseline_tokens = te.estimate_tokens(full_arch_text)
             sections[sec] = {
                 "status": status,
                 "tokens": tokens,

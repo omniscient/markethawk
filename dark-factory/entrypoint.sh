@@ -328,7 +328,7 @@ post_cost_report() {
   if [ -f "$BUDGET_FILE" ]; then
     local SCHEMA_VER SAVINGS_TOKENS SAVINGS_PCT FALLBACK_COUNT
     SCHEMA_VER=$(jq -r '.schema_version // 1' "$BUDGET_FILE" 2>/dev/null || echo "1")
-    if [ "$SCHEMA_VER" -ge 2 ] 2>/dev/null; then
+    if [[ "$SCHEMA_VER" =~ ^[0-9]+$ ]] && [ "$SCHEMA_VER" -ge 2 ]; then
       SAVINGS_TOKENS=$(jq -r '.savings_tokens // 0' "$BUDGET_FILE" 2>/dev/null || echo "0")
       SAVINGS_PCT=$(jq -r '.savings_pct // 0' "$BUDGET_FILE" 2>/dev/null || echo "0")
       if [ "${SAVINGS_TOKENS:-0}" -gt 0 ] 2>/dev/null; then

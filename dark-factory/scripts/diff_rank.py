@@ -18,6 +18,7 @@ exits non-zero so the caller's '&&' falls back to the unranked diff.
 """
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -96,7 +97,6 @@ def load_config(path: str) -> tuple:
     ranking or truncation. The env var TOKEN_OPTIMIZATION_DIFF_ENABLED overrides
     the config value; missing/unknown values default to True (fail-safe).
     """
-    import os
     try:
         import yaml  # type: ignore
         with open(path) as f:
