@@ -16,7 +16,7 @@ import argparse
 import copy
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # Hardcoded defaults — used when config is missing/invalid/partially specified
