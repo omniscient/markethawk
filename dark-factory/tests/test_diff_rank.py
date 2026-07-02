@@ -300,6 +300,19 @@ def test_summary_line_low_risk_format():
     assert "# [SUMMARIZED: low-risk test-only] tests/test_scanner.py — +84/-6 (2 hunks)" in output
 
 
+def test_summary_line_non_test_low_risk_not_labeled_test_only():
+    """A non-test file in the low tier is labeled 'low-risk', never 'test-only'
+    (regression for the #669 code-review finding: non-test low files were being
+    misreported as tests, which could reduce reviewer scrutiny)."""
+    diff = make_diff("frontend/src/utils/format.ts", added=5, removed=2, n_hunks=1)
+    output, ranking = run_main(diff)
+    entry = ranking["files"][0]
+    assert entry["risk_class"] == "low"
+    assert "test_file" not in entry["signals"]
+    assert "# [SUMMARIZED: low-risk] frontend/src/utils/format.ts" in output
+    assert "test-only" not in output
+
+
 def test_summary_line_budget_exhausted_format():
     diff = make_diff("backend/app/routers/scanner.py", added=200, removed=100, n_hunks=5)
     output, _ = run_main(diff, token_cap=10)

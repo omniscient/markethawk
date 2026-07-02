@@ -364,8 +364,11 @@ def build_ranked_diff(
 
     def _summary_low(c):
         f = c["file"]
+        # Only call it "test-only" when the file actually matched the test_file signal;
+        # non-test files also fall into the low tier and must not be misreported as tests.
+        label = "low-risk test-only" if "test_file" in c["signals"] else "low-risk"
         summary = (
-            f"# [SUMMARIZED: low-risk test-only] {f['path']} — "
+            f"# [SUMMARIZED: {label}] {f['path']} — "
             f"+{f['added']}/-{f['removed']} ({f['hunks']} hunks)\n"
         )
         output_parts.append(summary)
