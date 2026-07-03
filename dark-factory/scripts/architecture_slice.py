@@ -166,7 +166,12 @@ def _is_architecture_enabled(cfg: dict) -> bool:
 def _get_architecture_max_tokens(cfg: dict) -> int | None:
     """Return the max_tokens cap for architecture slicing, or None if no cap.
 
-    Priority: TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS env var → config value → None.
+    Env-only (TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS): the config
+    `architecture.max_tokens` is the *derivation input* for budget_enforce.py,
+    not a live cap — reading it here would activate trimming on every default
+    run while enforce_budgets is still false (backend slices lose 4 of 5
+    sections at the baked 3000 value). The cap only bites when the enforcement
+    step exports the env var.
     """
     env_val = os.environ.get("TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS", "").strip()
     if env_val:
@@ -175,12 +180,6 @@ def _get_architecture_max_tokens(cfg: dict) -> int | None:
             if v > 0:
                 return v
         except ValueError:
-            pass
-    cfg_val = (cfg.get("token_optimization") or {}).get("architecture", {}).get("max_tokens")
-    if cfg_val is not None:
-        try:
-            return int(cfg_val)
-        except (ValueError, TypeError):
             pass
     return None
 

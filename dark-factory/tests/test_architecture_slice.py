@@ -370,12 +370,17 @@ def test_slice_cap_keeps_at_least_one_section(arch_file, tmp_path, monkeypatch):
     assert len(result.included_sections) == 1
 
 
-def test_slice_cap_config_fallback(arch_file, tmp_path, monkeypatch):
-    """When no env var, max_tokens from config is used."""
+def test_slice_cap_config_alone_is_inert(arch_file, tmp_path, monkeypatch):
+    """Config max_tokens alone (no env var) must NOT cap — enforcement is env-only.
+
+    The baked config value is budget_enforce.py's derivation input; if the slicer
+    read it directly, trimming would activate on every default run while
+    enforce_budgets is still false (observe mode must preserve current behavior).
+    """
     monkeypatch.delenv("TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS", raising=False)
     cfg_dir = tmp_path / ".claude" / "skills" / "refinement"
     cfg_dir.mkdir(parents=True)
-    # Set a very tight config cap — only 1 token allowed
+    # Even a 1-token config cap must be ignored without the env var
     (cfg_dir / "config.yaml").write_text(textwrap.dedent("""\
         token_optimization:
           architecture:
@@ -387,8 +392,8 @@ def test_slice_cap_config_fallback(arch_file, tmp_path, monkeypatch):
         spec_component="backend", clone_dir=str(tmp_path),
     )
     assert not result.fallback
-    # Tight config cap → only 1 section kept (floor)
-    assert len(result.included_sections) == 1
+    # All wanted sections kept — config cap did not apply
+    assert set(result.included_sections) == set(aslice.COMPONENT_SECTION_MAP["backend"])
 
 
 def test_full_doc_result_is_cap_immune(arch_file, tmp_path, monkeypatch):

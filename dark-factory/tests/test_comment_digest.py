@@ -359,12 +359,17 @@ def test_comments_cap_env_override_honored(tmp_path, monkeypatch):
 
 
 def test_comments_cap_unset_no_truncation(tmp_path, monkeypatch):
-    """When TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS is unset, digest is not truncated."""
+    """When TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS is unset, digest is never truncated.
+
+    Uses a body far larger than any plausible default cap: without the env var
+    there is NO cap at all (enforcement is env-only; observe mode must preserve
+    current behavior).
+    """
     import sys as _sys
     monkeypatch.delenv("TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS", raising=False)
     issue_data = {
         "comments": [
-            {"body": "short feedback", "author": {"login": "user"}, "createdAt": "2026-07-01T10:00:00Z"},
+            {"body": "big feedback " + "Z" * 20000, "author": {"login": "user"}, "createdAt": "2026-07-01T10:00:00Z"},
         ],
     }
     issue_json = tmp_path / "issue.json"
@@ -379,9 +384,9 @@ def test_comments_cap_unset_no_truncation(tmp_path, monkeypatch):
         _sys.argv = old_argv
 
     content = out_path.read_text()
-    # No truncation marker expected since content is well under default 2000 tokens
+    # No cap without the env var — even a >2000-token digest is untouched
     assert "<!-- truncated:" not in content
-    assert "short feedback" in content
+    assert "big feedback" in content
 
 
 def test_comments_cap_build_digest_stays_pure(monkeypatch):
