@@ -14468,5 +14468,12 @@
       "allowance": 38000,
       "opt_tokens": 4542
     }
-  ]
+  ],
+  "p90_uncapped_arch_slice_tokens_per_scenario": {
+    "refine": {"p90_tokens": 4645, "sliced_issue_count": 5, "sliced_issues": [224, 332, 276, 215, 697]},
+    "plan": {"p90_tokens": 4644, "sliced_issue_count": 5, "sliced_issues": [224, 332, 276, 215, 697]},
+    "implement": {"p90_tokens": 4645, "sliced_issue_count": 5, "sliced_issues": [224, 332, 276, 215, 697]},
+    "conformance": {"p90_tokens": null, "sliced_issue_count": 0, "note": "no sliced samples"},
+    "code-review": {"p90_tokens": null, "sliced_issue_count": 0, "note": "no sliced samples"}
+  }
 }

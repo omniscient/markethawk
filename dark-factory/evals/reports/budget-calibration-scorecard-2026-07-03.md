@@ -1,11 +1,13 @@
 # Budget Calibration Scorecard — 2026-07-03
 
-**Issue:** [#718](https://github.com/omniscient/markethawk/issues/718)
+**Issue:** [#730](https://github.com/omniscient/markethawk/issues/730)
 **Script:** `dark-factory/evals/token_opt_eval.py --calibrate`
 
 ---
 
 ## Per-Scenario Token Distribution (opt_tokens)
+
+Note: "p90 (tok)" below is the p90 of total `opt_tokens` across all issues — not the uncapped `architecture_md` slice size. See the dedicated section below for uncapped arch-slice p90 values.
 
 | Scenario | p50 (tok) | p90 (tok) | p90×1.1 advisory |
 |----------|-----------|-----------|------------------|
@@ -14,6 +16,20 @@
 | implement | 17,176 | 17,271 | 18,998 |
 | conformance | 4,259 | 4,259 | 4,684 |
 | code-review | 4,561 | 4,694 | 5,164 |
+
+---
+
+## p90 Uncapped `architecture_md` Slice Size (sliced issues only, fallback=False)
+
+These values are the p90 of the pre-cap `architecture_md` slice token count, restricted to issues where architecture slicing was applied (not the full-doc fallback). Required by acceptance criterion 4 as input for the cap-raise ticket.
+
+| Scenario | p90 uncapped arch-slice (tok) | Sliced issue count | Sliced issue IDs |
+|----------|-------------------------------|--------------------|-----------------|
+| refine | 4,645 | 5 | 224, 332, 276, 215, 697 |
+| plan | 4,644 | 5 | 224, 332, 276, 215, 697 |
+| implement | 4,645 | 5 | 224, 332, 276, 215, 697 |
+| conformance | n/a | 0 | no sliced samples |
+| code-review | n/a | 0 | no sliced samples |
 
 ---
 
