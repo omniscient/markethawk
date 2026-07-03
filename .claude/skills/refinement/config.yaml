@@ -105,7 +105,19 @@ main_red_autofix:
 token_optimization:
   enabled: true               # measure token usage per run; env: TOKEN_OPTIMIZATION_ENABLED overrides
   enforce_budgets: false      # false = measure-only (no enforcement); env: TOKEN_OPTIMIZATION_ENFORCE_BUDGETS overrides
-  default_budget_tokens: 24000  # per-scenario budget when no override is set; env: TOKEN_OPTIMIZATION_DEFAULT_BUDGET_TOKENS overrides
+  default_budget_tokens: 30000  # per-scenario budget when no override is set; env: TOKEN_OPTIMIZATION_DEFAULT_BUDGET_TOKENS overrides
+  budgets:
+    refine: 30000
+    plan: 30000
+    implement: 30000
+    conformance: 30000
+    code-review: 30000
+  enforce:
+    refine: false
+    plan: false
+    implement: false
+    conformance: false
+    code-review: false
   issue_context:
     reserve_tokens: 2000      # minimum token reservation for issue_context (floor applied even when actual < reserve)
   architecture:
