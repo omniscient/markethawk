@@ -24,6 +24,7 @@ from app.models.scanner_event import ScannerEvent
 from app.schemas.event import SeverityLiteral
 from app.services.alert_service import _validate_jsonb_dict
 from app.services.event_helpers import compute_event_severity, generate_event_summary
+from app.services.scanner_explanations import build_live_event_explanation
 from app.services.signal_ranker import compute_signal_quality_score, load_ranker_config
 from live_scanner.bar_aggregator import ET, MinuteBar
 from live_scanner.conditions import ConditionResult
@@ -260,6 +261,11 @@ class LivePublisher:
             indicators=condition.indicators,
             criteria_met=condition.criteria_met,
             metadata_={"source": "live_scanner", "session": bar.session},
+            explanation=build_live_event_explanation(
+                scanner_type=condition.scanner_type,
+                indicators=condition.indicators,
+                criteria_met=condition.criteria_met,
+            ),
             signal_quality_score=score,
         )
 

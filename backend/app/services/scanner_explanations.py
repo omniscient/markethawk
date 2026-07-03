@@ -579,6 +579,234 @@ def build_trend_pullback_explanation(
     return validate_scanner_explanation(payload)
 
 
+def _live_volume_spike_criteria(
+    indicators: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    return {
+        "volume_spike_4x": _criterion(
+            "Projected volume spike",
+            indicators.get("volume_spike_ratio"),
+            4,
+            ">=",
+            unit="x",
+            source="live_scanner",
+            lookback="intraday",
+            importance=1.0,
+        ),
+        "sufficient_avg_volume": _criterion(
+            "Average daily volume floor",
+            indicators.get("avg_daily_volume"),
+            50_000,
+            ">=",
+            unit="shares",
+            source="live_scanner",
+            lookback="daily_baseline",
+            importance=0.6,
+        ),
+    }
+
+
+def build_live_volume_spike_explanation(
+    indicators: Dict[str, Any],
+    criteria_met: Dict[str, Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    criteria = _live_volume_spike_criteria(indicators)
+    passed, failed = _split_criteria(criteria_met, criteria, "live_volume_spike")
+
+    why = ["Live projected volume exceeded the spike threshold."]
+    if indicators.get("volume_spike_ratio") is not None:
+        why[0] = (
+            f"Projected volume was {float(indicators['volume_spike_ratio']):.2f}x "
+            "average daily volume."
+        )
+    if indicators.get("minutes_elapsed") is not None:
+        why.append(
+            f"Signal fired after {float(indicators['minutes_elapsed']):.1f} minutes."
+        )
+
+    payload = {
+        "schema_version": "scanner_explanation.v1",
+        "why": why,
+        "criteria_passed": passed,
+        "criteria_failed": failed,
+        "confidence_inputs": {
+            "scanner_type": "live_volume_spike",
+            "volume_spike_ratio": indicators.get("volume_spike_ratio"),
+            "session_volume": indicators.get("session_volume"),
+            "avg_daily_volume": indicators.get("avg_daily_volume"),
+            "projected_volume": indicators.get("projected_volume"),
+            "minutes_elapsed": indicators.get("minutes_elapsed"),
+            "session": indicators.get("session"),
+        },
+        "data_quality_warnings": _quality_warnings(gate_metadata),
+        "evidence": {
+            "reconstructed": False,
+            "generated_at": utc_now(),
+            "generator_version": "explanation_builder.v1",
+            "provider": "live_scanner",
+        },
+    }
+    return validate_scanner_explanation(payload)
+
+
+def _live_price_move_criteria(
+    indicators: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    return {
+        "price_move_1pct": _criterion(
+            "Live price move",
+            abs(float(indicators.get("price_move_pct") or 0)),
+            1,
+            ">=",
+            unit="%",
+            source="live_scanner",
+            lookback="prior_close",
+            importance=1.0,
+        ),
+    }
+
+
+def build_live_price_move_explanation(
+    indicators: Dict[str, Any],
+    criteria_met: Dict[str, Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    criteria = _live_price_move_criteria(indicators)
+    passed, failed = _split_criteria(criteria_met, criteria, "live_price_move")
+
+    why = ["Live price moved beyond the configured threshold."]
+    if indicators.get("price_move_pct") is not None:
+        why[0] = f"Price moved {float(indicators['price_move_pct']):+.2f}% from prior close."
+    if (
+        indicators.get("prior_close") is not None
+        and indicators.get("current_price") is not None
+    ):
+        why.append(
+            f"Price moved from ${float(indicators['prior_close']):.2f} "
+            f"to ${float(indicators['current_price']):.2f}."
+        )
+
+    payload = {
+        "schema_version": "scanner_explanation.v1",
+        "why": why,
+        "criteria_passed": passed,
+        "criteria_failed": failed,
+        "confidence_inputs": {
+            "scanner_type": "live_price_move",
+            "price_move_pct": indicators.get("price_move_pct"),
+            "current_price": indicators.get("current_price"),
+            "prior_close": indicators.get("prior_close"),
+            "session": indicators.get("session"),
+        },
+        "data_quality_warnings": _quality_warnings(gate_metadata),
+        "evidence": {
+            "reconstructed": False,
+            "generated_at": utc_now(),
+            "generator_version": "explanation_builder.v1",
+            "provider": "live_scanner",
+        },
+    }
+    return validate_scanner_explanation(payload)
+
+
+def _social_callout_criteria(
+    indicators: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    return {
+        "has_cashtag": _criterion(
+            "Cashtag extracted",
+            bool(indicators.get("ticker") or indicators.get("tickers")),
+            True,
+            "==",
+            source="tweet_monitor",
+            importance=0.7,
+        ),
+        "has_price_level": _criterion(
+            "Price level extracted",
+            bool(
+                indicators.get("price_entry")
+                or indicators.get("price_target")
+                or indicators.get("price_stop")
+            ),
+            True,
+            "==",
+            source="tweet_monitor",
+            importance=0.6,
+        ),
+        "above_confidence_threshold": _criterion(
+            "Classifier confidence",
+            indicators.get("confidence"),
+            0.7,
+            ">=",
+            source="tweet_monitor",
+            importance=1.0,
+        ),
+    }
+
+
+def build_social_callout_explanation(
+    indicators: Dict[str, Any],
+    criteria_met: Dict[str, Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    criteria = _social_callout_criteria(indicators)
+    passed, failed = _split_criteria(criteria_met, criteria, "social_callout")
+
+    account = indicators.get("source_account") or "unknown"
+    why = [f"@{account} posted a classified social callout."]
+    if indicators.get("confidence") is not None:
+        why.append(f"Classifier confidence was {float(indicators['confidence']):.0%}.")
+    if indicators.get("price_entry") is not None:
+        why.append(f"Entry level extracted at ${float(indicators['price_entry']):.2f}.")
+
+    payload = {
+        "schema_version": "scanner_explanation.v1",
+        "why": why,
+        "criteria_passed": passed,
+        "criteria_failed": failed,
+        "confidence_inputs": {
+            "scanner_type": "social_callout",
+            "confidence": indicators.get("confidence"),
+            "source_account": indicators.get("source_account"),
+            "direction": indicators.get("direction"),
+            "price_entry": indicators.get("price_entry"),
+            "price_target": indicators.get("price_target"),
+            "price_stop": indicators.get("price_stop"),
+            "tweet_id": indicators.get("tweet_id"),
+        },
+        "data_quality_warnings": _quality_warnings(gate_metadata),
+        "evidence": {
+            "reconstructed": False,
+            "generated_at": utc_now(),
+            "generator_version": "explanation_builder.v1",
+            "provider": "tweet_monitor",
+        },
+    }
+    return validate_scanner_explanation(payload)
+
+
+def build_live_event_explanation(
+    scanner_type: str,
+    indicators: Dict[str, Any],
+    criteria_met: Dict[str, Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    if scanner_type == "live_volume_spike":
+        return build_live_volume_spike_explanation(
+            indicators=indicators,
+            criteria_met=criteria_met,
+            gate_metadata=gate_metadata,
+        )
+    if scanner_type == "live_price_move":
+        return build_live_price_move_explanation(
+            indicators=indicators,
+            criteria_met=criteria_met,
+            gate_metadata=gate_metadata,
+        )
+    raise ValueError(f"Unsupported live scanner type: {scanner_type}")
+
+
 def reconstruct_explanation_for_event(event: ScannerEvent) -> Dict[str, Any]:
     indicators = event.indicators or {}
     criteria_met = event.criteria_met or {}
@@ -628,6 +856,15 @@ def reconstruct_explanation_for_event(event: ScannerEvent) -> Dict[str, Any]:
     elif event.scanner_type == "trend_pullback":
         criteria = _trend_pullback_criteria(indicators)
         passed, failed = _split_criteria(criteria_met, criteria, "trend_pullback")
+    elif event.scanner_type == "live_volume_spike":
+        criteria = _live_volume_spike_criteria(indicators)
+        passed, failed = _split_criteria(criteria_met, criteria, "live_volume_spike")
+    elif event.scanner_type == "live_price_move":
+        criteria = _live_price_move_criteria(indicators)
+        passed, failed = _split_criteria(criteria_met, criteria, "live_price_move")
+    elif event.scanner_type == "social_callout":
+        criteria = _social_callout_criteria(indicators)
+        passed, failed = _split_criteria(criteria_met, criteria, "social_callout")
     else:
         scanner_prefix = event.scanner_type.replace("_", ".")
         passed = {}

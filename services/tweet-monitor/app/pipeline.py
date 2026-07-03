@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import redis
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -30,6 +30,103 @@ _redis = redis.from_url(settings.redis_url, decode_responses=True)
 
 # Celery task name for alert evaluation (matches backend task registration)
 _ALERT_TASK = "app.tasks.evaluate_scanner_alerts"
+
+
+def _criterion(
+    label: str,
+    observed: Any,
+    threshold: Any,
+    operator: str,
+    source: str = "tweet_monitor",
+    importance: float | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "label": label,
+        "observed": observed,
+        "threshold": threshold,
+        "operator": operator,
+        "source": source,
+    }
+    if importance is not None:
+        payload["importance"] = importance
+    return payload
+
+
+def _split_criteria(
+    criteria_met: dict[str, Any],
+    criteria: dict[str, dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    passed = {}
+    failed = {}
+    for key, explanation in criteria.items():
+        target = passed if bool(criteria_met.get(key)) else failed
+        target[f"social_callout.{key}"] = explanation
+    return passed, failed
+
+
+def _build_social_callout_explanation(
+    indicators: dict[str, Any],
+    criteria_met: dict[str, Any],
+) -> dict[str, Any]:
+    criteria = {
+        "has_cashtag": _criterion(
+            "Cashtag extracted",
+            bool(indicators.get("ticker")),
+            True,
+            "==",
+            importance=0.7,
+        ),
+        "has_price_level": _criterion(
+            "Price level extracted",
+            bool(
+                indicators.get("price_entry")
+                or indicators.get("price_target")
+                or indicators.get("price_stop")
+            ),
+            True,
+            "==",
+            importance=0.6,
+        ),
+        "above_confidence_threshold": _criterion(
+            "Classifier confidence",
+            indicators.get("confidence"),
+            0.7,
+            ">=",
+            importance=1.0,
+        ),
+    }
+    passed, failed = _split_criteria(criteria_met, criteria)
+
+    account = indicators.get("source_account") or "unknown"
+    why = [f"@{account} posted a classified social callout."]
+    if indicators.get("confidence") is not None:
+        why.append(f"Classifier confidence was {float(indicators['confidence']):.0%}.")
+    if indicators.get("price_entry") is not None:
+        why.append(f"Entry level extracted at ${float(indicators['price_entry']):.2f}.")
+
+    return {
+        "schema_version": "scanner_explanation.v1",
+        "why": why,
+        "criteria_passed": passed,
+        "criteria_failed": failed,
+        "confidence_inputs": {
+            "scanner_type": "social_callout",
+            "confidence": indicators.get("confidence"),
+            "source_account": indicators.get("source_account"),
+            "direction": indicators.get("direction"),
+            "price_entry": indicators.get("price_entry"),
+            "price_target": indicators.get("price_target"),
+            "price_stop": indicators.get("price_stop"),
+            "tweet_id": indicators.get("tweet_id"),
+        },
+        "data_quality_warnings": [],
+        "evidence": {
+            "reconstructed": False,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generator_version": "explanation_builder.v1",
+            "provider": "tweet_monitor",
+        },
+    }
 
 
 class SignalPipeline:
@@ -102,6 +199,9 @@ class SignalPipeline:
             "confidence": signal.confidence,
             "source_account": signal.account.handle if signal.account else "",
             "direction": signal.direction,
+            "ticker": ticker,
+            "tweet_id": signal.tweet_id,
+            "tweet_url": signal.tweet_url,
         }
         if ind.get("entry"):
             indicators["price_entry"] = ind["entry"]
@@ -113,6 +213,12 @@ class SignalPipeline:
         severity = "high" if signal.confidence > 0.9 else "medium"
         summary = self._build_summary(indicators)
 
+        criteria_met = {
+            "has_cashtag": bool(signal.tickers),
+            "has_price_level": bool(signal.price_levels),
+            "above_confidence_threshold": True,
+        }
+
         event = ScannerEvent(
             uuid=str(uuid_mod.uuid4()),
             ticker=ticker,
@@ -121,11 +227,7 @@ class SignalPipeline:
             summary=summary,
             severity=severity,
             indicators=indicators,
-            criteria_met={
-                "has_cashtag": bool(signal.tickers),
-                "has_price_level": bool(signal.price_levels),
-                "above_confidence_threshold": True,
-            },
+            criteria_met=criteria_met,
             metadata_={
                 "tweet_id": signal.tweet_id,
                 "tweet_url": signal.tweet_url,
@@ -133,6 +235,7 @@ class SignalPipeline:
                 "tweet_signal_id": signal.id,
                 "source": "tweet_monitor",
             },
+            explanation=_build_social_callout_explanation(indicators, criteria_met),
             signal_quality_score=signal.confidence,
             created_at=datetime.now(timezone.utc).replace(tzinfo=None),
             updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
