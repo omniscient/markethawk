@@ -113,8 +113,8 @@ token_optimization:
     conformance: 22000         # provisional from T5 smoke run; recalibrate per runbook Follow-up Path (docs/agents/dark-factory-token-optimization.md)
     code-review: 22000         # provisional from T5 smoke run; recalibrate per runbook Follow-up Path (docs/agents/dark-factory-token-optimization.md)
   enforce:
-    refine: false
-    plan: false
+    refine: true               # T3b: enforcement live — #731 scorecard: 0% section_at_risk
+    plan: true                 # T3b: enforcement live — #731 scorecard: 0% section_at_risk
     implement: false
     conformance: true          # T6: enforcement live — 0% section_at_risk in T5 calibration
     code-review: true          # T6: enforcement live — 0% section_at_risk in T5 calibration
