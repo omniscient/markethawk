@@ -13,6 +13,9 @@ Options:
   --output-dir DIR   Where to write results/ and reports/ (default: dark-factory/evals)
   --issues N,N,...   Comma-separated list of issue numbers (overrides suite.json + supplementals)
   --dry-run          Print issue list and exit without running eval
+  --calibrate        Also run budget-calibration sweep and emit scorecard
+  --budgets N,N,...  Comma-separated candidate budgets for --calibrate (default: 22000,24000,...)
+  --scenarios S,...  Comma-separated scenarios for --calibrate (default: all 5 enforcement scenarios)
 """
 from __future__ import annotations
 
@@ -33,9 +36,22 @@ sys.path.insert(0, _SCRIPTS_DIR)
 import architecture_slice as aslice
 from context_pack import assemble_pack
 
+# ── Fail-open import of budget_enforce (T1, may not be present in all envs) ──
+
+try:
+    from budget_enforce import derive_caps as _derive_caps, _load_config as _be_load_config
+    _BUDGET_ENFORCE_AVAILABLE = True
+except Exception:
+    _BUDGET_ENFORCE_AVAILABLE = False
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-TIER1_SCENARIOS = ["refine", "plan", "implement"]
+ENFORCEMENT_SCENARIOS = ["refine", "plan", "implement", "conformance", "code-review"]
+TIER1_SCENARIOS = ENFORCEMENT_SCENARIOS  # backward-compat alias
+
+_DEFAULT_BUDGET_SWEEP = [22000, 24000, 26000, 28000, 30000, 32000, 36000, 40000]
+_DEFAULT_CONFIG_PATH = ".claude/skills/refinement/config.yaml"
+_OVER_BUDGET_RATE_THRESHOLD = 0.10  # 10% max for safe-budget recommendation
 
 SAFETY_RULES = [
     "alembic upgrade head",
@@ -193,6 +209,7 @@ def eval_issue_scenario(
         "section_check": section_check,
         "included_arch_sections": included_arch,
         "omitted_arch_sections": omitted_arch,
+        "opt_manifest": opt_manifest,
     }
 
 # ── Safety rule checks ────────────────────────────────────────────────────────
@@ -249,6 +266,271 @@ def _check_section_presence(
         results[section] = "present" if heading in opt_text else "missing"
     return results
 
+# ── Budget calibration ────────────────────────────────────────────────────────
+
+
+def _get_default_budget_tokens(clone_dir: str) -> int:
+    """Read default_budget_tokens from config.yaml; fall back to 30000."""
+    config_path = os.path.join(clone_dir, _DEFAULT_CONFIG_PATH)
+    try:
+        if not _BUDGET_ENFORCE_AVAILABLE:
+            raise ImportError("budget_enforce unavailable")
+        cfg = _be_load_config(config_path)
+        val = cfg.get("token_optimization", {}).get("default_budget_tokens")
+        if val is not None:
+            return int(val)
+    except Exception:
+        pass
+    # Fallback: parse yaml manually with a simple regex
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            text = f.read()
+        m = re.search(r"default_budget_tokens\s*:\s*(\d+)", text)
+        if m:
+            return int(m.group(1))
+    except Exception:
+        pass
+    return 30000
+
+
+def _build_budget_sweep(budgets_override: list[int] | None, clone_dir: str) -> list[int]:
+    """Build final budget sweep list including config default."""
+    base = list(budgets_override) if budgets_override else list(_DEFAULT_BUDGET_SWEEP)
+    default = _get_default_budget_tokens(clone_dir)
+    if default not in base:
+        base.append(default)
+    return sorted(set(base))
+
+
+def simulate_enforcement(
+    result: dict,
+    budget: int,
+    config: dict,
+) -> dict:
+    """Simulate what budget_enforce.derive_caps() would do for one issue/scenario/budget row.
+
+    Returns a dict with enforcement simulation fields, or a calibration_error row on failure.
+    """
+    if not _BUDGET_ENFORCE_AVAILABLE:
+        return {
+            "issue": result["issue"],
+            "scenario": result["scenario"],
+            "budget": budget,
+            "status": "calibration_error",
+            "error": "budget_enforce not available",
+        }
+
+    opt_manifest = result.get("opt_manifest", {})
+    sections = opt_manifest.get("sections", {})
+    arch_fallback = result.get("fallback", True)
+
+    try:
+        br = _derive_caps(
+            sections=sections,
+            budget=budget,
+            arch_fallback=arch_fallback,
+            config=config,
+            scenario=result.get("scenario", "unknown"),
+        )
+
+        # section_at_risk: arch_fallback=False AND derived arch cap < opt arch tokens
+        section_at_risk = False
+        if not arch_fallback:
+            arch_sec = sections.get("architecture_md", {})
+            opt_arch_tokens = int(arch_sec.get("tokens", 0)) if arch_sec.get("status", "dropped") != "dropped" else 0
+            derived_arch = br.derived_caps.get("architecture_md", None)
+            if derived_arch is not None and opt_arch_tokens > 0:
+                section_at_risk = derived_arch < opt_arch_tokens
+
+        # Also propagate pre-existing section_check "missing" verdicts
+        section_check = result.get("section_check", {})
+        if any(v == "missing" for v in section_check.values()):
+            section_at_risk = True
+
+        return {
+            "issue": result["issue"],
+            "scenario": result["scenario"],
+            "budget": budget,
+            "over_budget": br.over_budget,
+            "would_trim": br.would_trim,
+            "derived_caps": br.derived_caps,
+            "section_at_risk": section_at_risk,
+            "reserved_tokens": br.reserved_tokens,
+            "allowance": br.allowance,
+            "opt_tokens": result.get("opt_tokens", 0),
+        }
+    except Exception as e:
+        return {
+            "issue": result["issue"],
+            "scenario": result["scenario"],
+            "budget": budget,
+            "status": "calibration_error",
+            "error": str(e),
+        }
+
+
+def calibrate_issue(
+    result: dict,
+    budget_sweep: list[int],
+    config: dict,
+) -> list[dict]:
+    """Run enforcement simulation across all candidate budgets for one issue/scenario result."""
+    rows = []
+    for budget in budget_sweep:
+        row = simulate_enforcement(result, budget, config)
+        rows.append(row)
+    return rows
+
+
+def safe_budget_recommendation(
+    scenario_rows: list[dict],
+    budget_sweep: list[int],
+) -> str:
+    """Find lowest budget where section_at_risk_rate==0 AND over_budget_rate<=10%.
+
+    Returns the budget as a string, or 'none — widen --budgets' if none qualifies.
+    """
+    for budget in sorted(budget_sweep):
+        budget_rows = [r for r in scenario_rows if r.get("budget") == budget
+                       and r.get("status") != "calibration_error"]
+        if not budget_rows:
+            continue
+        total = len(budget_rows)
+        risk_count = sum(1 for r in budget_rows if r.get("section_at_risk"))
+        over_count = sum(1 for r in budget_rows if r.get("over_budget"))
+        section_at_risk_rate = risk_count / total
+        over_budget_rate = over_count / total
+        if section_at_risk_rate == 0.0 and over_budget_rate <= _OVER_BUDGET_RATE_THRESHOLD:
+            return str(budget)
+    return "none — widen --budgets"
+
+
+def _percentile(values: list[float], pct: int) -> float:
+    """Compute the pct-th percentile of a sorted list."""
+    if not values:
+        return 0.0
+    sv = sorted(values)
+    idx = (pct / 100) * (len(sv) - 1)
+    lo = int(idx)
+    hi = min(lo + 1, len(sv) - 1)
+    frac = idx - lo
+    return sv[lo] + frac * (sv[hi] - sv[lo])
+
+
+def generate_calibration_scorecard(
+    calibration_rows: list[dict],
+    eval_results: list[dict],
+    budget_sweep: list[int],
+    scenarios: list[str],
+    output_dir: str,
+    date_str: str,
+) -> str:
+    """Generate budget-calibration scorecard markdown. Returns path to file."""
+    lines: list[str] = []
+    lines.append(f"# Budget Calibration Scorecard — {date_str}")
+    lines.append("")
+    lines.append("**Issue:** [#718](https://github.com/omniscient/markethawk/issues/718)")
+    lines.append("**Script:** `dark-factory/evals/token_opt_eval.py --calibrate`")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## Per-Scenario Token Distribution (opt_tokens)")
+    lines.append("")
+    lines.append("| Scenario | p50 (tok) | p90 (tok) | p90×1.1 advisory |")
+    lines.append("|----------|-----------|-----------|------------------|")
+
+    scenario_opt_tokens: dict[str, list[float]] = {s: [] for s in scenarios}
+    for r in eval_results:
+        s = r.get("scenario", "")
+        if s in scenario_opt_tokens and "opt_tokens" in r:
+            scenario_opt_tokens[s].append(float(r["opt_tokens"]))
+
+    for s in scenarios:
+        vals = scenario_opt_tokens[s]
+        p50 = _percentile(vals, 50)
+        p90 = _percentile(vals, 90)
+        advisory = p90 * 1.1
+        lines.append(f"| {s} | {int(p50):,} | {int(p90):,} | {int(advisory):,} |")
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## Over-Budget Rate and Section-at-Risk Rate per Scenario × Budget")
+    lines.append("")
+
+    budget_cols = " | ".join(f"{b:,}" for b in sorted(budget_sweep))
+    lines.append(f"| Scenario | Metric | {budget_cols} |")
+    lines.append("|----------|--------|" + "--------|" * len(budget_sweep))
+
+    for s in scenarios:
+        s_rows = [r for r in calibration_rows if r.get("scenario") == s]
+        ob_vals = []
+        risk_vals = []
+        for budget in sorted(budget_sweep):
+            budget_rows = [r for r in s_rows if r.get("budget") == budget
+                           and r.get("status") != "calibration_error"]
+            total = len(budget_rows)
+            if total == 0:
+                ob_vals.append("—")
+                risk_vals.append("—")
+            else:
+                ob_rate = sum(1 for r in budget_rows if r.get("over_budget")) / total
+                risk_rate = sum(1 for r in budget_rows if r.get("section_at_risk")) / total
+                ob_vals.append(f"{ob_rate:.0%}")
+                risk_vals.append(f"{risk_rate:.0%}")
+        ob_str = " | ".join(ob_vals)
+        risk_str = " | ".join(risk_vals)
+        lines.append(f"| {s} | over_budget_rate | {ob_str} |")
+        lines.append(f"| {s} | section_at_risk_rate | {risk_str} |")
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## Safe-Budget Recommendations")
+    lines.append("")
+    lines.append("Criteria: `section_at_risk_rate == 0%` AND `over_budget_rate ≤ 10%`")
+    lines.append("")
+    lines.append("| Scenario | Recommended Budget |")
+    lines.append("|----------|--------------------|")
+
+    for s in scenarios:
+        s_rows = [r for r in calibration_rows if r.get("scenario") == s]
+        rec = safe_budget_recommendation(s_rows, budget_sweep)
+        lines.append(f"| {s} | {rec} |")
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    # Unresolved component counts per scenario
+    unresolved_counts: dict[str, int] = {s: 0 for s in scenarios}
+    for r in eval_results:
+        s = r.get("scenario", "")
+        if s in unresolved_counts:
+            sc = r.get("section_check", {})
+            if sc.get("reason") == "component_unresolved_or_unknown":
+                unresolved_counts[s] += 1
+
+    lines.append("## Unresolved Component Counts (by Scenario)")
+    lines.append("")
+    lines.append("| Scenario | Issues with unresolved component |")
+    lines.append("|----------|----------------------------------|")
+    for s in scenarios:
+        lines.append(f"| {s} | {unresolved_counts[s]} |")
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("*Generated by `dark-factory/evals/token_opt_eval.py --calibrate`*")
+
+    reports_dir = os.path.join(output_dir, "reports")
+    os.makedirs(reports_dir, exist_ok=True)
+    report_path = os.path.join(reports_dir, f"budget-calibration-scorecard-{date_str}.md")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"Calibration scorecard written: {report_path}")
+    return report_path
+
 # ── Main eval loop ────────────────────────────────────────────────────────────
 
 
@@ -264,6 +546,9 @@ def run_eval(
     output_dir: str,
     issue_override: list[int] | None = None,
     dry_run: bool = False,
+    calibrate: bool = False,
+    budgets_override: list[int] | None = None,
+    scenarios_override: list[str] | None = None,
 ) -> dict:
     """Run the full evaluation; return aggregated results dict."""
     suite_json = os.path.join(clone_dir, "dark-factory", "bench", "suite.json")
@@ -292,7 +577,28 @@ def run_eval(
     results_dir = os.path.join(output_dir, "results")
     os.makedirs(results_dir, exist_ok=True)
 
+    # Determine which scenarios to use for calibration
+    calib_scenarios = scenarios_override if scenarios_override else ENFORCEMENT_SCENARIOS
+
+    # Scenarios used for the regular eval — always TIER1_SCENARIOS for backward compat
+    eval_scenarios = ENFORCEMENT_SCENARIOS
+
     all_results: list[dict] = []
+    calibration_rows: list[dict] = []
+
+    # Load budget_enforce config once for the calibration sweep
+    calib_config: dict | None = None
+    budget_sweep: list[int] = []
+    if calibrate:
+        budget_sweep = _build_budget_sweep(budgets_override, clone_dir)
+        print(f"Calibration budget sweep: {budget_sweep}")
+        print(f"Calibration scenarios: {calib_scenarios}")
+        if _BUDGET_ENFORCE_AVAILABLE:
+            config_path = os.path.join(clone_dir, _DEFAULT_CONFIG_PATH)
+            calib_config = _be_load_config(config_path)
+        else:
+            print("[warn] budget_enforce not available; calibration rows will be error rows", file=sys.stderr)
+            calib_config = {}
 
     with tempfile.TemporaryDirectory(prefix="tokeval-") as tmp_dir:
         for issue_num in all_issues:
@@ -306,7 +612,7 @@ def run_eval(
                 })
                 continue
 
-            for scenario in TIER1_SCENARIOS:
+            for scenario in eval_scenarios:
                 print(f"  scenario={scenario} ...", end="", flush=True)
                 try:
                     result = eval_issue_scenario(issue, scenario, clone_dir, tmp_dir)
@@ -318,7 +624,14 @@ def run_eval(
                         f" savings={savings}%"
                         f" safety={verdict}"
                     )
-                    all_results.append(result)
+                    # Store result without opt_manifest (large, not needed in JSON output)
+                    result_for_json = {k: v for k, v in result.items() if k != "opt_manifest"}
+                    all_results.append(result_for_json)
+
+                    # Calibration: run sweep for this issue × scenario if in calib_scenarios
+                    if calibrate and calib_config is not None and scenario in calib_scenarios:
+                        rows = calibrate_issue(result, budget_sweep, calib_config)
+                        calibration_rows.extend(rows)
                 except Exception as e:
                     print(f" ERROR: {e}", file=sys.stderr)
                     all_results.append({
@@ -329,13 +642,26 @@ def run_eval(
                     })
 
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    output: dict = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "results": all_results,
+    }
+    if calibrate:
+        output["calibration_results"] = calibration_rows
+
     json_path = os.path.join(results_dir, f"token-opt-eval-{date_str}.json")
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump({"generated_at": datetime.now(timezone.utc).isoformat(),
-                   "results": all_results}, f, indent=2)
+        json.dump(output, f, indent=2)
     print(f"\nResults written: {json_path}")
 
-    return {"results": all_results, "json_path": json_path, "date": date_str}
+    return {
+        "results": all_results,
+        "calibration_results": calibration_rows,
+        "json_path": json_path,
+        "date": date_str,
+        "budget_sweep": budget_sweep,
+        "calib_scenarios": calib_scenarios,
+    }
 
 
 # ── Report generation ─────────────────────────────────────────────────────────
@@ -361,7 +687,7 @@ def generate_scorecard(eval_data: dict, output_dir: str, clone_dir: str) -> str:
     lines.append("")
     lines.append("---")
     lines.append("")
-    lines.append("## Per-Issue Savings (Tier 1: refine / plan / implement)")
+    lines.append("## Per-Issue Savings (Enforcement scenarios: refine / plan / implement / conformance / code-review)")
     lines.append("")
     lines.append("| Issue | Component | Scenario | Baseline (tok) | Optimized (tok) | Savings % | Safety | Sliced? |")
     lines.append("|-------|-----------|----------|----------------|-----------------|-----------|--------|---------|")
@@ -427,8 +753,8 @@ def generate_scorecard(eval_data: dict, output_dir: str, clone_dir: str) -> str:
     lines.append("## Recommendations")
     lines.append("")
 
-    scenario_safety: dict[str, list[str]] = {s: [] for s in TIER1_SCENARIOS}
-    scenario_savings: dict[str, list[float]] = {s: [] for s in TIER1_SCENARIOS}
+    scenario_safety: dict[str, list[str]] = {s: [] for s in ENFORCEMENT_SCENARIOS}
+    scenario_savings: dict[str, list[float]] = {s: [] for s in ENFORCEMENT_SCENARIOS}
     for r in results:
         if r.get("status") in ("skipped", "error") or "safety" not in r:
             continue
@@ -439,7 +765,7 @@ def generate_scorecard(eval_data: dict, output_dir: str, clone_dir: str) -> str:
 
     safe_to_enforce = []
     needs_review = []
-    for s in TIER1_SCENARIOS:
+    for s in ENFORCEMENT_SCENARIOS:
         verdicts = scenario_safety[s]
         if not verdicts:
             continue
@@ -487,6 +813,12 @@ def main() -> None:
                         help="Comma-separated issue numbers (overrides suite.json + supplementals)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print issue list and exit without running eval")
+    parser.add_argument("--calibrate", action="store_true",
+                        help="Also run budget-calibration sweep and emit calibration scorecard")
+    parser.add_argument("--budgets", default=None,
+                        help="Comma-separated candidate budgets for --calibrate (e.g. 22000,30000)")
+    parser.add_argument("--scenarios", default=None,
+                        help="Comma-separated scenarios for --calibrate (default: all 5 enforcement scenarios)")
     args = parser.parse_args()
 
     clone_dir = args.clone_dir
@@ -494,11 +826,34 @@ def main() -> None:
     issue_override = None
     if args.issues:
         issue_override = [int(n.strip()) for n in args.issues.split(",") if n.strip()]
+    budgets_override = None
+    if args.budgets:
+        budgets_override = [int(n.strip()) for n in args.budgets.split(",") if n.strip()]
+    scenarios_override = None
+    if args.scenarios:
+        scenarios_override = [s.strip() for s in args.scenarios.split(",") if s.strip()]
 
-    eval_data = run_eval(clone_dir, output_dir, issue_override, args.dry_run)
+    eval_data = run_eval(
+        clone_dir,
+        output_dir,
+        issue_override,
+        args.dry_run,
+        calibrate=args.calibrate,
+        budgets_override=budgets_override,
+        scenarios_override=scenarios_override,
+    )
 
     if not eval_data.get("dry_run"):
         generate_scorecard(eval_data, output_dir, clone_dir)
+        if args.calibrate and eval_data.get("calibration_results"):
+            generate_calibration_scorecard(
+                calibration_rows=eval_data["calibration_results"],
+                eval_results=eval_data["results"],
+                budget_sweep=eval_data["budget_sweep"],
+                scenarios=eval_data["calib_scenarios"],
+                output_dir=output_dir,
+                date_str=eval_data["date"],
+            )
 
 
 if __name__ == "__main__":
