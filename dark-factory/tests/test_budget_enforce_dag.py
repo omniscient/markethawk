@@ -78,14 +78,14 @@ def test_config_enforce_has_all_scenarios():
 def test_config_enforce_t6_state():
     enforce = _tok_opt().get("enforce", {})
     expected = {
-        "refine": False,
-        "plan": False,
+        "refine": True,
+        "plan": True,
         "implement": False,
         "conformance": True,
         "code-review": True,
     }
     assert enforce == expected, (
-        f"enforce must match the T6 intended state {expected}, got {enforce}"
+        f"enforce must match the T3b intended state {expected}, got {enforce}"
     )
 
 
