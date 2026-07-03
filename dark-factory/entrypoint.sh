@@ -323,7 +323,7 @@ post_cost_report() {
   }
 
   # Build context savings line from context-budget.json (schema v2, best-effort)
-  local SAVINGS_LINE="" FALLBACKS_LINE=""
+  local SAVINGS_LINE="" FALLBACKS_LINE="" BUDGET_LINE=""
   local BUDGET_FILE="${ARTIFACTS_DIR:-}/context-budget.json"
   if [ -f "$BUDGET_FILE" ]; then
     local SCHEMA_VER SAVINGS_TOKENS SAVINGS_PCT FALLBACK_COUNT
@@ -340,15 +340,44 @@ post_cost_report() {
           "**Fallbacks:** " + ([ (.fallback_events // [])[] | "\(.section): \(.reason)" ] | join(", "))
         ' "$BUDGET_FILE" 2>/dev/null || true)
       fi
+      local OVER_BUDGET WOULD_TRIM
+      OVER_BUDGET=$(jq -r '.over_budget // "null"' "$BUDGET_FILE" 2>/dev/null || echo "null") || true
+      WOULD_TRIM=$(jq -r '.would_trim // "null"' "$BUDGET_FILE" 2>/dev/null || echo "null") || true
+      if [ "$OVER_BUDGET" = "true" ]; then
+        local BE_SCENARIO BE_RESERVED BE_BUDGET CAPS_STR
+        BE_SCENARIO=$(jq -r '.scenario // "unknown"' "$BUDGET_FILE" 2>/dev/null || echo "unknown") || true
+        BE_RESERVED=$(jq -r '.reserved_tokens // 0' "$BUDGET_FILE" 2>/dev/null || echo "0") || true
+        BE_BUDGET=$(jq -r '.scenario_budget // 0' "$BUDGET_FILE" 2>/dev/null || echo "0") || true
+        CAPS_STR=$(jq -r '
+          [(.derived_caps // {}) | to_entries[] | "\(.key)→\(.value)"] | join(", ")
+        ' "$BUDGET_FILE" 2>/dev/null || echo "") || true
+        BUDGET_LINE="**⚠️ Over budget (${BE_SCENARIO}): $(fmt_tokens "$BE_RESERVED") reserved / $(fmt_tokens "$BE_BUDGET") budget — trimmed: ${CAPS_STR}**" || true
+      elif [ "$WOULD_TRIM" = "true" ]; then
+        local BE_SCENARIO BE_ESTIMATED BE_BUDGET CAPS_STR
+        BE_SCENARIO=$(jq -r '.scenario // "unknown"' "$BUDGET_FILE" 2>/dev/null || echo "unknown") || true
+        BE_ESTIMATED=$(jq -r '.estimated_input_tokens // empty' "$BUDGET_FILE" 2>/dev/null || echo "") || true
+        if [ -z "$BE_ESTIMATED" ]; then
+          BE_ESTIMATED=$(jq -r '.reserved_tokens // 0' "$BUDGET_FILE" 2>/dev/null || echo "0") || true
+          local EST_LABEL="rsv"
+        else
+          local EST_LABEL="est"
+        fi
+        BE_BUDGET=$(jq -r '.scenario_budget // 0' "$BUDGET_FILE" 2>/dev/null || echo "0") || true
+        CAPS_STR=$(jq -r '
+          [(.derived_caps // {}) | to_entries[] | "\(.key)→\(.value)"] | join(", ")
+        ' "$BUDGET_FILE" 2>/dev/null || echo "") || true
+        BUDGET_LINE="**Budget trim (${BE_SCENARIO}): ${EST_LABEL} $(fmt_tokens "$BE_ESTIMATED") / $(fmt_tokens "$BE_BUDGET") budget — capped: ${CAPS_STR}**" || true
+      fi
     fi
   fi
 
   # Build the full comment body
   local SAVINGS_BLOCK=""
-  if [ -n "$SAVINGS_LINE" ] || [ -n "$FALLBACKS_LINE" ]; then
+  if [ -n "$SAVINGS_LINE" ] || [ -n "$FALLBACKS_LINE" ] || [ -n "$BUDGET_LINE" ]; then
     SAVINGS_BLOCK="
 ${SAVINGS_LINE}${SAVINGS_LINE:+
-}${FALLBACKS_LINE}"
+}${FALLBACKS_LINE}${FALLBACKS_LINE:+
+}${BUDGET_LINE}"
   fi
 
   local BODY

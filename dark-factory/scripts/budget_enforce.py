@@ -15,7 +15,9 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import sys
+import tempfile
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
@@ -333,6 +335,27 @@ def run_cli(argv: list[str] | None = None) -> BudgetResult:
             f"over_budget={result.over_budget} would_trim={result.would_trim}",
             file=sys.stderr,
         )
+
+    # Write-back six telemetry fields to context-budget.json in-place (both modes).
+    # Fail-open: errors are logged to stderr and do not affect the load-bearing path.
+    try:
+        with open(args.context_budget_json, encoding="utf-8") as f:
+            cb_wb = json.load(f)
+        cb_wb["over_budget"] = result.over_budget
+        cb_wb["would_trim"] = result.would_trim
+        cb_wb["derived_caps"] = result.derived_caps
+        cb_wb["scenario_budget"] = args.budget_tokens
+        cb_wb["reserved_tokens"] = result.reserved_tokens
+        cb_wb["allowance"] = result.allowance
+        dir_ = os.path.dirname(os.path.abspath(args.context_budget_json))
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=dir_, delete=False, suffix=".tmp"
+        ) as tf:
+            tmp_path = tf.name
+            json.dump(cb_wb, tf, indent=2)
+        os.replace(tmp_path, args.context_budget_json)
+    except Exception as exc:
+        print(f"budget_enforce: write-back failed (non-fatal): {exc}", file=sys.stderr)
 
     return result
 
