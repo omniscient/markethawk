@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-03T15:24:14.519324+00:00",
+  "generated_at": "2026-07-03T17:31:46.312517+00:00",
   "results": [
     {
       "issue": 224,
@@ -3675,9 +3675,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 12067
@@ -3689,9 +3689,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 12067
@@ -3703,9 +3703,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 12067
@@ -3717,9 +3717,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 12067
@@ -3731,9 +3731,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 12067
@@ -3745,9 +3745,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 12067
@@ -3759,9 +3759,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 12067
@@ -3773,9 +3773,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 12067
@@ -3787,9 +3787,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 12066
@@ -3801,9 +3801,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 12066
@@ -3815,9 +3815,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 12066
@@ -3829,9 +3829,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 12066
@@ -3843,9 +3843,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 12066
@@ -3857,9 +3857,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 12066
@@ -3871,9 +3871,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 12066
@@ -3885,9 +3885,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 12066
@@ -3899,9 +3899,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 7808
@@ -3913,9 +3913,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 7808
@@ -3927,9 +3927,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 7808
@@ -3941,9 +3941,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 7808
@@ -3955,9 +3955,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 7808
@@ -3969,9 +3969,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 7808
@@ -3983,9 +3983,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 7808
@@ -3997,9 +3997,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 7808
@@ -4203,9 +4203,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 11758
@@ -4217,9 +4217,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 11758
@@ -4231,9 +4231,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 11758
@@ -4245,9 +4245,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 11758
@@ -4259,9 +4259,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 11758
@@ -4273,9 +4273,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 11758
@@ -4287,9 +4287,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 11758
@@ -4301,9 +4301,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 11758
@@ -4315,9 +4315,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 11757
@@ -4329,9 +4329,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 11757
@@ -4343,9 +4343,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 11757
@@ -4357,9 +4357,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 11757
@@ -4371,9 +4371,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 11757
@@ -4385,9 +4385,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 11757
@@ -4399,9 +4399,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 11757
@@ -4413,9 +4413,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 11757
@@ -4427,9 +4427,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 7499
@@ -4441,9 +4441,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 7499
@@ -4455,9 +4455,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 7499
@@ -4469,9 +4469,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 7499
@@ -4483,9 +4483,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 7499
@@ -4497,9 +4497,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 7499
@@ -4511,9 +4511,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 7499
@@ -4525,9 +4525,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 7499
@@ -6171,9 +6171,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 11684
@@ -6185,9 +6185,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 11684
@@ -6199,9 +6199,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 11684
@@ -6213,9 +6213,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 11684
@@ -6227,9 +6227,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 11684
@@ -6241,9 +6241,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 11684
@@ -6255,9 +6255,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 11684
@@ -6269,9 +6269,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 11684
@@ -6283,9 +6283,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 11683
@@ -6297,9 +6297,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 11683
@@ -6311,9 +6311,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 11683
@@ -6325,9 +6325,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 11683
@@ -6339,9 +6339,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 11683
@@ -6353,9 +6353,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 11683
@@ -6367,9 +6367,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 11683
@@ -6381,9 +6381,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 11683
@@ -6395,9 +6395,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 17589,
       "opt_tokens": 7425
@@ -6409,9 +6409,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 19589,
       "opt_tokens": 7425
@@ -6423,9 +6423,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 21589,
       "opt_tokens": 7425
@@ -6437,9 +6437,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 23589,
       "opt_tokens": 7425
@@ -6451,9 +6451,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 25589,
       "opt_tokens": 7425
@@ -6465,9 +6465,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 27589,
       "opt_tokens": 7425
@@ -6479,9 +6479,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 31589,
       "opt_tokens": 7425
@@ -6493,9 +6493,9 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
-      "section_at_risk": true,
+      "section_at_risk": false,
       "reserved_tokens": 4411,
       "allowance": 35589,
       "opt_tokens": 7425
@@ -7179,7 +7179,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7193,7 +7193,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7207,7 +7207,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7221,7 +7221,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7235,7 +7235,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7249,7 +7249,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7263,7 +7263,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7277,7 +7277,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7291,7 +7291,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7305,7 +7305,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7319,7 +7319,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7333,7 +7333,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7347,7 +7347,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7361,7 +7361,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7375,7 +7375,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7389,7 +7389,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7403,7 +7403,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7417,7 +7417,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7431,7 +7431,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7445,7 +7445,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7459,7 +7459,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7473,7 +7473,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7487,7 +7487,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -7501,7 +7501,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12507,7 +12507,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12521,7 +12521,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12535,7 +12535,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12549,7 +12549,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12563,7 +12563,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12577,7 +12577,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12591,7 +12591,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12605,7 +12605,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12619,7 +12619,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12633,7 +12633,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12647,7 +12647,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12661,7 +12661,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12675,7 +12675,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12689,7 +12689,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12703,7 +12703,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12717,7 +12717,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12731,7 +12731,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12745,7 +12745,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12759,7 +12759,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12773,7 +12773,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12787,7 +12787,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12801,7 +12801,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12815,7 +12815,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -12829,7 +12829,7 @@
       "over_budget": false,
       "would_trim": false,
       "derived_caps": {
-        "architecture_md": 3000
+        "architecture_md": 5000
       },
       "section_at_risk": false,
       "reserved_tokens": 4411,
@@ -14468,12 +14468,5 @@
       "allowance": 38000,
       "opt_tokens": 4542
     }
-  ],
-  "p90_uncapped_arch_slice_tokens_per_scenario": {
-    "refine": {"p90_tokens": 4645, "sliced_issue_count": 5, "sliced_issues": [224, 332, 276, 215, 697]},
-    "plan": {"p90_tokens": 4644, "sliced_issue_count": 5, "sliced_issues": [224, 332, 276, 215, 697]},
-    "implement": {"p90_tokens": 4645, "sliced_issue_count": 5, "sliced_issues": [224, 332, 276, 215, 697]},
-    "conformance": {"p90_tokens": null, "sliced_issue_count": 0, "note": "no sliced samples"},
-    "code-review": {"p90_tokens": null, "sliced_issue_count": 0, "note": "no sliced samples"}
-  }
+  ]
 }
