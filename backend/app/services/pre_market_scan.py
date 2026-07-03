@@ -411,6 +411,7 @@ def _persist(
     scanner_run: Optional[Any],
     gate_metadata: Optional[Dict[str, Any]] = None,
 ) -> list[Dict[str, Any]]:
+    from app.services.data_readiness import DataReadinessService
     from app.services.scanner import ScannerService
     from app.services.scanner_explanations import build_pre_market_volume_explanation
     from app.services.signal_ranker import compute_signal_quality_score
@@ -426,10 +427,17 @@ def _persist(
             signal_quality_score = compute_signal_quality_score(
                 signal.indicators, ranker_config["weights"]
             )
+        event_gate_metadata = DataReadinessService.event_quality_gate_metadata(
+            db=db,
+            ticker=signal.raw.ticker,
+            scanner_type="pre_market_volume_spike",
+            event_date=event_date,
+            base_metadata=gate_metadata,
+        )
         explanation = build_pre_market_volume_explanation(
             signal,
             signal_quality_score=signal_quality_score,
-            gate_metadata=gate_metadata,
+            gate_metadata=event_gate_metadata,
         )
         event_dict = ScannerService._save_event(
             db=db,
@@ -443,7 +451,7 @@ def _persist(
             opening_price=signal.day_metrics.get("opening_price", 0.0),
             closing_price=signal.day_metrics.get("closing_price"),
             ranker_config=ranker_config,
-            gate_metadata=gate_metadata,
+            gate_metadata=event_gate_metadata,
             explanation=explanation,
         )
         results.append(event_dict)

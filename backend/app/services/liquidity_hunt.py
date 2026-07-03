@@ -34,6 +34,7 @@ from app.models.stock_split import StockSplit
 from app.models.ticker_reference import TickerReference
 from app.services.alert_service import save_event as _save_event
 from app.services.catalyst_parser import CatalystParser
+from app.services.data_readiness import DataReadinessService
 from app.services.scanner_explanations import build_liquidity_hunt_explanation
 from app.utils.session import get_market_today
 from app.utils.time import to_utc_naive
@@ -542,6 +543,15 @@ async def run_liquidity_hunt_scan(
                             event_date,
                             session_metrics["pre_vol"],
                         )
+                        event_gate_metadata = (
+                            DataReadinessService.event_quality_gate_metadata(
+                                db=db,
+                                ticker=ticker,
+                                scanner_type="liquidity_hunt_pre",
+                                event_date=event_date,
+                                base_metadata=gate_metadata,
+                            )
+                        )
                         event_dict = _save_event(
                             db=db,
                             ticker=ticker,
@@ -553,12 +563,12 @@ async def run_liquidity_hunt_scan(
                             previous_close=prior_day_close,
                             opening_price=session_metrics["regular_open"],
                             closing_price=session_metrics["regular_close"],
-                            gate_metadata=gate_metadata,
+                            gate_metadata=event_gate_metadata,
                             explanation=build_liquidity_hunt_explanation(
                                 scanner_type="liquidity_hunt_pre",
                                 indicators=indicators_pre,
                                 criteria_met=criteria_pre,
-                                gate_metadata=gate_metadata,
+                                gate_metadata=event_gate_metadata,
                                 config=config,
                             ),
                         )
@@ -592,6 +602,15 @@ async def run_liquidity_hunt_scan(
                                 event_date,
                                 session_metrics["post_vol"],
                             )
+                            event_gate_metadata = (
+                                DataReadinessService.event_quality_gate_metadata(
+                                    db=db,
+                                    ticker=ticker,
+                                    scanner_type="liquidity_hunt_post",
+                                    event_date=event_date,
+                                    base_metadata=gate_metadata,
+                                )
+                            )
                             event_dict = _save_event(
                                 db=db,
                                 ticker=ticker,
@@ -603,12 +622,12 @@ async def run_liquidity_hunt_scan(
                                 previous_close=event_date_regular_close,
                                 opening_price=session_metrics["regular_open"],
                                 closing_price=session_metrics["regular_close"],
-                                gate_metadata=gate_metadata,
+                                gate_metadata=event_gate_metadata,
                                 explanation=build_liquidity_hunt_explanation(
                                     scanner_type="liquidity_hunt_post",
                                     indicators=indicators_post,
                                     criteria_met=criteria_post,
-                                    gate_metadata=gate_metadata,
+                                    gate_metadata=event_gate_metadata,
                                     config=config,
                                 ),
                             )
