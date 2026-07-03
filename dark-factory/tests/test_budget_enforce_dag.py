@@ -40,6 +40,8 @@ def test_config_has_budgets_map():
 
 
 def test_config_budgets_has_all_scenarios():
+    # Kept alongside test_config_budgets_t6_state as independent scenario-presence guard:
+    # catches a missing key even if the exact-value dict comparison changes in the future.
     budgets = _tok_opt().get("budgets", {})
     for scenario in ("refine", "plan", "implement", "conformance", "code-review"):
         assert scenario in budgets, f"budgets map must include '{scenario}'"
@@ -66,6 +68,8 @@ def test_config_has_enforce_map():
 
 
 def test_config_enforce_has_all_scenarios():
+    # Kept alongside test_config_enforce_t6_state as independent scenario-presence guard:
+    # catches a missing key even if the exact-value dict comparison changes in the future.
     enforce = _tok_opt().get("enforce", {})
     for scenario in ("refine", "plan", "implement", "conformance", "code-review"):
         assert scenario in enforce, f"enforce map must include '{scenario}'"

@@ -110,8 +110,8 @@ token_optimization:
     refine: 30000
     plan: 30000
     implement: 30000
-    conformance: 22000         # provisional from T5 smoke run; recalibrate after full-corpus calibration
-    code-review: 22000         # provisional from T5 smoke run; recalibrate after full-corpus calibration
+    conformance: 22000         # provisional from T5 smoke run; recalibrate per runbook Follow-up Path (docs/agents/dark-factory-token-optimization.md)
+    code-review: 22000         # provisional from T5 smoke run; recalibrate per runbook Follow-up Path (docs/agents/dark-factory-token-optimization.md)
   enforce:
     refine: false
     plan: false
