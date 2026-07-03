@@ -320,5 +320,7 @@ def test_enforce_budget_node_env_kill_switch(node_id):
     bash = nodes.get(node_id, {}).get("bash", "")
     assert "TOKEN_OPTIMIZATION_ENFORCE_BUDGETS" in bash, \
         f"'{node_id}' bash must read TOKEN_OPTIMIZATION_ENFORCE_BUDGETS from env"
-    assert ",,}" in bash, \
-        f"'{node_id}' bash must use bash 4 lowercase expansion (,,) for the env var"
+    assert 'case "${_EENV' in bash, \
+        f"'{node_id}' bash must branch on _EENV with a case statement"
+    assert '_MODE="observe"' in bash, \
+        f"'{node_id}' bash must set _MODE=\"observe\" when the kill-switch is active"
