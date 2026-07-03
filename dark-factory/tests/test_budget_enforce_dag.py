@@ -40,15 +40,25 @@ def test_config_has_budgets_map():
 
 
 def test_config_budgets_has_all_scenarios():
+    # Kept alongside test_config_budgets_t6_state as independent scenario-presence guard:
+    # catches a missing key even if the exact-value dict comparison changes in the future.
     budgets = _tok_opt().get("budgets", {})
     for scenario in ("refine", "plan", "implement", "conformance", "code-review"):
         assert scenario in budgets, f"budgets map must include '{scenario}'"
 
 
-def test_config_budgets_all_30000():
+def test_config_budgets_t6_state():
     budgets = _tok_opt().get("budgets", {})
-    for scenario, value in budgets.items():
-        assert value == 30000, f"budgets['{scenario}'] must be 30000, got {value}"
+    expected = {
+        "refine": 30000,
+        "plan": 30000,
+        "implement": 30000,
+        "conformance": 22000,
+        "code-review": 22000,
+    }
+    assert budgets == expected, (
+        f"budgets must match the T6 intended state {expected}, got {budgets}"
+    )
 
 
 # ── T3-C3: config has enforce: map ───────────────────────────────────────────
@@ -58,15 +68,25 @@ def test_config_has_enforce_map():
 
 
 def test_config_enforce_has_all_scenarios():
+    # Kept alongside test_config_enforce_t6_state as independent scenario-presence guard:
+    # catches a missing key even if the exact-value dict comparison changes in the future.
     enforce = _tok_opt().get("enforce", {})
     for scenario in ("refine", "plan", "implement", "conformance", "code-review"):
         assert scenario in enforce, f"enforce map must include '{scenario}'"
 
 
-def test_config_enforce_all_false():
+def test_config_enforce_t6_state():
     enforce = _tok_opt().get("enforce", {})
-    for scenario, value in enforce.items():
-        assert value is False, f"enforce['{scenario}'] must be false, got {value!r}"
+    expected = {
+        "refine": False,
+        "plan": False,
+        "implement": False,
+        "conformance": True,
+        "code-review": True,
+    }
+    assert enforce == expected, (
+        f"enforce must match the T6 intended state {expected}, got {enforce}"
+    )
 
 
 # ── T3-D1: enforce-budget nodes exist in workflow ────────────────────────────

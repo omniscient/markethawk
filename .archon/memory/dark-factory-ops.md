@@ -5,7 +5,6 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 ## Docker Volume Sharing
 
-- [AVOID] Never define a Docker named volume with `driver_opts: type: tmpfs` when the intent is to share files across containers — Docker tmpfs mounts are per-container; each container that mounts the volume gets its own independent tmpfs, making writes from one container invisible to another. Use a regular named volume (no `driver_opts`) for shared-directory patterns like prometheus-client multiprocess mode. <!-- issue:#194 date:2026-06-05 expires:2026-12-05 source:implement -->
 
 ## Preview Stack
 
@@ -121,3 +120,5 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 - [PROVISIONAL] codebase-memory-mcp v0.8.1: Python callers() returns empty list via trace_path — real callers (e.g. pre_market_scan.py:340 calling calculate_day_metrics) are invisible; do not use for blast-radius gate until upstream fixes <!-- evidence:tool-output issue:#675 date:2026-07-02 expires:2027-01-02 source:implement -->
 - [PROVISIONAL] In context-budget.json, the continue scenario emits `comment_digest` (not `comments`) — both map to `TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS` and share the `comments` config block in config.yaml; T2 optimizer reads must accept both keys. <!-- evidence:test-output issue:#714 date:2026-07-02 expires:2027-01-02 source:implement -->
 - [PROVISIONAL] YAML block scalars (bash: |) require ALL content lines to be indented at the block's level; multiline python3 -c "...$ continuation lines at zero indent break YAML parsing. Fix: wrap everything in a subshell and use single-line $(python3 -c '...') calls for config reads. <!-- evidence:yaml-parse-error issue:#716 date:2026-07-03 expires:2027-01-03 source:implement -->
+- [PATTERN] token_optimization enforcement gates (enforce_budgets, per-scenario enforce) in config.yaml have NO env override — they are clone-read from ${CLONE_DIR}/config.yaml by the enforce-budget-* DAG nodes; rollback requires a git commit to main (not .archon/.env or scheduler restart). <!-- issue:#719 date:2026-07-03 expires:2027-01-03 source:implement -->
+- [AVOID] Never define a Docker named volume with `driver_opts: type: tmpfs` when the intent is to share files across containers — Docker tmpfs mounts are per-container; each container that mounts the volume gets its own independent tmpfs, making writes from one container invisible to another. Use a regular named volume (no `driver_opts`) for shared-directory patterns like prometheus-client multiprocess mode. <!-- issue:#194 date:2026-06-05 expires:2026-12-05 source:implement -->
