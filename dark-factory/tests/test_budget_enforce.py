@@ -464,3 +464,106 @@ def test_load_config_reads_real_yaml(tmp_path):
     assert to["memory"]["min_tokens"] == 600
     assert to["comments"]["min_tokens"] == 900
     assert to["diff"]["min_review_tokens"] == 2500
+
+
+# ── Test 29: write-back in observe mode — six fields written to JSON ──────────
+
+def test_writeback_observe_mode(tmp_path):
+    cb_json = tmp_path / "context-budget.json"
+    cb_json.write_text(json.dumps({
+        "scenario": "implement",
+        "schema_version": 2,
+        "sections": make_sections(claude_md_tokens=5000, issue_context_tokens=500, arch_fallback=False),
+    }))
+    be.run_cli([
+        "--context-budget-json", str(cb_json),
+        "--budget-tokens", "30000",
+        "--mode", "observe",
+    ])
+    data = json.loads(cb_json.read_text())
+    assert "over_budget" in data
+    assert "would_trim" in data
+    assert "derived_caps" in data
+    assert "scenario_budget" in data
+    assert "reserved_tokens" in data
+    assert "allowance" in data
+    assert data["scenario_budget"] == 30000
+    assert isinstance(data["derived_caps"], dict)
+
+
+# ── Test 30: write-back in enforce mode — six fields also written ──────────────
+
+def test_writeback_enforce_mode(tmp_path, capsys):
+    cb_json = tmp_path / "context-budget.json"
+    cb_json.write_text(json.dumps({
+        "scenario": "refine",
+        "schema_version": 2,
+        "sections": make_sections(claude_md_tokens=5000, issue_context_tokens=500, arch_fallback=False),
+    }))
+    be.run_cli([
+        "--context-budget-json", str(cb_json),
+        "--budget-tokens", "30000",
+        "--mode", "enforce",
+    ])
+    data = json.loads(cb_json.read_text())
+    assert "over_budget" in data
+    assert "would_trim" in data
+    assert "derived_caps" in data
+    assert "scenario_budget" in data
+    assert data["scenario_budget"] == 30000
+    assert isinstance(data["over_budget"], bool)
+
+
+# ── Test 31: write-back fail-open — unwritable path raises no exception ────────
+
+def test_writeback_fail_open_on_missing_path(tmp_path):
+    cb_json = tmp_path / "context-budget.json"
+    cb_json.write_text(json.dumps({
+        "scenario": "implement",
+        "schema_version": 2,
+        "sections": make_sections(claude_md_tokens=5000, issue_context_tokens=500, arch_fallback=False),
+    }))
+    # Pass a nonexistent directory as the JSON path — write-back should not raise
+    bad_path = str(tmp_path / "nonexistent" / "context-budget.json")
+    # run_cli will fail on the *read* step for a missing file — use the valid file for
+    # reading but simulate write failure by making the directory read-only after read.
+    # Simpler: just verify that run_cli with a valid file does not raise even if the
+    # file cannot be re-written (chmod the file to read-only after writing).
+    import stat
+    # Write valid content, then remove write permission
+    cb_json.chmod(stat.S_IRUSR | stat.S_IRGRP)
+    try:
+        # Should not raise even though write-back will fail
+        be.run_cli([
+            "--context-budget-json", str(cb_json),
+            "--budget-tokens", "30000",
+            "--mode", "observe",
+        ])
+    finally:
+        cb_json.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
+
+
+# ── Test 32: write-back preserves existing fields ─────────────────────────────
+
+def test_writeback_preserves_existing_fields(tmp_path):
+    cb_json = tmp_path / "context-budget.json"
+    original = {
+        "scenario": "implement",
+        "schema_version": 2,
+        "estimated_input_tokens": 42000,
+        "savings_tokens": 1200,
+        "savings_pct": 5,
+        "sections": make_sections(claude_md_tokens=5000, issue_context_tokens=500, arch_fallback=False),
+    }
+    cb_json.write_text(json.dumps(original))
+    be.run_cli([
+        "--context-budget-json", str(cb_json),
+        "--budget-tokens", "30000",
+        "--mode", "observe",
+    ])
+    data = json.loads(cb_json.read_text())
+    assert data["scenario"] == "implement"
+    assert data["schema_version"] == 2
+    assert data["estimated_input_tokens"] == 42000
+    assert data["savings_tokens"] == 1200
+    assert data["savings_pct"] == 5
