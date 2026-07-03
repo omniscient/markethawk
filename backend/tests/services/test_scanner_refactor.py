@@ -223,6 +223,10 @@ def test_oversold_bounce_detects_rsi_crossover():
 
     mock_save.assert_called_once()
     assert len(results) == 1
+    explanation = mock_save.call_args.kwargs["explanation"]
+    assert explanation["schema_version"] == "scanner_explanation.v1"
+    assert "oversold_bounce.rsi_2_crossed" in explanation["criteria_passed"]
+    assert explanation["confidence_inputs"]["rsi_2"] >= 15
 
 
 def test_oversold_bounce_skips_with_insufficient_bars():

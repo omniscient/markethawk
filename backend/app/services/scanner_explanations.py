@@ -273,6 +273,189 @@ def build_liquidity_hunt_explanation(
     return validate_scanner_explanation(payload)
 
 
+def _oversold_bounce_criteria(
+    indicators: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    return {
+        "volume_ma_3_ok": _criterion(
+            "3-day volume average",
+            indicators.get("vol_ma_3"),
+            500000,
+            ">=",
+            unit="shares",
+            source="daily_aggregates",
+            lookback="3d",
+            importance=0.7,
+        ),
+        "price_ge_5": _criterion(
+            "Price floor",
+            indicators.get("previous_close") or indicators.get("closing_price"),
+            5,
+            ">=",
+            unit="$",
+            source="daily_aggregates",
+            importance=0.5,
+        ),
+        "rsi_2_crossed": _criterion(
+            "RSI-2 recovery cross",
+            indicators.get("rsi_2"),
+            15,
+            ">=",
+            source="daily_aggregates",
+            lookback="2d",
+            importance=1.0,
+        ),
+        "rsi_5_crossed": _criterion(
+            "RSI-5 recovery cross",
+            indicators.get("rsi_5"),
+            27,
+            ">=",
+            source="daily_aggregates",
+            lookback="5d",
+            importance=0.9,
+        ),
+        "no_gap_down": _criterion(
+            "No gap below prior low",
+            True,
+            True,
+            "==",
+            source="daily_aggregates",
+            importance=0.6,
+        ),
+    }
+
+
+def build_oversold_bounce_explanation(
+    indicators: Dict[str, Any],
+    criteria_met: Dict[str, Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    criteria = _oversold_bounce_criteria(indicators)
+    passed, failed = _split_criteria(criteria_met, criteria, "oversold_bounce")
+
+    why = ["RSI-2 and RSI-5 recovered from oversold levels."]
+    if indicators.get("rsi_2") is not None and indicators.get("rsi_5") is not None:
+        why[0] = (
+            f"RSI-2 recovered to {float(indicators['rsi_2']):.2f} and "
+            f"RSI-5 recovered to {float(indicators['rsi_5']):.2f}."
+        )
+    if indicators.get("vol_ma_3") is not None:
+        why.append(f"3-day average volume was {int(indicators['vol_ma_3']):,} shares.")
+
+    payload = {
+        "schema_version": "scanner_explanation.v1",
+        "why": why,
+        "criteria_passed": passed,
+        "criteria_failed": failed,
+        "confidence_inputs": {
+            "scanner_type": "oversold_bounce",
+            "rsi_2": indicators.get("rsi_2"),
+            "rsi_5": indicators.get("rsi_5"),
+            "vol_ma_3": indicators.get("vol_ma_3"),
+            "relative_volume": indicators.get("relative_volume"),
+            "avg_liquidity_5d": indicators.get("avg_liquidity_5d"),
+            "gap_pct": indicators.get("gap_pct"),
+        },
+        "data_quality_warnings": _quality_warnings(gate_metadata),
+        "evidence": {
+            "reconstructed": False,
+            "generated_at": utc_now(),
+            "generator_version": "explanation_builder.v1",
+            "provider": "polygon",
+        },
+    }
+    return validate_scanner_explanation(payload)
+
+
+def _pocket_pivot_criteria(
+    indicators: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    return {
+        "up_day": _criterion(
+            "Up day",
+            _pct(indicators.get("up_day_pct")),
+            0,
+            ">=",
+            unit="%",
+            source="daily_aggregates",
+            importance=0.7,
+        ),
+        "volume_over_max_down": _criterion(
+            "Volume exceeds highest down-day volume",
+            indicators.get("today_volume"),
+            indicators.get("max_down_day_vol"),
+            ">",
+            unit="shares",
+            source="daily_aggregates",
+            lookback=f"{indicators.get('lookback_days_available', 'n/a')}d",
+            importance=1.0,
+        ),
+        "price_floor": _criterion(
+            "Price floor",
+            indicators.get("today_close"),
+            indicators.get("price_floor", 5.0),
+            ">=",
+            unit="$",
+            source="daily_aggregates",
+            importance=0.5,
+        ),
+        "volume_floor": _criterion(
+            "Volume floor",
+            indicators.get("today_volume"),
+            indicators.get("volume_floor", 100000),
+            ">=",
+            unit="shares",
+            source="daily_aggregates",
+            importance=0.5,
+        ),
+    }
+
+
+def build_pocket_pivot_explanation(
+    indicators: Dict[str, Any],
+    criteria_met: Dict[str, Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    criteria = _pocket_pivot_criteria(indicators)
+    passed, failed = _split_criteria(criteria_met, criteria, "pocket_pivot")
+
+    why = ["Daily volume exceeded the highest down-day volume in the lookback."]
+    if (
+        indicators.get("today_volume") is not None
+        and indicators.get("max_down_day_vol") is not None
+    ):
+        why[0] = (
+            f"Volume was {int(indicators['today_volume']):,} shares versus "
+            f"{int(indicators['max_down_day_vol']):,} on the highest down day."
+        )
+    if indicators.get("up_day_pct") is not None:
+        why.append(f"Close was {_pct(indicators['up_day_pct']):.2f}% above prior close.")
+
+    payload = {
+        "schema_version": "scanner_explanation.v1",
+        "why": why,
+        "criteria_passed": passed,
+        "criteria_failed": failed,
+        "confidence_inputs": {
+            "scanner_type": "pocket_pivot",
+            "today_volume": indicators.get("today_volume"),
+            "max_down_day_vol": indicators.get("max_down_day_vol"),
+            "volume_over_max_down_pct": indicators.get("volume_over_max_down_pct"),
+            "down_days_in_lookback": indicators.get("down_days_in_lookback"),
+            "lookback_days_available": indicators.get("lookback_days_available"),
+            "split_in_lookback": indicators.get("split_in_lookback"),
+        },
+        "data_quality_warnings": _quality_warnings(gate_metadata),
+        "evidence": {
+            "reconstructed": False,
+            "generated_at": utc_now(),
+            "generator_version": "explanation_builder.v1",
+            "provider": "polygon",
+        },
+    }
+    return validate_scanner_explanation(payload)
+
+
 def reconstruct_explanation_for_event(event: ScannerEvent) -> Dict[str, Any]:
     indicators = event.indicators or {}
     criteria_met = event.criteria_met or {}
@@ -313,6 +496,12 @@ def reconstruct_explanation_for_event(event: ScannerEvent) -> Dict[str, Any]:
     elif event.scanner_type in {"liquidity_hunt_pre", "liquidity_hunt_post"}:
         criteria = _liquidity_hunt_criteria(indicators)
         passed, failed = _split_criteria(criteria_met, criteria, event.scanner_type)
+    elif event.scanner_type == "oversold_bounce":
+        criteria = _oversold_bounce_criteria(indicators)
+        passed, failed = _split_criteria(criteria_met, criteria, "oversold_bounce")
+    elif event.scanner_type == "pocket_pivot":
+        criteria = _pocket_pivot_criteria(indicators)
+        passed, failed = _split_criteria(criteria_met, criteria, "pocket_pivot")
     else:
         scanner_prefix = event.scanner_type.replace("_", ".")
         passed = {}
