@@ -4,9 +4,12 @@ from app.models.scanner_event import ScannerEvent
 from app.services.pre_market_scan import EnrichedSignal, RawSignal
 from app.services.scanner_explanations import (
     build_liquidity_hunt_explanation,
+    build_live_price_move_explanation,
+    build_live_volume_spike_explanation,
     build_oversold_bounce_explanation,
     build_pocket_pivot_explanation,
     build_pre_market_volume_explanation,
+    build_social_callout_explanation,
     build_trend_pullback_explanation,
     reconstruct_explanation_for_event,
 )
@@ -222,6 +225,88 @@ def test_build_trend_pullback_explanation_uses_named_criteria():
     assert explanation["evidence"]["reconstructed"] is False
 
 
+def test_build_live_volume_spike_explanation_uses_named_criteria():
+    indicators = {
+        "volume_spike_ratio": 6.4,
+        "session_volume": 128000,
+        "avg_daily_volume": 500000,
+        "projected_volume": 3200000,
+        "minutes_elapsed": 12.0,
+        "session": "regular",
+    }
+    criteria_met = {"volume_spike_4x": True, "sufficient_avg_volume": True}
+
+    explanation = build_live_volume_spike_explanation(
+        indicators=indicators,
+        criteria_met=criteria_met,
+    )
+
+    assert explanation["schema_version"] == "scanner_explanation.v1"
+    assert "live_volume_spike.volume_spike_4x" in explanation["criteria_passed"]
+    assert (
+        explanation["criteria_passed"]["live_volume_spike.volume_spike_4x"]["label"]
+        == "Projected volume spike"
+    )
+    assert explanation["confidence_inputs"]["session"] == "regular"
+    assert explanation["evidence"]["provider"] == "live_scanner"
+
+
+def test_build_live_price_move_explanation_uses_named_criteria():
+    indicators = {
+        "price_move_pct": -3.25,
+        "current_price": 96.75,
+        "prior_close": 100.0,
+        "session": "pre",
+    }
+    criteria_met = {"price_move_1pct": True}
+
+    explanation = build_live_price_move_explanation(
+        indicators=indicators,
+        criteria_met=criteria_met,
+    )
+
+    assert explanation["schema_version"] == "scanner_explanation.v1"
+    assert "live_price_move.price_move_1pct" in explanation["criteria_passed"]
+    assert (
+        explanation["criteria_passed"]["live_price_move.price_move_1pct"]["label"]
+        == "Live price move"
+    )
+    assert explanation["confidence_inputs"]["price_move_pct"] == -3.25
+    assert explanation["evidence"]["provider"] == "live_scanner"
+
+
+def test_build_social_callout_explanation_uses_tweet_facts():
+    indicators = {
+        "confidence": 0.92,
+        "source_account": "market_pro",
+        "direction": "long",
+        "price_entry": 185.0,
+        "price_target": 195.0,
+        "tweet_id": "12345",
+    }
+    criteria_met = {
+        "has_cashtag": True,
+        "has_price_level": True,
+        "above_confidence_threshold": True,
+    }
+
+    explanation = build_social_callout_explanation(
+        indicators=indicators,
+        criteria_met=criteria_met,
+    )
+
+    assert explanation["schema_version"] == "scanner_explanation.v1"
+    assert "social_callout.above_confidence_threshold" in explanation["criteria_passed"]
+    assert (
+        explanation["criteria_passed"]["social_callout.above_confidence_threshold"][
+            "label"
+        ]
+        == "Classifier confidence"
+    )
+    assert explanation["confidence_inputs"]["tweet_id"] == "12345"
+    assert explanation["evidence"]["provider"] == "tweet_monitor"
+
+
 def test_reconstruct_explanation_for_existing_event_marks_best_effort():
     event = ScannerEvent(
         ticker="AAPL",
@@ -350,3 +435,44 @@ def test_reconstruct_trend_pullback_event_uses_named_criteria():
         explanation["criteria_passed"]["trend_pullback.orderly_pullback"]["label"]
         == "Orderly pullback depth"
     )
+
+
+def test_reconstruct_live_and_social_events_use_named_criteria():
+    live_event = ScannerEvent(
+        ticker="AAPL",
+        event_date=date(2026, 6, 2),
+        scanner_type="live_price_move",
+        indicators={
+            "price_move_pct": 2.4,
+            "current_price": 102.4,
+            "prior_close": 100.0,
+            "session": "regular",
+        },
+        criteria_met={"price_move_1pct": True},
+        metadata_={"source": "live_scanner"},
+        created_at=datetime(2026, 6, 2),
+        updated_at=datetime(2026, 6, 2),
+    )
+    social_event = ScannerEvent(
+        ticker="AAPL",
+        event_date=date(2026, 6, 2),
+        scanner_type="social_callout",
+        indicators={
+            "confidence": 0.88,
+            "source_account": "market_pro",
+            "direction": "long",
+            "tweet_id": "12345",
+        },
+        criteria_met={"above_confidence_threshold": True},
+        metadata_={"source": "tweet_monitor"},
+        created_at=datetime(2026, 6, 2),
+        updated_at=datetime(2026, 6, 2),
+    )
+
+    live_explanation = reconstruct_explanation_for_event(live_event)
+    social_explanation = reconstruct_explanation_for_event(social_event)
+
+    assert "live_price_move.price_move_1pct" in live_explanation["criteria_passed"]
+    assert "social_callout.above_confidence_threshold" in social_explanation[
+        "criteria_passed"
+    ]
