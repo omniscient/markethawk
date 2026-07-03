@@ -10,7 +10,7 @@
 
 ## Goal
 
-Flip budget enforcement live for conformance and code-review (the two scenarios T5 calibration confirmed at 0% `section_at_risk`), and update the operator runbook with the enforcement lifecycle, corrected two-tier rollback procedure, deploy nuance callout, and follow-up path for the deferred scenarios (refine/plan/implement).
+Flip budget enforcement live for conformance and code-review (the two scenarios T5 calibration confirmed at 0% `section_at_risk`), update the T3 config-shape tests to pin the exact post-T6 state, and update the operator runbook with the enforcement lifecycle, corrected two-tier rollback procedure, deploy nuance callout, and follow-up path for the deferred scenarios (refine/plan/implement).
 
 No code changes. Config + doc only.
 
@@ -18,10 +18,11 @@ No code changes. Config + doc only.
 
 ## Architecture
 
+- **`dark-factory/tests/test_budget_enforce_dag.py`** — replace two blanket-assertion tests (`test_config_budgets_all_30000`, `test_config_enforce_all_false`) with exact post-T6 state guards. These must be updated before the config edit so the TDD cycle is visible (red before Task 2, green after).
 - **`.claude/skills/refinement/config.yaml`** — flip `enforce_budgets: true`, set `budgets.conformance: 22000`, `budgets.code-review: 22000`, `enforce.conformance: true`, `enforce.code-review: true`.
 - **`docs/agents/dark-factory-token-optimization.md`** — add Budget Enforcement section, Observe→Enforce Procedure section, two-tier Rollback extension, Deploy Nuance callout, Follow-up Path section, update Path to Phase 4 section, update config snippet to reflect live values, note provisional-22k.
 
-These are the only two files touched. The enforce-budget DAG nodes read both values directly from the cloned `config.yaml` on every factory run, so the commit to main takes effect on the next run with no image rebuild or scheduler restart.
+The enforce-budget DAG nodes read both `enforce_budgets` and per-scenario `enforce` directly from the cloned `config.yaml` on every factory run, so the commit to main takes effect on the next run with no image rebuild or scheduler restart.
 
 ---
 
@@ -29,16 +30,109 @@ These are the only two files touched. The enforce-budget DAG nodes read both val
 
 | File | Change |
 |------|--------|
+| `dark-factory/tests/test_budget_enforce_dag.py` | Replace 2 blanket tests with exact post-T6 state guards |
 | `.claude/skills/refinement/config.yaml` | Flip 3 flags, update 2 budget values |
 | `docs/agents/dark-factory-token-optimization.md` | Add 3 new sections, extend 2 existing sections, update config snippet |
 
 ---
 
-## Task 1 — Flip enforcement config in `config.yaml`
+## Task 1 — Update config-shape tests (TDD: write exact-state guards)
+
+**Files:** `dark-factory/tests/test_budget_enforce_dag.py`
+
+This task updates the two blanket-assertion tests that will break the moment Task 2's config edit lands. The new exact-state guards encode precisely the post-T6 map — they catch both accidental widening (flipping implement) and accidental rollback drift.
+
+### Step 1.1 — Baseline: confirm tests currently PASS
+
+```bash
+cd /workspace/markethawk
+python3 -m pytest dark-factory/tests/test_budget_enforce_dag.py::test_config_budgets_all_30000 \
+                   dark-factory/tests/test_budget_enforce_dag.py::test_config_enforce_all_false -v
+```
+
+Expected: both pass (config is all-30000 / all-false today).
+
+### Step 1.2 — Replace `test_config_budgets_all_30000` with exact post-T6 guard
+
+In `dark-factory/tests/test_budget_enforce_dag.py`, replace:
+
+```python
+def test_config_budgets_all_30000():
+    budgets = _tok_opt().get("budgets", {})
+    for scenario, value in budgets.items():
+        assert value == 30000, f"budgets['{scenario}'] must be 30000, got {value}"
+```
+
+With:
+
+```python
+def test_config_budgets_t6_state():
+    budgets = _tok_opt().get("budgets", {})
+    expected = {
+        "refine": 30000,
+        "plan": 30000,
+        "implement": 30000,
+        "conformance": 22000,    # T6: enforced at T5 safe-budget rec (provisional)
+        "code-review": 22000,    # T6: enforced at T5 safe-budget rec (provisional)
+    }
+    assert budgets == expected, f"budgets must match T6 state, got {budgets}"
+```
+
+### Step 1.3 — Replace `test_config_enforce_all_false` with exact post-T6 guard
+
+In the same file, replace:
+
+```python
+def test_config_enforce_all_false():
+    enforce = _tok_opt().get("enforce", {})
+    for scenario, value in enforce.items():
+        assert value is False, f"enforce['{scenario}'] must be false, got {value!r}"
+```
+
+With:
+
+```python
+def test_config_enforce_t6_state():
+    enforce = _tok_opt().get("enforce", {})
+    expected = {
+        "refine": False,
+        "plan": False,
+        "implement": False,
+        "conformance": True,     # T6: enforcement live
+        "code-review": True,     # T6: enforcement live
+    }
+    assert enforce == expected, f"enforce must match T6 state, got {enforce}"
+```
+
+### Step 1.4 — Verify tests FAIL (TDD red — config not yet changed)
+
+```bash
+python3 -m pytest dark-factory/tests/test_budget_enforce_dag.py::test_config_budgets_t6_state \
+                   dark-factory/tests/test_budget_enforce_dag.py::test_config_enforce_t6_state -v
+```
+
+Expected: both FAIL with messages like:
+```
+AssertionError: budgets must match T6 state, got {'refine': 30000, ..., 'conformance': 30000, 'code-review': 30000}
+AssertionError: enforce must match T6 state, got {'refine': False, ..., 'conformance': False, 'code-review': False}
+```
+
+This confirms the tests guard the right invariant.
+
+### Step 1.5 — Commit
+
+```bash
+git add dark-factory/tests/test_budget_enforce_dag.py
+git commit -m "test(#719): T6 — pin exact post-T6 state in config-shape tests"
+```
+
+---
+
+## Task 2 — Flip enforcement config in `config.yaml`
 
 **Files:** `.claude/skills/refinement/config.yaml`
 
-### Step 1.1 — Verify current state (baseline)
+### Step 2.1 — Verify current state (baseline)
 
 ```bash
 grep -A 20 "^token_optimization:" .claude/skills/refinement/config.yaml | grep -E "enforce_budgets|conformance|code-review"
@@ -46,14 +140,14 @@ grep -A 20 "^token_optimization:" .claude/skills/refinement/config.yaml | grep -
 
 Expected output (pre-change):
 ```
-  enforce_budgets: false      # false = measure-only ...
+  enforce_budgets: false
     conformance: 30000
     code-review: 30000
     conformance: false
     code-review: false
 ```
 
-### Step 1.2 — Apply config edits
+### Step 2.2 — Apply config edits
 
 Edit `.claude/skills/refinement/config.yaml`, `token_optimization` block:
 
@@ -78,7 +172,7 @@ Edit `.claude/skills/refinement/config.yaml`, `token_optimization` block:
     code-review: true         # live — T5 calibration: 0% section_at_risk, 0% over_budget at 22k
 ```
 
-### Step 1.3 — Verify changes
+### Step 2.3 — Verify config changes
 
 ```bash
 grep -A 20 "^token_optimization:" .claude/skills/refinement/config.yaml | grep -E "enforce_budgets|conformance|code-review"
@@ -93,7 +187,41 @@ Expected output (post-change):
     code-review: true
 ```
 
-### Step 1.4 — Commit
+Also verify full yaml parses correctly:
+
+```bash
+python3 -c "
+import yaml
+cfg = yaml.safe_load(open('.claude/skills/refinement/config.yaml'))
+to = cfg['token_optimization']
+print('enforce_budgets:', to['enforce_budgets'])
+print('budgets.conformance:', to['budgets']['conformance'])
+print('budgets.code-review:', to['budgets']['code-review'])
+print('enforce.conformance:', to['enforce']['conformance'])
+print('enforce.code-review:', to['enforce']['code-review'])
+"
+```
+
+Expected:
+```
+enforce_budgets: True
+budgets.conformance: 22000
+budgets.code-review: 22000
+enforce.conformance: True
+enforce.code-review: True
+```
+
+### Step 2.4 — Run config-shape tests to confirm GREEN
+
+```bash
+python3 -m pytest dark-factory/tests/test_budget_enforce_dag.py -q
+```
+
+Expected: all tests pass, including `test_config_budgets_t6_state` and `test_config_enforce_t6_state`.
+
+If either fails, re-examine the config edit before committing.
+
+### Step 2.5 — Commit
 
 ```bash
 git add .claude/skills/refinement/config.yaml
@@ -102,13 +230,13 @@ git commit -m "feat(#719): T6 — flip enforce_budgets + conformance/code-review
 
 ---
 
-## Task 2 — Update operator runbook
+## Task 3 — Update operator runbook
 
 **Files:** `docs/agents/dark-factory-token-optimization.md`
 
 This task makes five distinct changes to the runbook in a single edit pass, committed together.
 
-### Step 2.1 — Verify sections that need adding are absent
+### Step 3.1 — Verify sections that need adding are absent
 
 ```bash
 grep -c "## Budget Enforcement\|## Observe → Enforce\|## Follow-up Path\|Tier 1\|Deploy Nuance" \
@@ -117,7 +245,7 @@ grep -c "## Budget Enforcement\|## Observe → Enforce\|## Follow-up Path\|Tier 
 
 Expected output: `0` (none of these headings or phrases exist yet).
 
-### Step 2.2 — Change A: Update the Configuration section config snippet
+### Step 3.2 — Change A: Update the Configuration section config snippet
 
 Replace the existing config block in the **Configuration** section (lines ~30–42) with one that reflects the live enforcement state and includes the `budgets`/`enforce` subsections:
 
@@ -157,7 +285,7 @@ Environment variables override individual feature flags (e.g. `TOKEN_OPTIMIZATIO
 **No env override exists for `enforce_budgets` or per-scenario `enforce`/`budgets`** — see Rollback below.
 ```
 
-### Step 2.3 — Change B: Add **Budget Enforcement** section (after Configuration)
+### Step 3.3 — Change B: Add **Budget Enforcement** section (after Configuration)
 
 Insert immediately after the Configuration section, before Disable / Rollback Procedure:
 
@@ -191,7 +319,7 @@ The `context-budget.json` artifact (`$ARTIFACTS_DIR/context-budget.json`) contai
 `section_at_risk` is the key health signal for un-enforced scenarios. A non-zero rate on a deferred scenario tells you enforcement is not yet safe to flip.
 ```
 
-### Step 2.4 — Change C: Add **Observe → Enforce Procedure** section (after Budget Enforcement)
+### Step 3.4 — Change C: Add **Observe → Enforce Procedure** section (after Budget Enforcement)
 
 Insert immediately after the Budget Enforcement section:
 
@@ -227,7 +355,7 @@ To promote a scenario from observe-only to enforced:
 5. **Confirm on the next enforced run:** check `context-budget.json` for `would_trim`, `over_budget`, and `section_at_risk`. If `over_budget` fires, lower the budget or investigate; if `section_at_risk` fires, re-examine the per-feature cap (see Follow-up Path below).
 ```
 
-### Step 2.5 — Change D: Extend **Disable / Rollback Procedure** with two-tier enforcement rollback + Deploy Nuance
+### Step 3.5 — Change D: Extend **Disable / Rollback Procedure** with two-tier enforcement rollback + Deploy Nuance
 
 Replace the existing Disable / Rollback Procedure section with the expanded version:
 
@@ -269,7 +397,8 @@ git push origin main
 ```
 Or:
 ```bash
-# Option B: revert the T6 config commit
+# Option B: revert the T6 config commit (targets that SHA specifically — T6 is two commits,
+# this reverts the config commit; use git log to find the correct SHA)
 git revert <T6-config-commit-sha>
 git push origin main
 ```
@@ -297,7 +426,7 @@ git push origin main
 If a new config change seems ignored, confirm it is in `config.yaml` (clone-read) not `entrypoint.sh` (baked). If the T4 cost-report savings line is missing from a run, check whether the image was rebuilt after T4 landed.
 ```
 
-### Step 2.6 — Change E: Update **Path to Phase 4** section + add **Follow-up Path** section
+### Step 3.6 — Change E: Update **Path to Phase 4** section + add **Follow-up Path** section
 
 Replace the Path to Phase 4 section and append the Follow-up Path section after it:
 
@@ -345,7 +474,7 @@ To unlock:
 Per the original Phase 4 design, `implement` enforcement is gated on sustained observation of conformance/code-review enforcement in production. After ≥ 10 enforced conformance/code-review runs without incidents, run full-corpus calibration for implement and follow the Observe → Enforce Procedure.
 ```
 
-### Step 2.7 — Verify all new sections exist
+### Step 3.7 — Verify all new sections exist
 
 ```bash
 grep -c "## Budget Enforcement\|## Observe → Enforce\|## Follow-up Path\|Tier 1 — master kill\|Deploy nuance\|clone-read" \
@@ -360,7 +489,7 @@ grep "enforce_budgets:" docs/agents/dark-factory-token-optimization.md
 
 Expected: lines showing `enforce_budgets: true` in the config snippet (old `false` value replaced).
 
-### Step 2.8 — Commit
+### Step 3.8 — Commit
 
 ```bash
 git add docs/agents/dark-factory-token-optimization.md
@@ -393,6 +522,13 @@ budgets.code-review: 22000
 enforce.conformance: True
 enforce.code-review: True
 ```
+
+```bash
+# Confirm all tests pass
+python3 -m pytest dark-factory/tests/test_budget_enforce_dag.py -q
+```
+
+Expected: all tests pass (including `test_config_budgets_t6_state` and `test_config_enforce_t6_state`).
 
 ```bash
 # Confirm runbook has all required sections
