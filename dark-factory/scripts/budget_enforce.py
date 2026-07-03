@@ -15,7 +15,9 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import sys
+import tempfile
 from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
@@ -345,8 +347,13 @@ def run_cli(argv: list[str] | None = None) -> BudgetResult:
         cb_wb["scenario_budget"] = args.budget_tokens
         cb_wb["reserved_tokens"] = result.reserved_tokens
         cb_wb["allowance"] = result.allowance
-        with open(args.context_budget_json, "w", encoding="utf-8") as f:
-            json.dump(cb_wb, f, indent=2)
+        dir_ = os.path.dirname(os.path.abspath(args.context_budget_json))
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=dir_, delete=False, suffix=".tmp"
+        ) as tf:
+            tmp_path = tf.name
+            json.dump(cb_wb, tf, indent=2)
+        os.replace(tmp_path, args.context_budget_json)
     except Exception as exc:
         print(f"budget_enforce: write-back failed (non-fatal): {exc}", file=sys.stderr)
 
