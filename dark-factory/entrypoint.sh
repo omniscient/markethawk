@@ -353,14 +353,14 @@ post_cost_report() {
         ' "$BUDGET_FILE" 2>/dev/null || echo "") || true
         BUDGET_LINE="**⚠️ Over budget (${BE_SCENARIO}): $(fmt_tokens "$BE_RESERVED") reserved / $(fmt_tokens "$BE_BUDGET") budget — trimmed: ${CAPS_STR}**" || true
       elif [ "$WOULD_TRIM" = "true" ]; then
-        local BE_SCENARIO BE_RESERVED BE_BUDGET CAPS_STR
+        local BE_SCENARIO BE_ESTIMATED BE_BUDGET CAPS_STR
         BE_SCENARIO=$(jq -r '.scenario // "unknown"' "$BUDGET_FILE" 2>/dev/null || echo "unknown") || true
-        BE_RESERVED=$(jq -r '.reserved_tokens // 0' "$BUDGET_FILE" 2>/dev/null || echo "0") || true
+        BE_ESTIMATED=$(jq -r '.estimated_input_tokens // 0' "$BUDGET_FILE" 2>/dev/null || echo "0") || true
         BE_BUDGET=$(jq -r '.scenario_budget // 0' "$BUDGET_FILE" 2>/dev/null || echo "0") || true
         CAPS_STR=$(jq -r '
           [(.derived_caps // {}) | to_entries[] | "\(.key)→\(.value)"] | join(", ")
         ' "$BUDGET_FILE" 2>/dev/null || echo "") || true
-        BUDGET_LINE="**Budget trim (${BE_SCENARIO}): est $(fmt_tokens "$BE_RESERVED") / $(fmt_tokens "$BE_BUDGET") budget — capped: ${CAPS_STR}**" || true
+        BUDGET_LINE="**Budget trim (${BE_SCENARIO}): est $(fmt_tokens "$BE_ESTIMATED") / $(fmt_tokens "$BE_BUDGET") budget — capped: ${CAPS_STR}**" || true
       fi
     fi
   fi
