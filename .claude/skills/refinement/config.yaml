@@ -123,8 +123,8 @@ token_optimization:
   architecture:
     enabled: true             # false = skip slicing, load full ARCHITECTURE.md; env: TOKEN_OPTIMIZATION_ARCHITECTURE_ENABLED overrides
     mode: slice               # slice = emit only the changed file excerpt + its direct callers
-    max_tokens: 3000          # token ceiling for architecture context per scenario (baked — no env override)
-    min_tokens: 1500          # floor for budget_enforce.py proportional distribution (50% of max_tokens)
+    max_tokens: 5000          # token ceiling for architecture context per scenario (baked — no env override)
+    min_tokens: 2500          # floor for budget_enforce.py proportional distribution (50% of max_tokens)
   memory:
     enabled: true             # false = skip top-k cap, emit all matching entries; env: TOKEN_OPTIMIZATION_MEMORY_ENABLED overrides
     mode: top_k               # top_k = emit only the K highest-scored memory entries

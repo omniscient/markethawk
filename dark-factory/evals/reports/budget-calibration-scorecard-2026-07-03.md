@@ -1,13 +1,11 @@
 # Budget Calibration Scorecard — 2026-07-03
 
-**Issue:** [#730](https://github.com/omniscient/markethawk/issues/730)
+**Issue:** [#718](https://github.com/omniscient/markethawk/issues/718)
 **Script:** `dark-factory/evals/token_opt_eval.py --calibrate`
 
 ---
 
 ## Per-Scenario Token Distribution (opt_tokens)
-
-Note: "p90 (tok)" below is the p90 of total `opt_tokens` across all issues — not the uncapped `architecture_md` slice size. See the dedicated section below for uncapped arch-slice p90 values.
 
 | Scenario | p50 (tok) | p90 (tok) | p90×1.1 advisory |
 |----------|-----------|-----------|------------------|
@@ -19,30 +17,16 @@ Note: "p90 (tok)" below is the p90 of total `opt_tokens` across all issues — n
 
 ---
 
-## p90 Uncapped `architecture_md` Slice Size (sliced issues only, fallback=False)
-
-These values are the p90 of the pre-cap `architecture_md` slice token count, restricted to issues where architecture slicing was applied (not the full-doc fallback). Required by acceptance criterion 4 as input for the cap-raise ticket.
-
-| Scenario | p90 uncapped arch-slice (tok) | Sliced issue count | Sliced issue IDs |
-|----------|-------------------------------|--------------------|-----------------|
-| refine | 4,645 | 5 | 224, 332, 276, 215, 697 |
-| plan | 4,644 | 5 | 224, 332, 276, 215, 697 |
-| implement | 4,645 | 5 | 224, 332, 276, 215, 697 |
-| conformance | n/a | 0 | no sliced samples |
-| code-review | n/a | 0 | no sliced samples |
-
----
-
 ## Over-Budget Rate and Section-at-Risk Rate per Scenario × Budget
 
 | Scenario | Metric | 22,000 | 24,000 | 26,000 | 28,000 | 30,000 | 32,000 | 36,000 | 40,000 |
 |----------|--------|--------|--------|--------|--------|--------|--------|--------|--------|
 | refine | over_budget_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| refine | section_at_risk_rate | 14% | 14% | 14% | 14% | 14% | 14% | 14% | 14% |
+| refine | section_at_risk_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | plan | over_budget_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| plan | section_at_risk_rate | 14% | 14% | 14% | 14% | 14% | 14% | 14% | 14% |
+| plan | section_at_risk_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | implement | over_budget_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| implement | section_at_risk_rate | 14% | 14% | 14% | 14% | 14% | 14% | 14% | 14% |
+| implement | section_at_risk_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | conformance | over_budget_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | conformance | section_at_risk_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | code-review | over_budget_rate | 0% | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -56,9 +40,9 @@ Criteria: `section_at_risk_rate == 0%` AND `over_budget_rate ≤ 10%`
 
 | Scenario | Recommended Budget |
 |----------|--------------------|
-| refine | none — widen --budgets |
-| plan | none — widen --budgets |
-| implement | none — widen --budgets |
+| refine | 22000 |
+| plan | 22000 |
+| implement | 22000 |
 | conformance | 22000 |
 | code-review | 22000 |
 

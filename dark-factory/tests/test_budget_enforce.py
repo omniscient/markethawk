@@ -15,7 +15,7 @@ import budget_enforce as be
 DEFAULT_CONFIG = {
     "token_optimization": {
         "issue_context": {"reserve_tokens": 2000},
-        "architecture": {"max_tokens": 3000, "min_tokens": 1500},
+        "architecture": {"max_tokens": 5000, "min_tokens": 2500},
         "memory": {"max_tokens": 1500, "min_tokens": 750},
         "comments": {"max_tokens": 2000, "min_tokens": 1000},
         "diff": {"max_review_tokens": 6000, "min_review_tokens": 3000},
@@ -166,9 +166,9 @@ def test_proportional_distribution_normal():
     )
     result = be.derive_caps(sections, budget=30000, arch_fallback=False, config=DEFAULT_CONFIG)
     # All 4 optimizable sections present; allowance = 30000 - 2000 = 28000
-    # Sum of defaults = 3000 + 1500 + 2000 + 6000 = 12500
-    # Each should be at its default (28000 >> 12500)
-    assert result.derived_caps.get("architecture_md") == 3000
+    # Sum of defaults = 5000 + 1500 + 2000 + 6000 = 14500
+    # Each should be at its default (28000 >> 14500)
+    assert result.derived_caps.get("architecture_md") == 5000
     assert result.derived_caps.get("memory_context") == 1500
     assert result.derived_caps.get("comments") == 2000
     assert result.derived_caps.get("diff") == 6000
@@ -183,10 +183,10 @@ def test_proportional_distribution_floor_clamp():
         arch_fallback=False,
     )
     # allowance = 1000 - 2000 = 0... need budget > reserve
-    # budget=3000, reserve=2000, allowance=1000 (much less than sum of floors=6250)
+    # budget=3000, reserve=2000, allowance=1000 (much less than sum of floors=7250)
     result = be.derive_caps(sections, budget=3000, arch_fallback=False, config=DEFAULT_CONFIG)
     # Each section should be clamped to its floor
-    assert result.derived_caps.get("architecture_md") == 1500
+    assert result.derived_caps.get("architecture_md") == 2500
     assert result.derived_caps.get("memory_context") == 750
     assert result.derived_caps.get("comments") == 1000
     assert result.derived_caps.get("diff") == 3000
@@ -200,10 +200,10 @@ def test_proportional_distribution_default_clamp():
         issue_context_tokens=0,
         arch_fallback=False,
     )
-    # budget=200000, reserve=2000 (floor), allowance=198000 >> 12500 (sum of defaults)
+    # budget=200000, reserve=2000 (floor), allowance=198000 >> 14500 (sum of defaults)
     result = be.derive_caps(sections, budget=200000, arch_fallback=False, config=DEFAULT_CONFIG)
     # Each capped at default
-    assert result.derived_caps.get("architecture_md") == 3000
+    assert result.derived_caps.get("architecture_md") == 5000
     assert result.derived_caps.get("memory_context") == 1500
     assert result.derived_caps.get("comments") == 2000
     assert result.derived_caps.get("diff") == 6000
@@ -376,8 +376,8 @@ def test_missing_config_uses_hardcoded_defaults():
     config = be._load_config("/nonexistent/path/config.yaml")
     # Should return defaults without error
     assert config is not None
-    assert config["token_optimization"]["architecture"]["max_tokens"] == 3000
-    assert config["token_optimization"]["architecture"]["min_tokens"] == 1500
+    assert config["token_optimization"]["architecture"]["max_tokens"] == 5000
+    assert config["token_optimization"]["architecture"]["min_tokens"] == 2500
 
 
 # ── Test 25: comment_digest (continue scenario) maps to COMMENTS env var ──────
@@ -567,3 +567,26 @@ def test_writeback_preserves_existing_fields(tmp_path):
     assert data["estimated_input_tokens"] == 42000
     assert data["savings_tokens"] == 1200
     assert data["savings_pct"] == 5
+
+
+# ── Test 33: guard — _HARDCODED arch caps match config.yaml ──────────────────
+
+def test_hardcoded_arch_caps_match_config_yaml():
+    """Guard: _HARDCODED architecture values must stay in sync with config.yaml.
+
+    If this test fails, update _HARDCODED in budget_enforce.py (or config.yaml)
+    so both sources agree — never let them drift silently.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    config_path = repo_root / ".claude" / "skills" / "refinement" / "config.yaml"
+    config = be._load_config(str(config_path))
+    arch_cfg = config["token_optimization"]["architecture"]
+    arch_hc = be._HARDCODED["token_optimization"]["architecture"]
+    assert arch_hc["max_tokens"] == arch_cfg["max_tokens"], (
+        f"_HARDCODED max_tokens ({arch_hc['max_tokens']}) != "
+        f"config.yaml max_tokens ({arch_cfg['max_tokens']})"
+    )
+    assert arch_hc["min_tokens"] == arch_cfg["min_tokens"], (
+        f"_HARDCODED min_tokens ({arch_hc['min_tokens']}) != "
+        f"config.yaml min_tokens ({arch_cfg['min_tokens']})"
+    )

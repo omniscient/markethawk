@@ -27,7 +27,7 @@ from dataclasses import dataclass
 _HARDCODED = {
     "token_optimization": {
         "issue_context": {"reserve_tokens": 2000},
-        "architecture": {"max_tokens": 3000, "min_tokens": 1500},
+        "architecture": {"max_tokens": 5000, "min_tokens": 2500},
         "memory": {"max_tokens": 1500, "min_tokens": 750},
         "comments": {"max_tokens": 2000, "min_tokens": 1000},
         "diff": {"max_review_tokens": 6000, "min_review_tokens": 3000},
