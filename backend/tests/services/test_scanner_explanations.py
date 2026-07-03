@@ -7,6 +7,7 @@ from app.services.scanner_explanations import (
     build_oversold_bounce_explanation,
     build_pocket_pivot_explanation,
     build_pre_market_volume_explanation,
+    build_trend_pullback_explanation,
     reconstruct_explanation_for_event,
 )
 
@@ -183,6 +184,44 @@ def test_build_pocket_pivot_explanation_uses_named_criteria():
     assert explanation["evidence"]["reconstructed"] is False
 
 
+def test_build_trend_pullback_explanation_uses_named_criteria():
+    indicators = {
+        "close": 65.8,
+        "sma20": 66.1,
+        "sma50": 63.4,
+        "sma200": 51.9,
+        "rsi5": 28.5,
+        "pct_off_252d_high": 7.2,
+        "pullback_depth_pct": 6.4,
+        "consecutive_days_above_sma20": 9,
+        "atr14": 1.37,
+        "avg_dollar_vol_20d": 18_000_000,
+    }
+    criteria_met = {
+        "uptrend": True,
+        "near_high": True,
+        "pullback_in_progress": True,
+        "orderly_pullback": True,
+        "rsi_reset": True,
+        "liquidity": True,
+    }
+
+    explanation = build_trend_pullback_explanation(
+        indicators=indicators,
+        criteria_met=criteria_met,
+    )
+
+    assert explanation["schema_version"] == "scanner_explanation.v1"
+    assert "trend_pullback.uptrend" in explanation["criteria_passed"]
+    assert "trend_pullback.orderly_pullback" in explanation["criteria_passed"]
+    assert (
+        explanation["criteria_passed"]["trend_pullback.uptrend"]["label"]
+        == "SMA trend structure"
+    )
+    assert explanation["confidence_inputs"]["atr14"] == 1.37
+    assert explanation["evidence"]["reconstructed"] is False
+
+
 def test_reconstruct_explanation_for_existing_event_marks_best_effort():
     event = ScannerEvent(
         ticker="AAPL",
@@ -279,4 +318,35 @@ def test_reconstruct_pocket_pivot_event_uses_named_criteria():
     assert (
         explanation["criteria_passed"]["pocket_pivot.volume_over_max_down"]["label"]
         == "Volume exceeds highest down-day volume"
+    )
+
+
+def test_reconstruct_trend_pullback_event_uses_named_criteria():
+    event = ScannerEvent(
+        ticker="AAPL",
+        event_date=date(2026, 6, 2),
+        scanner_type="trend_pullback",
+        indicators={
+            "close": 65.8,
+            "sma20": 66.1,
+            "sma50": 63.4,
+            "sma200": 51.9,
+            "rsi5": 28.5,
+            "pullback_depth_pct": 6.4,
+            "atr14": 1.37,
+            "avg_dollar_vol_20d": 18_000_000,
+        },
+        criteria_met={"uptrend": True, "orderly_pullback": True, "liquidity": True},
+        metadata_={},
+        created_at=datetime(2026, 6, 2),
+        updated_at=datetime(2026, 6, 2),
+    )
+
+    explanation = reconstruct_explanation_for_event(event)
+
+    assert "trend_pullback.uptrend" in explanation["criteria_passed"]
+    assert "trend_pullback.orderly_pullback" in explanation["criteria_passed"]
+    assert (
+        explanation["criteria_passed"]["trend_pullback.orderly_pullback"]["label"]
+        == "Orderly pullback depth"
     )

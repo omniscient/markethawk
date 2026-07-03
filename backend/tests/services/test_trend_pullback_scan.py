@@ -115,6 +115,23 @@ def _pullback_bars(
     return bars
 
 
+def _clean_trend_pullback_bars() -> list[MagicMock]:
+    bars = []
+    early_bars = 234
+    for i in range(early_bars):
+        c = 50.0 + 10.0 * (i / (early_bars - 1))
+        bars.append(_bar(c, volume=2_000_000))
+    for i in range(20):
+        c = 60.0 + 10.0 * ((i + 1) / 20)
+        bars.append(_bar(c, volume=2_000_000))
+    for j in range(5):
+        c = 70.0 * (1 - 0.001 * j)
+        bars.append(_bar(c, volume=2_000_000))
+    close = 70.0 * 0.97
+    bars.append(_bar(close, low=close * 0.995, high=close * 1.005, volume=500_000))
+    return bars
+
+
 # ---------------------------------------------------------------------------
 # Scenario 1: Module import
 # ---------------------------------------------------------------------------
@@ -242,6 +259,19 @@ def test_low_dollar_volume_does_not_fire():
     results, diag, _ = _run_scan(lambda db, t, d, lb: bars)
     assert results == []
     assert diag["fired"] == 0
+
+
+def test_clean_trend_pullback_persists_explanation():
+    bars = _clean_trend_pullback_bars()
+    results, diag, mock_save = _run_scan(lambda db, t, d, lb: bars)
+
+    assert results == [{"ticker": "AAPL"}]
+    assert diag["fired"] == 1
+    explanation = mock_save.call_args.kwargs["explanation"]
+    assert explanation["schema_version"] == "scanner_explanation.v1"
+    assert "trend_pullback.uptrend" in explanation["criteria_passed"]
+    assert "trend_pullback.rsi_reset" in explanation["criteria_passed"]
+    assert explanation["confidence_inputs"]["scanner_type"] == "trend_pullback"
 
 
 # ---------------------------------------------------------------------------
