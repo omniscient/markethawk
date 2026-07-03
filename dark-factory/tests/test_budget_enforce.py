@@ -567,3 +567,26 @@ def test_writeback_preserves_existing_fields(tmp_path):
     assert data["estimated_input_tokens"] == 42000
     assert data["savings_tokens"] == 1200
     assert data["savings_pct"] == 5
+
+
+# ── Test 33: guard — _HARDCODED arch caps match config.yaml ──────────────────
+
+def test_hardcoded_arch_caps_match_config_yaml():
+    """Guard: _HARDCODED architecture values must stay in sync with config.yaml.
+
+    If this test fails, update _HARDCODED in budget_enforce.py (or config.yaml)
+    so both sources agree — never let them drift silently.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    config_path = repo_root / ".claude" / "skills" / "refinement" / "config.yaml"
+    config = be._load_config(str(config_path))
+    arch_cfg = config["token_optimization"]["architecture"]
+    arch_hc = be._HARDCODED["token_optimization"]["architecture"]
+    assert arch_hc["max_tokens"] == arch_cfg["max_tokens"], (
+        f"_HARDCODED max_tokens ({arch_hc['max_tokens']}) != "
+        f"config.yaml max_tokens ({arch_cfg['max_tokens']})"
+    )
+    assert arch_hc["min_tokens"] == arch_cfg["min_tokens"], (
+        f"_HARDCODED min_tokens ({arch_hc['min_tokens']}) != "
+        f"config.yaml min_tokens ({arch_cfg['min_tokens']})"
+    )
