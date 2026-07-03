@@ -334,6 +334,22 @@ def run_cli(argv: list[str] | None = None) -> BudgetResult:
             file=sys.stderr,
         )
 
+    # Write-back six telemetry fields to context-budget.json in-place (both modes).
+    # Fail-open: errors are logged to stderr and do not affect the load-bearing path.
+    try:
+        with open(args.context_budget_json, encoding="utf-8") as f:
+            cb_wb = json.load(f)
+        cb_wb["over_budget"] = result.over_budget
+        cb_wb["would_trim"] = result.would_trim
+        cb_wb["derived_caps"] = result.derived_caps
+        cb_wb["scenario_budget"] = args.budget_tokens
+        cb_wb["reserved_tokens"] = result.reserved_tokens
+        cb_wb["allowance"] = result.allowance
+        with open(args.context_budget_json, "w", encoding="utf-8") as f:
+            json.dump(cb_wb, f, indent=2)
+    except Exception as exc:
+        print(f"budget_enforce: write-back failed (non-fatal): {exc}", file=sys.stderr)
+
     return result
 
 
