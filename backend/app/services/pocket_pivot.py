@@ -31,6 +31,7 @@ from app.models.stock_split import StockSplit
 from app.models.ticker_reference import TickerReference
 from app.services.alert_service import save_event as _save_event
 from app.services.catalyst_parser import CatalystParser
+from app.services.scanner_explanations import build_pocket_pivot_explanation
 from app.utils.session import get_market_today
 from app.utils.time import to_utc_naive
 
@@ -323,6 +324,11 @@ async def run_pocket_pivot_scan(
                         previous_close=prior_close,
                         closing_price=today["close"],
                         gate_metadata=gate_metadata,
+                        explanation=build_pocket_pivot_explanation(
+                            indicators=indicators,
+                            criteria_met=criteria_met,
+                            gate_metadata=gate_metadata,
+                        ),
                     )
                     results.append(event_dict)
                     counts["fired"] += 1
