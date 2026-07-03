@@ -32,6 +32,7 @@ from app.schemas.outcome import (
     SignalListResponse,
 )
 from app.schemas.regime import RegimeBreakdownResponse
+from app.services.ai_signal_brief import AISignalBriefService
 from app.services.data_readiness import DataReadinessService
 from app.services.outcome_service import OutcomeService
 from app.services.stats import StatsService
@@ -196,6 +197,15 @@ def get_event_outcome(
     )
 
     return EventOutcomeResponse(summary=summary, snapshots=snapshots)
+
+
+@router.get("/event/{event_id}/ai-signal-brief")
+def get_ai_signal_brief(
+    event_id: int,
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return AISignalBriefService().build(db, event)
 
 
 @router.get("/readiness/{ticker}", response_model=ReadinessResponse)
