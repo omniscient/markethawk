@@ -19,6 +19,7 @@ ISSUE_ARG=""
 [[ "${ISSUE_NUM:-}" =~ ^[0-9]+$ ]] && ISSUE_ARG="--issue ${ISSUE_NUM}"
 
 mkdir -p "$ARTIFACTS_DIR"
+[ -f "${ARTIFACTS_DIR}/token-opt-caps.env" ] && . "${ARTIFACTS_DIR}/token-opt-caps.env" || true
 
 MEMORY_CONTEXT=$(python3 "${REPO_ROOT}/dark-factory/scripts/memory_retrieve.py" \
   --phase "$PHASE" \

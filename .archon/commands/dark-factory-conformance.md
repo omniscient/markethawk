@@ -160,6 +160,7 @@ absent). `$FILTER_ANNOTATION` is the one-line informational note (empty if no st
 ```bash
 # Rank and chunk the fmt-filtered diff (fail-open)
 RANK_IN=$(mktemp /tmp/rank_in_XXXXXX.txt)
+[ -f "$ARTIFACTS_DIR/token-opt-caps.env" ] && . "$ARTIFACTS_DIR/token-opt-caps.env" || true
 printf '%s' "$TRIAGED_DIFF" > "$RANK_IN"
 RANKED=$(python3 dark-factory/scripts/diff_rank.py \
   --diff "$RANK_IN" \
