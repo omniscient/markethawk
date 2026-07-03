@@ -39,10 +39,12 @@ T6 is the go-live step for Phase 4 budget enforcement. T1–T5 shipped all the m
    - Prerequisite: run the full bench-corpus calibration (`token_opt_eval.py --calibrate`) and confirm `section_at_risk_rate == 0%` and `over_budget_rate ≤ 10%` at the target budget for the scenario.
    - How to set the `budgets.<scenario>` and `enforce.<scenario>` values in `config.yaml`.
    - Confirming the budget and enforce change lands by checking `context-budget.json` on the next enforced run.
-6. Extend **Disable / Rollback Procedure** with a two-tier enforcement rollback:
-   - **Tier 1 — master kill-switch** (fastest, no file edit): set `TOKEN_OPTIMIZATION_ENFORCE_BUDGETS=false` in `.archon/.env` and restart the scheduler. All scenarios revert to measure-only.
-   - **Tier 2 — targeted rollback** (one scenario): set `enforce.<scenario>: false` in `config.yaml` and restart. Use when only one scenario misbehaves.
-   - Document the limitation: per-scenario `enforce` and `budgets` have **no env override** — only the master gate (`TOKEN_OPTIMIZATION_ENFORCE_BUDGETS`) is hot-swappable without a file edit.
+6. Extend **Disable / Rollback Procedure** with a two-tier enforcement rollback — **both tiers via git** (enforcement gates are clone-read from `config.yaml`; no env override exists, no scheduler restart required):
+   - **Tier 1 — master kill** (fastest): commit `enforce_budgets: false` to `config.yaml` on main, or `git revert` the T6 config commit. Takes effect on the next factory run.
+   - **Tier 2 — targeted** (one scenario): commit `enforce.<scenario>: false` to `config.yaml` on main. Same immediacy as Tier 1.
+   - Document explicitly: **no env override exists** for the enforcement gates. The `enforce-budget-*` DAG nodes read `enforce_budgets` and `enforce.<scenario>` exclusively from the cloned `config.yaml` via inline Python — `TOKEN_OPTIMIZATION_ENFORCE_BUDGETS` is a stale claim from issue #673 that Phase 4 never wired up. Remove that env-override comment from the runbook; an operator relying on `.archon/.env` for enforcement rollback would be stranded mid-incident.
+   - Note that wiring `TOKEN_OPTIMIZATION_ENFORCE_BUDGETS` into the enforce-budget nodes is a candidate follow-up ticket (see Open Question 2).
+   - Add a **Deploy Nuance** callout: `config.yaml`, workflow YAML, and command files are **clone-read** (fresh `git clone` on every factory run) — a commit to main takes effect on the next run with no image rebuild or scheduler restart. `entrypoint.sh` (including the T4 cost-report savings line) is **baked** into the Docker image and requires a rebuild + redeploy. An operator asking "why is the cost line missing" needs this distinction.
 7. Add a **Follow-up Path** section for the deferred scenarios:
    - **refine/plan**: blocked on `section_at_risk`. Next step: run full-corpus calibration to determine p90 uncapped arch slice size; raise `architecture.max_tokens` above that p90 as a separate data-driven change; re-run calibration to confirm `section_at_risk_rate == 0%`; then flip `enforce.refine` and `enforce.plan`.
    - **implement**: operational follow-up per the original Phase 4 design, gated on continued observation of conformance/code-review enforcement in production.
