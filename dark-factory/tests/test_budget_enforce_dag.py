@@ -304,3 +304,23 @@ def test_conformance_cmd_sources_near_diff_rank():
     assert caps_pos != -1, "conformance must source token-opt-caps.env"
     assert caps_pos > rank_pos, \
         "token-opt-caps.env must be sourced after RANK_IN=$(mktemp ...) in ranking block"
+
+
+# ── T4-E1: enforce-budget nodes read env kill-switch ─────────────────────────
+
+@pytest.mark.parametrize("node_id", [
+    "enforce-budget-refine",
+    "enforce-budget-plan",
+    "enforce-budget-implement",
+    "enforce-budget-conformance",
+    "enforce-budget-code-review",
+])
+def test_enforce_budget_node_env_kill_switch(node_id):
+    nodes = _workflow_nodes()
+    bash = nodes.get(node_id, {}).get("bash", "")
+    assert "TOKEN_OPTIMIZATION_ENFORCE_BUDGETS" in bash, \
+        f"'{node_id}' bash must read TOKEN_OPTIMIZATION_ENFORCE_BUDGETS from env"
+    assert 'case "${_EENV' in bash, \
+        f"'{node_id}' bash must branch on _EENV with a case statement"
+    assert '_MODE="observe"' in bash, \
+        f"'{node_id}' bash must set _MODE=\"observe\" when the kill-switch is active"

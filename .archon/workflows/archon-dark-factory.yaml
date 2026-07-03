@@ -368,6 +368,8 @@ nodes:
         # Single parse — avoids mode/budget desync if config is partially malformed.
         read -r _EB _ES _BUD < <(python3 -c "import yaml; to=yaml.safe_load(open('${_CFG}')).get('token_optimization',{}); print(str(to.get('enforce_budgets',False)).lower(), str(to.get('enforce',{}).get('refine',False)).lower(), to.get('budgets',{}).get('refine',to.get('default_budget_tokens',30000)))" 2>/dev/null || echo "false false 30000")
         if [ "$_EB" = "true" ] && [ "$_ES" = "true" ]; then _MODE="enforce"; else _MODE="observe"; fi
+        _EENV="${TOKEN_OPTIMIZATION_ENFORCE_BUDGETS}"
+        case "${_EENV,,}" in false|0|no) _MODE="observe" ;; esac
         python3 "${_CLONE}/dark-factory/scripts/budget_enforce.py" \
           --context-budget-json "$ARTIFACTS_DIR/context-budget.json" \
           --budget-tokens "${_BUD:-30000}" --mode "$_MODE" --config "$_CFG" \
@@ -413,6 +415,8 @@ nodes:
         # Single parse — avoids mode/budget desync if config is partially malformed.
         read -r _EB _ES _BUD < <(python3 -c "import yaml; to=yaml.safe_load(open('${_CFG}')).get('token_optimization',{}); print(str(to.get('enforce_budgets',False)).lower(), str(to.get('enforce',{}).get('plan',False)).lower(), to.get('budgets',{}).get('plan',to.get('default_budget_tokens',30000)))" 2>/dev/null || echo "false false 30000")
         if [ "$_EB" = "true" ] && [ "$_ES" = "true" ]; then _MODE="enforce"; else _MODE="observe"; fi
+        _EENV="${TOKEN_OPTIMIZATION_ENFORCE_BUDGETS}"
+        case "${_EENV,,}" in false|0|no) _MODE="observe" ;; esac
         python3 "${_CLONE}/dark-factory/scripts/budget_enforce.py" \
           --context-budget-json "$ARTIFACTS_DIR/context-budget.json" \
           --budget-tokens "${_BUD:-30000}" --mode "$_MODE" --config "$_CFG" \
@@ -520,6 +524,8 @@ nodes:
         # Single parse — avoids mode/budget desync if config is partially malformed.
         read -r _EB _ES _BUD < <(python3 -c "import yaml; to=yaml.safe_load(open('${_CFG}')).get('token_optimization',{}); print(str(to.get('enforce_budgets',False)).lower(), str(to.get('enforce',{}).get('implement',False)).lower(), to.get('budgets',{}).get('implement',to.get('default_budget_tokens',30000)))" 2>/dev/null || echo "false false 30000")
         if [ "$_EB" = "true" ] && [ "$_ES" = "true" ]; then _MODE="enforce"; else _MODE="observe"; fi
+        _EENV="${TOKEN_OPTIMIZATION_ENFORCE_BUDGETS}"
+        case "${_EENV,,}" in false|0|no) _MODE="observe" ;; esac
         python3 "${_CLONE}/dark-factory/scripts/budget_enforce.py" \
           --context-budget-json "$ARTIFACTS_DIR/context-budget.json" \
           --budget-tokens "${_BUD:-30000}" --mode "$_MODE" --config "$_CFG" \
@@ -916,6 +922,8 @@ nodes:
         # Single parse — avoids mode/budget desync if config is partially malformed.
         read -r _EB _ES _BUD < <(python3 -c "import yaml; to=yaml.safe_load(open('${_CFG}')).get('token_optimization',{}); print(str(to.get('enforce_budgets',False)).lower(), str(to.get('enforce',{}).get('conformance',False)).lower(), to.get('budgets',{}).get('conformance',to.get('default_budget_tokens',30000)))" 2>/dev/null || echo "false false 30000")
         if [ "$_EB" = "true" ] && [ "$_ES" = "true" ]; then _MODE="enforce"; else _MODE="observe"; fi
+        _EENV="${TOKEN_OPTIMIZATION_ENFORCE_BUDGETS}"
+        case "${_EENV,,}" in false|0|no) _MODE="observe" ;; esac
         python3 "${_CLONE}/dark-factory/scripts/budget_enforce.py" \
           --context-budget-json "$ARTIFACTS_DIR/context-budget.json" \
           --budget-tokens "${_BUD:-30000}" --mode "$_MODE" --config "$_CFG" \
@@ -1122,6 +1130,8 @@ nodes:
         # Single parse — avoids mode/budget desync if config is partially malformed.
         read -r _EB _ES _BUD < <(python3 -c "import yaml; to=yaml.safe_load(open('${_CFG}')).get('token_optimization',{}); print(str(to.get('enforce_budgets',False)).lower(), str(to.get('enforce',{}).get('code-review',False)).lower(), to.get('budgets',{}).get('code-review',to.get('default_budget_tokens',30000)))" 2>/dev/null || echo "false false 30000")
         if [ "$_EB" = "true" ] && [ "$_ES" = "true" ]; then _MODE="enforce"; else _MODE="observe"; fi
+        _EENV="${TOKEN_OPTIMIZATION_ENFORCE_BUDGETS}"
+        case "${_EENV,,}" in false|0|no) _MODE="observe" ;; esac
         python3 "${_CLONE}/dark-factory/scripts/budget_enforce.py" \
           --context-budget-json "$ARTIFACTS_DIR/context-budget.json" \
           --budget-tokens "${_BUD:-30000}" --mode "$_MODE" --config "$_CFG" \

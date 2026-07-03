@@ -20,6 +20,7 @@ via issues #664–#671. Phase 4 (budget enforcement) shipped via #713–#719.
 | Memory top-k | `token_optimization.memory.enabled` | `TOKEN_OPTIMIZATION_MEMORY_ENABLED` | Caps memory retrieval to the top 8 highest-scored entries (≤ 1 500 tokens) |
 | Comment digesting | `token_optimization.comments.enabled` | `TOKEN_OPTIMIZATION_COMMENTS_ENABLED` | Collapses raw comment history into a single human-feedback digest for `continue` runs |
 | Diff ranking | `token_optimization.diff.enabled` | `TOKEN_OPTIMIZATION_DIFF_ENABLED` | Ranks and truncates the review diff by risk tier; critical files bypass the cap |
+| Budget enforcement | `token_optimization.enforce_budgets` + `enforce.<scenario>` | `TOKEN_OPTIMIZATION_ENFORCE_BUDGETS` | Kill-only: `false`/`0`/`no` (case-insensitive) forces observe in all 5 nodes; unset or any other value defers to config |
 
 ---
 
@@ -61,10 +62,8 @@ token_optimization:
 
 Environment variables for the per-feature `enabled` flags override config values.
 Set them in `.archon/.env` before the scheduler container starts; `_set_cfg` wires
-them at startup. **No env override exists for `enforce_budgets` or per-scenario `enforce`
-flags** — these are enforcement gates read exclusively from the cloned `config.yaml`.
-The stale `TOKEN_OPTIMIZATION_ENFORCE_BUDGETS` env comment (from #673) was never wired
-into the Phase 4 enforce nodes; ignore it.
+them at startup. `TOKEN_OPTIMIZATION_ENFORCE_BUDGETS` is a kill-only override for
+the budget enforcement gates (see Rollback — Tier 0 below).
 
 ---
 
@@ -90,14 +89,33 @@ To disable **all features** at once, set `token_optimization.enabled: false` in 
 **Fail-safe semantics:** Every disabled path widens context to the full/original baseline.
 Disabling a feature never silently drops content.
 
-### Budget enforcement rollback (Tier 1 and Tier 2)
+### Budget enforcement rollback (Tier 0, Tier 1, Tier 2)
 
-Enforcement gates (`enforce_budgets`, per-scenario `enforce`) have **no env override** —
-they are read exclusively from the cloned `config.yaml`. Both rollback tiers are git
-commits to `config.yaml` on `main`; they take effect on the **next factory run**
-(no scheduler restart, no image rebuild needed).
+Three tiers are available. Tier 0 is instant (no git commit); Tier 1 and Tier 2 are git
+commits to `config.yaml` on `main` and take effect on the **next factory run** (no
+scheduler restart or image rebuild needed).
 
-**Tier 1 — master kill (reverts all enforcement immediately):**
+**Tier 0 — env kill (fastest, no git commit required):**
+
+Sets `TOKEN_OPTIMIZATION_ENFORCE_BUDGETS=false` in `.archon/.env` so all five
+`enforce-budget-*` nodes immediately switch to observe mode on the next factory run.
+The env var can only force observe — it cannot force enforcement on.
+
+```bash
+# 1. Set the kill switch in the Archon env file
+echo "TOKEN_OPTIMIZATION_ENFORCE_BUDGETS=false" >> .archon/.env
+
+# 2. Force-recreate the scheduler so the new env var is injected
+docker compose --profile scheduler up -d --force-recreate backlog-scheduler
+```
+
+> **Note:** In-flight factory containers are unaffected — the kill-switch only takes effect
+> on the **next** factory run. `docker compose restart` does NOT re-read `env_file`, so
+> `up -d --force-recreate` is required.
+
+To restore enforcement: remove the line from `.archon/.env` and run `up -d --force-recreate` again.
+
+**Tier 1 — master kill (reverts all enforcement immediately via config):**
 ```bash
 # Option A: direct commit
 # In config.yaml, set:   enforce_budgets: false
@@ -118,12 +136,6 @@ git push origin main
 git commit -am "revert(enforce): disable code-review budget enforcement"
 git push origin main
 ```
-
-> **Note:** To wire a hot-changeable env override for enforcement gates in a future ticket,
-> the `enforce-budget-*` DAG nodes must be updated to read
-> `TOKEN_OPTIMIZATION_ENFORCE_BUDGETS` (and per-scenario equivalents) from the environment
-> alongside the config file. This is a candidate follow-up (see Open Question 2 in
-> the Phase 4 design doc).
 
 ---
 
