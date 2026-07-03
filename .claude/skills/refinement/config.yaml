@@ -104,7 +104,7 @@ main_red_autofix:
 
 token_optimization:
   enabled: true               # measure token usage per run; env: TOKEN_OPTIMIZATION_ENABLED overrides
-  enforce_budgets: true       # true = enforce budgets for per-scenario enforce: true scenarios; env: TOKEN_OPTIMIZATION_ENFORCE_BUDGETS overrides
+  enforce_budgets: true       # true = enforce budgets for per-scenario enforce: true scenarios; NO env override — rollback is a git commit to main (see runbook)
   default_budget_tokens: 30000  # per-scenario budget when no override is set; env: TOKEN_OPTIMIZATION_DEFAULT_BUDGET_TOKENS overrides
   budgets:
     refine: 30000
