@@ -390,7 +390,6 @@ def format_index_output(candidates, labels=None, _cap_out=None, config_path=None
     """
     labels = labels or []
     memory_enabled = _is_memory_enabled(clone_dir)
-    effective_budget = _get_memory_max_tokens(clone_dir)
 
     # Tiebreaker: entries without created_at sort as "" which, under reverse=True,
     # ranks them last within equal specificity+boost (i.e. oldest/undated are lowest
@@ -408,6 +407,10 @@ def format_index_output(candidates, labels=None, _cap_out=None, config_path=None
     dropped = []
     token_total = 0
     uncapped_tokens = sum(te.estimate_tokens(c["text"]) for c in ranked)
+
+    # Only resolve the budget when memory is enabled; deferred to avoid reading
+    # config/env on disabled paths.
+    effective_budget = _get_memory_max_tokens(clone_dir) if memory_enabled else None
 
     for c in ranked:
         token_cost = te.estimate_tokens(c["text"])

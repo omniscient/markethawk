@@ -216,8 +216,15 @@ def main() -> None:
     max_tokens = _get_comments_max_tokens()
     max_chars = max_tokens * 4
     if len(digest) > max_chars:
-        dropped = len(digest) - max_chars
-        digest = digest[:max_chars] + f"\n<!-- truncated: {dropped} chars dropped (cap={max_tokens} tokens) -->\n"
+        # If max_chars would cut inside a leading HTML comment, extend to its closing -->
+        # so the marker is never emitted in a malformed (mid-token) state.
+        safe_cut = max_chars
+        if digest.startswith("<!--"):
+            close = digest.find("-->")
+            if close >= 0 and max_chars < close + 3:
+                safe_cut = close + 3
+        dropped = len(digest) - safe_cut
+        digest = digest[:safe_cut] + f"\n<!-- truncated: {dropped} chars dropped (cap={max_tokens} tokens) -->\n"
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(digest)

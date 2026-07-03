@@ -394,10 +394,12 @@ def slice_architecture(
     max_tokens = _get_architecture_max_tokens(cfg)
     if max_tokens is not None:
         body = "".join(all_sections[s] for s in included_sections)
-        while te.estimate_tokens(body) > max_tokens and len(included_sections) > 1:
+        running_tokens = te.estimate_tokens(body)
+        while running_tokens > max_tokens and len(included_sections) > 1:
             dropped = included_sections.pop()
             omitted_sections.insert(0, dropped)
-            body = "".join(all_sections[s] for s in included_sections)
+            running_tokens -= te.estimate_tokens(all_sections[dropped])
+        body = "".join(all_sections[s] for s in included_sections)
     else:
         body = "".join(all_sections[s] for s in included_sections)
 
