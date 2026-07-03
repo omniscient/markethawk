@@ -338,3 +338,76 @@ def test_slice_proceeds_when_feature_enabled(arch_file, tmp_path):
         clone_dir=str(tmp_path),
     )
     assert result.fallback_reason != "feature_disabled"
+
+
+# ── T4: max_tokens cap-override (R1/R2/R3 — section exclusion) ──────────────
+
+def test_slice_cap_env_override_honored(arch_file, tmp_path, monkeypatch):
+    """TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS env var tightens the slice."""
+    clone_dir = make_config(tmp_path)
+    # backend has 5 sections; set a tiny cap so at least one gets excluded
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS", "1")
+    result = aslice.slice_architecture(
+        arch_path=arch_file, scenario="implement",
+        spec_component="backend", clone_dir=clone_dir,
+    )
+    assert not result.fallback
+    # At least one section dropped due to tiny cap
+    assert len(result.included_sections) < len(aslice.COMPONENT_SECTION_MAP["backend"])
+    # At least one section kept (floor of 1)
+    assert len(result.included_sections) >= 1
+
+
+def test_slice_cap_keeps_at_least_one_section(arch_file, tmp_path, monkeypatch):
+    """Even with an extreme cap, at least 1 section is always kept."""
+    clone_dir = make_config(tmp_path)
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS", "1")
+    result = aslice.slice_architecture(
+        arch_path=arch_file, scenario="implement",
+        spec_component="backend", clone_dir=clone_dir,
+    )
+    assert not result.fallback
+    assert len(result.included_sections) == 1
+
+
+def test_slice_cap_config_alone_is_inert(arch_file, tmp_path, monkeypatch):
+    """Config max_tokens alone (no env var) must NOT cap — enforcement is env-only.
+
+    The baked config value is budget_enforce.py's derivation input; if the slicer
+    read it directly, trimming would activate on every default run while
+    enforce_budgets is still false (observe mode must preserve current behavior).
+    """
+    monkeypatch.delenv("TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS", raising=False)
+    cfg_dir = tmp_path / ".claude" / "skills" / "refinement"
+    cfg_dir.mkdir(parents=True)
+    # Even a 1-token config cap must be ignored without the env var
+    (cfg_dir / "config.yaml").write_text(textwrap.dedent("""\
+        token_optimization:
+          architecture:
+            enabled: true
+            max_tokens: 1
+    """))
+    result = aslice.slice_architecture(
+        arch_path=arch_file, scenario="implement",
+        spec_component="backend", clone_dir=str(tmp_path),
+    )
+    assert not result.fallback
+    # All wanted sections kept — config cap did not apply
+    assert set(result.included_sections) == set(aslice.COMPONENT_SECTION_MAP["backend"])
+
+
+def test_full_doc_result_is_cap_immune(arch_file, tmp_path, monkeypatch):
+    """_full_doc_result (safety fallback) is never affected by the max_tokens cap."""
+    clone_dir = make_config(tmp_path)
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS", "1")
+    # Trigger safety fallback via a safety keyword label
+    result = aslice.slice_architecture(
+        arch_path=arch_file, scenario="implement",
+        spec_component="backend",
+        labels=["migration", "size: S"],
+        clone_dir=clone_dir,
+    )
+    # Must be full-doc fallback regardless of cap
+    assert result.fallback is True
+    # Full doc contains all sections
+    assert len(result.included_sections) > 1

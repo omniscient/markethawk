@@ -505,3 +505,43 @@ def test_build_ranked_diff_includes_raw_diff_tokens():
     )
     assert "raw_diff_tokens" in info
     assert info["raw_diff_tokens"] >= 0
+
+
+# ── T5: TOKEN_OPTIMIZATION_DIFF_MAX_REVIEW_TOKENS env override ───────────────
+
+def test_load_config_env_override_token_cap(tmp_path, monkeypatch):
+    """TOKEN_OPTIMIZATION_DIFF_MAX_REVIEW_TOKENS env var overrides config token_cap."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("token_optimization:\n  diff:\n    max_review_tokens: 6000\n")
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_DIFF_MAX_REVIEW_TOKENS", "500")
+    token_cap, _, _ = dr.load_config(str(cfg))
+    assert token_cap == 500
+
+
+def test_load_config_env_override_takes_precedence_over_config(tmp_path, monkeypatch):
+    """Env override wins even when config has a higher value."""
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("token_optimization:\n  diff:\n    max_review_tokens: 9000\n")
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_DIFF_MAX_REVIEW_TOKENS", "100")
+    token_cap, _, _ = dr.load_config(str(cfg))
+    assert token_cap == 100
+
+
+def test_load_config_no_env_override_uses_config(tmp_path, monkeypatch):
+    """When env var is unset, config value is returned (no override)."""
+    monkeypatch.delenv("TOKEN_OPTIMIZATION_DIFF_MAX_REVIEW_TOKENS", raising=False)
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("token_optimization:\n  diff:\n    max_review_tokens: 7500\n")
+    token_cap, _, _ = dr.load_config(str(cfg))
+    assert token_cap == 7500
+
+
+def test_critical_tier_files_cap_immune(monkeypatch):
+    """Critical-tier files (auth, migration, dark-factory) bypass even an env-overridden cap."""
+    monkeypatch.setenv("TOKEN_OPTIMIZATION_DIFF_MAX_REVIEW_TOKENS", "1")
+    diff = make_diff("backend/app/routers/auth/router.py", added=200, removed=50)
+    output, ranking = run_main(diff, token_cap=1)
+    auth_entry = next(f for f in ranking["files"] if "auth" in f["path"])
+    # Critical files are always emitted in full, bypassing the token cap
+    assert auth_entry["included"] == "full"
+    assert auth_entry["risk_class"] == "critical"

@@ -163,6 +163,27 @@ def _is_architecture_enabled(cfg: dict) -> bool:
     return True
 
 
+def _get_architecture_max_tokens(cfg: dict) -> int | None:
+    """Return the max_tokens cap for architecture slicing, or None if no cap.
+
+    Env-only (TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS): the config
+    `architecture.max_tokens` is the *derivation input* for budget_enforce.py,
+    not a live cap — reading it here would activate trimming on every default
+    run while enforce_budgets is still false (backend slices lose 4 of 5
+    sections at the baked 3000 value). The cap only bites when the enforcement
+    step exports the env var.
+    """
+    env_val = os.environ.get("TOKEN_OPTIMIZATION_ARCHITECTURE_MAX_TOKENS", "").strip()
+    if env_val:
+        try:
+            v = int(env_val)
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+    return None
+
+
 # ── Section parsing ────────────────────────────────────────────────────────────
 
 def _parse_sections(path: str) -> dict[str, str]:
@@ -368,8 +389,20 @@ def slice_architecture(
         return _full_doc_result(arch_path, all_sections, all_section_names,
                                 scenario, component, "no_sections_matched")
 
+    # 5a. Apply section-exclusion cap (drop tail sections until under cap; keep at least 1)
+    max_tokens = _get_architecture_max_tokens(cfg)
+    if max_tokens is not None:
+        body = "".join(all_sections[s] for s in included_sections)
+        running_tokens = te.estimate_tokens(body)
+        while running_tokens > max_tokens and len(included_sections) > 1:
+            dropped = included_sections.pop()
+            omitted_sections.insert(0, dropped)
+            running_tokens -= te.estimate_tokens(all_sections[dropped])
+        body = "".join(all_sections[s] for s in included_sections)
+    else:
+        body = "".join(all_sections[s] for s in included_sections)
+
     section_hashes = {s: te.hash_text(all_sections[s]) for s in included_sections}
-    body = "".join(all_sections[s] for s in included_sections)
     comment = _make_slice_comment(component, scenario, included_sections,
                                   omitted_sections, False, None)
     text = comment + body

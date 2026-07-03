@@ -122,6 +122,38 @@ def _is_memory_enabled(clone_dir: str | None = None) -> bool:
     return True
 
 
+def _get_memory_max_tokens(clone_dir: str | None = None) -> int:
+    """Return the max_tokens cap for memory retrieval.
+
+    Priority: TOKEN_OPTIMIZATION_MEMORY_MAX_TOKENS env var → config value → TOKEN_BUDGET_DEFAULT.
+    """
+    env_val = os.environ.get("TOKEN_OPTIMIZATION_MEMORY_MAX_TOKENS", "").strip()
+    if env_val:
+        try:
+            v = int(env_val)
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+    candidates = list(_MEMORY_CONFIG_PATHS)
+    if clone_dir:
+        candidates.insert(0, Path(clone_dir) / ".claude" / "skills" / "refinement" / "config.yaml")
+    try:
+        import yaml  # type: ignore[import]
+        for path in candidates:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                val = (data or {}).get("token_optimization", {}).get("memory", {}).get("max_tokens")
+                if val is not None:
+                    return int(val)
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return TOKEN_BUDGET_DEFAULT
+
+
 # ── Label boost ───────────────────────────────────────────────────────────
 
 def compute_label_boost(source_file, labels):
@@ -376,6 +408,10 @@ def format_index_output(candidates, labels=None, _cap_out=None, config_path=None
     token_total = 0
     uncapped_tokens = sum(te.estimate_tokens(c["text"]) for c in ranked)
 
+    # Only resolve the budget when memory is enabled; deferred to avoid reading
+    # config/env on disabled paths.
+    effective_budget = _get_memory_max_tokens(clone_dir) if memory_enabled else None
+
     for c in ranked:
         token_cost = te.estimate_tokens(c["text"])
         if not memory_enabled:
@@ -387,8 +423,8 @@ def format_index_output(candidates, labels=None, _cap_out=None, config_path=None
             # so a single large memory never silently yields an empty block.
             # Over-budget entries are skipped individually (not a hard stop); a later
             # smaller entry may still be admitted if it fits within the remaining budget.
-            if len(selected) >= TOP_K_DEFAULT or (selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT):
-                if selected and token_total + token_cost > TOKEN_BUDGET_DEFAULT and len(selected) < TOP_K_DEFAULT:
+            if len(selected) >= TOP_K_DEFAULT or (selected and token_total + token_cost > effective_budget):
+                if selected and token_total + token_cost > effective_budget and len(selected) < TOP_K_DEFAULT:
                     sys.stderr.write(
                         f"memory-cap: dropped oversized entry ({token_cost} tokens) from {c['source_file']}\n"
                     )

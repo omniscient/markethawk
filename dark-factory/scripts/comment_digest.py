@@ -17,6 +17,27 @@ import os
 import re
 import sys
 
+
+def _get_comments_max_tokens() -> int | None:
+    """Return the max_tokens cap for comment digest output, or None if no cap.
+
+    Env-only (TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS): the config
+    `comments.max_tokens` is the *derivation input* for budget_enforce.py,
+    not a live cap — reading it here would truncate digests on every default
+    run while enforce_budgets is still false. The cap only bites when the
+    enforcement step exports the env var.
+    """
+    env_val = os.environ.get("TOKEN_OPTIMIZATION_COMMENTS_MAX_TOKENS", "").strip()
+    if env_val:
+        try:
+            v = int(env_val)
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+    return None
+
+
 _BOT_RE = re.compile(
     r"Posted by MarketHawk Refinement Pipeline"
     r"|Posted by MarketHawk Backlog Scheduler"
@@ -175,6 +196,18 @@ def main() -> None:
         sys.exit(1)
 
     digest = build_digest(issue_data)
+    max_tokens = _get_comments_max_tokens()
+    max_chars = max_tokens * 4 if max_tokens is not None else None
+    if max_chars is not None and len(digest) > max_chars:
+        # If max_chars would cut inside a leading HTML comment, extend to its closing -->
+        # so the marker is never emitted in a malformed (mid-token) state.
+        safe_cut = max_chars
+        if digest.startswith("<!--"):
+            close = digest.find("-->")
+            if close >= 0 and max_chars < close + 3:
+                safe_cut = close + 3
+        dropped = len(digest) - safe_cut
+        digest = digest[:safe_cut] + f"\n<!-- truncated: {dropped} chars dropped (cap={max_tokens} tokens) -->\n"
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(digest)
