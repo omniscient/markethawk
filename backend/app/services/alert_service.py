@@ -420,6 +420,10 @@ def save_event(
         )
         regime = None
 
+    metadata_payload = dict(enrichment)
+    if gate_metadata is not None:
+        metadata_payload["quality_gate"] = gate_metadata
+
     event_dict = {
         "ticker": ticker,
         "event_date": event_date,
@@ -431,7 +435,7 @@ def save_event(
         "closing_price": closing_price,
         "indicators": indicators,
         "criteria_met": criteria_met,
-        "metadata": enrichment,
+        "metadata": metadata_payload,
         "signal_quality_score": score,
         "regime": regime,
     }
@@ -458,10 +462,7 @@ def save_event(
         event_dict["id"] = existing.id
     else:
         model_data = event_dict.copy()
-        enrichment_with_gate = dict(model_data.pop("metadata"))
-        if gate_metadata is not None:
-            enrichment_with_gate["quality_gate"] = gate_metadata
-        model_data["metadata_"] = enrichment_with_gate
+        model_data["metadata_"] = model_data.pop("metadata")
         new_event = ScannerEvent(**model_data)
         db.add(new_event)
         db.flush()

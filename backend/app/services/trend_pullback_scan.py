@@ -28,6 +28,7 @@ from app.core.metrics import (
 )
 from app.models.stock_aggregate import StockAggregate
 from app.services.alert_service import save_event as _save_event
+from app.services.data_readiness import DataReadinessService
 from app.services.scanner_explanations import build_trend_pullback_explanation
 from app.utils.session import get_market_today
 
@@ -328,6 +329,15 @@ async def run_trend_pullback_scan(
                     indicators = result["indicators"]
                     criteria_met = result["criteria_met"]
 
+                    event_gate_metadata = (
+                        DataReadinessService.event_quality_gate_metadata(
+                            db=db,
+                            ticker=ticker,
+                            scanner_type="trend_pullback",
+                            event_date=event_date,
+                            base_metadata=gate_metadata,
+                        )
+                    )
                     event_dict = _save_event(
                         db=db,
                         ticker=ticker,
@@ -338,11 +348,11 @@ async def run_trend_pullback_scan(
                         enrichment={},
                         previous_close=None,
                         closing_price=close_today,
-                        gate_metadata=gate_metadata,
+                        gate_metadata=event_gate_metadata,
                         explanation=build_trend_pullback_explanation(
                             indicators=indicators,
                             criteria_met=criteria_met,
-                            gate_metadata=gate_metadata,
+                            gate_metadata=event_gate_metadata,
                         ),
                     )
                     results.append(event_dict)

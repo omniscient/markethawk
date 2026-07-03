@@ -22,6 +22,7 @@ Grade scale
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -343,6 +344,40 @@ def _analyze_ticker_timespan(
 
 
 class DataQualityService:
+    @staticmethod
+    def summarize_event_bars(rows: List[Any], timespan: str, multiplier: int) -> Dict:
+        """Return event-scoped integrity/continuity counts for aggregate rows."""
+        bad_bar_count = 0
+        timestamps = []
+        for row in rows:
+            timestamps.append(row.timestamp)
+            high = Decimal(row.high)
+            low = Decimal(row.low)
+            open_ = Decimal(row.open)
+            close = Decimal(row.close)
+            volume = int(row.volume)
+            if (
+                high < low
+                or high < open_
+                or high < close
+                or low > open_
+                or low > close
+                or open_ <= 0
+                or close <= 0
+                or high <= 0
+                or low <= 0
+                or volume < 0
+            ):
+                bad_bar_count += 1
+
+        duplicate_count = len(timestamps) - len(set(timestamps))
+        gaps = _detect_gaps(timestamps, timespan, multiplier)
+        return {
+            "bad_bar_count": bad_bar_count,
+            "duplicate_count": duplicate_count,
+            "gap_count": len(gaps),
+        }
+
     @staticmethod
     def analyze_universe(db: Session, universe_id: int) -> Dict:
         """

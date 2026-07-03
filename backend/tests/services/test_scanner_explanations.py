@@ -60,9 +60,10 @@ def test_build_pre_market_volume_explanation_splits_passed_and_failed_criteria()
             "tier": "warning",
             "warnings": [
                 {
-                    "code": "stale_bars",
+                    "code": "stale_data",
                     "severity": "warning",
                     "message": "Some bars are stale.",
+                    "affected_inputs": ["minute_aggregates", "price", "volume"],
                 }
             ],
         },
@@ -72,7 +73,13 @@ def test_build_pre_market_volume_explanation_splits_passed_and_failed_criteria()
     assert "premarket.volume_spike" in explanation["criteria_passed"]
     assert "premarket.liquidity" in explanation["criteria_failed"]
     assert explanation["confidence_inputs"]["signal_quality_score"] == 88.0
+    assert explanation["data_quality_warnings"][0]["code"] == "stale_data"
     assert explanation["data_quality_warnings"][0]["severity"] == "medium"
+    assert explanation["data_quality_warnings"][0]["affected_inputs"] == [
+        "minute_aggregates",
+        "price",
+        "volume",
+    ]
     assert explanation["evidence"]["reconstructed"] is False
 
 
