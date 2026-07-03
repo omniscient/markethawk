@@ -8,7 +8,7 @@ independently disabled via config flags or environment variable overrides.
 
 Rollout phases 1–3 (observe, low-risk optimization, implementation/conformance) landed
 via issues #664–#671. Phase 4 (budget enforcement) shipped via #713–#719.
-**As of T6 (#719), enforcement is live for conformance and code-review.**
+**As of T3b (#733), enforcement is live for conformance, code-review, refine, and plan.**
 
 ---
 
@@ -32,14 +32,14 @@ token_optimization:
   enabled: true
   enforce_budgets: true    # T6 live — master enforcement gate
   budgets:                 # per-scenario token budgets (provisional from T5 smoke run)
-    refine: 30000          # observe-only — enforce: false
-    plan: 30000            # observe-only — enforce: false
+    refine: 30000          # enforced — T3b go-live (#733)
+    plan: 30000            # enforced — T3b go-live (#733)
     implement: 30000       # observe-only — enforce: false
     conformance: 22000     # enforced — T6 go-live
     code-review: 22000     # enforced — T6 go-live
   enforce:
-    refine: false          # deferred; see Follow-up Path below
-    plan: false            # deferred; see Follow-up Path below
+    refine: true           # T3b live — #731 scorecard: 0% section_at_risk
+    plan: true             # T3b live — #731 scorecard: 0% section_at_risk
     implement: false       # deferred; see Follow-up Path below
     conformance: true      # T6 live
     code-review: true      # T6 live
@@ -181,19 +181,20 @@ The `context-budget.json` artifact (in `$ARTIFACTS_DIR`) includes per-section sa
 
 ## Budget Enforcement (Phase 4 — Live)
 
-As of T6 (#719), budget enforcement is **active** for `conformance` and `code-review`.
+As of T3b (#733), budget enforcement is **active** for `conformance`, `code-review`, `refine`, and `plan`.
 
 | Scenario | Enforce | Budget | Status |
 |----------|---------|--------|--------|
-| refine | false | 30 000 | observe-only |
-| plan | false | 30 000 | observe-only |
+| refine | **true** | **30 000** | **enforced (T3b)** |
+| plan | **true** | **30 000** | **enforced (T3b)** |
 | implement | false | 30 000 | observe-only |
 | conformance | **true** | **22 000** | **enforced (T6)** |
 | code-review | **true** | **22 000** | **enforced (T6)** |
 
-Budgets for conformance and code-review are **provisional** — derived from a 2-issue
-T5 smoke run. Run the full-corpus calibration (`dark-factory/evals/token_opt_eval.py
---calibrate`) after accumulating ≥ 10 bench issues to confirm or adjust.
+Budgets for refine and plan were validated by the full-corpus calibration in #731 (Phase 4b T2)
+with 0% `section_at_risk_rate` at the 30k budget. Budgets for conformance and code-review were
+derived from the T5 smoke run — run `dark-factory/evals/token_opt_eval.py --calibrate` after
+accumulating ≥ 10 bench issues to confirm or adjust.
 
 ### How enforcement works
 
@@ -255,14 +256,15 @@ planned `architecture.max_tokens` cap before flipping.
 
 ## Path to Phase 4 — Current Status
 
-Phase 4 (budget enforcement) is **partially live** as of T6 (#719):
-- **Conformance and code-review**: enforcement active (see Budget Enforcement section).
-- **Refine, plan, implement**: observe-only — deferred pending calibration.
+Phase 4 (budget enforcement) is **mostly live** as of T3b (#733):
+- **Conformance and code-review**: enforcement active since T6 (#719).
+- **Refine and plan**: enforcement active since T3b (#733) — #731 scorecard gated go-live.
+- **Implement**: observe-only — deferred pending calibration.
 
-### Follow-up Path for deferred scenarios (refine / plan / implement)
+### Follow-up Path for deferred scenario (implement)
 
 **Why deferred:** T5 calibration showed `section_at_risk_rate == 50%` at ALL tested
-budgets (22k–40k) for refine/plan/implement. Root cause: `architecture.max_tokens: 3000`
+budgets (22k–40k) for implement. Root cause: `architecture.max_tokens: 3000`
 is below real arch slice sizes (3–4k+ tokens), so enforcement trims architecture context
 on every issue regardless of budget size. Flipping enforce would silently drop required
 ARCHITECTURE.md sections — violating the "Never drop safety-critical content" goal.
@@ -293,7 +295,7 @@ ARCHITECTURE.md sections — violating the "Never drop safety-critical content" 
 3. **Re-run calibration** with the new `architecture.max_tokens` and a candidate budget.
    Gates: `over_budget_rate ≤ 10%` + `section_at_risk_rate == 0%`.
 
-4. **Flip** refine, plan, implement using the Observe → Enforce Procedure above.
+4. **Flip** implement using the Observe → Enforce Procedure above.
 
 ---
 
