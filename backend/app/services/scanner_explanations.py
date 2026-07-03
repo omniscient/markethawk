@@ -456,6 +456,129 @@ def build_pocket_pivot_explanation(
     return validate_scanner_explanation(payload)
 
 
+def _trend_pullback_criteria(
+    indicators: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    return {
+        "uptrend": _criterion(
+            "SMA trend structure",
+            {
+                "close": indicators.get("close"),
+                "sma50": indicators.get("sma50"),
+                "sma200": indicators.get("sma200"),
+            },
+            "close > SMA50 > SMA200 and SMA50 rising",
+            "==",
+            source="daily_aggregates",
+            lookback="200d",
+            importance=1.0,
+        ),
+        "near_high": _criterion(
+            "Near 252-day high",
+            indicators.get("pct_off_252d_high"),
+            15,
+            "<=",
+            unit="%",
+            source="daily_aggregates",
+            lookback="252d",
+            importance=0.7,
+        ),
+        "pullback_in_progress": _criterion(
+            "SMA20 pullback tag",
+            {
+                "low_near_sma20": indicators.get("sma20"),
+                "consecutive_days_above_sma20": indicators.get(
+                    "consecutive_days_above_sma20"
+                ),
+            },
+            "low within configured SMA20 tolerance after prior closes above SMA20",
+            "==",
+            source="daily_aggregates",
+            lookback="60d",
+            importance=0.9,
+        ),
+        "orderly_pullback": _criterion(
+            "Orderly pullback depth",
+            indicators.get("pullback_depth_pct"),
+            "configured depth range with no SMA50 breakdown",
+            "==",
+            unit="%",
+            source="daily_aggregates",
+            lookback="20d",
+            importance=1.0,
+        ),
+        "rsi_reset": _criterion(
+            "RSI-5 reset",
+            indicators.get("rsi5"),
+            40,
+            "<",
+            source="daily_aggregates",
+            lookback="5d",
+            importance=0.8,
+        ),
+        "liquidity": _criterion(
+            "Dollar-volume liquidity floor",
+            indicators.get("avg_dollar_vol_20d"),
+            5_000_000,
+            ">=",
+            unit="$",
+            source="daily_aggregates",
+            lookback="20d",
+            importance=0.6,
+        ),
+    }
+
+
+def build_trend_pullback_explanation(
+    indicators: Dict[str, Any],
+    criteria_met: Dict[str, Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    criteria = _trend_pullback_criteria(indicators)
+    passed, failed = _split_criteria(criteria_met, criteria, "trend_pullback")
+
+    why = ["Trend pullback criteria were met."]
+    if indicators.get("pullback_depth_pct") is not None:
+        why[0] = (
+            f"Pullback depth was {float(indicators['pullback_depth_pct']):.2f}% "
+            "from the recent swing high."
+        )
+    if indicators.get("rsi5") is not None:
+        why.append(f"RSI-5 reset to {float(indicators['rsi5']):.2f}.")
+    if indicators.get("atr14") is not None:
+        why.append(f"ATR-14 was {float(indicators['atr14']):.2f}.")
+
+    payload = {
+        "schema_version": "scanner_explanation.v1",
+        "why": why,
+        "criteria_passed": passed,
+        "criteria_failed": failed,
+        "confidence_inputs": {
+            "scanner_type": "trend_pullback",
+            "close": indicators.get("close"),
+            "sma20": indicators.get("sma20"),
+            "sma50": indicators.get("sma50"),
+            "sma200": indicators.get("sma200"),
+            "rsi5": indicators.get("rsi5"),
+            "pct_off_252d_high": indicators.get("pct_off_252d_high"),
+            "pullback_depth_pct": indicators.get("pullback_depth_pct"),
+            "consecutive_days_above_sma20": indicators.get(
+                "consecutive_days_above_sma20"
+            ),
+            "atr14": indicators.get("atr14"),
+            "avg_dollar_vol_20d": indicators.get("avg_dollar_vol_20d"),
+        },
+        "data_quality_warnings": _quality_warnings(gate_metadata),
+        "evidence": {
+            "reconstructed": False,
+            "generated_at": utc_now(),
+            "generator_version": "explanation_builder.v1",
+            "provider": "polygon",
+        },
+    }
+    return validate_scanner_explanation(payload)
+
+
 def reconstruct_explanation_for_event(event: ScannerEvent) -> Dict[str, Any]:
     indicators = event.indicators or {}
     criteria_met = event.criteria_met or {}
@@ -502,6 +625,9 @@ def reconstruct_explanation_for_event(event: ScannerEvent) -> Dict[str, Any]:
     elif event.scanner_type == "pocket_pivot":
         criteria = _pocket_pivot_criteria(indicators)
         passed, failed = _split_criteria(criteria_met, criteria, "pocket_pivot")
+    elif event.scanner_type == "trend_pullback":
+        criteria = _trend_pullback_criteria(indicators)
+        passed, failed = _split_criteria(criteria_met, criteria, "trend_pullback")
     else:
         scanner_prefix = event.scanner_type.replace("_", ".")
         passed = {}

@@ -28,6 +28,7 @@ from app.core.metrics import (
 )
 from app.models.stock_aggregate import StockAggregate
 from app.services.alert_service import save_event as _save_event
+from app.services.scanner_explanations import build_trend_pullback_explanation
 from app.utils.session import get_market_today
 
 _ET = ZoneInfo("America/New_York")
@@ -338,6 +339,11 @@ async def run_trend_pullback_scan(
                         previous_close=None,
                         closing_price=close_today,
                         gate_metadata=gate_metadata,
+                        explanation=build_trend_pullback_explanation(
+                            indicators=indicators,
+                            criteria_met=criteria_met,
+                            gate_metadata=gate_metadata,
+                        ),
                     )
                     results.append(event_dict)
                     counts["fired"] += 1
