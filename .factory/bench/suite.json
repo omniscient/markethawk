@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "description": "Replay benchmark suite for the dark-factory harness. Each task is a closed issue with a merged golden PR that added tests exercising the new functionality. Oracle tests fail at pre_pr_sha and pass after the correct fix is applied.",
+  "tasks": [
+    {
+      "issue": 224,
+      "title": "[dark-factory] Guard against OR-join trigger_rule regressions in the workflow DAG",
+      "size": "S",
+      "pre_pr_sha": "a6626694b087a07fbc9c61ef96ba2c1914b3b227",
+      "golden_pr": 344,
+      "oracle_tests": [
+        "dark-factory/tests/test_workflow_or_join.py::test_current_workflow_passes",
+        "dark-factory/tests/test_workflow_or_join.py::test_regression_pre_fix_validate_missing_trigger_rule",
+        "dark-factory/tests/test_workflow_or_join.py::test_sync_tripwire_catches_extra_trigger_rule_node"
+      ],
+      "oracle_cmd": "pytest",
+      "notes": "Introduced check_workflow_dag.py + test_workflow_or_join.py; the validate node had all_success trigger_rule pre-fix (ce9e4a3 regression)."
+    },
+    {
+      "issue": 332,
+      "title": "Baseline-green gate: smoke origin/main before any factory run",
+      "size": "S",
+      "pre_pr_sha": "34d160cfb593259256507fab0b56e1f70ebe8acd",
+      "golden_pr": 354,
+      "oracle_tests": [
+        "dark-factory/tests/test_smoke_gate.sh"
+      ],
+      "oracle_cmd": "bash",
+      "notes": "Added smoke_gate.sh and test_smoke_gate.sh; pre-fix the smoke gate script did not exist."
+    },
+    {
+      "issue": 289,
+      "title": "[arch-v3][MED] Add readiness probe (DB/Redis) + migration gate in deploy path",
+      "size": "S",
+      "pre_pr_sha": "26f0f35ad2d08dcc5c369d55b1f4814084f2e197",
+      "golden_pr": 351,
+      "oracle_tests": [
+        "backend/tests/test_health_ready.py::test_ready_returns_200_when_all_probes_pass",
+        "backend/tests/test_health_ready.py::test_ready_returns_503_when_db_fails"
+      ],
+      "oracle_cmd": "pytest",
+      "notes": "Added /api/health/ready endpoint with DB+Redis probes; pre-fix the endpoint did not exist."
+    },
+    {
+      "issue": 299,
+      "title": "Implement trend_pullback daily scanner (trend-following pullback signals)",
+      "size": "M",
+      "pre_pr_sha": "fe7bba4939f1332dfc1383c2c67a6c7705d06c94",
+      "golden_pr": 342,
+      "oracle_tests": [
+        "backend/tests/services/test_trend_pullback_scan.py::test_module_importable",
+        "backend/tests/services/test_trend_pullback_scan.py::test_orchestrator_registration",
+        "backend/tests/services/test_trend_pullback_scan.py::test_no_bars_skipped"
+      ],
+      "oracle_cmd": "pytest",
+      "notes": "Added trend_pullback_scan.py service and registered scanner; pre-fix import fails."
+    },
+    {
+      "issue": 286,
+      "title": "[arch-v3][MED] Consolidate time-normalization duplication into app/utils/time.py",
+      "size": "S",
+      "pre_pr_sha": "8b4e37daa8da66a92f08164cae08a06ba93ea1ee",
+      "golden_pr": 341,
+      "oracle_tests": [
+        "backend/tests/test_time_utils.py",
+        "backend/tests/test_db_utils.py"
+      ],
+      "oracle_cmd": "pytest",
+      "notes": "Added app/utils/time.py and app/utils/db.py; pre-fix both files and their tests did not exist."
+    },
+    {
+      "issue": 276,
+      "title": "Dark-factory scope-enforcement over-reports ruff/isort reformatting of touched files",
+      "size": "S",
+      "pre_pr_sha": "424a34d4bad04c124d6ce610685f4e9b17a04991",
+      "golden_pr": 330,
+      "oracle_tests": [
+        "dark-factory/tests/test_fmt_hunk_filter.py::test_parse_file_hunks_returns_two_hunks",
+        "dark-factory/tests/test_fmt_hunk_filter.py::test_overlaps_true_when_adjacent",
+        "dark-factory/tests/test_fmt_hunk_filter.py::test_overlaps_false_when_disjoint"
+      ],
+      "oracle_cmd": "pytest",
+      "notes": "Added fmt_hunk_filter.py and expanded test_fmt_hunk_filter.py; pre-fix tests fail on missing functions."
+    },
+    {
+      "issue": 287,
+      "title": "[arch-v3][MED] Decompose DiscoveryService.run_screen into asset-class screeners",
+      "size": "S",
+      "pre_pr_sha": "9634deac5449e4da1038c9ac6f5bd72c7ccbd3f4",
+      "golden_pr": 327,
+      "oracle_tests": [
+        "backend/tests/services/test_stock_screener.py::test_stock_screener_returns_all_with_empty_criteria",
+        "backend/tests/services/test_futures_screener.py::test_futures_screener_empty_symbols_returns_empty"
+      ],
+      "oracle_cmd": "pytest",
+      "notes": "Extracted StockScreener and FuturesScreener from DiscoveryService; pre-fix imports fail."
+    },
+    {
+      "issue": 215,
+      "title": "test: add P1.5-1 increment_retry and P1.5-5 trip_to_blocked scheduler tests",
+      "size": "S",
+      "pre_pr_sha": "b7664f07876361d37022fbc3c2e983bdb6c8fb4d",
+      "golden_pr": 296,
+      "oracle_tests": [
+        "dark-factory/tests/test_scheduler.sh"
+      ],
+      "oracle_cmd": "bash",
+      "notes": "Added increment_retry and trip_to_blocked test cases to test_scheduler.sh."
+    },
+    {
+      "issue": 285,
+      "title": "[arch-v3][MED] Add ruff check to CI backend job + fix 65 lint errors on main",
+      "size": "S",
+      "pre_pr_sha": "69e5421c7dbcad2b251b29a992b0d7daf42c8b1b",
+      "golden_pr": 321,
+      "oracle_tests": [
+        "backend/tests/api/test_alerts.py",
+        "backend/tests/api/test_cache.py"
+      ],
+      "oracle_cmd": "pytest",
+      "notes": "Fixed 65 ruff lint violations; tests that existed pre-fix may have import errors due to lint issues. Weaker oracle — mark as needs-review on rerun."
+    },
+    {
+      "issue": 249,
+      "title": "Add unit tests for calculateDoubleSupertrend indicator function",
+      "size": "S",
+      "pre_pr_sha": "e54e19acebb2b57122d06e61c286aa2340691370",
+      "golden_pr": 279,
+      "oracle_tests": [
+        "frontend/src/utils/indicators.test.ts"
+      ],
+      "oracle_cmd": "jest",
+      "notes": "Added calculateDoubleSupertrend tests; pre-fix the test file does not exist so jest exits non-zero."
+    }
+  ]
+}
