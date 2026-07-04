@@ -29,6 +29,10 @@ PUBLIC_TASKS = [
     # regime
     "update_regime_model",
     "backfill_regime_labels",
+    # embeddings
+    "embed_news_article_source",
+    "embed_scanner_event_sources",
+    "embed_generated_narrative_source",
 ]
 
 SUBMODULE_TASKS = {
@@ -62,6 +66,11 @@ SUBMODULE_TASKS = {
     "app.tasks.regime": [
         "update_regime_model",
         "backfill_regime_labels",
+    ],
+    "app.tasks.embeddings": [
+        "embed_news_article_source",
+        "embed_scanner_event_sources",
+        "embed_generated_narrative_source",
     ],
 }
 
