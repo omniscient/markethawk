@@ -26,6 +26,7 @@ from app.models.alert_rule import AlertRule
 from app.models.push_subscription import PushSubscription
 from app.models.scanner_event import ScannerEvent
 from app.schemas.event import SeverityLiteral
+from app.services.alert_copy import AlertCopyService
 from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -102,20 +103,37 @@ class NotificationDispatcher:
         """Fan-out to all channels configured on this rule."""
         channels = rule.channels or []
         config = rule.channel_config or {}
+        try:
+            alert_copy = AlertCopyService().build(db, event)
+        except Exception as exc:
+            logger.warning(
+                "Alert copy generation failed for scanner_event_id=%s: %s",
+                event.id,
+                exc,
+            )
+            alert_copy = None
 
         for channel in channels:
             status = "sent"
             error_msg = None
             try:
                 if channel == "browser_push":
-                    NotificationDispatcher._send_browser_push(event, db)
+                    NotificationDispatcher._send_browser_push(
+                        event, db, alert_copy=alert_copy
+                    )
                 elif channel == "email":
                     to = config.get("email")
                     if to:
                         NotificationDispatcher._send_email(
                             to=to,
-                            subject=f"MarketHawk Alert: {event.ticker} — {event.scanner_type.replace('_', ' ').title()}",
-                            body=NotificationDispatcher._build_email_body(event),
+                            subject=(
+                                alert_copy["title"]
+                                if alert_copy
+                                else f"MarketHawk Alert: {event.ticker} — {event.scanner_type.replace('_', ' ').title()}"
+                            ),
+                            body=NotificationDispatcher._build_email_body(
+                                event, alert_copy=alert_copy
+                            ),
                         )
                     else:
                         raise ValueError("No email address configured for this rule.")
@@ -124,7 +142,9 @@ class NotificationDispatcher:
                     if webhook_url:
                         NotificationDispatcher._send_google_chat(
                             webhook_url=webhook_url,
-                            message=NotificationDispatcher._build_chat_message(event),
+                            message=NotificationDispatcher._build_chat_message(
+                                event, alert_copy=alert_copy
+                            ),
                         )
                     else:
                         raise ValueError("No Google Chat webhook URL configured.")
@@ -134,7 +154,7 @@ class NotificationDispatcher:
                         NotificationDispatcher._send_webhook(
                             url=url,
                             payload=NotificationDispatcher._build_webhook_payload(
-                                event, rule
+                                event, rule, alert_copy=alert_copy
                             ),
                         )
                     else:
@@ -231,10 +251,12 @@ class NotificationDispatcher:
         return len(subscriptions) - failed
 
     @staticmethod
-    def _send_browser_push(event: ScannerEvent, db: Session) -> None:
+    def _send_browser_push(
+        event: ScannerEvent, db: Session, alert_copy: dict | None = None
+    ) -> None:
         """Scanner-event browser push (thin wrapper over the generic sender)."""
         NotificationDispatcher._push_to_subscriptions(
-            NotificationDispatcher._build_push_payload(event), db
+            NotificationDispatcher._build_push_payload(event, alert_copy=alert_copy), db
         )
 
     # ── Email ─────────────────────────────────────────────────────────────────
@@ -281,12 +303,17 @@ class NotificationDispatcher:
     # ── Payload Builders ──────────────────────────────────────────────────────
 
     @staticmethod
-    def _build_push_payload(event: ScannerEvent) -> dict:
+    def _build_push_payload(
+        event: ScannerEvent, alert_copy: dict | None = None
+    ) -> dict:
         scanner_type_display = event.scanner_type.replace("_", " ").title()
         return {
-            "title": f"MarketHawk: {event.ticker} — {scanner_type_display}",
-            "body": event.summary
-            or f"{scanner_type_display} detected on {event.ticker}",
+            "title": alert_copy["title"]
+            if alert_copy
+            else f"MarketHawk: {event.ticker} — {scanner_type_display}",
+            "body": alert_copy["summary"]
+            if alert_copy
+            else event.summary or f"{scanner_type_display} detected on {event.ticker}",
             "severity": event.severity,
             "ticker": event.ticker,
             "scanner_type": event.scanner_type,
@@ -295,8 +322,11 @@ class NotificationDispatcher:
         }
 
     @staticmethod
-    def _build_email_body(event: ScannerEvent) -> str:
+    def _build_email_body(
+        event: ScannerEvent, alert_copy: dict | None = None
+    ) -> str:
         scanner_type_display = event.scanner_type.replace("_", " ").title()
+        summary = alert_copy["body"] if alert_copy else event.summary or "Scanner event detected."
         indicators_html = "".join(
             f"<tr><td style='padding:4px 8px;color:#9ca3af'>{k}</td>"
             f"<td style='padding:4px 8px;color:#f3f4f6'>{v}</td></tr>"
@@ -307,7 +337,7 @@ class NotificationDispatcher:
           <h2 style="color:#3b82f6">🔔 MarketHawk Alert</h2>
           <h3 style="color:#f3f4f6">{event.ticker} — {scanner_type_display}</h3>
           <p style="color:#9ca3af">{event.event_date}</p>
-          <p>{event.summary or "Scanner event detected."}</p>
+          <p>{summary}</p>
           <table style="border-collapse:collapse;margin-top:16px">
             {indicators_html}
           </table>
@@ -318,7 +348,9 @@ class NotificationDispatcher:
         """
 
     @staticmethod
-    def _build_chat_message(event: ScannerEvent) -> str:
+    def _build_chat_message(
+        event: ScannerEvent, alert_copy: dict | None = None
+    ) -> str:
         scanner_type_display = event.scanner_type.replace("_", " ").title()
         indicators = event.indicators or {}
         indicator_lines = "\n".join(
@@ -328,13 +360,15 @@ class NotificationDispatcher:
             f"🔔 *MarketHawk Alert*\n"
             f"*{event.ticker}* — {scanner_type_display}\n"
             f"_{event.event_date}_ · Severity: {event.severity}\n\n"
-            f"{event.summary or ''}\n\n"
+            f"{alert_copy['body'] if alert_copy else event.summary or ''}\n\n"
             f"{indicator_lines}"
         )
 
     @staticmethod
-    def _build_webhook_payload(event: ScannerEvent, rule: AlertRule) -> dict:
-        return {
+    def _build_webhook_payload(
+        event: ScannerEvent, rule: AlertRule, alert_copy: dict | None = None
+    ) -> dict:
+        payload = {
             "source": "MarketHawk",
             "rule_id": rule.id,
             "rule_name": rule.name,
@@ -345,6 +379,9 @@ class NotificationDispatcher:
             "event_date": str(event.event_date),
             "indicators": event.indicators or {},
         }
+        if alert_copy:
+            payload["alert_copy"] = alert_copy
+        return payload
 
 
 # ──────────────────────────────────────────────────────────────────────────────
