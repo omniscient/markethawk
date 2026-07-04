@@ -80,12 +80,12 @@ def test_config_enforce_t6_state():
     expected = {
         "refine": True,
         "plan": True,
-        "implement": False,
+        "implement": True,
         "conformance": True,
         "code-review": True,
     }
     assert enforce == expected, (
-        f"enforce must match the T3b intended state {expected}, got {enforce}"
+        f"enforce must match the T5 intended state {expected}, got {enforce}"
     )
 
 
