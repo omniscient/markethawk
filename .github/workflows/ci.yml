@@ -211,6 +211,46 @@ jobs:
         env:
           PYTHONPATH: dark-factory/scripts
 
+  adapter-validate:
+    name: Factory adapter validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      # dark-factory repo is public; clone provides factory_core.adapter + adapter_defaults
+      # without requiring GHCR package-visibility grants (checkout variant, P2 Task 6).
+      - name: Checkout dark-factory (public, factory_core.adapter loader)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: omniscient/dark-factory
+          path: _dark-factory
+
+      - name: Install pyyaml
+        run: pip install pyyaml
+
+      - name: Schema-validate .factory/adapter.yaml against the extracted factory
+        run: |
+          PYTHONPATH=_dark-factory/scripts python -m factory_core.adapter \
+            --clone-dir "$GITHUB_WORKSPACE" --validate
+
+      - name: Assert mirrored values equal factory defaults
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, '_dark-factory/scripts')
+          from factory_core import adapter, adapter_defaults
+          merged = adapter.load('$GITHUB_WORKSPACE')
+          for key in ('components', 'safety', 'memory_routing', 'deconflict'):
+              assert merged[key] == adapter_defaults.DEFAULTS[key], f'MIRROR DRIFT in {key}'
+          print('MIRROR-EQUAL')"
+
+      - name: Hooks are executable and parse
+        run: |
+          for h in .factory/hooks/*; do
+            [ -x "$h" ] || { echo "not executable: $h" >&2; exit 1; }
+            bash -n "$h"
+          done
+
   sast:
     runs-on: ubuntu-latest
     steps:
