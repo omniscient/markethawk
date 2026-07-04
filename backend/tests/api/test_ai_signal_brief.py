@@ -192,3 +192,35 @@ def test_ai_signal_brief_no_analog_event_reports_warning(db):
     assert any(
         warning["code"] == "no_historical_analogs" for warning in data["warnings"]
     )
+
+
+def test_historical_analogs_endpoint_enriches_events_explanations_and_outcomes(db):
+    _seed_event(
+        db,
+        ticker="OLD",
+        event_date=date(2026, 7, 1),
+        explanation=_explanation(warnings=["missing_float"]),
+    )
+    target = _seed_event(
+        db,
+        ticker="TGT",
+        event_date=date(2026, 7, 3),
+        explanation=_explanation(),
+        complete=False,
+    )
+
+    response = client.get(
+        f"/api/v1/outcomes/event/{target.id}/historical-analogs?min_sample_size=1"
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["target_event"]["ticker"] == "TGT"
+    assert data["target_event"]["why"] == [
+        "Volume and liquidity aligned with the scanner setup."
+    ]
+    assert data["analogs"][0]["ticker"] == "OLD"
+    assert data["analogs"][0]["event"]["criteria_passed"][0]["label"] == "Volume Spike"
+    assert data["analogs"][0]["event"]["criteria_failed"][0]["label"] == "News Catalyst"
+    assert data["analogs"][0]["event"]["warnings"][0]["code"] == "missing_float"
+    assert data["analogs"][0]["outcome_summary"]["eod_pct_change"] == 2.0

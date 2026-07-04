@@ -3,7 +3,7 @@ Outcomes router — scanner signal quality and outcome tracking endpoints.
 """
 
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import ValidationError
@@ -38,6 +38,7 @@ from app.services.explanation_archetype_service import ExplanationArchetypeServi
 from app.services.explanation_trait_performance import (
     ExplanationTraitPerformanceService,
 )
+from app.services.historical_analog_service import HistoricalAnalogService
 from app.services.outcome_service import OutcomeService
 from app.services.stats import StatsService
 from app.utils.db import get_or_404
@@ -63,6 +64,44 @@ def get_outcome_date_range(
             status_code=422,
             detail="; ".join(e["msg"] for e in exc.errors()),
         ) from exc
+
+
+def _analog_event_payload(event: ScannerEvent) -> dict[str, Any]:
+    explanation = event.explanation or {}
+    return {
+        "id": event.id,
+        "ticker": event.ticker,
+        "event_date": event.event_date.isoformat() if event.event_date else None,
+        "scanner_type": event.scanner_type,
+        "summary": event.summary,
+        "severity": event.severity,
+        "why": list(explanation.get("why") or []),
+        "criteria_passed": _criteria_payload(explanation.get("criteria_passed") or {}),
+        "criteria_failed": _criteria_payload(explanation.get("criteria_failed") or {}),
+        "warnings": [
+            {
+                "code": str(warning.get("code") or "quality_warning"),
+                "severity": warning.get("severity"),
+                "message": warning.get("message") or warning.get("code"),
+                "affected_inputs": warning.get("affected_inputs") or [],
+            }
+            for warning in explanation.get("data_quality_warnings") or []
+        ],
+    }
+
+
+def _criteria_payload(criteria: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "key": key,
+            "label": criterion.get("label") or key,
+            "observed": criterion.get("observed"),
+            "threshold": criterion.get("threshold"),
+            "operator": criterion.get("operator"),
+            "importance": criterion.get("importance"),
+        }
+        for key, criterion in sorted(criteria.items())
+    ]
 
 
 @router.get("/scorecard")
@@ -246,6 +285,41 @@ def get_ai_signal_brief(
 ):
     event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
     return AISignalBriefService().build(db, event)
+
+
+@router.get("/event/{event_id}/historical-analogs")
+def get_historical_analogs(
+    event_id: int,
+    limit: int = Query(default=5, ge=1, le=25),
+    min_sample_size: int = Query(default=5, ge=1, le=100),
+    same_scanner_only: bool = True,
+    db: Session = Depends(get_db),
+):
+    target = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    result = HistoricalAnalogService().find_similar_events(
+        db,
+        target_event_id=target.id,
+        limit=limit,
+        min_sample_size=min_sample_size,
+        same_scanner_only=same_scanner_only,
+    )
+    analog_ids = [analog["event_id"] for analog in result["analogs"]]
+    events_by_id = {
+        event.id: event
+        for event in db.query(ScannerEvent).filter(ScannerEvent.id.in_(analog_ids)).all()
+    }
+    return {
+        **result,
+        "target_event": _analog_event_payload(target),
+        "analogs": [
+            {
+                **analog,
+                "event": _analog_event_payload(events_by_id[analog["event_id"]]),
+            }
+            for analog in result["analogs"]
+            if analog["event_id"] in events_by_id
+        ],
+    }
 
 
 @router.get("/readiness/{ticker}", response_model=ReadinessResponse)
