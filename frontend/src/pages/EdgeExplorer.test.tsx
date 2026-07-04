@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   fetchExplanationTraits: vi.fn(),
   fetchExplanationArchetypes: vi.fn(),
   fetchEdgeDecay: vi.fn(),
+  fetchHistoricalAnalogs: vi.fn(),
 }));
 
 vi.mock('../api/client', () => ({
@@ -32,6 +33,7 @@ vi.mock('../api/outcomes', () => ({
   fetchExplanationTraits: (...args: unknown[]) => mocks.fetchExplanationTraits(...args),
   fetchExplanationArchetypes: (...args: unknown[]) => mocks.fetchExplanationArchetypes(...args),
   fetchEdgeDecay: (...args: unknown[]) => mocks.fetchEdgeDecay(...args),
+  fetchHistoricalAnalogs: (...args: unknown[]) => mocks.fetchHistoricalAnalogs(...args),
 }));
 
 vi.mock('recharts', () => {
@@ -147,6 +149,57 @@ const edgeDecay = [
   { period: '2026-W27', win_rate: 75, avg_mfe: 5.5, avg_mae: 1.1, sample_size: 8 },
 ];
 
+const analogResponse = {
+  target_event_id: 1,
+  target_scanner_type: 'pre_market_volume_spike',
+  target_event: {
+    id: 1,
+    ticker: 'TGT',
+    event_date: '2026-07-03',
+    scanner_type: 'pre_market_volume_spike',
+    summary: 'TGT signal',
+    severity: 'high',
+    why: ['Volume and liquidity aligned.'],
+    criteria_passed: [{ key: 'premarket.volume_spike', label: 'Volume Spike', observed: 6, threshold: 4, operator: '>=', importance: 1 }],
+    criteria_failed: [],
+    warnings: [],
+  },
+  sample_size: 1,
+  filters: {
+    scanner_type: 'pre_market_volume_spike',
+    same_scanner_only: true,
+    prior_only: true,
+    complete_only: true,
+  },
+  warnings: [],
+  analogs: [
+    {
+      event_id: 2,
+      ticker: 'OLD',
+      event_date: '2026-07-01',
+      scanner_type: 'pre_market_volume_spike',
+      similarity_score: 0.82,
+      score_components: { criterion_overlap: 1 },
+      matched_criteria: ['premarket.volume_spike'],
+      outcome_summary: { eod_pct_change: 2, mfe_pct: 4, mae_pct: 1 },
+      captured_snapshot_count: 2,
+      warning_count: 0,
+      event: {
+        id: 2,
+        ticker: 'OLD',
+        event_date: '2026-07-01',
+        scanner_type: 'pre_market_volume_spike',
+        summary: 'OLD signal',
+        severity: 'medium',
+        why: ['Historical setup matched the current event.'],
+        criteria_passed: [{ key: 'premarket.volume_spike', label: 'Volume Spike', observed: 5.8, threshold: 4, operator: '>=', importance: 1 }],
+        criteria_failed: [{ key: 'premarket.news_catalyst', label: 'News Catalyst', observed: false, threshold: true, operator: '==', importance: 0.5 }],
+        warnings: [],
+      },
+    },
+  ],
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.fetchScannerConfigs.mockResolvedValue([scannerConfig]);
@@ -156,6 +209,7 @@ beforeEach(() => {
   mocks.fetchExplanationTraits.mockResolvedValue(traitResponse);
   mocks.fetchExplanationArchetypes.mockResolvedValue(archetypeResponse);
   mocks.fetchEdgeDecay.mockResolvedValue(edgeDecay);
+  mocks.fetchHistoricalAnalogs.mockResolvedValue(analogResponse);
   mocks.apiGet.mockImplementation((url: string) => {
     if (url.startsWith('/scanner/edge-stats')) {
       return Promise.resolve({
@@ -216,5 +270,69 @@ describe('EdgeExplorer explanation intelligence', () => {
     expect(screen.queryByText(/^Volume Spike$/i)).not.toBeInTheDocument();
     expect(screen.getAllByText(/Missing Float \/ Weak Outcomes/i).length).toBeGreaterThan(1);
     expect(screen.getAllByText(/Volume Spike \/ Positive Outcomes/i)).toHaveLength(1);
+  });
+
+  it('drills into populated analog events from an archetype', async () => {
+    renderWithQuery(<EdgeExplorer />);
+
+    await screen.findByRole('option', { name: /Pre Market Volume Spike/i });
+    fireEvent.change(screen.getByLabelText(/Strategy filter/i), {
+      target: { value: 'pre_market_volume_spike' },
+    });
+    fireEvent.click(await screen.findAllByRole('button', { name: /Inspect analogs/i }).then((buttons) => buttons[0]));
+
+    expect(await screen.findByText(/Historical Analog Drill-Down/i)).toBeInTheDocument();
+    expect(await screen.findByText(/TGT \/ 2026-07-03/i)).toBeInTheDocument();
+    expect(screen.getByText(/OLD \/ 2026-07-01/i)).toBeInTheDocument();
+    expect(screen.getByText(/Historical setup matched the current event/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Volume Spike$/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/^News Catalyst$/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Stock/i })).toHaveAttribute('href', '/stock/OLD');
+    expect(mocks.fetchHistoricalAnalogs).toHaveBeenCalledWith(1);
+  });
+
+  it('shows a no-analog drill-down state', async () => {
+    mocks.fetchHistoricalAnalogs.mockResolvedValueOnce({
+      ...analogResponse,
+      sample_size: 0,
+      warnings: [{ code: 'no_historical_analogs', message: 'No complete prior analogs were available for this target event.' }],
+      analogs: [],
+    });
+    renderWithQuery(<EdgeExplorer />);
+
+    await screen.findByRole('option', { name: /Pre Market Volume Spike/i });
+    fireEvent.change(screen.getByLabelText(/Strategy filter/i), {
+      target: { value: 'pre_market_volume_spike' },
+    });
+    fireEvent.click(await screen.findAllByRole('button', { name: /Inspect analogs/i }).then((buttons) => buttons[0]));
+
+    expect(await screen.findByText(/No complete prior analogs were available/i)).toBeInTheDocument();
+    expect(screen.getByText(/No historical analogs matched this event/i)).toBeInTheDocument();
+  });
+
+  it('surfaces warning-heavy analog groups', async () => {
+    mocks.fetchHistoricalAnalogs.mockResolvedValueOnce({
+      ...analogResponse,
+      warnings: [{ code: 'weak_sample_size', message: 'Only 1 analog candidates were available.' }],
+      analogs: [
+        {
+          ...analogResponse.analogs[0],
+          event: {
+            ...analogResponse.analogs[0].event,
+            warnings: [{ code: 'missing_float', message: 'Float data was missing.' }],
+          },
+        },
+      ],
+    });
+    renderWithQuery(<EdgeExplorer />);
+
+    await screen.findByRole('option', { name: /Pre Market Volume Spike/i });
+    fireEvent.change(screen.getByLabelText(/Strategy filter/i), {
+      target: { value: 'pre_market_volume_spike' },
+    });
+    fireEvent.click(await screen.findAllByRole('button', { name: /Inspect analogs/i }).then((buttons) => buttons[0]));
+
+    expect(await screen.findByText(/Only 1 analog candidates were available/i)).toBeInTheDocument();
+    expect(screen.getByText(/Float data was missing/i)).toBeInTheDocument();
   });
 });

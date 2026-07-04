@@ -150,6 +150,57 @@ export interface ExplanationWarning {
   message: string;
 }
 
+export interface AnalogCriterion {
+  key: string;
+  label: string;
+  observed: unknown;
+  threshold: unknown;
+  operator: string | null;
+  importance: number | null;
+}
+
+export interface AnalogEvent {
+  id: number;
+  ticker: string;
+  event_date: string | null;
+  scanner_type: string;
+  summary: string | null;
+  severity: string | null;
+  why: string[];
+  criteria_passed: AnalogCriterion[];
+  criteria_failed: AnalogCriterion[];
+  warnings: Array<ExplanationWarning & { severity?: string | null; affected_inputs?: string[] }>;
+}
+
+export interface HistoricalAnalog {
+  event_id: number;
+  ticker: string;
+  event_date: string | null;
+  scanner_type: string;
+  similarity_score: number;
+  score_components: Record<string, number>;
+  matched_criteria: string[];
+  outcome_summary: Partial<OutcomeSummary> | null;
+  captured_snapshot_count: number;
+  warning_count: number;
+  event: AnalogEvent;
+}
+
+export interface HistoricalAnalogResponse {
+  target_event_id: number;
+  target_scanner_type: string;
+  target_event: AnalogEvent;
+  sample_size: number;
+  filters: {
+    scanner_type: string | null;
+    same_scanner_only: boolean;
+    prior_only: boolean;
+    complete_only: boolean;
+  };
+  warnings: ExplanationWarning[];
+  analogs: HistoricalAnalog[];
+}
+
 export interface ExplanationTrait {
   trait_type: string;
   trait_key: string;
@@ -257,6 +308,13 @@ export const fetchEdgeDecay = async (
 
 export const fetchEventOutcome = async (eventId: number): Promise<EventOutcome> => {
   const response = await apiClient.get(`/outcomes/event/${eventId}`);
+  return response.data;
+};
+
+export const fetchHistoricalAnalogs = async (
+  eventId: number,
+): Promise<HistoricalAnalogResponse> => {
+  const response = await apiClient.get(`/outcomes/event/${eventId}/historical-analogs`);
   return response.data;
 };
 

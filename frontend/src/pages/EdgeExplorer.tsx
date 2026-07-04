@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   BarChart2,
   TrendingUp,
@@ -46,11 +47,13 @@ import {
   fetchEdgeDecay,
   fetchExplanationArchetypes,
   fetchExplanationTraits,
+  fetchHistoricalAnalogs,
 } from '../api/outcomes';
 import type {
   EdgeDecayPoint,
   ExplanationArchetype,
   ExplanationTrait,
+  HistoricalAnalogResponse,
 } from '../api/outcomes';
 
 const fmtPct = (value: number | null | undefined): string => (
@@ -83,6 +86,7 @@ const EdgeExplorer: React.FC = () => {
   const [scannerType, setScannerType] = useState<string>('');
   const [traitFilter, setTraitFilter] = useState<string>('');
   const [archetypeFilter, setArchetypeFilter] = useState<string>('');
+  const [analogTargetEventId, setAnalogTargetEventId] = useState<number | null>(null);
 
   // Fetch scanner configurations for the dropdown
   const { data: configs } = useQuery({
@@ -138,6 +142,12 @@ const EdgeExplorer: React.FC = () => {
     queryKey: ['edgeExplanationDecay', scannerType, period],
     queryFn: () => fetchEdgeDecay(scannerType, { period }),
     enabled: !!scannerType,
+  });
+
+  const { data: analogDrilldown, isLoading: loadingAnalogs } = useQuery<HistoricalAnalogResponse>({
+    queryKey: ['edgeHistoricalAnalogs', analogTargetEventId],
+    queryFn: () => fetchHistoricalAnalogs(analogTargetEventId!),
+    enabled: analogTargetEventId !== null,
   });
 
   const triggerMutation = useMutation({
@@ -208,6 +218,7 @@ const EdgeExplorer: React.FC = () => {
                 setScannerType(e.target.value);
                 setTraitFilter('');
                 setArchetypeFilter('');
+                setAnalogTargetEventId(null);
               }}
             >
               <option value="">All Strategies</option>
@@ -295,6 +306,10 @@ const EdgeExplorer: React.FC = () => {
             archetypeChartData={archetypeChartData}
             edgeDecay={edgeDecay ?? []}
             isLoading={loadingTraits || loadingArchetypes || loadingEdgeDecay}
+            analogTargetEventId={analogTargetEventId}
+            onAnalogTarget={setAnalogTargetEventId}
+            analogDrilldown={analogDrilldown}
+            loadingAnalogs={loadingAnalogs}
           />
 
           {/* Distribution Charts */}
@@ -529,6 +544,10 @@ interface ExplanationResearchSectionProps {
   }>;
   edgeDecay: EdgeDecayPoint[];
   isLoading: boolean;
+  analogTargetEventId: number | null;
+  onAnalogTarget: (eventId: number) => void;
+  analogDrilldown: HistoricalAnalogResponse | undefined;
+  loadingAnalogs: boolean;
 }
 
 const ExplanationResearchSection: React.FC<ExplanationResearchSectionProps> = ({
@@ -545,6 +564,10 @@ const ExplanationResearchSection: React.FC<ExplanationResearchSectionProps> = ({
   archetypeChartData,
   edgeDecay,
   isLoading,
+  analogTargetEventId,
+  onAnalogTarget,
+  analogDrilldown,
+  loadingAnalogs,
 }) => (
   <Card title="Explanation Edge Research" icon={Target}>
     {!scannerType ? (
@@ -659,6 +682,15 @@ const ExplanationResearchSection: React.FC<ExplanationResearchSectionProps> = ({
                   winRate={archetype.return_profile.win_rate_pct}
                   avgMfe={archetype.return_profile.avg_mfe_pct}
                   warnings={archetype.warnings}
+                  action={archetype.event_ids[0] ? (
+                    <button
+                      type="button"
+                      onClick={() => onAnalogTarget(archetype.event_ids[0])}
+                      className="px-3 py-1.5 rounded-md bg-financial-blue/20 text-financial-blue hover:bg-financial-blue hover:text-white text-[10px] font-black uppercase tracking-widest transition-colors"
+                    >
+                      Inspect analogs
+                    </button>
+                  ) : undefined}
                 />
               ))}
             </div>
@@ -685,6 +717,13 @@ const ExplanationResearchSection: React.FC<ExplanationResearchSectionProps> = ({
             </ComposedChart>
           </ResponsiveContainer>
         </ExplanationPanel>
+
+        <AnalogDrilldownPanel
+          analogTargetEventId={analogTargetEventId}
+          data={analogDrilldown}
+          isLoading={loadingAnalogs}
+          scannerType={scannerType}
+        />
       </div>
     )}
   </Card>
@@ -717,7 +756,8 @@ const ExplanationSummaryRow: React.FC<{
   winRate: number | null | undefined;
   avgMfe: number | null | undefined;
   warnings: Array<{ code: string; message: string }>;
-}> = ({ label, prefix, sampleSize, winRate, avgMfe, warnings }) => (
+  action?: React.ReactNode;
+}> = ({ label, prefix, sampleSize, winRate, avgMfe, warnings, action }) => (
   <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/30">
     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
       <div>
@@ -736,6 +776,7 @@ const ExplanationSummaryRow: React.FC<{
           <div className="font-bold text-positive">{fmtPct(avgMfe)}</div>
         </div>
       </div>
+      {action}
     </div>
     {warnings.length > 0 && (
       <div className="mt-2 flex items-start gap-2 text-xs text-amber-300">
@@ -745,5 +786,159 @@ const ExplanationSummaryRow: React.FC<{
     )}
   </div>
 );
+
+const AnalogDrilldownPanel: React.FC<{
+  analogTargetEventId: number | null;
+  data: HistoricalAnalogResponse | undefined;
+  isLoading: boolean;
+  scannerType: string;
+}> = ({ analogTargetEventId, data, isLoading, scannerType }) => (
+  <section className="border border-gray-800 rounded-lg p-4 bg-gray-900/30">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+      <div>
+        <h3 className="text-xs font-black uppercase tracking-widest text-financial-light">
+          Historical Analog Drill-Down
+        </h3>
+        <p className="text-xs text-gray-500 mt-1">
+          Inspect matching historical events behind the selected archetype.
+        </p>
+      </div>
+      {analogTargetEventId && (
+        <Link
+          to={`/scorecard/${scannerType}`}
+          className="text-[10px] font-black uppercase tracking-widest text-financial-blue hover:text-white"
+        >
+          Open scorecard detail
+        </Link>
+      )}
+    </div>
+
+    {analogTargetEventId === null ? (
+      <div className="flex items-center justify-center h-28 border border-dashed border-gray-800 rounded-lg text-sm text-gray-500">
+        Choose Inspect analogs on an archetype to review its matching event set.
+      </div>
+    ) : isLoading ? (
+      <div className="flex items-center justify-center h-28 text-gray-500 text-xs uppercase tracking-widest">
+        Loading historical analogs...
+      </div>
+    ) : !data ? (
+      <div className="flex items-center justify-center h-28 border border-dashed border-gray-800 rounded-lg text-sm text-gray-500">
+        Analog data is unavailable for this event.
+      </div>
+    ) : (
+      <div className="space-y-4">
+        {data.warnings.length > 0 && (
+          <div className="border border-amber-500/30 bg-amber-500/10 rounded-lg p-3 text-xs text-amber-300 space-y-1">
+            {data.warnings.map((warning) => (
+              <div key={warning.code}>{warning.message}</div>
+            ))}
+          </div>
+        )}
+
+        <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/30">
+          <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+            Target Event
+          </div>
+          <div className="mt-1 text-sm font-bold text-financial-light">
+            {data.target_event.ticker} / {data.target_event.event_date ?? 'No date'}
+          </div>
+          <ExplanationDetail event={data.target_event} />
+        </div>
+
+        {data.analogs.length === 0 ? (
+          <div className="flex items-center justify-center h-28 border border-dashed border-gray-800 rounded-lg text-sm text-gray-500">
+            No historical analogs matched this event.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {data.analogs.map((analog) => (
+              <div key={analog.event_id} className="border border-gray-800 rounded-lg p-3 bg-gray-950/30">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-financial-light">
+                      {analog.ticker} / {analog.event_date ?? 'No date'}
+                    </div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                      Similarity {(analog.similarity_score * 100).toFixed(1)}% / snapshots {analog.captured_snapshot_count}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest">
+                    <Link to={`/stock/${analog.ticker}`} className="text-financial-blue hover:text-white">
+                      Stock
+                    </Link>
+                    <Link to={`/scorecard/${analog.scanner_type}`} className="text-financial-blue hover:text-white">
+                      Scorecard
+                    </Link>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  <Metric label="EOD" value={fmtPct(analog.outcome_summary?.eod_pct_change)} />
+                  <Metric label="MFE" value={fmtPct(analog.outcome_summary?.mfe_pct)} />
+                  <Metric label="MAE" value={fmtPct(analog.outcome_summary?.mae_pct)} />
+                </div>
+                <ExplanationDetail event={analog.event} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+  </section>
+);
+
+const Metric: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div>
+    <div className="text-gray-500">{label}</div>
+    <div className="font-bold text-financial-light">{value}</div>
+  </div>
+);
+
+const ExplanationDetail: React.FC<{ event: HistoricalAnalogResponse['target_event'] }> = ({ event }) => (
+  <div className="mt-3 space-y-3">
+    {event.why.length > 0 && (
+      <div>
+        <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Why</div>
+        <ul className="space-y-1 text-xs text-gray-300">
+          {event.why.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      </div>
+    )}
+    <CriteriaList title="Key Criteria" rows={event.criteria_passed} />
+    <CriteriaList title="Failed Criteria" rows={event.criteria_failed} />
+    {event.warnings.length > 0 && (
+      <div>
+        <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Warnings</div>
+        <div className="space-y-1">
+          {event.warnings.map((warning) => (
+            <div key={warning.code} className="text-xs text-amber-300">
+              {warning.message}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+);
+
+const CriteriaList: React.FC<{
+  title: string;
+  rows: HistoricalAnalogResponse['target_event']['criteria_passed'];
+}> = ({ title, rows }) => {
+  if (rows.length === 0) return null;
+  return (
+    <div>
+      <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">{title}</div>
+      <div className="flex flex-wrap gap-2">
+        {rows.map((criterion) => (
+          <span key={criterion.key} className="px-2 py-1 rounded-md bg-gray-800 text-xs text-gray-300">
+            {criterion.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default EdgeExplorer;
