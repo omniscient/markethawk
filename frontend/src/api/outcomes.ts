@@ -201,6 +201,42 @@ export interface HistoricalAnalogResponse {
   analogs: HistoricalAnalog[];
 }
 
+export interface AISignalBrief {
+  schema_version: string;
+  event_id: number;
+  facts: {
+    ticker: string;
+    event_date: string | null;
+    scanner_type: string;
+    severity: string | null;
+    summary: string | null;
+    signal_quality_score: number | null;
+    regime: string | null;
+  };
+  why: string[];
+  risks: string[];
+  warnings: Array<ExplanationWarning & { severity?: string | null }>;
+  analogs: HistoricalAnalog[];
+  outcome_context: {
+    summary: Partial<OutcomeSummary> | null;
+    snapshots: Array<{
+      interval_key: string;
+      pct_change: number | null;
+      snapshot_price: number | null;
+      status: string;
+      captured_at: string | null;
+    }>;
+  };
+  archetype: {
+    cluster_id: number;
+    label: string;
+    event_count: number;
+    centroid: Record<string, unknown>;
+    return_profile: Record<string, unknown>;
+  } | null;
+  forbidden_claims: string[];
+}
+
 export interface ExplanationTrait {
   trait_type: string;
   trait_key: string;
@@ -315,6 +351,11 @@ export const fetchHistoricalAnalogs = async (
   eventId: number,
 ): Promise<HistoricalAnalogResponse> => {
   const response = await apiClient.get(`/outcomes/event/${eventId}/historical-analogs`);
+  return response.data;
+};
+
+export const fetchAISignalBrief = async (eventId: number): Promise<AISignalBrief> => {
+  const response = await apiClient.get(`/outcomes/event/${eventId}/ai-signal-brief`);
   return response.data;
 };
 

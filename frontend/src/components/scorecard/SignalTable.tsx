@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Check, X, Sparkles } from 'lucide-react';
+import { fetchAISignalBrief } from '../../api/outcomes';
+import type { AISignalBrief } from '../../api/outcomes';
 import { useSignals } from '../../hooks/useScorecard';
 
 interface SignalTableProps {
@@ -60,6 +63,7 @@ const SignalTable: React.FC<SignalTableProps> = ({ scannerType, startDate, endDa
   const [sortBy, setSortBy] = useState<SortField>('event_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(0);
+  const [expandedEventId, setExpandedEventId] = useState<number | null>(null);
 
   const { data, isLoading } = useSignals(scannerType, {
     start_date: startDate,
@@ -176,14 +180,13 @@ const SignalTable: React.FC<SignalTableProps> = ({ scannerType, startDate, endDa
               <th className="px-3 py-3 text-right">MFE:MAE</th>
               <th className="px-3 py-3 text-center">FT</th>
               <th className="px-3 py-3 text-center">Status</th>
+              <th className="px-3 py-3 text-center">Intel</th>
             </tr>
           </thead>
           <tbody>
             {data.signals.map((signal) => (
-              <tr
-                key={signal.id}
-                className="border-b border-gray-800 hover:bg-gray-800/30 transition-colors"
-              >
+              <React.Fragment key={signal.id}>
+              <tr className="border-b border-gray-800 hover:bg-gray-800/30 transition-colors">
                 <td className="px-3 py-2.5 text-sm font-mono text-gray-300">{signal.event_date}</td>
                 <td className="px-3 py-2.5">
                   <Link
@@ -227,7 +230,26 @@ const SignalTable: React.FC<SignalTableProps> = ({ scannerType, startDate, endDa
                     <span className="text-[10px] font-bold text-yellow-500/70 uppercase">pending</span>
                   )}
                 </td>
+                <td className="px-3 py-2.5 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedEventId(expandedEventId === signal.id ? null : signal.id)}
+                    aria-expanded={expandedEventId === signal.id}
+                    className="inline-flex items-center gap-1 rounded border border-gray-700 px-2 py-1 text-[11px] font-semibold text-gray-300 hover:border-financial-blue hover:text-financial-blue"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    Brief
+                  </button>
+                </td>
               </tr>
+              {expandedEventId === signal.id && (
+                <tr className="border-b border-gray-800 bg-gray-950/30">
+                  <td colSpan={11} className="px-3 py-3">
+                    <SignalIntelligencePanel eventId={signal.id} />
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -235,5 +257,126 @@ const SignalTable: React.FC<SignalTableProps> = ({ scannerType, startDate, endDa
     </div>
   );
 };
+
+const SignalIntelligencePanel: React.FC<{ eventId: number }> = ({ eventId }) => {
+  const { data, isLoading, isError } = useQuery<AISignalBrief>({
+    queryKey: ['aiSignalBrief', eventId],
+    queryFn: () => fetchAISignalBrief(eventId),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="rounded border border-gray-800 bg-gray-950/50 p-4 text-sm text-gray-400">
+        Loading deterministic brief...
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="rounded border border-red-900/60 bg-red-950/20 p-4 text-sm text-red-300">
+        Deterministic brief is unavailable.
+      </div>
+    );
+  }
+
+  const summary = data.outcome_context.summary;
+  const analogs = data.analogs.slice(0, 3);
+
+  return (
+    <div className="rounded border border-gray-800 bg-gray-950/60 p-4">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold text-financial-light">
+            Deterministic Signal Brief
+          </div>
+          <div className="mt-1 text-xs text-gray-400">
+            Facts only. Generated narrative can be added later, but this panel does not infer beyond stored data.
+          </div>
+        </div>
+        <div className="text-xs font-mono text-gray-400">
+          {data.facts.ticker} - {data.facts.event_date ?? 'no date'}
+        </div>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        <BriefBlock title="Explanation">
+          {data.why.length > 0 ? (
+            <ul className="space-y-1">
+              {data.why.map((why) => (
+                <li key={why}>{why}</li>
+              ))}
+            </ul>
+          ) : (
+            <span>No explanation bullets are stored.</span>
+          )}
+        </BriefBlock>
+
+        <BriefBlock title="Expected behavior">
+          {analogs.length > 0 ? (
+            <ul className="space-y-2">
+              {analogs.map((analog) => (
+                <li key={analog.event_id} className="flex items-center justify-between gap-3">
+                  <span>
+                    <span className="font-semibold text-financial-light">{analog.ticker}</span>
+                    <span className="text-gray-500"> - {Math.round(analog.similarity_score * 100)}% similar</span>
+                  </span>
+                  <span className={colorForPct(analog.outcome_summary?.eod_pct_change ?? null)}>
+                    EOD {fmtPct(analog.outcome_summary?.eod_pct_change ?? null)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span>No historical analogs were available.</span>
+          )}
+        </BriefBlock>
+
+        <BriefBlock title="Archetype / Outcome">
+          <div className="space-y-2">
+            <div>
+              <span className="text-gray-500">Archetype </span>
+              <span className="font-semibold text-financial-light">
+                {data.archetype ? `${data.archetype.label} (${data.archetype.event_count})` : 'Unassigned'}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 font-mono">
+              <Metric label="EOD" value={summary?.eod_pct_change ?? null} />
+              <Metric label="MFE" value={summary?.mfe_pct ?? null} />
+              <Metric label="MAE" value={summary?.mae_pct ?? null} />
+            </div>
+          </div>
+        </BriefBlock>
+      </div>
+
+      {data.risks.length > 0 && (
+        <div className="mt-3 rounded border border-yellow-700/40 bg-yellow-950/20 p-3">
+          <div className="mb-1 text-[11px] font-bold uppercase text-yellow-300">Risk flags</div>
+          <ul className="space-y-1 text-xs text-yellow-100">
+            {data.risks.map((risk) => (
+              <li key={risk}>{risk}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const BriefBlock: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="rounded border border-gray-800 bg-gray-900/40 p-3 text-xs text-gray-300">
+    <div className="mb-2 text-[11px] font-bold uppercase text-gray-500">{title}</div>
+    {children}
+  </div>
+);
+
+const Metric: React.FC<{ label: string; value: number | null }> = ({ label, value }) => (
+  <div>
+    <div className="text-[10px] uppercase text-gray-500">{label}</div>
+    <div className={colorForPct(value)}>
+      {label} {fmtPct(value)}
+    </div>
+  </div>
+);
 
 export default SignalTable;
