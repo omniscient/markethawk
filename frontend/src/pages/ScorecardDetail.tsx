@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
-import { useScorecard, useEdgeDecay, useIntervals, useDistribution, useExplanationTraits, useExplanationArchetypes } from '../hooks/useScorecard';
+import { useScorecard, useEdgeDecay, useIntervals, useDistribution, useRegimeBreakdown, useExplanationTraits, useExplanationArchetypes } from '../hooks/useScorecard';
 import type { ExplanationArchetype, ExplanationTrait } from '../api/outcomes';
 import HeroMetrics from '../components/scorecard/HeroMetrics';
 import EdgeDecayChart from '../components/scorecard/EdgeDecayChart';
@@ -9,6 +9,7 @@ import DistributionChart from '../components/scorecard/DistributionChart';
 import IntervalTable from '../components/scorecard/IntervalTable';
 import BackfillPanel from '../components/scorecard/BackfillPanel';
 import SignalTable from '../components/scorecard/SignalTable';
+import RegimePerformancePanel from '../components/scorecard/RegimePerformancePanel';
 
 type Period = '7d' | '30d' | '90d' | 'all';
 
@@ -58,6 +59,7 @@ const ScorecardDetail: React.FC = () => {
   const { data: edgeDecay, isLoading: loadingEdge } = useEdgeDecay(scannerType, dates);
   const { data: intervals, isLoading: loadingIntervals } = useIntervals(scannerType);
   const { data: distribution, isLoading: loadingDist } = useDistribution(scannerType);
+  const { data: regimeBreakdown, isLoading: loadingRegimes } = useRegimeBreakdown(scannerType, dates);
   const { data: traits, isLoading: loadingTraits } = useExplanationTraits(scannerType, scorecardParams);
   const { data: archetypes, isLoading: loadingArchetypes } = useExplanationArchetypes(scannerType, scorecardParams);
 
@@ -143,6 +145,8 @@ const ScorecardDetail: React.FC = () => {
 
       {/* Hero Metrics */}
       {scorecard && <HeroMetrics scorecard={scorecard} />}
+
+      <RegimePerformancePanel data={regimeBreakdown} isLoading={loadingRegimes} />
 
       {/* Explanation Intelligence */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
