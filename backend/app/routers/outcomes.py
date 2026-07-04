@@ -34,6 +34,7 @@ from app.schemas.outcome import (
 from app.schemas.regime import RegimeBreakdownResponse
 from app.services.ai_signal_brief import AISignalBriefService
 from app.services.data_readiness import DataReadinessService
+from app.services.embedding_service import EmbeddingService
 from app.services.explanation_archetype_service import ExplanationArchetypeService
 from app.services.explanation_trait_performance import (
     ExplanationTraitPerformanceService,
@@ -278,6 +279,21 @@ def get_event_outcome(
     )
 
     return EventOutcomeResponse(summary=summary, snapshots=snapshots)
+
+
+@router.get("/semantic-search")
+def semantic_search(
+    query: str = Query(..., min_length=1),
+    top_k: int = Query(default=10, ge=1, le=50),
+    source_type: list[str] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    return EmbeddingService().search(
+        db,
+        query_text=query,
+        top_k=top_k,
+        source_types=source_type,
+    )
 
 
 @router.get("/event/{event_id}/ai-signal-brief")
