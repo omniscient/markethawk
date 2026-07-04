@@ -13,6 +13,7 @@ from app.models.alert_rule import AlertRule
 from app.models.scanner_event import ScannerEvent
 from app.services.alert_service import (
     AlertRuleService,
+    NotificationDispatcher,
     _validate_jsonb_dict,
     save_event,
 )
@@ -244,3 +245,53 @@ def test_save_event_persists_explanation_payload(mock_trigger, db: Session):
     event = db.query(ScannerEvent).filter(ScannerEvent.id == result["id"]).one()
     assert event.explanation == explanation
     mock_trigger.assert_called_once_with(result["id"])
+
+
+def test_payload_builders_can_use_generated_alert_copy(db: Session):
+    rule = _rule(db)
+    event = _event(db)
+    copy = {
+        "source": "generated",
+        "title": "MarketHawk Alert: AAPL - Generated",
+        "summary": "Generated short copy.",
+        "body": "Generated long copy with risks and data-quality caveats.",
+        "risk_caveats": ["Incomplete outcome."],
+        "data_quality_caveats": ["Quote data is stale."],
+    }
+
+    push = NotificationDispatcher._build_push_payload(event, alert_copy=copy)
+    email = NotificationDispatcher._build_email_body(event, alert_copy=copy)
+    chat = NotificationDispatcher._build_chat_message(event, alert_copy=copy)
+    webhook = NotificationDispatcher._build_webhook_payload(event, rule, alert_copy=copy)
+
+    assert push["title"] == copy["title"]
+    assert push["body"] == copy["summary"]
+    assert "Generated long copy" in email
+    assert "Generated long copy" in chat
+    assert webhook["alert_copy"]["source"] == "generated"
+    assert webhook["alert_copy"]["body"] == copy["body"]
+
+
+@patch("app.services.alert_service.AlertCopyService")
+@patch.object(NotificationDispatcher, "_send_email")
+def test_dispatch_uses_alert_copy_for_email(mock_send_email, mock_copy_cls, db: Session):
+    rule = _rule(db, channels=["email"])
+    rule.channel_config = {"email": "desk@example.com"}
+    event = _event(db)
+    mock_copy_cls.return_value.build.return_value = {
+        "source": "generated",
+        "title": "MarketHawk Alert: AAPL - Generated",
+        "summary": "Generated short copy.",
+        "body": "Generated long copy.",
+        "risk_caveats": [],
+        "data_quality_caveats": [],
+    }
+
+    NotificationDispatcher.dispatch(rule, event, db)
+
+    assert mock_send_email.call_args.kwargs["subject"] == (
+        "MarketHawk Alert: AAPL - Generated"
+    )
+    assert "Generated long copy." in mock_send_email.call_args.kwargs["body"]
+    log = db.query(AlertDeliveryLog).filter_by(rule_id=rule.id).one()
+    assert log.status == "sent"
