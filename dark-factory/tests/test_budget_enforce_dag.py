@@ -85,7 +85,7 @@ def test_config_enforce_t6_state():
         "code-review": True,
     }
     assert enforce == expected, (
-        f"enforce must match the T5 intended state {expected}, got {enforce}"
+        f"enforce must match the T6 intended state {expected}, got {enforce}"
     )
 
 

@@ -115,7 +115,7 @@ token_optimization:
   enforce:
     refine: true               # T3b: enforcement live — #733 via #731 scorecard: 0% section_at_risk
     plan: true                 # T3b: enforcement live — #733 via #731 scorecard: 0% section_at_risk
-    implement: true               # T5 (#734): enforcement live — #730/#731 calibration, arch-cap raise → 0% section_at_risk at 30000
+    implement: true            # T5 (#734): enforcement live — #730/#731 calibration, arch-cap raise → 0% section_at_risk at 30000
     conformance: true          # T6: enforcement live — 0% section_at_risk in T5 calibration
     code-review: true          # T6: enforcement live — 0% section_at_risk in T5 calibration
   issue_context:
