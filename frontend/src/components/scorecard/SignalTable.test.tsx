@@ -1,13 +1,20 @@
-import { vi, describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { renderWithQuery } from '../../test-utils/renderWithQuery';
 import SignalTable from './SignalTable';
-import type { SignalListItem } from '../../api/outcomes';
+import type { AISignalBrief, SignalListItem } from '../../api/outcomes';
 
-const mockUseSignals = vi.fn();
+const mocks = vi.hoisted(() => ({
+  useSignals: vi.fn(),
+  fetchAISignalBrief: vi.fn(),
+}));
 
 vi.mock('../../hooks/useScorecard', () => ({
-  useSignals: (...args: unknown[]) => mockUseSignals(...args),
+  useSignals: (...args: unknown[]) => mocks.useSignals(...args),
+}));
+
+vi.mock('../../api/outcomes', () => ({
+  fetchAISignalBrief: (...args: unknown[]) => mocks.fetchAISignalBrief(...args),
 }));
 
 const makeSignal = (overrides: Partial<SignalListItem> = {}): SignalListItem => ({
@@ -29,9 +36,179 @@ const makeSignal = (overrides: Partial<SignalListItem> = {}): SignalListItem => 
   ...overrides,
 });
 
+describe('SignalTable - event intelligence brief', () => {
+  beforeEach(() => {
+    mocks.useSignals.mockReturnValue({
+      data: {
+        signals: [makeSignal({ ticker: 'TSLA', id: 1 })],
+        total: 1,
+        limit: 20,
+        offset: 0,
+      },
+      isLoading: false,
+    });
+    mocks.fetchAISignalBrief.mockResolvedValue(makeBrief());
+  });
+
+  it('shows deterministic explanation, analogs, expected behavior, archetype, and outcome context for a complete event', async () => {
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+
+    expect(await screen.findByText('Deterministic Signal Brief')).toBeInTheDocument();
+    expect(screen.getByText(/Facts only/i)).toBeInTheDocument();
+    expect(screen.getByText('Relative volume exceeded the configured threshold.')).toBeInTheDocument();
+    expect(screen.getByText(/NVDA/)).toBeInTheDocument();
+    expect(screen.getByText(/expected behavior/i)).toBeInTheDocument();
+    expect(screen.getByText(/Gap continuation/)).toBeInTheDocument();
+    expect(screen.getByText(/EOD \+1.50%/)).toBeInTheDocument();
+    expect(screen.getByText(/MFE \+3.20%/)).toBeInTheDocument();
+    expect(screen.getByText(/MAE -1.10%/)).toBeInTheDocument();
+  });
+
+  it('shows partial-state copy when explanation, analogs, archetype, and complete outcome are unavailable', async () => {
+    mocks.fetchAISignalBrief.mockResolvedValueOnce(makeBrief({
+      why: [],
+      analogs: [],
+      archetype: null,
+      outcome_context: { summary: null, snapshots: [] },
+      risks: [
+        'Scanner explanation is missing.',
+        'Outcome summary is incomplete or unavailable.',
+        'No explanation-aware archetype is assigned yet.',
+      ],
+    }));
+
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+
+    expect(await screen.findByText('No explanation bullets are stored.')).toBeInTheDocument();
+    expect(screen.getByText('No historical analogs were available.')).toBeInTheDocument();
+    expect(screen.getByText(/Unassigned/)).toBeInTheDocument();
+    expect(screen.getByText('Scanner explanation is missing.')).toBeInTheDocument();
+    expect(screen.getByText('Outcome summary is incomplete or unavailable.')).toBeInTheDocument();
+  });
+
+  it('keeps no-outcome events factual and labels the missing outcome context', async () => {
+    mocks.useSignals.mockReturnValue({
+      data: {
+        signals: [
+          makeSignal({
+            id: 9,
+            ticker: 'MSFT',
+            eod_pct_change: null,
+            mfe_pct: null,
+            mae_pct: null,
+            mfe_mae_ratio: null,
+            follow_through: null,
+            is_complete: false,
+          }),
+        ],
+        total: 1,
+        limit: 20,
+        offset: 0,
+      },
+      isLoading: false,
+    });
+    mocks.fetchAISignalBrief.mockResolvedValueOnce(makeBrief({
+      event_id: 9,
+      facts: {
+        ticker: 'MSFT',
+        event_date: '2026-01-15',
+        scanner_type: 'pre_market_volume_spike',
+        severity: 'high',
+        summary: null,
+        signal_quality_score: null,
+        regime: null,
+      },
+      outcome_context: { summary: null, snapshots: [] },
+      risks: ['Outcome summary is incomplete or unavailable.'],
+    }));
+
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+
+    expect(await screen.findByText('Deterministic Signal Brief')).toBeInTheDocument();
+    expect(screen.getAllByText(/MSFT/).length).toBeGreaterThan(1);
+    expect(screen.getByText('Outcome summary is incomplete or unavailable.')).toBeInTheDocument();
+    expect(screen.getByText(/Generated narrative can be added later/i)).toBeInTheDocument();
+  });
+});
+
+const makeBrief = (overrides: Partial<AISignalBrief> = {}): AISignalBrief => ({
+  schema_version: 'ai_signal_brief.v1',
+  event_id: 1,
+  facts: {
+    ticker: 'TSLA',
+    event_date: '2026-01-15',
+    scanner_type: 'pre_market_volume_spike',
+    severity: 'high',
+    summary: 'Premarket volume expansion with elevated gap.',
+    signal_quality_score: 82,
+    regime: 'risk_on',
+  },
+  why: ['Relative volume exceeded the configured threshold.'],
+  risks: [],
+  warnings: [],
+  analogs: [
+    {
+      event_id: 22,
+      ticker: 'NVDA',
+      event_date: '2025-11-03',
+      scanner_type: 'pre_market_volume_spike',
+      similarity_score: 0.87,
+      score_components: {},
+      matched_criteria: ['premarket.volume_spike'],
+      outcome_summary: {
+        eod_pct_change: 2.4,
+        mfe_pct: 4.1,
+        mae_pct: -0.8,
+      },
+      captured_snapshot_count: 4,
+      warning_count: 0,
+      event: {
+        id: 22,
+        ticker: 'NVDA',
+        event_date: '2025-11-03',
+        scanner_type: 'pre_market_volume_spike',
+        summary: null,
+        severity: 'medium',
+        why: [],
+        criteria_passed: [],
+        criteria_failed: [],
+        warnings: [],
+      },
+    },
+  ],
+  outcome_context: {
+    summary: {
+      eod_pct_change: 1.5,
+      mfe_pct: 3.2,
+      mae_pct: -1.1,
+      follow_through: true,
+      is_complete: true,
+    },
+    snapshots: [],
+  },
+  archetype: {
+    cluster_id: 7,
+    label: 'Gap continuation',
+    event_count: 18,
+    centroid: {},
+    return_profile: {},
+  },
+  forbidden_claims: ['Do not claim guaranteed future returns.'],
+  ...overrides,
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.fetchAISignalBrief.mockResolvedValue(makeBrief());
+});
+
 describe('SignalTable — loading state', () => {
   it('shows loading skeleton when isLoading', () => {
-    mockUseSignals.mockReturnValue({ data: undefined, isLoading: true });
+    mocks.useSignals.mockReturnValue({ data: undefined, isLoading: true });
     const { container } = renderWithQuery(
       <SignalTable scannerType="pre_market_volume_spike" />,
     );
@@ -39,7 +216,7 @@ describe('SignalTable — loading state', () => {
   });
 
   it('shows "Signals" heading in loading state', () => {
-    mockUseSignals.mockReturnValue({ data: undefined, isLoading: true });
+    mocks.useSignals.mockReturnValue({ data: undefined, isLoading: true });
     renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
     expect(screen.getByText(/^Signals$/)).toBeInTheDocument();
   });
@@ -47,7 +224,7 @@ describe('SignalTable — loading state', () => {
 
 describe('SignalTable — empty state', () => {
   it('shows "No signals found" when data total is 0', () => {
-    mockUseSignals.mockReturnValue({
+    mocks.useSignals.mockReturnValue({
       data: { signals: [], total: 0, limit: 20, offset: 0 },
       isLoading: false,
     });
@@ -56,7 +233,7 @@ describe('SignalTable — empty state', () => {
   });
 
   it('shows "No signals found" when data is undefined', () => {
-    mockUseSignals.mockReturnValue({ data: undefined, isLoading: false });
+    mocks.useSignals.mockReturnValue({ data: undefined, isLoading: false });
     renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
     expect(screen.getByText(/No signals found/i)).toBeInTheDocument();
   });
@@ -64,7 +241,7 @@ describe('SignalTable — empty state', () => {
 
 describe('SignalTable — data state', () => {
   beforeEach(() => {
-    mockUseSignals.mockReturnValue({
+    mocks.useSignals.mockReturnValue({
       data: {
         signals: [makeSignal({ ticker: 'TSLA', id: 1 })],
         total: 1,
@@ -109,7 +286,7 @@ describe('SignalTable — data state', () => {
 
 describe('SignalTable — sorting', () => {
   beforeEach(() => {
-    mockUseSignals.mockReturnValue({
+    mocks.useSignals.mockReturnValue({
       data: { signals: [makeSignal()], total: 1, limit: 20, offset: 0 },
       isLoading: false,
     });
@@ -118,7 +295,7 @@ describe('SignalTable — sorting', () => {
   it('clicking Date header calls useSignals with changed sort params', () => {
     renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
     fireEvent.click(screen.getByText(/^Date/i));
-    expect(mockUseSignals).toHaveBeenCalled();
+    expect(mocks.useSignals).toHaveBeenCalled();
   });
 
   it('clicking Ticker header triggers a re-render', () => {
@@ -130,7 +307,7 @@ describe('SignalTable — sorting', () => {
 
 describe('SignalTable — pagination', () => {
   it('shows pagination controls when total > PAGE_SIZE', () => {
-    mockUseSignals.mockReturnValue({
+    mocks.useSignals.mockReturnValue({
       data: {
         signals: Array.from({ length: 20 }, (_, i) => makeSignal({ id: i + 1, ticker: `SYM${i}` })),
         total: 45,
