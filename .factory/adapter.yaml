@@ -1,0 +1,123 @@
+# MarketHawk Dark Factory adapter (.factory/adapter.yaml)
+#
+# Explicit mirror of the extracted factory's built-in defaults
+# (dark-factory: scripts/factory_core/adapter_defaults.py). Every mirrored value
+# EQUALS the default — behavior is bit-identical; the point is that MarketHawk
+# no longer depends on those defaults surviving future factory releases.
+# Deep-merged over defaults at dispatch; validated by MarketHawk CI (adapter-validate)
+# and at factory dispatch (fail-closed with a ticket comment on invalid).
+#
+# token_optimization is DECLARATIVE-ONLY until the factory re-points config
+# resolution from .claude/skills/refinement/config.yaml to this adapter
+# (dark-factory follow-up; must land before P3 deletes the config from this repo).
+# Until then .claude/skills/refinement/config.yaml remains authoritative — keep
+# the two in sync when calibrating budgets.
+schema_version: 1
+
+components:
+  backend:
+    - "Scan Execution Flow"
+    - "Backend Module Map"
+    - "Error Tracking System"
+    - "Celery Task Architecture"
+    - "Test Architecture"
+  frontend:
+    - "Frontend Architecture"
+    - "Backend Module Map"
+    - "Error Tracking System"
+  dark-factory:
+    - "Service Topology"
+    - "Celery Task Architecture"
+    - "Metrics and Observability"
+  infrastructure:
+    - "Service Topology"
+    - "IB Gateway Integration"
+    - "Live Scanner"
+    - "Celery Task Architecture"
+    - "Catch Up Feature (Universe Aggregate Backfill)"
+    - "Metrics and Observability"
+
+safety:
+  sensitive_keywords: "trading|ibkr|live order|notional|authentication|authorization|authn|authz|jwt|oauth|rbac|/auth"
+  hard_exclude_paths:
+    - "dark-factory/"
+    - ".archon/"
+    - "scheduler.sh"
+    - "factory_core/"
+    - "app/services/trading"
+    - "app/tasks/trading.py"
+    - "app/core/auth"
+    - "app/routers/auth"
+  dispatch_ceiling_keywords: "migration|migrate|performance|perf|architectur|refactor"
+  critical_diff_paths:
+    - "^alembic/versions/"
+    - "^backend/app/routers/auth"
+    - "^backend/app/core/auth"
+    - "app/services/trading"
+    - "app/tasks/trading\\.py"
+    - "^dark-factory/"
+  migration_seed_auth_patterns:
+    - "^alembic/versions/"
+    - "^dark-factory/seed/"
+    - "seed.*\\.sql$"
+    - "^backend/app/routers/auth\\.py$"
+  main_red_allowed_paths:
+    - "backend/"
+    - "frontend/"
+    - "alembic/"
+    - "dark-factory/smoke_gate.sh"
+
+memory_routing:
+  "backend/app/*": ".archon/memory/backend-patterns.md"
+  "frontend/src/*": ".archon/memory/frontend-patterns.md"
+
+deconflict:
+  models_init: "backend/app/models/__init__.py"
+  migrations_dir: "alembic/versions/"
+
+token_optimization:
+  enabled: true
+  enforce_budgets: true       # NO env override — rollback is a git commit (see dark-factory README two-tier rollback)
+  default_budget_tokens: 30000
+  budgets:
+    refine: 30000
+    plan: 30000
+    implement: 30000
+    conformance: 22000        # provisional from T5 smoke run; recalibrate per runbook
+    code-review: 22000        # provisional from T5 smoke run; recalibrate per runbook
+  enforce:
+    refine: true              # T3b enforcement live — #733 via #731 scorecard
+    plan: true                # T3b enforcement live — #733 via #731 scorecard
+    implement: false
+    conformance: true         # T6 enforcement live
+    code-review: true         # T6 enforcement live
+  issue_context:
+    reserve_tokens: 2000
+  architecture:
+    enabled: true
+    mode: slice
+    max_tokens: 5000
+    min_tokens: 2500
+  memory:
+    enabled: true
+    mode: top_k
+    max_entries: 8
+    max_tokens: 1500
+    min_tokens: 750
+  comments:
+    enabled: true
+    digest_after_factory_marker: true
+    max_tokens: 2000
+    min_tokens: 1000
+  diff:
+    enabled: true
+    max_review_tokens: 6000
+    min_review_tokens: 3000
+  escalation:
+    cheap_model_first: true
+    opus_only_for:
+      - security
+      - trading
+      - auth
+      - high_blast_radius
+      - material_conformance_uncertainty
