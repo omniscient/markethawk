@@ -8,7 +8,7 @@ independently disabled via config flags or environment variable overrides.
 
 Rollout phases 1–3 (observe, low-risk optimization, implementation/conformance) landed
 via issues #664–#671. Phase 4 (budget enforcement) shipped via #713–#719.
-**As of T3b (#733), enforcement is live for conformance, code-review, refine, and plan.**
+**As of T5 (#734), enforcement is live for all 5 scenarios (conformance, code-review, refine, plan, and implement).**
 
 ---
 
@@ -35,13 +35,13 @@ token_optimization:
   budgets:                 # per-scenario token budgets (provisional from T5 smoke run)
     refine: 30000          # enforced — T3b go-live (#733)
     plan: 30000            # enforced — T3b go-live (#733)
-    implement: 30000       # observe-only — enforce: false
+    implement: 30000       # enforced — T5 go-live (#734)
     conformance: 22000     # enforced — T6 go-live
     code-review: 22000     # enforced — T6 go-live
   enforce:
     refine: true           # T3b live — #731 scorecard: 0% section_at_risk
     plan: true             # T3b live — #731 scorecard: 0% section_at_risk
-    implement: false       # deferred; see Follow-up Path below
+    implement: true        # T5 live — #730/#731 calibration, arch-cap raise → 0% section_at_risk at 30000
     conformance: true      # T6 live
     code-review: true      # T6 live
   architecture:
@@ -193,13 +193,13 @@ The `context-budget.json` artifact (in `$ARTIFACTS_DIR`) includes per-section sa
 
 ## Budget Enforcement (Phase 4 — Live)
 
-As of T3b (#733), budget enforcement is **active** for `conformance`, `code-review`, `refine`, and `plan`.
+As of T5 (#734), budget enforcement is **active** for all 5 scenarios.
 
 | Scenario | Enforce | Budget | Status |
 |----------|---------|--------|--------|
 | refine | **true** | **30 000** | **enforced (T3b)** |
 | plan | **true** | **30 000** | **enforced (T3b)** |
-| implement | false | 30 000 | observe-only |
+| implement | **true** | **30 000** | **enforced (T5)** |
 | conformance | **true** | **22 000** | **enforced (T6)** |
 | code-review | **true** | **22 000** | **enforced (T6)** |
 
@@ -268,46 +268,10 @@ planned `architecture.max_tokens` cap before flipping.
 
 ## Path to Phase 4 — Current Status
 
-Phase 4 (budget enforcement) is **mostly live** as of T3b (#733):
+Phase 4 (budget enforcement) is **fully live as of T5 (#734)**:
 - **Conformance and code-review**: enforcement active since T6 (#719).
 - **Refine and plan**: enforcement active since T3b (#733) — #731 scorecard gated go-live.
-- **Implement**: observe-only — deferred pending calibration.
-
-### Follow-up Path for deferred scenario (implement)
-
-**Why deferred:** T5 calibration showed `section_at_risk_rate == 50%` at ALL tested
-budgets (22k–40k) for implement. Root cause: `architecture.max_tokens: 3000`
-is below real arch slice sizes (3–4k+ tokens), so enforcement trims architecture context
-on every issue regardless of budget size. Flipping enforce would silently drop required
-ARCHITECTURE.md sections — violating the "Never drop safety-critical content" goal.
-
-**Required unlock steps:**
-
-1. **Measure real arch slice sizes** — collect `sections.architecture_md.tokens` from
-   per-run `context-budget.json` artifacts across ≥ 10 full-corpus bench issues:
-   ```bash
-   # Example: extract p90 slice size from recent artifacts
-   python3 -c "
-   import json, glob, statistics
-   sizes = []
-   for f in glob.glob('$ARTIFACTS_DIR/**/context-budget.json', recursive=True):
-       d = json.load(open(f))
-       s = d.get('sections', {}).get('architecture_md', {}).get('tokens')
-       if s: sizes.append(s)
-   sizes.sort()
-   p90 = sizes[int(len(sizes) * 0.9)] if sizes else 'no data'
-   print(f'p90 arch slice: {p90} tokens ({len(sizes)} samples)')
-   "
-   ```
-
-2. **Raise `architecture.max_tokens`** above the p90 arch slice size (currently 3000;
-   likely needs to be 4000–5000). This is a separate config-only change requiring a
-   re-calibration pass to confirm `section_at_risk_rate` drops to 0%.
-
-3. **Re-run calibration** with the new `architecture.max_tokens` and a candidate budget.
-   Gates: `over_budget_rate ≤ 10%` + `section_at_risk_rate == 0%`.
-
-4. **Flip** implement using the Observe → Enforce Procedure above.
+- **Implement**: enforcement active since T5 (#734) — #730/#731 calibration + arch-cap raise → 0% section_at_risk at 30 000.
 
 ---
 
