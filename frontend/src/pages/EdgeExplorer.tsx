@@ -6,7 +6,8 @@ import {
   Calendar,
   Layers,
   Search,
-  Target
+  Target,
+  AlertTriangle,
 } from 'lucide-react';
 
 // Per spec Req 7: library cast, does not count against @ts-expect-error budget.
@@ -41,11 +42,47 @@ import type { EdgeDistributionEvent, EdgeStatEntry } from '../api/scanner';
 import { apiClient } from '../api/client';
 import CorrelationHeatmap from '../components/CorrelationHeatmap';
 import { fetchCorrelations, triggerAnalysis } from '../api/analysis';
+import {
+  fetchEdgeDecay,
+  fetchExplanationArchetypes,
+  fetchExplanationTraits,
+} from '../api/outcomes';
+import type {
+  EdgeDecayPoint,
+  ExplanationArchetype,
+  ExplanationTrait,
+} from '../api/outcomes';
+
+const fmtPct = (value: number | null | undefined): string => (
+  value === null || value === undefined ? 'N/A' : `${value.toFixed(1)}%`
+);
+
+const traitValue = (trait: ExplanationTrait): string => `${trait.trait_type}:${trait.trait_key}`;
+
+const traitTypeLabel = (type: string): string => {
+  const labels: Record<string, string> = {
+    criterion_passed: 'Criterion',
+    criterion_failed: 'Failed Criterion',
+    warning: 'Warning',
+    confidence_input: 'Confidence',
+  };
+  return labels[type] ?? type.replace(/_/g, ' ');
+};
+
+const traitOptionLabel = (trait: ExplanationTrait): string => (
+  `${traitTypeLabel(trait.trait_type)}: ${trait.trait_label}`
+);
+
+const traitChartLabel = (trait: ExplanationTrait): string => (
+  trait.trait_label.length > 22 ? `${trait.trait_label.slice(0, 19)}...` : trait.trait_label
+);
 
 const EdgeExplorer: React.FC = () => {
   const [period, setPeriod] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly');
   const [ticker, setTicker] = useState<string>('');
   const [scannerType, setScannerType] = useState<string>('');
+  const [traitFilter, setTraitFilter] = useState<string>('');
+  const [archetypeFilter, setArchetypeFilter] = useState<string>('');
 
   // Fetch scanner configurations for the dropdown
   const { data: configs } = useQuery({
@@ -85,6 +122,24 @@ const EdgeExplorer: React.FC = () => {
     retry: false,
   });
 
+  const { data: explanationTraits, isLoading: loadingTraits } = useQuery({
+    queryKey: ['edgeExplanationTraits', scannerType],
+    queryFn: () => fetchExplanationTraits({ scanner_type: scannerType }),
+    enabled: !!scannerType,
+  });
+
+  const { data: explanationArchetypes, isLoading: loadingArchetypes } = useQuery({
+    queryKey: ['edgeExplanationArchetypes', scannerType],
+    queryFn: () => fetchExplanationArchetypes({ scanner_type: scannerType }),
+    enabled: !!scannerType,
+  });
+
+  const { data: edgeDecay, isLoading: loadingEdgeDecay } = useQuery<EdgeDecayPoint[]>({
+    queryKey: ['edgeExplanationDecay', scannerType, period],
+    queryFn: () => fetchEdgeDecay(scannerType, { period }),
+    enabled: !!scannerType,
+  });
+
   const triggerMutation = useMutation({
     mutationFn: () => triggerAnalysis(scannerType || undefined),
     onSuccess: (data) => {
@@ -103,6 +158,29 @@ const EdgeExplorer: React.FC = () => {
   const isLoading = loadingStats || loadingDist;
 
   const events = distribution?.events || [];
+  const traitRows = explanationTraits?.traits ?? [];
+  const archetypeRows = explanationArchetypes?.archetypes ?? [];
+  const selectedTraits = traitFilter
+    ? traitRows.filter((trait) => traitValue(trait) === traitFilter)
+    : traitRows.slice(0, 8);
+  const selectedArchetypes = archetypeFilter
+    ? archetypeRows.filter((archetype) => String(archetype.cluster_id) === archetypeFilter)
+    : archetypeRows.slice(0, 6);
+  const traitChartData = selectedTraits.map((trait) => ({
+    name: traitChartLabel(trait),
+    label: trait.trait_label,
+    sample_size: trait.sample_size,
+    win_rate_pct: trait.win_rate_pct ?? 0,
+    avg_mfe_pct: trait.avg_mfe_pct ?? 0,
+    avg_mae_pct: trait.avg_mae_pct ?? 0,
+  }));
+  const archetypeChartData = selectedArchetypes.map((archetype) => ({
+    name: archetype.label.length > 26 ? `${archetype.label.slice(0, 23)}...` : archetype.label,
+    label: archetype.label,
+    sample_size: archetype.sample_size,
+    win_rate_pct: archetype.return_profile.win_rate_pct ?? 0,
+    avg_mfe_pct: archetype.return_profile.avg_mfe_pct ?? 0,
+  }));
   
   // Calculate aggregate metrics
   const avgGap = events.length > 0 ? events.reduce((acc, e) => acc + (e.gap_pct || 0), 0) / events.length : 0;
@@ -123,9 +201,14 @@ const EdgeExplorer: React.FC = () => {
           <div className="relative min-w-[200px]">
             <Target className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-financial-blue" />
             <select 
+              aria-label="Strategy filter"
               className="pl-9 pr-4 py-2 w-full bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold focus:outline-none focus:ring-1 focus:ring-financial-blue text-white uppercase tracking-wider"
               value={scannerType}
-              onChange={(e) => setScannerType(e.target.value)}
+              onChange={(e) => {
+                setScannerType(e.target.value);
+                setTraitFilter('');
+                setArchetypeFilter('');
+              }}
             >
               <option value="">All Strategies</option>
               {configs?.map(c => (
@@ -197,6 +280,22 @@ const EdgeExplorer: React.FC = () => {
               color="purple"
             />
           </div>
+
+          <ExplanationResearchSection
+            scannerType={scannerType}
+            traitRows={traitRows}
+            archetypeRows={archetypeRows}
+            traitFilter={traitFilter}
+            archetypeFilter={archetypeFilter}
+            onTraitFilter={setTraitFilter}
+            onArchetypeFilter={setArchetypeFilter}
+            selectedTraits={selectedTraits}
+            selectedArchetypes={selectedArchetypes}
+            traitChartData={traitChartData}
+            archetypeChartData={archetypeChartData}
+            edgeDecay={edgeDecay ?? []}
+            isLoading={loadingTraits || loadingArchetypes || loadingEdgeDecay}
+          />
 
           {/* Distribution Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -402,5 +501,249 @@ const EdgeExplorer: React.FC = () => {
     </div>
   );
 };
+
+interface ExplanationResearchSectionProps {
+  scannerType: string;
+  traitRows: ExplanationTrait[];
+  archetypeRows: ExplanationArchetype[];
+  traitFilter: string;
+  archetypeFilter: string;
+  onTraitFilter: (value: string) => void;
+  onArchetypeFilter: (value: string) => void;
+  selectedTraits: ExplanationTrait[];
+  selectedArchetypes: ExplanationArchetype[];
+  traitChartData: Array<{
+    name: string;
+    label: string;
+    sample_size: number;
+    win_rate_pct: number;
+    avg_mfe_pct: number;
+    avg_mae_pct: number;
+  }>;
+  archetypeChartData: Array<{
+    name: string;
+    label: string;
+    sample_size: number;
+    win_rate_pct: number;
+    avg_mfe_pct: number;
+  }>;
+  edgeDecay: EdgeDecayPoint[];
+  isLoading: boolean;
+}
+
+const ExplanationResearchSection: React.FC<ExplanationResearchSectionProps> = ({
+  scannerType,
+  traitRows,
+  archetypeRows,
+  traitFilter,
+  archetypeFilter,
+  onTraitFilter,
+  onArchetypeFilter,
+  selectedTraits,
+  selectedArchetypes,
+  traitChartData,
+  archetypeChartData,
+  edgeDecay,
+  isLoading,
+}) => (
+  <Card title="Explanation Edge Research" icon={Target}>
+    {!scannerType ? (
+      <div className="flex items-center justify-center h-28 border border-dashed border-gray-800 rounded-lg text-sm text-gray-500">
+        Select a strategy to research edge by explanation trait and archetype.
+      </div>
+    ) : isLoading ? (
+      <div className="flex items-center justify-center h-28 text-gray-500 text-xs uppercase tracking-widest">
+        Loading explanation analysis...
+      </div>
+    ) : (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <label className="space-y-1">
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+              Explanation Trait
+            </span>
+            <select
+              aria-label="Explanation trait filter"
+              value={traitFilter}
+              onChange={(event) => onTraitFilter(event.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-financial-blue"
+            >
+              <option value="">All explanation traits</option>
+              {traitRows.map((trait) => (
+                <option key={traitValue(trait)} value={traitValue(trait)}>
+                  {traitOptionLabel(trait)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+              Signal Archetype
+            </span>
+            <select
+              aria-label="Signal archetype filter"
+              value={archetypeFilter}
+              onChange={(event) => onArchetypeFilter(event.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-financial-blue"
+            >
+              <option value="">All signal archetypes</option>
+              {archetypeRows.map((archetype) => (
+                <option key={archetype.cluster_id} value={archetype.cluster_id}>
+                  {archetype.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <ExplanationPanel
+            title="Trait Performance"
+            isEmpty={selectedTraits.length === 0}
+            emptyText="No explanation trait performance exists for this strategy yet."
+          >
+            <ResponsiveContainer width="100%" height={240}>
+              <ComposedChart data={traitChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+                <XAxis dataKey="name" stroke="#6B7280" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="left" stroke="#6B7280" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="#6B7280" tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase' }} />
+                <Bar yAxisId="left" dataKey="sample_size" name="Sample" fill="#3B82F6" radius={[2, 2, 0, 0]} />
+                <Bar yAxisId="right" dataKey="avg_mfe_pct" name="Avg MFE %" fill="#10B981" radius={[2, 2, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="win_rate_pct" name="Win %" stroke="#F59E0B" />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div className="space-y-2">
+              {selectedTraits.map((trait) => (
+                <ExplanationSummaryRow
+                  key={traitValue(trait)}
+                  label={trait.trait_label}
+                  prefix={traitTypeLabel(trait.trait_type)}
+                  sampleSize={trait.sample_size}
+                  winRate={trait.win_rate_pct}
+                  avgMfe={trait.avg_mfe_pct}
+                  warnings={trait.warnings}
+                />
+              ))}
+            </div>
+          </ExplanationPanel>
+
+          <ExplanationPanel
+            title="Archetype Performance"
+            isEmpty={selectedArchetypes.length === 0}
+            emptyText="No explanation archetypes exist for this strategy yet."
+          >
+            <ResponsiveContainer width="100%" height={240}>
+              <ComposedChart data={archetypeChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+                <XAxis dataKey="name" stroke="#6B7280" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="left" stroke="#6B7280" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" stroke="#6B7280" tick={{ fontSize: 10 }} />
+                <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase' }} />
+                <Bar yAxisId="left" dataKey="sample_size" name="Sample" fill="#8B5CF6" radius={[2, 2, 0, 0]} />
+                <Bar yAxisId="right" dataKey="avg_mfe_pct" name="Avg MFE %" fill="#10B981" radius={[2, 2, 0, 0]} />
+                <Line yAxisId="right" type="monotone" dataKey="win_rate_pct" name="Win %" stroke="#F59E0B" />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <div className="space-y-2">
+              {selectedArchetypes.map((archetype) => (
+                <ExplanationSummaryRow
+                  key={archetype.cluster_id}
+                  label={archetype.label}
+                  prefix="Archetype"
+                  sampleSize={archetype.sample_size}
+                  winRate={archetype.return_profile.win_rate_pct}
+                  avgMfe={archetype.return_profile.avg_mfe_pct}
+                  warnings={archetype.warnings}
+                />
+              ))}
+            </div>
+          </ExplanationPanel>
+        </div>
+
+        <ExplanationPanel
+          title="Scanner Edge Decay"
+          isEmpty={edgeDecay.length === 0}
+          emptyText="No edge decay series exists for this strategy yet."
+        >
+          <ResponsiveContainer width="100%" height={240}>
+            <ComposedChart data={edgeDecay} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+              <XAxis dataKey="period" stroke="#6B7280" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="left" stroke="#6B7280" tick={{ fontSize: 10 }} />
+              <YAxis yAxisId="right" orientation="right" stroke="#6B7280" tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151' }} />
+              <Legend wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase' }} />
+              <Bar yAxisId="left" dataKey="sample_size" name="Sample" fill="#3B82F6" radius={[2, 2, 0, 0]} />
+              <Line yAxisId="right" type="monotone" dataKey="win_rate" name="Win %" stroke="#F59E0B" />
+              <Line yAxisId="right" type="monotone" dataKey="avg_mfe" name="Avg MFE" stroke="#10B981" />
+              <Line yAxisId="right" type="monotone" dataKey="avg_mae" name="Avg MAE" stroke="#EF4444" />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </ExplanationPanel>
+      </div>
+    )}
+  </Card>
+);
+
+const ExplanationPanel: React.FC<{
+  title: string;
+  isEmpty: boolean;
+  emptyText: string;
+  children: React.ReactNode;
+}> = ({ title, isEmpty, emptyText, children }) => (
+  <section className="border border-gray-800 rounded-lg p-4 bg-gray-900/30">
+    <h3 className="text-xs font-black uppercase tracking-widest text-financial-light mb-3">
+      {title}
+    </h3>
+    {isEmpty ? (
+      <div className="flex items-center justify-center h-32 border border-dashed border-gray-800 rounded-lg text-sm text-gray-500">
+        {emptyText}
+      </div>
+    ) : (
+      <div className="space-y-3">{children}</div>
+    )}
+  </section>
+);
+
+const ExplanationSummaryRow: React.FC<{
+  label: string;
+  prefix: string;
+  sampleSize: number;
+  winRate: number | null | undefined;
+  avgMfe: number | null | undefined;
+  warnings: Array<{ code: string; message: string }>;
+}> = ({ label, prefix, sampleSize, winRate, avgMfe, warnings }) => (
+  <div className="border border-gray-800 rounded-lg p-3 bg-gray-950/30">
+    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+      <div>
+        <div className="text-sm font-bold text-financial-light">{label}</div>
+        <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+          {prefix} / n={sampleSize}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-right text-xs">
+        <div>
+          <div className="text-gray-500">Win</div>
+          <div className="font-bold text-financial-light">{fmtPct(winRate)}</div>
+        </div>
+        <div>
+          <div className="text-gray-500">MFE</div>
+          <div className="font-bold text-positive">{fmtPct(avgMfe)}</div>
+        </div>
+      </div>
+    </div>
+    {warnings.length > 0 && (
+      <div className="mt-2 flex items-start gap-2 text-xs text-amber-300">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <span>{warnings[0].message}</span>
+      </div>
+    )}
+  </div>
+);
 
 export default EdgeExplorer;
