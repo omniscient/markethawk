@@ -33,6 +33,7 @@ from app.schemas.outcome import (
 )
 from app.schemas.regime import RegimeBreakdownResponse
 from app.services.ai_signal_brief import AISignalBriefService
+from app.services.analyst_qa_service import AnalystQAService
 from app.services.data_readiness import DataReadinessService
 from app.services.embedding_service import EmbeddingService
 from app.services.explanation_archetype_service import ExplanationArchetypeService
@@ -312,6 +313,21 @@ def semantic_signal_search(
     )
 
 
+@router.get("/analyst-qa")
+def analyst_qa_for_events(
+    question: str = Query(..., min_length=1),
+    scanner_type: str | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    return AnalystQAService().answer_for_events(
+        db,
+        question=question,
+        scanner_type=scanner_type,
+        limit=limit,
+    )
+
+
 @router.get("/event/{event_id}/ai-signal-brief")
 def get_ai_signal_brief(
     event_id: int,
@@ -353,6 +369,16 @@ def get_event_semantic_matches(
         top_k=top_k,
         source_types=source_type,
     )
+
+
+@router.get("/event/{event_id}/analyst-qa")
+def analyst_qa_for_event(
+    event_id: int,
+    question: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return AnalystQAService().answer_for_event(db, event, question=question)
 
 
 @router.get("/event/{event_id}/historical-analogs")
