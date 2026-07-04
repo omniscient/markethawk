@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# MarketHawk validate hook — lightweight post-merge validation (no running DB).
+# Called as a gate by the factory's deconflict flow; non-zero exit escalates
+# the ticket to Blocked. Ported from entrypoint.sh's inline deconflict tsc check.
+set -uo pipefail
+
+echo "[validate hook] TypeScript type check..."
+cd "${CLONE_DIR}/frontend" && npx tsc --noEmit
