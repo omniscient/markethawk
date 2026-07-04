@@ -7,6 +7,9 @@ import type { AISignalBrief, SignalListItem } from '../../api/outcomes';
 const mocks = vi.hoisted(() => ({
   useSignals: vi.fn(),
   fetchAISignalBrief: vi.fn(),
+  fetchAISignalNarrative: vi.fn(),
+  fetchSignalPostMortem: vi.fn(),
+  getLLMStatus: vi.fn(),
 }));
 
 vi.mock('../../hooks/useScorecard', () => ({
@@ -15,6 +18,12 @@ vi.mock('../../hooks/useScorecard', () => ({
 
 vi.mock('../../api/outcomes', () => ({
   fetchAISignalBrief: (...args: unknown[]) => mocks.fetchAISignalBrief(...args),
+  fetchAISignalNarrative: (...args: unknown[]) => mocks.fetchAISignalNarrative(...args),
+  fetchSignalPostMortem: (...args: unknown[]) => mocks.fetchSignalPostMortem(...args),
+}));
+
+vi.mock('../../api/system', () => ({
+  getLLMStatus: (...args: unknown[]) => mocks.getLLMStatus(...args),
 }));
 
 const makeSignal = (overrides: Partial<SignalListItem> = {}): SignalListItem => ({
@@ -48,6 +57,9 @@ describe('SignalTable - event intelligence brief', () => {
       isLoading: false,
     });
     mocks.fetchAISignalBrief.mockResolvedValue(makeBrief());
+    mocks.fetchAISignalNarrative.mockResolvedValue(makeNarrative({ cache: { status: 'disabled' } }));
+    mocks.fetchSignalPostMortem.mockResolvedValue(makePostMortem({ cache: { status: 'disabled' } }));
+    mocks.getLLMStatus.mockResolvedValue(makeLLMStatus({ enabled: false, allowed_features: [] }));
   });
 
   it('shows deterministic explanation, analogs, expected behavior, archetype, and outcome context for a complete event', async () => {
@@ -133,6 +145,153 @@ describe('SignalTable - event intelligence brief', () => {
     expect(screen.getByText('Outcome summary is incomplete or unavailable.')).toBeInTheDocument();
     expect(screen.getByText(/Generated narrative can be added later/i)).toBeInTheDocument();
   });
+
+  it('keeps generated AI layers visibly disabled while preserving deterministic facts', async () => {
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+
+    expect(await screen.findByText('Deterministic Signal Brief')).toBeInTheDocument();
+    expect(await screen.findByText(/AI narrative layers disabled/i)).toBeInTheDocument();
+    expect(screen.getByText(/Relative volume exceeded the configured threshold/i)).toBeInTheDocument();
+    expect(screen.queryByText(/provider/i)).not.toBeInTheDocument();
+  });
+
+  it('loads an enabled generated narrative on demand and labels cached content', async () => {
+    mocks.getLLMStatus.mockResolvedValueOnce(makeLLMStatus({
+      enabled: true,
+      allowed_features: ['scanner_narrative'],
+    }));
+    mocks.fetchAISignalNarrative.mockResolvedValueOnce(makeNarrative({
+      narrative: {
+        text: 'TSLA produced a grounded generated scanner narrative.',
+        prompt_version: 'scanner_narrative.v1',
+        brief_schema_version: 'ai_signal_brief.v1',
+        brief_fingerprint: 'abc',
+        provenance: [{ claim: 'Scanner event facts', source_fields: ['facts.ticker'] }],
+        created_at: '2026-07-04T10:00:00Z',
+        updated_at: '2026-07-04T10:00:00Z',
+      },
+      cache: { status: 'hit' },
+    }));
+
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+
+    expect(await screen.findByRole('button', { name: /load ai narrative/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /load ai narrative/i }));
+
+    expect(await screen.findByText('Generated AI Narrative')).toBeInTheDocument();
+    expect(screen.getByText(/TSLA produced a grounded generated scanner narrative/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cached/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sources: Scanner event facts/i)).toBeInTheDocument();
+  });
+
+  it('shows loading state while an AI narrative layer is being generated', async () => {
+    mocks.getLLMStatus.mockResolvedValueOnce(makeLLMStatus({
+      enabled: true,
+      allowed_features: ['scanner_narrative'],
+    }));
+    mocks.fetchAISignalNarrative.mockReturnValueOnce(new Promise(() => {}));
+
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+
+    expect(await screen.findByRole('button', { name: /load ai narrative/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /load ai narrative/i }));
+
+    expect(await screen.findByText(/Generating AI narrative/i)).toBeInTheDocument();
+  });
+
+  it('labels stale regenerated content without hiding generated text', async () => {
+    mocks.getLLMStatus.mockResolvedValueOnce(makeLLMStatus({
+      enabled: true,
+      allowed_features: ['scanner_narrative'],
+    }));
+    mocks.fetchAISignalNarrative.mockResolvedValueOnce(makeNarrative({
+      narrative: {
+        text: 'Updated generated scanner narrative after brief changes.',
+        prompt_version: 'scanner_narrative.v1',
+        brief_schema_version: 'ai_signal_brief.v1',
+        brief_fingerprint: 'def',
+        provenance: [{ claim: 'Risk summary', source_fields: ['risks'] }],
+        created_at: '2026-07-04T10:00:00Z',
+        updated_at: '2026-07-04T11:00:00Z',
+      },
+      cache: { status: 'stale_regenerated' },
+    }));
+
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /load ai narrative/i }));
+
+    expect(await screen.findByText(/Updated generated scanner narrative/i)).toBeInTheDocument();
+    expect(screen.getByText(/Regenerated from stale cache/i)).toBeInTheDocument();
+  });
+
+  it('shows rejected and failed AI generation states as generated-layer status only', async () => {
+    mocks.getLLMStatus.mockResolvedValueOnce(makeLLMStatus({
+      enabled: true,
+      allowed_features: ['scanner_narrative'],
+    }));
+    mocks.fetchAISignalNarrative.mockResolvedValueOnce(makeNarrative({
+      narrative: null,
+      cache: { status: 'rejected' },
+      rejection: { reason: 'Generated narrative is missing provenance.' },
+    }));
+
+    const { unmount } = renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /load ai narrative/i }));
+
+    expect(await screen.findByText(/AI narrative was rejected/i)).toBeInTheDocument();
+    expect(screen.getByText(/Generated narrative is missing provenance/i)).toBeInTheDocument();
+    expect(screen.getByText('Deterministic Signal Brief')).toBeInTheDocument();
+
+    unmount();
+    mocks.getLLMStatus.mockResolvedValueOnce(makeLLMStatus({
+      enabled: true,
+      allowed_features: ['scanner_narrative'],
+    }));
+    mocks.fetchAISignalNarrative.mockRejectedValueOnce(new Error('service unavailable'));
+
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /load ai narrative/i }));
+
+    expect(await screen.findByText(/AI narrative failed/i)).toBeInTheDocument();
+    expect(screen.getByText('Deterministic Signal Brief')).toBeInTheDocument();
+  });
+
+  it('offers post-mortem controls only when that narrative feature is enabled', async () => {
+    mocks.getLLMStatus.mockResolvedValueOnce(makeLLMStatus({
+      enabled: true,
+      allowed_features: ['scanner_narrative', 'post_mortem'],
+    }));
+    mocks.fetchSignalPostMortem.mockResolvedValueOnce(makePostMortem({
+      post_mortem: {
+        text: 'The realized outcome matched the expected analog pattern.',
+        prompt_version: 'signal_post_mortem.v1',
+        brief_schema_version: 'ai_signal_brief.v1',
+        brief_fingerprint: 'post',
+        outcome_status: 'winning',
+        known_at_signal_time: {},
+        expected_behavior: {},
+        realized_outcome: {},
+        provenance: [{ claim: 'Realized outcome', source_fields: ['realized_outcome.summary'] }],
+        created_at: '2026-07-04T10:00:00Z',
+        updated_at: '2026-07-04T10:00:00Z',
+      },
+      cache: { status: 'miss' },
+    }));
+
+    renderWithQuery(<SignalTable scannerType="pre_market_volume_spike" />);
+    fireEvent.click(screen.getByRole('button', { name: /Brief/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /load post-mortem/i }));
+
+    expect(await screen.findByText('Generated Post-Mortem')).toBeInTheDocument();
+    expect(screen.getByText(/The realized outcome matched/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Generated$/)).toBeInTheDocument();
+  });
 });
 
 const makeBrief = (overrides: Partial<AISignalBrief> = {}): AISignalBrief => ({
@@ -204,6 +363,36 @@ const makeBrief = (overrides: Partial<AISignalBrief> = {}): AISignalBrief => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.fetchAISignalBrief.mockResolvedValue(makeBrief());
+  mocks.fetchAISignalNarrative.mockResolvedValue(makeNarrative({ cache: { status: 'disabled' } }));
+  mocks.fetchSignalPostMortem.mockResolvedValue(makePostMortem({ cache: { status: 'disabled' } }));
+  mocks.getLLMStatus.mockResolvedValue(makeLLMStatus({ enabled: false, allowed_features: [] }));
+});
+
+const makeLLMStatus = (overrides: Record<string, unknown> = {}) => ({
+  enabled: false,
+  provider_state: 'disabled',
+  allowed_features: [],
+  limits: {
+    timeout_seconds: 20,
+    max_tokens: 1000,
+    max_cost_usd_per_call: 0,
+  },
+  metrics: {},
+  ...overrides,
+});
+
+const makeNarrative = (overrides: Record<string, unknown> = {}) => ({
+  brief: makeBrief(),
+  narrative: null,
+  cache: { status: 'disabled' },
+  ...overrides,
+});
+
+const makePostMortem = (overrides: Record<string, unknown> = {}) => ({
+  brief: makeBrief(),
+  post_mortem: null,
+  cache: { status: 'disabled' },
+  ...overrides,
 });
 
 describe('SignalTable — loading state', () => {
