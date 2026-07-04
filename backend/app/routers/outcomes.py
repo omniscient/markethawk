@@ -41,6 +41,7 @@ from app.services.explanation_trait_performance import (
 from app.services.historical_analog_service import HistoricalAnalogService
 from app.services.outcome_service import OutcomeService
 from app.services.scanner_event_narrative import ScannerEventNarrativeService
+from app.services.signal_post_mortem import SignalPostMortemService
 from app.services.stats import StatsService
 from app.utils.db import get_or_404
 
@@ -295,6 +296,15 @@ def get_ai_signal_narrative(
 ):
     event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
     return ScannerEventNarrativeService().build(db, event)
+
+
+@router.get("/event/{event_id}/signal-post-mortem")
+def get_signal_post_mortem(
+    event_id: int,
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return SignalPostMortemService().build(db, event)
 
 
 @router.get("/event/{event_id}/historical-analogs")

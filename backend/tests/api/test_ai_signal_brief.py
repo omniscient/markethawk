@@ -211,6 +211,23 @@ def test_ai_signal_narrative_disabled_returns_brief_without_generated_text(db):
     assert data["cache"]["status"] == "disabled"
 
 
+def test_signal_post_mortem_disabled_returns_brief_without_generated_text(db):
+    target = _seed_event(
+        db,
+        ticker="PMT",
+        event_date=date(2026, 7, 3),
+        explanation=_explanation(),
+    )
+
+    response = client.get(f"/api/v1/outcomes/event/{target.id}/signal-post-mortem")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["brief"]["facts"]["ticker"] == "PMT"
+    assert data["post_mortem"] is None
+    assert data["cache"]["status"] == "disabled"
+
+
 def test_historical_analogs_endpoint_enriches_events_explanations_and_outcomes(db):
     _seed_event(
         db,
