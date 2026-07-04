@@ -162,6 +162,7 @@ class Settings(BaseSettings):
     LLM_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0)
     LLM_MAX_RETRIES: int = Field(default=1, ge=0)
     LLM_RETRY_BACKOFF_SECONDS: float = Field(default=0.5, gt=0)
+    LLM_MAX_COST_USD_PER_CALL: float = Field(default=0.0, ge=0)
     LLM_ALLOWED_FEATURES: str = ""
 
     # ── WebSocket resource limits ──────────────────────────────────────────
