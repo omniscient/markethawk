@@ -42,6 +42,7 @@ from app.services.explanation_trait_performance import (
 from app.services.historical_analog_service import HistoricalAnalogService
 from app.services.outcome_service import OutcomeService
 from app.services.scanner_event_narrative import ScannerEventNarrativeService
+from app.services.semantic_signal_search import SemanticSignalSearchService
 from app.services.signal_post_mortem import SignalPostMortemService
 from app.services.stats import StatsService
 from app.utils.db import get_or_404
@@ -296,6 +297,21 @@ def semantic_search(
     )
 
 
+@router.get("/semantic-signal-search")
+def semantic_signal_search(
+    query: str = Query(..., min_length=1),
+    top_k: int = Query(default=10, ge=1, le=50),
+    source_type: list[str] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    return SemanticSignalSearchService().find_for_text(
+        db,
+        query_text=query,
+        top_k=top_k,
+        source_types=source_type,
+    )
+
+
 @router.get("/event/{event_id}/ai-signal-brief")
 def get_ai_signal_brief(
     event_id: int,
@@ -321,6 +337,22 @@ def get_signal_post_mortem(
 ):
     event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
     return SignalPostMortemService().build(db, event)
+
+
+@router.get("/event/{event_id}/semantic-matches")
+def get_event_semantic_matches(
+    event_id: int,
+    top_k: int = Query(default=10, ge=1, le=50),
+    source_type: list[str] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return SemanticSignalSearchService().find_for_event(
+        db,
+        event,
+        top_k=top_k,
+        source_types=source_type,
+    )
 
 
 @router.get("/event/{event_id}/historical-analogs")
