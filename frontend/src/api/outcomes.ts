@@ -145,6 +145,70 @@ export interface SignalListResponse {
   offset: number;
 }
 
+export interface ExplanationWarning {
+  code: string;
+  message: string;
+}
+
+export interface ExplanationTrait {
+  trait_type: string;
+  trait_key: string;
+  trait_label: string;
+  sample_size: number;
+  event_ids: number[];
+  win_rate_pct: number | null;
+  follow_through_rate_pct: number | null;
+  avg_mfe_pct: number | null;
+  avg_mae_pct: number | null;
+  win_rate_ci_95_pct: { lower: number | null; upper: number | null };
+  warnings: ExplanationWarning[];
+}
+
+export interface ExplanationTraitPerformance {
+  event_count: number;
+  filters: {
+    scanner_type: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    severity: string | null;
+    min_sample_size: number;
+  };
+  traits: ExplanationTrait[];
+}
+
+export interface ExplanationArchetype {
+  cluster_id: number;
+  cluster_index: number;
+  label: string;
+  sample_size: number;
+  event_ids: number[];
+  centroid: Record<string, unknown>;
+  return_profile: {
+    sample_size?: number;
+    win_rate_pct?: number | null;
+    follow_through_rate_pct?: number | null;
+    avg_mfe_pct?: number | null;
+    avg_mae_pct?: number | null;
+    avg_eod_pct_change?: number | null;
+  };
+  warnings: ExplanationWarning[];
+}
+
+export interface ExplanationArchetypeResponse {
+  analysis_run_id: number | null;
+  scanner_type: string;
+  event_count: number;
+  filters: {
+    scanner_type: string;
+    start_date: string | null;
+    end_date: string | null;
+    severity: string | null;
+    min_sample_size: number;
+  };
+  warnings: ExplanationWarning[];
+  archetypes: ExplanationArchetype[];
+}
+
 // ---- API Functions -------------------------------------------------------- //
 
 export const fetchScorecard = async (params: {
@@ -218,6 +282,38 @@ export const fetchSignals = async (params: {
 }): Promise<SignalListResponse> => {
   const { scanner_type, ...rest } = params;
   const response = await apiClient.get(`/outcomes/signals/${scanner_type}`, { params: rest });
+  return response.data;
+};
+
+export const fetchExplanationTraits = async (params: {
+  scanner_type: string;
+  start_date?: string;
+  end_date?: string;
+  severity?: string;
+}): Promise<ExplanationTraitPerformance> => {
+  const response = await apiClient.get(`/outcomes/traits/${params.scanner_type}`, {
+    params: {
+      start_date: params.start_date,
+      end_date: params.end_date,
+      severity: params.severity,
+    },
+  });
+  return response.data;
+};
+
+export const fetchExplanationArchetypes = async (params: {
+  scanner_type: string;
+  start_date?: string;
+  end_date?: string;
+  severity?: string;
+}): Promise<ExplanationArchetypeResponse> => {
+  const response = await apiClient.get(`/outcomes/archetypes/${params.scanner_type}`, {
+    params: {
+      start_date: params.start_date,
+      end_date: params.end_date,
+      severity: params.severity,
+    },
+  });
   return response.data;
 };
 

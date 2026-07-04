@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from statistics import mean
 from typing import Any
@@ -16,6 +17,74 @@ from app.utils.time import utc_now
 
 class ExplanationArchetypeService:
     """Generate deterministic explanation-aware signal archetypes."""
+
+    def latest_performance(
+        self,
+        db: Session,
+        *,
+        scanner_type: str,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        severity: str | None = None,
+        min_sample_size: int = 5,
+    ) -> dict[str, Any]:
+        run = (
+            db.query(SignalAnalysisRun)
+            .filter(
+                SignalAnalysisRun.status == "completed",
+                SignalAnalysisRun.scanner_type == scanner_type,
+            )
+            .order_by(SignalAnalysisRun.completed_at.desc(), SignalAnalysisRun.id.desc())
+            .first()
+        )
+        filters = {
+            "scanner_type": scanner_type,
+            "start_date": start_date.isoformat() if start_date else None,
+            "end_date": end_date.isoformat() if end_date else None,
+            "severity": severity,
+            "min_sample_size": min_sample_size,
+        }
+        if not run:
+            return {
+                "analysis_run_id": None,
+                "scanner_type": scanner_type,
+                "event_count": 0,
+                "filters": filters,
+                "warnings": [
+                    {
+                        "code": "no_explanation_archetypes",
+                        "message": "No completed explanation archetype run is available.",
+                    }
+                ],
+                "archetypes": [],
+            }
+
+        clusters = (
+            db.query(SignalCluster)
+            .filter(SignalCluster.analysis_run_id == run.id)
+            .order_by(SignalCluster.cluster_index)
+            .all()
+        )
+        archetypes = [
+            self._cluster_payload(
+                db,
+                cluster,
+                scanner_type=scanner_type,
+                start_date=start_date,
+                end_date=end_date,
+                severity=severity,
+                min_sample_size=min_sample_size,
+            )
+            for cluster in clusters
+        ]
+        return {
+            "analysis_run_id": run.id,
+            "scanner_type": scanner_type,
+            "event_count": sum(item["sample_size"] for item in archetypes),
+            "filters": filters,
+            "warnings": [],
+            "archetypes": archetypes,
+        }
 
     def generate(
         self,
@@ -101,6 +170,68 @@ class ExplanationArchetypeService:
         )
         if scanner_type:
             query = query.filter(ScannerEvent.scanner_type == scanner_type)
+        return query.order_by(ScannerEvent.event_date.asc(), ScannerEvent.id.asc()).all()
+
+    def _cluster_payload(
+        self,
+        db: Session,
+        cluster: SignalCluster,
+        *,
+        scanner_type: str,
+        start_date: date | None,
+        end_date: date | None,
+        severity: str | None,
+        min_sample_size: int,
+    ) -> dict[str, Any]:
+        rows = self._cluster_rows(
+            db,
+            cluster.id,
+            scanner_type=scanner_type,
+            start_date=start_date,
+            end_date=end_date,
+            severity=severity,
+        )
+        return_profile = _return_profile([summary for _, summary in rows])
+        sample_size = len(rows)
+        return {
+            "cluster_id": cluster.id,
+            "cluster_index": cluster.cluster_index,
+            "label": cluster.label,
+            "sample_size": sample_size,
+            "event_ids": sorted(event.id for event, _ in rows),
+            "centroid": cluster.centroid or {},
+            "return_profile": return_profile,
+            "warnings": _sample_warnings(sample_size, min_sample_size),
+        }
+
+    def _cluster_rows(
+        self,
+        db: Session,
+        cluster_id: int,
+        *,
+        scanner_type: str,
+        start_date: date | None,
+        end_date: date | None,
+        severity: str | None,
+    ) -> list[tuple[ScannerEvent, ScannerOutcomeSummary]]:
+        query = (
+            db.query(ScannerEvent, ScannerOutcomeSummary)
+            .join(
+                ScannerOutcomeSummary,
+                ScannerOutcomeSummary.scanner_event_id == ScannerEvent.id,
+            )
+            .filter(
+                ScannerEvent.signal_cluster_id == cluster_id,
+                ScannerEvent.scanner_type == scanner_type,
+                ScannerOutcomeSummary.is_complete.is_(True),
+            )
+        )
+        if start_date:
+            query = query.filter(ScannerEvent.event_date >= start_date)
+        if end_date:
+            query = query.filter(ScannerEvent.event_date <= end_date)
+        if severity:
+            query = query.filter(ScannerEvent.severity == severity)
         return query.order_by(ScannerEvent.event_date.asc(), ScannerEvent.id.asc()).all()
 
     def _group_rows(
@@ -277,6 +408,41 @@ def _title_from_key(value: str) -> str:
 
 def _float_values(values) -> list[float]:
     return [converted for value in values if (converted := _to_float(value)) is not None]
+
+
+def _return_profile(summaries: list[ScannerOutcomeSummary]) -> dict[str, Any]:
+    eod_values = _float_values(summary.eod_pct_change for summary in summaries)
+    follow_values = [
+        bool(summary.follow_through)
+        for summary in summaries
+        if summary.follow_through is not None
+    ]
+    wins = sum(1 for value in eod_values if value > 0)
+    return {
+        "sample_size": len(summaries),
+        "win_rate_pct": _pct(wins, len(eod_values)),
+        "follow_through_rate_pct": _pct(
+            sum(1 for value in follow_values if value),
+            len(follow_values),
+        ),
+        "avg_mfe_pct": _mean(_float_values(summary.mfe_pct for summary in summaries)),
+        "avg_mae_pct": _mean(_float_values(summary.mae_pct for summary in summaries)),
+        "avg_eod_pct_change": _mean(eod_values),
+    }
+
+
+def _sample_warnings(sample_size: int, min_sample_size: int) -> list[dict[str, str]]:
+    if sample_size >= min_sample_size:
+        return []
+    return [
+        {
+            "code": "weak_archetype_sample",
+            "message": (
+                f"Only {sample_size} events matched this archetype; "
+                f"minimum recommended sample is {min_sample_size}."
+            ),
+        }
+    ]
 
 
 def _mean(values: list[float]) -> float | None:

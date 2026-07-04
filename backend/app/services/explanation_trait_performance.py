@@ -23,6 +23,7 @@ class ExplanationTraitPerformanceService:
         scanner_type: str | None = None,
         start_date: date | None = None,
         end_date: date | None = None,
+        severity: str | None = None,
         min_sample_size: int = 5,
     ) -> dict[str, Any]:
         rows = self._query_rows(
@@ -30,6 +31,7 @@ class ExplanationTraitPerformanceService:
             scanner_type=scanner_type,
             start_date=start_date,
             end_date=end_date,
+            severity=severity,
         )
         buckets: dict[tuple[str, str], _TraitBucket] = {}
 
@@ -64,6 +66,7 @@ class ExplanationTraitPerformanceService:
                 "scanner_type": scanner_type,
                 "start_date": start_date.isoformat() if start_date else None,
                 "end_date": end_date.isoformat() if end_date else None,
+                "severity": severity,
                 "min_sample_size": min_sample_size,
             },
             "traits": traits,
@@ -76,6 +79,7 @@ class ExplanationTraitPerformanceService:
         scanner_type: str | None,
         start_date: date | None,
         end_date: date | None,
+        severity: str | None,
     ) -> list[tuple[ScannerEvent, ScannerOutcomeSummary]]:
         query = (
             db.query(ScannerEvent, ScannerOutcomeSummary)
@@ -91,6 +95,8 @@ class ExplanationTraitPerformanceService:
             query = query.filter(ScannerEvent.event_date >= start_date)
         if end_date:
             query = query.filter(ScannerEvent.event_date <= end_date)
+        if severity:
+            query = query.filter(ScannerEvent.severity == severity)
         return query.order_by(ScannerEvent.event_date.asc(), ScannerEvent.id.asc()).all()
 
 
