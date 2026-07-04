@@ -17,6 +17,7 @@ from app.core.database import SessionLocal, get_db
 from app.core.rate_limits import limiter
 from app.models.system_config import SystemConfig
 from app.models.user import User
+from app.services.llm_observability import LLMObservabilityService
 from app.services.system_service import SystemService
 
 router = APIRouter(prefix="/api/v1/system", tags=["system"])
@@ -71,6 +72,12 @@ def get_system_status(db: Session = Depends(get_db)):
         }
 
     return get_cached("mh:system:status", 30, _fetch)
+
+
+@router.get("/llm-status")
+def get_llm_status():
+    """Return optional LLM provider, limits, and usage metric status."""
+    return LLMObservabilityService().status()
 
 
 @router.get("/config")
