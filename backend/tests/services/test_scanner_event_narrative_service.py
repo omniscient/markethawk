@@ -37,6 +37,17 @@ class RecordingGenerator:
         return f"{facts['ticker']} narrative. Risks: {'; '.join(risks)}"
 
 
+class StructuredGenerator:
+    provider_name = "local"
+    model_name = "unit-narrator"
+
+    def __init__(self, payload):
+        self.payload = payload
+
+    def generate(self, brief, guardrails):
+        return self.payload
+
+
 def make_settings(**overrides) -> Settings:
     return Settings(_env_file=None, **{**BASE_SETTINGS, **overrides})
 
@@ -185,3 +196,93 @@ def test_stale_brief_regenerates_and_updates_existing_cache_row(db):
     cached = db.query(ScannerEventNarrative).one()
     assert cached.id == cache_id
     assert cached.input_payload["risks"] == ["Updated risk."]
+
+
+def test_supported_provenance_is_returned_and_cached(db):
+    event = seed_event(db)
+    provenance = [
+        {
+            "claim": "Ticker and setup summary",
+            "source_fields": ["facts.ticker", "facts.summary"],
+        },
+        {"claim": "Risk summary", "source_fields": ["risks"]},
+    ]
+    service = ScannerEventNarrativeService(
+        brief_service=FakeBriefService(make_brief()),
+        generator=StructuredGenerator(
+            {
+                "text": "TGT signal narrative. Key risks: incomplete outcome.",
+                "provenance": provenance,
+            }
+        ),
+        settings=enabled_settings(),
+    )
+
+    result = service.build(db, event)
+
+    assert result["cache"]["status"] == "miss"
+    assert result["narrative"]["provenance"] == provenance
+    cached = db.query(ScannerEventNarrative).one()
+    assert cached.provenance_payload == provenance
+
+
+def test_forbidden_claim_is_rejected_before_persistence(db):
+    event = seed_event(db)
+    service = ScannerEventNarrativeService(
+        brief_service=FakeBriefService(make_brief()),
+        generator=StructuredGenerator(
+            {
+                "text": "TGT is strong, so recommend live trade execution now.",
+                "provenance": [
+                    {"claim": "Ticker summary", "source_fields": ["facts.ticker"]}
+                ],
+            }
+        ),
+        settings=enabled_settings(),
+    )
+
+    result = service.build(db, event)
+
+    assert result["narrative"] is None
+    assert result["cache"]["status"] == "rejected"
+    assert "forbidden claim" in result["rejection"]["reason"]
+    assert db.query(ScannerEventNarrative).count() == 0
+
+
+def test_missing_provenance_is_rejected_before_persistence(db):
+    event = seed_event(db)
+    service = ScannerEventNarrativeService(
+        brief_service=FakeBriefService(make_brief()),
+        generator=StructuredGenerator({"text": "TGT narrative without provenance."}),
+        settings=enabled_settings(),
+    )
+
+    result = service.build(db, event)
+
+    assert result["narrative"] is None
+    assert result["cache"]["status"] == "rejected"
+    assert "provenance" in result["rejection"]["reason"]
+    assert db.query(ScannerEventNarrative).count() == 0
+
+
+def test_unsupported_provenance_field_is_rejected_before_persistence(db):
+    event = seed_event(db)
+    service = ScannerEventNarrativeService(
+        brief_service=FakeBriefService(make_brief()),
+        generator=StructuredGenerator(
+            {
+                "text": "TGT narrative with unsupported provenance.",
+                "provenance": [
+                    {"claim": "Analog claim", "source_fields": ["analogs"]}
+                ],
+            }
+        ),
+        settings=enabled_settings(),
+    )
+
+    result = service.build(db, event)
+
+    assert result["narrative"] is None
+    assert result["cache"]["status"] == "rejected"
+    assert "unsupported provenance field" in result["rejection"]["reason"]
+    assert db.query(ScannerEventNarrative).count() == 0

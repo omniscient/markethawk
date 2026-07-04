@@ -37,6 +37,7 @@ class ScannerEventNarrative(Base):
     brief_schema_version = Column(String(50), nullable=False)
     brief_fingerprint = Column(String(64), nullable=False, index=True)
     input_payload = Column(JSONB, nullable=False, default=dict)
+    provenance_payload = Column(JSONB, nullable=False, default=list)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
