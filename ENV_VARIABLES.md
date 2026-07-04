@@ -53,6 +53,25 @@ These must be set before starting the stack. The application will start without 
 
 ---
 
+## Optional LLM Features
+
+LLM-powered narratives and semantic intelligence are disabled by default. Setting provider/model values alone does not affect deterministic scanner explainability; callers must explicitly enable LLM features and opt feature areas into the allowlist.
+
+Allowed feature areas: `scanner_narrative`, `alert_copy`, `post_mortem`, `semantic_search`, `analyst_qa`, `embeddings`.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LLM_FEATURES_ENABLED` | `false` | Master flag for optional LLM feature paths. When `false`, LLM guardrails deny every feature area. |
+| `LLM_PROVIDER` | `disabled` | Provider selector. Supported values: `disabled`, `openai`, `anthropic`, `local`. Must be non-`disabled` when `LLM_FEATURES_ENABLED=true`. |
+| `LLM_MODEL` | `` (empty) | Model identifier for the selected provider. Required when `LLM_FEATURES_ENABLED=true`. |
+| `LLM_MAX_TOKENS` | `800` | Maximum output tokens allowed for one LLM call. Must be greater than zero. |
+| `LLM_TIMEOUT_SECONDS` | `10.0` | Per-call timeout in seconds. Must be greater than zero. |
+| `LLM_MAX_RETRIES` | `1` | Maximum retry attempts after an LLM call failure. Must be zero or greater. |
+| `LLM_RETRY_BACKOFF_SECONDS` | `0.5` | Backoff delay between retry attempts in seconds. Must be greater than zero. |
+| `LLM_ALLOWED_FEATURES` | `` (empty) | Comma-separated allowlist of feature areas permitted to use LLMs, e.g. `scanner_narrative,semantic_search`. Unknown areas fail startup validation. |
+
+---
+
 ## System Notifications
 
 Generic (non-scanner) email + browser-push notifications via `notify_system()` and `POST /api/v1/alerts/system`. Used by server-to-server callers such as the dark-factory scheduler.
