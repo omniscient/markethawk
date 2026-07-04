@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# MarketHawk preview-up hook — spin up the per-issue preview stack.
+# Port of the workflow preview-up node (check-only: code moved verbatim, not rewritten).
+# NOT YET WIRED: the workflow node remains authoritative until the factory rewires it
+# to run_hook (post-P2). See docs/superpowers/plans/2026-07-04-dark-factory-extraction-p2.md.
+set -uo pipefail
+ISSUE="${ISSUE_NUM:?preview-up requires ISSUE_NUM}"
+NEEDS_PREVIEW="${NEEDS_PREVIEW:-true}"
+SKIP_REASON="${PREVIEW_SKIP_REASON_IN:-}"
+
+mkdir -p "$ARTIFACTS_DIR"
+BUILD_LOG="$ARTIFACTS_DIR/preview_build.log"
+
+# Single writer for preview_env.sh — every exit path MUST go through this so
+# downstream nodes (validate, push-and-pr, report) can always source the file.
+# args: skipped failed reason slot frontend backend net
+write_preview_env() {
+  {
+    echo "export PREVIEW_SKIPPED=$1"
+    echo "export PREVIEW_FAILED=$2"
+    echo "export PREVIEW_SKIP_REASON=\"$3\""
+    echo "export PREVIEW_SLOT=\"$4\""
+    echo "export PREVIEW_FRONTEND=\"$5\""
+    echo "export PREVIEW_BACKEND=\"$6\""
+    echo "export PREVIEW_NET=\"$7\""
+  } > "$ARTIFACTS_DIR/preview_env.sh"
+}
+
+# Fail-proof degrade: a broken preview must never kill the run (it used to send the
+# ticket back to Ready in a loop). Note the failure on the ticket, mark the preview
+# as skipped+failed, and exit 0 so validate/push/PR proceed without live endpoints.
+preview_fail() {
+  REASON="$1"
+  echo "WARNING: preview failed: ${REASON} — continuing without preview" >&2
+  write_preview_env true true "preview failed: ${REASON}" "" "" "" ""
+  LOG_TAIL=""
+  [ -f "$BUILD_LOG" ] && LOG_TAIL=$(tail -30 "$BUILD_LOG")
+  gh issue comment "$ISSUE" --body "⚠️ **Preview environment failed to start** — ${REASON}
+
+The run continued in degraded mode (no live-endpoint validation; PR still created). Last build/boot output:
+\`\`\`
+${LOG_TAIL:-<no build log captured>}
+\`\`\`
+The \`mh-preview-${ISSUE}\` stack was left as-is for debugging — tear down with \"Close issue #${ISSUE}\"." \
+      || echo "WARNING: could not post preview-failure comment to issue #${ISSUE}" >&2
+  echo "PREVIEW_SKIPPED=true"
+  echo "PREVIEW_FAILED=true"
+  echo "PREVIEW_SKIP_REASON=preview failed: ${REASON}"
+  exit 0
+}
+
+# Bench mode stub: skip Docker entirely, write canned preview_env.sh, exit 0.
+# BENCH_MODE=stub: no preview stack (only push-and-pr is also stubbed).
+# BENCH_MODE=full: preview runs normally; only push-and-pr is stubbed (no junk PRs).
+if [ "${BENCH_MODE:-}" = "stub" ]; then
+  echo "BENCH_MODE=stub: preview stubbed for issue #${ISSUE}"
+  write_preview_env true false "bench mode stub — no preview stack" "" "" "" ""
+  echo "PREVIEW_SKIPPED=true"
+  echo "PREVIEW_SKIP_REASON=bench mode stub"
+  exit 0
+fi
+
+# Skip ONLY on an explicit "false". Any other value (including garbled or errored
+# classifier output) falls through to building the preview — fail-safe direction.
+if [ "$NEEDS_PREVIEW" = "false" ]; then
+  echo "Preview differentiator: skipping preview for issue #${ISSUE}"
+  echo "Reason: ${SKIP_REASON}"
+  write_preview_env true false "${SKIP_REASON}" "" "" "" ""
+  echo "PREVIEW_SKIPPED=true"
+  echo "PREVIEW_SKIP_REASON=${SKIP_REASON}"
+  exit 0
+fi
+
+# Preview ports follow 1{SLOT}{suffix} (e.g. slot 03 -> frontend 10333, backend 10380).
+# Collision-free allocation: recover the slot from the already-running preview stack (Continue runs),
+# or scan docker ps for occupied 1PP33->3333 frontend ports and pick the lowest free 2-digit slot.
+PADDED=""
+EXISTING_PORT=$(docker ps \
+  --filter "label=com.docker.compose.project=mh-preview-${ISSUE}" \
+  --format '{{.Ports}}' 2>/dev/null \
+  | grep -oP '(?<=:)1\d{4}(?=->3333)' | head -1 || true)
+if [ -n "$EXISTING_PORT" ]; then
+  PADDED=$(printf "%02d" $(( (EXISTING_PORT - 10000) / 100 )))
+  echo "INFO: Recovered slot ${PADDED} from existing preview for issue #${ISSUE}" >&2
+else
+  USED_SLOTS=$(docker ps --format '{{.Ports}}' 2>/dev/null \
+    | grep -oP '(?<=:)1\d{4}(?=->3333)' \
+    | while read -r PORT; do printf "%02d\n" $(( (PORT - 10000) / 100 )); done \
+    | sort -u || true)
+  for i in $(seq 0 99); do
+    SLOT=$(printf "%02d" $i)
+    if ! echo "$USED_SLOTS" | grep -qx "$SLOT"; then
+      PADDED="$SLOT"
+      break
+    fi
+  done
+  if [ -z "$PADDED" ]; then
+    preview_fail "no free preview slot in range 00-99 — run 'Close issue #N' on a stale preview to free one"
+  fi
+  echo "INFO: Allocated slot ${PADDED} for issue #${ISSUE}" >&2
+fi
+export ISSUE_NUM_PADDED="$PADDED"
+export POLYGON_API_KEY="${POLYGON_API_KEY:-}"
+
+PREVIEW_START=$(date +%s)
+echo "Starting preview stack mh-preview-${ISSUE} (ports: 1${PADDED}33, 1${PADDED}80)..."
+
+# Pre-bake images via the remote BuildKit daemon (tcp://buildkit:1234 on factory-network).
+# buildx talks to buildkitd directly over TCP — never the proxied docker.sock — so it
+# sidesteps the connection-hijack the socket-proxy blocks (#436). --load then imports the
+# result into dockerd via POST /images/load (allowed by the proxy), so `up -d` finds the
+# images locally. Build/boot noise goes to the build log, NOT stdout: this node's stdout
+# becomes the preview-up node output, and oversized node output triggered the E2BIG loop.
+export PREVIEW_BACKEND_IMAGE="mh-preview-${ISSUE}-backend:latest"
+export PREVIEW_FRONTEND_IMAGE="mh-preview-${ISSUE}-frontend:latest"
+BUILDKIT_ADDR="tcp://${BUILDKIT_HOST:-buildkit}:${BUILDKIT_PORT:-1234}"
+# Builder is per-run (the run container is ephemeral); ignore "already exists" on re-run.
+docker buildx create --name preview-remote --driver remote "$BUILDKIT_ADDR" >> "$BUILD_LOG" 2>&1 || true
+echo "Building ${PREVIEW_BACKEND_IMAGE} via remote BuildKit..."
+if ! docker buildx build --builder preview-remote --load \
+  -t "$PREVIEW_BACKEND_IMAGE" -f backend/Dockerfile backend >> "$BUILD_LOG" 2>&1; then
+  preview_fail "buildx build of backend image failed (see preview_build.log tail below)"
+fi
+echo "Building ${PREVIEW_FRONTEND_IMAGE} via remote BuildKit..."
+if ! docker buildx build --builder preview-remote --load \
+  -t "$PREVIEW_FRONTEND_IMAGE" -f frontend/Dockerfile frontend >> "$BUILD_LOG" 2>&1; then
+  preview_fail "buildx build of frontend image failed (see preview_build.log tail below)"
+fi
+
+# Bring the stack up WITHOUT --build (images are pre-baked). The one-shot `migrate` service
+# applies the schema (alembic upgrade head) and gates backend/celery startup; a migrate
+# failure makes `up -d` exit non-zero (compose aborts on a failed
+# service_completed_successfully dependency), so it is caught here.
+if ! docker compose -p "mh-preview-${ISSUE}" \
+  -f dark-factory/docker-compose.preview.yml \
+  up -d >> "$BUILD_LOG" 2>&1; then
+  preview_fail "docker compose up failed (migrate/boot — see preview_build.log tail below)"
+fi
+
+PREVIEW_NET="mh-preview-${ISSUE}_preview-network"
+# Connect to the preview network so we can reach the backend by container hostname.
+# We stay connected for the lifetime of this job — the validate command step that
+# follows needs direct network access to run endpoint smoke tests.  Disconnect
+# happens in the validate step's cleanup (or on container exit).
+docker network connect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
+
+# Backend is reachable inside the preview network via its container hostname.
+# Using the container hostname avoids the localhost:<hostPort> approach, which
+# does not work when the dark-factory container and the preview containers are on
+# different Docker networks (the host port IS reachable from the Docker host but
+# NOT from inside another container).
+BACKEND_HOSTNAME="mh-preview-${ISSUE}-backend-1"
+BACKEND_INTERNAL="http://${BACKEND_HOSTNAME}:8000"
+
+# Poll the backend container's healthcheck via `docker inspect` (GET /containers/<id>/json,
+# allowed by the proxy via CONTAINERS:1) instead of `docker compose exec` (proxy is EXEC:0,
+# and exec-start also needs the connection-hijack the proxy can't forward). The backend
+# service defines an /api/health healthcheck, so State.Health.Status flips to "healthy".
+echo "Waiting for backend health..."
+for i in $(seq 1 60); do
+  HEALTH=$(docker inspect --format '{{.State.Health.Status}}' "$BACKEND_HOSTNAME" 2>/dev/null || echo "missing")
+  if [ "$HEALTH" = "healthy" ]; then
+    PREVIEW_SECS=$(( $(date +%s) - PREVIEW_START ))
+    echo "Backend healthy!"
+    echo "PREVIEW_SLOT=${PADDED}"
+    echo "PREVIEW_FRONTEND=http://localhost:1${PADDED}33"
+    echo "PREVIEW_BACKEND=${BACKEND_INTERNAL}"
+    echo "PREVIEW_MOUNT_SECS=${PREVIEW_SECS}"
+    # Write env file so downstream nodes (validate, push-and-pr, report) can source
+    # it reliably without having to parse raw step output or guess the URL.
+    write_preview_env false false "" "${PADDED}" "http://localhost:1${PADDED}33" "${BACKEND_INTERNAL}" "${PREVIEW_NET}"
+    exit 0
+  fi
+  sleep 3
+done
+docker network disconnect "$PREVIEW_NET" "$(hostname)" 2>/dev/null || true
+docker compose -p "mh-preview-${ISSUE}" -f dark-factory/docker-compose.preview.yml \
+  logs --tail 40 backend >> "$BUILD_LOG" 2>&1 || true
+preview_fail "backend did not become healthy within 180s"
