@@ -22,6 +22,7 @@ from app.models.replay_run import ReplayRun
 from app.models.replay_trade import ReplayTrade
 from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
+from app.models.scanner_event_narrative import ScannerEventNarrative
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.scanner_replay_diff import ScannerReplayDiff
@@ -48,6 +49,7 @@ __all__ = [
     "StockUniverse",
     "MonitoredStock",
     "ScannerEvent",
+    "ScannerEventNarrative",
     "ScannerConfig",
     "ScannerRun",
     "TickerReference",
