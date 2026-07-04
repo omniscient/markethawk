@@ -12,6 +12,7 @@ const mockUseBackfillMutation = vi.fn();
 const mockUseSignals = vi.fn();
 const mockUseExplanationTraits = vi.fn();
 const mockUseExplanationArchetypes = vi.fn();
+const mockUseRegimeBreakdown = vi.fn();
 
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
@@ -28,6 +29,7 @@ vi.mock('../hooks/useScorecard', () => ({
   useDistribution: (...args: unknown[]) => mockUseDistribution(...args),
   useExplanationTraits: (...args: unknown[]) => mockUseExplanationTraits(...args),
   useExplanationArchetypes: (...args: unknown[]) => mockUseExplanationArchetypes(...args),
+  useRegimeBreakdown: (...args: unknown[]) => mockUseRegimeBreakdown(...args),
   useBackfillMutation: () => mockUseBackfillMutation(),
   useSignals: (...args: unknown[]) => mockUseSignals(...args),
 }));
@@ -78,6 +80,14 @@ const noDataDefaults = () => {
     },
     isLoading: false,
   });
+  mockUseRegimeBreakdown.mockReturnValue({
+    data: {
+      scanner_type: 'pre_market_volume_spike',
+      total_events: 0,
+      breakdown: {},
+    },
+    isLoading: false,
+  });
   mockUseBackfillMutation.mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
@@ -117,6 +127,64 @@ describe('ScorecardDetail — shell', () => {
   it('shows back arrow link', () => {
     renderWithQuery(<ScorecardDetail />);
     expect(screen.getByRole('link')).toBeInTheDocument();
+  });
+});
+
+describe('ScorecardDetail — regime performance', () => {
+  beforeEach(noDataDefaults);
+
+  it('shows empty advisory state when no regime outcome evidence exists', () => {
+    renderWithQuery(<ScorecardDetail />);
+    expect(screen.getByText(/Regime Performance/i)).toBeInTheDocument();
+    expect(screen.getByText(/No regime outcome evidence yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/advisory evidence, not a trading rule/i)).toBeInTheDocument();
+  });
+
+  it('shows loading state while regime breakdown loads', () => {
+    mockUseRegimeBreakdown.mockReturnValue({ data: null, isLoading: true });
+    renderWithQuery(<ScorecardDetail />);
+    expect(screen.getByText(/Regime Performance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Loading regime evidence/i)).toBeInTheDocument();
+  });
+
+  it('renders conservative interpretations for populated and low-sample regimes', () => {
+    mockUseRegimeBreakdown.mockReturnValue({
+      isLoading: false,
+      data: {
+        scanner_type: 'pre_market_volume_spike',
+        total_events: 26,
+        breakdown: {
+          risk_on: {
+            sample_size: 18,
+            win_rate_pct: 68,
+            avg_mfe_pct: 4.2,
+            avg_mae_pct: -1.0,
+          },
+          high_volatility: {
+            sample_size: 3,
+            win_rate_pct: 80,
+            avg_mfe_pct: 6.5,
+            avg_mae_pct: -3.2,
+          },
+          risk_off: {
+            sample_size: 5,
+            win_rate_pct: 35,
+            avg_mfe_pct: 1.4,
+            avg_mae_pct: -4.1,
+          },
+        },
+      },
+    });
+
+    renderWithQuery(<ScorecardDetail />);
+
+    expect(screen.getByText(/Risk On/i)).toBeInTheDocument();
+    expect(screen.getByText(/Candidate favorable regime/i)).toBeInTheDocument();
+    expect(screen.getByText(/High Volatility/i)).toBeInTheDocument();
+    expect(screen.getByText(/Insufficient evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/Risk Off/i)).toBeInTheDocument();
+    expect(screen.getByText(/Candidate hostile regime/i)).toBeInTheDocument();
+    expect(screen.getByText(/n=18/i)).toBeInTheDocument();
   });
 });
 

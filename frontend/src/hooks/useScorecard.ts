@@ -6,6 +6,7 @@ import {
   fetchIntervals,
   fetchDistribution,
   fetchSignals,
+  fetchRegimeBreakdown,
   fetchExplanationTraits,
   fetchExplanationArchetypes,
   triggerBackfill,
@@ -14,6 +15,7 @@ import {
   IntervalBreakdown,
   DistributionPoint,
   SignalListResponse,
+  RegimeBreakdownResponse,
   ExplanationTraitPerformance,
   ExplanationArchetypeResponse,
   BackfillRequest,
@@ -87,6 +89,17 @@ export const useSignals = (
   });
 };
 
+export const useRegimeBreakdown = (
+  scannerType: string | undefined,
+  params?: { start_date?: string; end_date?: string },
+) => {
+  return useQuery<RegimeBreakdownResponse>({
+    queryKey: ['regimeBreakdown', scannerType, params],
+    queryFn: () => fetchRegimeBreakdown(scannerType!, params),
+    enabled: !!scannerType,
+  });
+};
+
 export const useExplanationTraits = (
   scannerType: string | undefined,
   params?: { start_date?: string; end_date?: string; severity?: string },
@@ -118,6 +131,7 @@ export const useBackfillMutation = () => {
       queryClient.invalidateQueries({ queryKey: ['edgeDecay'] });
       queryClient.invalidateQueries({ queryKey: ['intervals'] });
       queryClient.invalidateQueries({ queryKey: ['distribution'] });
+      queryClient.invalidateQueries({ queryKey: ['regimeBreakdown'] });
     },
   });
 };

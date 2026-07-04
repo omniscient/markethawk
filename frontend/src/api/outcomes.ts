@@ -237,6 +237,19 @@ export interface AISignalBrief {
   forbidden_claims: string[];
 }
 
+export interface RegimeSlice {
+  sample_size: number;
+  win_rate_pct: number | null;
+  avg_mfe_pct: number | null;
+  avg_mae_pct: number | null;
+}
+
+export interface RegimeBreakdownResponse {
+  scanner_type: string;
+  total_events: number;
+  breakdown: Record<string, RegimeSlice>;
+}
+
 export interface ExplanationTrait {
   trait_type: string;
   trait_key: string;
@@ -356,6 +369,19 @@ export const fetchHistoricalAnalogs = async (
 
 export const fetchAISignalBrief = async (eventId: number): Promise<AISignalBrief> => {
   const response = await apiClient.get(`/outcomes/event/${eventId}/ai-signal-brief`);
+  return response.data;
+};
+
+export const fetchRegimeBreakdown = async (
+  scannerType: string,
+  params?: { start_date?: string; end_date?: string },
+): Promise<RegimeBreakdownResponse> => {
+  const response = await apiClient.get(`/outcomes/regime-breakdown/${scannerType}`, {
+    params: {
+      start_date: params?.start_date,
+      end_date: params?.end_date,
+    },
+  });
   return response.data;
 };
 
