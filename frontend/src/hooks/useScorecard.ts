@@ -6,12 +6,16 @@ import {
   fetchIntervals,
   fetchDistribution,
   fetchSignals,
+  fetchExplanationTraits,
+  fetchExplanationArchetypes,
   triggerBackfill,
   Scorecard,
   EdgeDecayPoint,
   IntervalBreakdown,
   DistributionPoint,
   SignalListResponse,
+  ExplanationTraitPerformance,
+  ExplanationArchetypeResponse,
   BackfillRequest,
   BackfillResponse,
 } from '../api/outcomes';
@@ -79,6 +83,28 @@ export const useSignals = (
   return useQuery<SignalListResponse>({
     queryKey: ['signals', scannerType, params],
     queryFn: () => fetchSignals({ scanner_type: scannerType!, ...params }),
+    enabled: !!scannerType,
+  });
+};
+
+export const useExplanationTraits = (
+  scannerType: string | undefined,
+  params?: { start_date?: string; end_date?: string; severity?: string },
+) => {
+  return useQuery<ExplanationTraitPerformance>({
+    queryKey: ['explanationTraits', scannerType, params],
+    queryFn: () => fetchExplanationTraits({ scanner_type: scannerType!, ...params }),
+    enabled: !!scannerType,
+  });
+};
+
+export const useExplanationArchetypes = (
+  scannerType: string | undefined,
+  params?: { start_date?: string; end_date?: string; severity?: string },
+) => {
+  return useQuery<ExplanationArchetypeResponse>({
+    queryKey: ['explanationArchetypes', scannerType, params],
+    queryFn: () => fetchExplanationArchetypes({ scanner_type: scannerType!, ...params }),
     enabled: !!scannerType,
   });
 };

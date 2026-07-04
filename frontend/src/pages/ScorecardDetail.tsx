@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { useScorecard, useEdgeDecay, useIntervals, useDistribution } from '../hooks/useScorecard';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { useScorecard, useEdgeDecay, useIntervals, useDistribution, useExplanationTraits, useExplanationArchetypes } from '../hooks/useScorecard';
+import type { ExplanationArchetype, ExplanationTrait } from '../api/outcomes';
 import HeroMetrics from '../components/scorecard/HeroMetrics';
 import EdgeDecayChart from '../components/scorecard/EdgeDecayChart';
 import DistributionChart from '../components/scorecard/DistributionChart';
@@ -32,6 +33,16 @@ const PERIODS: { label: string; value: Period }[] = [
 
 const SEVERITIES = ['All Severities', 'high', 'medium', 'low'] as const;
 
+const fmtPct = (value: number | null | undefined): string => (
+  value === null || value === undefined ? '—' : `${value.toFixed(1)}%`
+);
+
+const traitOutcomeScore = (trait: ExplanationTrait): number => (
+  (trait.win_rate_pct ?? 0) + (trait.avg_mfe_pct ?? 0) - Math.abs(trait.avg_mae_pct ?? 0)
+);
+
+const compactTraitType = (type: string): string => type.replace(/_/g, ' ');
+
 const ScorecardDetail: React.FC = () => {
   const { scannerType } = useParams<{ scannerType: string }>();
   const [period, setPeriod] = useState<Period>('30d');
@@ -47,8 +58,21 @@ const ScorecardDetail: React.FC = () => {
   const { data: edgeDecay, isLoading: loadingEdge } = useEdgeDecay(scannerType, dates);
   const { data: intervals, isLoading: loadingIntervals } = useIntervals(scannerType);
   const { data: distribution, isLoading: loadingDist } = useDistribution(scannerType);
+  const { data: traits, isLoading: loadingTraits } = useExplanationTraits(scannerType, scorecardParams);
+  const { data: archetypes, isLoading: loadingArchetypes } = useExplanationArchetypes(scannerType, scorecardParams);
 
   const displayName = scannerType?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) ?? '';
+  const rankedTraits = traits?.traits ?? [];
+  const positiveTraits = rankedTraits
+    .filter((trait) => (trait.win_rate_pct ?? 0) >= 50)
+    .sort((a, b) => traitOutcomeScore(b) - traitOutcomeScore(a))
+    .slice(0, 4);
+  const negativeTraits = rankedTraits
+    .filter((trait) => (trait.win_rate_pct ?? 0) < 50)
+    .sort((a, b) => traitOutcomeScore(a) - traitOutcomeScore(b))
+    .slice(0, 4);
+  const hasTraitData = rankedTraits.length > 0;
+  const archetypeRows = archetypes?.archetypes ?? [];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -120,6 +144,68 @@ const ScorecardDetail: React.FC = () => {
       {/* Hero Metrics */}
       {scorecard && <HeroMetrics scorecard={scorecard} />}
 
+      {/* Explanation Intelligence */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <section className="xl:col-span-2 bg-financial-gray rounded-lg border border-gray-700 p-5">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-financial-light uppercase tracking-wider">Explanation Traits</h2>
+              <p className="text-xs text-gray-500 mt-1">{traits?.event_count ?? 0} complete signals in scope</p>
+            </div>
+            {rankedTraits.some((trait) => trait.warnings.length > 0) && (
+              <div className="flex items-center gap-1 text-amber-300 text-xs font-semibold">
+                <AlertTriangle className="h-4 w-4" />
+                Low sample
+              </div>
+            )}
+          </div>
+
+          {loadingTraits && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-16 bg-gray-800 rounded animate-pulse" />
+              ))}
+            </div>
+          )}
+
+          {!loadingTraits && !hasTraitData && (
+            <div className="border border-dashed border-gray-700 rounded-lg p-5 text-sm text-gray-400">
+              No explanation trait performance yet.
+            </div>
+          )}
+
+          {!loadingTraits && hasTraitData && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <TraitList title="Top Positive Traits" traits={positiveTraits} />
+              <TraitList title="Top Negative Traits" traits={negativeTraits} />
+            </div>
+          )}
+        </section>
+
+        <section className="bg-financial-gray rounded-lg border border-gray-700 p-5">
+          <div className="mb-4">
+            <h2 className="text-sm font-bold text-financial-light uppercase tracking-wider">Archetypes</h2>
+            <p className="text-xs text-gray-500 mt-1">{archetypes?.event_count ?? 0} assigned signals</p>
+          </div>
+
+          {loadingArchetypes && <div className="h-24 bg-gray-800 rounded animate-pulse" />}
+
+          {!loadingArchetypes && archetypeRows.length === 0 && (
+            <div className="border border-dashed border-gray-700 rounded-lg p-5 text-sm text-gray-400">
+              No explanation archetypes yet.
+            </div>
+          )}
+
+          {!loadingArchetypes && archetypeRows.length > 0 && (
+            <div className="space-y-3">
+              {archetypeRows.slice(0, 4).map((archetype) => (
+                <ArchetypeRow key={archetype.cluster_id} archetype={archetype} />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
       {/* No data state */}
       {!loadingScorecard && !scorecardError && !scorecard && (
         <div className="flex flex-col items-center justify-center h-48 bg-gray-900/50 rounded-2xl border-2 border-dashed border-gray-800">
@@ -152,5 +238,58 @@ const ScorecardDetail: React.FC = () => {
     </div>
   );
 };
+
+const TraitList: React.FC<{ title: string; traits: ExplanationTrait[] }> = ({ title, traits }) => (
+  <div>
+    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{title}</h3>
+    <div className="space-y-2">
+      {traits.length === 0 && (
+        <div className="border border-dashed border-gray-800 rounded-lg p-3 text-sm text-gray-500">
+          No traits in this group.
+        </div>
+      )}
+      {traits.map((trait) => (
+        <div key={`${title}-${trait.trait_type}-${trait.trait_key}`} className="border border-gray-800 rounded-lg p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-financial-light">{trait.trait_label}</div>
+              <div className="text-xs text-gray-500 capitalize">{compactTraitType(trait.trait_type)} • n={trait.sample_size}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-bold text-financial-light">{fmtPct(trait.win_rate_pct)}</div>
+              <div className="text-xs text-gray-500">MFE {fmtPct(trait.avg_mfe_pct)}</div>
+            </div>
+          </div>
+          {trait.warnings.length > 0 && (
+            <div className="mt-2 text-xs text-amber-300">{trait.warnings[0].message}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const ArchetypeRow: React.FC<{ archetype: ExplanationArchetype }> = ({ archetype }) => (
+  <div className="border border-gray-800 rounded-lg p-3">
+    <div className="text-sm font-semibold text-financial-light">{archetype.label}</div>
+    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+      <div>
+        <div className="text-gray-500">Sample</div>
+        <div className="text-financial-light font-semibold">{archetype.sample_size}</div>
+      </div>
+      <div>
+        <div className="text-gray-500">Win</div>
+        <div className="text-financial-light font-semibold">{fmtPct(archetype.return_profile.win_rate_pct)}</div>
+      </div>
+      <div>
+        <div className="text-gray-500">MFE</div>
+        <div className="text-financial-light font-semibold">{fmtPct(archetype.return_profile.avg_mfe_pct)}</div>
+      </div>
+    </div>
+    {archetype.warnings.length > 0 && (
+      <div className="mt-2 text-xs text-amber-300">{archetype.warnings[0].message}</div>
+    )}
+  </div>
+);
 
 export default ScorecardDetail;

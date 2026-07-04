@@ -225,6 +225,7 @@ def test_aggregate_trait_performance_filters_by_scanner_type_and_date_range(db):
         "scanner_type": "pre_market_volume_spike",
         "start_date": "2026-07-01",
         "end_date": "2026-07-03",
+        "severity": None,
         "min_sample_size": 5,
     }
     assert passed["sample_size"] == 1

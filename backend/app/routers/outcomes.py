@@ -34,6 +34,10 @@ from app.schemas.outcome import (
 from app.schemas.regime import RegimeBreakdownResponse
 from app.services.ai_signal_brief import AISignalBriefService
 from app.services.data_readiness import DataReadinessService
+from app.services.explanation_archetype_service import ExplanationArchetypeService
+from app.services.explanation_trait_performance import (
+    ExplanationTraitPerformanceService,
+)
 from app.services.outcome_service import OutcomeService
 from app.services.stats import StatsService
 from app.utils.db import get_or_404
@@ -108,6 +112,42 @@ def get_scorecard_by_type(
         include_warnings=include_warnings,
         include_all=include_all,
         review_window_days=review_window_days,
+    )
+
+
+@router.get("/traits/{scanner_type}")
+def get_explanation_trait_performance(
+    scanner_type: str,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
+    severity: Optional[str] = None,
+    min_sample_size: int = Query(default=5, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    return ExplanationTraitPerformanceService().aggregate(
+        db,
+        scanner_type=scanner_type,
+        start_date=date_range.start_date,
+        end_date=date_range.end_date,
+        severity=severity,
+        min_sample_size=min_sample_size,
+    )
+
+
+@router.get("/archetypes/{scanner_type}")
+def get_explanation_archetypes(
+    scanner_type: str,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
+    severity: Optional[str] = None,
+    min_sample_size: int = Query(default=5, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    return ExplanationArchetypeService().latest_performance(
+        db,
+        scanner_type=scanner_type,
+        start_date=date_range.start_date,
+        end_date=date_range.end_date,
+        severity=severity,
+        min_sample_size=min_sample_size,
     )
 
 
