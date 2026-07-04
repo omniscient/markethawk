@@ -191,6 +191,12 @@ for t in tasks:
       log "    Cleaned up prior branch: $EXISTING_BRANCH"
     fi
 
+    # Remove codeindex artifacts before each run so codeindex analyze starts fresh.
+    # Without this, the analyze step accumulates state across runs and exceeds its
+    # 120s timeout from run 2 onwards, causing implement to be skipped.
+    rm -f "$REPO_ROOT/symbolindex.json" "$REPO_ROOT/codeindex.json" \
+          "$REPO_ROOT/symbolindex.json.bak" 2>/dev/null || true
+
     # Pin to pre-PR commit so oracle tests fail before the fix
     # Use -f to discard any local modifications (e.g. the bench script itself)
     git -C "$REPO_ROOT" checkout -f "$PRE_SHA" 2>/dev/null || {
