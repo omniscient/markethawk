@@ -14,6 +14,18 @@ from app.services.ai_signal_brief import AISignalBriefService
 
 SCANNER_NARRATIVE_FEATURE = "scanner_narrative"
 SCANNER_NARRATIVE_PROMPT_VERSION = "scanner_narrative.v1"
+SUPPORTED_PROVENANCE_FIELDS = frozenset(
+    {
+        "facts.ticker",
+        "facts.event_date",
+        "facts.scanner_type",
+        "facts.severity",
+        "facts.summary",
+        "facts.signal_quality_score",
+        "facts.regime",
+        "risks",
+    }
+)
 
 
 class ScannerNarrativeGenerator(Protocol):
@@ -94,7 +106,20 @@ class ScannerEventNarrativeService:
                 "guardrails": guardrails,
             }
 
-        narrative_text = self._generator.generate(brief, guardrails)
+        generated = _normalize_generated_narrative(
+            self._generator.generate(brief, guardrails),
+            input_payload,
+        )
+        rejection_reason = _rejection_reason(generated, brief, input_payload)
+        if rejection_reason:
+            return {
+                "brief": brief,
+                "narrative": None,
+                "cache": {"status": "rejected"},
+                "rejection": {"reason": rejection_reason},
+                "guardrails": guardrails,
+            }
+
         status = "stale_regenerated" if cache else "miss"
         if cache is None:
             cache = ScannerEventNarrative(
@@ -106,10 +131,11 @@ class ScannerEventNarrativeService:
             )
             db.add(cache)
 
-        cache.narrative_text = narrative_text
+        cache.narrative_text = generated["text"]
         cache.brief_schema_version = str(brief.get("schema_version") or "")
         cache.brief_fingerprint = fingerprint
         cache.input_payload = input_payload
+        cache.provenance_payload = generated["provenance"]
         db.flush()
 
         return {
@@ -141,6 +167,7 @@ class ScannerEventNarrativeService:
             "prompt_version": cache.prompt_version,
             "brief_schema_version": cache.brief_schema_version,
             "brief_fingerprint": cache.brief_fingerprint,
+            "provenance": list(cache.provenance_payload or []),
             "created_at": cache.created_at.isoformat() if cache.created_at else None,
             "updated_at": cache.updated_at.isoformat() if cache.updated_at else None,
         }
@@ -160,3 +187,100 @@ def _brief_fingerprint(brief: dict[str, Any]) -> str:
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _normalize_generated_narrative(
+    generated: str | dict[str, Any],
+    input_payload: dict[str, Any],
+) -> dict[str, Any]:
+    if isinstance(generated, str):
+        return {
+            "text": generated,
+            "provenance": _default_provenance(input_payload),
+        }
+    if not isinstance(generated, dict):
+        return {"text": "", "provenance": []}
+    return {
+        "text": generated.get("text") or "",
+        "provenance": generated.get("provenance") or [],
+    }
+
+
+def _default_provenance(input_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    facts = input_payload.get("facts") or {}
+    source_fields = [
+        f"facts.{field}"
+        for field in (
+            "ticker",
+            "event_date",
+            "scanner_type",
+            "severity",
+            "summary",
+            "signal_quality_score",
+            "regime",
+        )
+        if facts.get(field) is not None
+    ]
+    provenance = []
+    if source_fields:
+        provenance.append(
+            {
+                "claim": "Scanner event facts",
+                "source_fields": source_fields,
+            }
+        )
+    if input_payload.get("risks"):
+        provenance.append({"claim": "Risk summary", "source_fields": ["risks"]})
+    return provenance
+
+
+def _rejection_reason(
+    generated: dict[str, Any],
+    brief: dict[str, Any],
+    input_payload: dict[str, Any],
+) -> str | None:
+    text = generated.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return "Generated narrative is empty."
+
+    forbidden = _forbidden_claim_match(text, brief.get("forbidden_claims") or [])
+    if forbidden:
+        return f"Generated narrative contains a forbidden claim: {forbidden}"
+
+    provenance = generated.get("provenance")
+    if not isinstance(provenance, list) or not provenance:
+        return "Generated narrative is missing provenance."
+
+    for entry in provenance:
+        if not isinstance(entry, dict):
+            return "Generated narrative provenance must be a list of objects."
+        fields = entry.get("source_fields")
+        if not isinstance(fields, list) or not fields:
+            return "Generated narrative provenance is missing source fields."
+        for field in fields:
+            if field not in SUPPORTED_PROVENANCE_FIELDS:
+                return f"Generated narrative uses unsupported provenance field: {field}"
+            if field.startswith("facts."):
+                fact_key = field.split(".", 1)[1]
+                if fact_key not in (input_payload.get("facts") or {}):
+                    return f"Generated narrative references absent provenance field: {field}"
+    return None
+
+
+def _forbidden_claim_match(text: str, forbidden_claims: list[str]) -> str | None:
+    normalized_text = _normalize_claim_text(text)
+    for claim in forbidden_claims:
+        normalized_claim = _normalize_claim_text(claim)
+        for prefix in ("do not ", "don't ", "never "):
+            if normalized_claim.startswith(prefix):
+                normalized_claim = normalized_claim[len(prefix) :]
+                break
+        if normalized_claim and normalized_claim in normalized_text:
+            return claim
+    return None
+
+
+def _normalize_claim_text(value: str) -> str:
+    return " ".join(
+        "".join(char.lower() if char.isalnum() else " " for char in value).split()
+    )
