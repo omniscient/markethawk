@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# MarketHawk preview-down hook — tear down the per-issue preview stack.
+# Port of the workflow close-preview node. NOT YET WIRED: the workflow node
+# remains authoritative until the factory rewires it to run_hook (post-P2).
+set -uo pipefail
+: "${ISSUE_NUM:?preview-down requires ISSUE_NUM}"
+
+echo "Tearing down mh-preview-${ISSUE_NUM}..."
+docker compose -p "mh-preview-${ISSUE_NUM}" down -v 2>/dev/null || echo "No preview stack found"
+
+STALE=$(docker ps -a --filter "label=com.docker.compose.project=mh-preview-${ISSUE_NUM}" \
+  --format '{{.Names}}' 2>/dev/null || true)
+if [ -n "$STALE" ]; then
+  echo "ERROR: Stale preview containers remain after teardown:" >&2
+  echo "$STALE" >&2
+  exit 1
+fi
+echo "preview-down: teardown verified — no mh-preview-${ISSUE_NUM} containers remain"
