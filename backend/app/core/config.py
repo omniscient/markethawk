@@ -8,6 +8,18 @@ from urllib.parse import quote
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+LLM_ALLOWED_FEATURE_AREAS = frozenset(
+    {
+        "scanner_narrative",
+        "alert_copy",
+        "post_mortem",
+        "semantic_search",
+        "analyst_qa",
+        "embeddings",
+    }
+)
+LLM_SUPPORTED_PROVIDERS = frozenset({"disabled", "openai", "anthropic", "local"})
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -140,6 +152,18 @@ class Settings(BaseSettings):
     SCAN_DURATION_SLO_SECONDS: int = 120
     SCAN_STALENESS_SLO_SECONDS: int = 900
 
+    # Optional LLM features. These remain disabled by default and are only
+    # consulted by explicit LLM feature paths; deterministic explainability is
+    # intentionally independent of these provider settings.
+    LLM_FEATURES_ENABLED: bool = False
+    LLM_PROVIDER: str = "disabled"
+    LLM_MODEL: str = ""
+    LLM_MAX_TOKENS: int = Field(default=800, gt=0)
+    LLM_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0)
+    LLM_MAX_RETRIES: int = Field(default=1, ge=0)
+    LLM_RETRY_BACKOFF_SECONDS: float = Field(default=0.5, gt=0)
+    LLM_ALLOWED_FEATURES: str = ""
+
     # ── WebSocket resource limits ──────────────────────────────────────────
     # Single-process in-memory counters (see app/core/ws_limits.py).
     # For multi-replica deployments, migrate counters to Redis.
@@ -175,6 +199,15 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_environment(cls, v: str) -> str:
         return v.lower()
+
+    @field_validator("LLM_PROVIDER")
+    @classmethod
+    def normalize_llm_provider(cls, v: str) -> str:
+        provider = v.strip().lower()
+        if provider not in LLM_SUPPORTED_PROVIDERS:
+            supported = ", ".join(sorted(LLM_SUPPORTED_PROVIDERS))
+            raise ValueError(f"LLM_PROVIDER must be one of: {supported}")
+        return provider
 
     @field_validator("LIVE_TRADING_ARMED")
     @classmethod
@@ -224,6 +257,31 @@ class Settings(BaseSettings):
                 "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(48))'"
             )
         return v
+
+    @model_validator(mode="after")
+    def validate_llm_guardrails(self) -> "Settings":
+        unknown_features = self.llm_allowed_feature_set - LLM_ALLOWED_FEATURE_AREAS
+        if unknown_features:
+            unknown = ", ".join(sorted(unknown_features))
+            supported = ", ".join(sorted(LLM_ALLOWED_FEATURE_AREAS))
+            raise ValueError(
+                f"LLM_ALLOWED_FEATURES contains unsupported feature area(s): {unknown}. "
+                f"Supported areas: {supported}"
+            )
+        if self.LLM_FEATURES_ENABLED:
+            if self.LLM_PROVIDER == "disabled":
+                raise ValueError("LLM_PROVIDER must be configured when LLM features are enabled")
+            if not self.LLM_MODEL.strip():
+                raise ValueError("LLM_MODEL must be configured when LLM features are enabled")
+        return self
+
+    @property
+    def llm_allowed_feature_set(self) -> frozenset[str]:
+        return frozenset(
+            feature.strip()
+            for feature in self.LLM_ALLOWED_FEATURES.split(",")
+            if feature.strip()
+        )
 
 
 @lru_cache()
