@@ -709,64 +709,6 @@ services:
       resources:
         limits:
           memory: 128M
-
-  # agentmemory — spike evaluation only, never starts in default stack.
-  # Evaluates rohitg00/agentmemory as a structured/indexed backend for .archon/memory/*.md.
-  # Architecture: two services — init (permissions) + engine (HTTP API on port 3111).
-  # The agentmemory Node.js worker connects to the engine via host port 6791 (mapped from container port 49134).
-  #
-  # Start sequence:
-  #   docker compose --profile agentmemory-spike up -d agentmemory-init agentmemory-engine
-  #   # wait for engine healthy, then run the eval:
-  #   bash dark-factory/scripts/eval_agentmemory.sh
-  #
-  # See: docs/superpowers/specs/2026-06-27-agentmemory-memory-backend-spike.md
-
-  # Init: fix /data ownership for distroless engine (UID 65532) — runs once and exits.
-  agentmemory-init:
-    image: busybox:1.36
-    container_name: agentmemory-init
-    user: "0:0"
-    profiles:
-      - agentmemory-spike
-    volumes:
-      - agentmemory_data:/data
-    entrypoint: ["sh", "-c", "chown -R 65532:65532 /data && chmod 755 /data"]
-    restart: "no"
-
-  # Engine: iiidev/iii provides the HTTP API and state store.
-  # Uses --use-default-config (in-memory adapters, sufficient for spike evaluation).
-  # The agentmemory npm worker (node process on host) connects via host port 6791
-  # and registers /agentmemory/* endpoints with the engine at runtime.
-  # Run the worker: AGENTMEMORY_ENGINE_URL=ws://localhost:6791 npx agentmemory start
-  agentmemory-engine:
-    image: iiidev/iii:0.11.2
-    container_name: agentmemory-engine
-    command: ["--use-default-config"]
-    user: "65532:65532"
-    profiles:
-      - agentmemory-spike
-    depends_on:
-      agentmemory-init:
-        condition: service_completed_successfully
-    ports:
-      - "127.0.0.1:6789:3111"    # HTTP REST API
-      - "127.0.0.1:6790:3112"    # Stream API
-      - "127.0.0.1:6791:49134"   # Worker WebSocket (agentmemory npm connects here)
-    volumes:
-      - agentmemory_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "cat /proc/1/status >/dev/null"]
-      interval: 5s
-      timeout: 3s
-      retries: 6
-    networks:
-      - stockscanner-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
 volumes:
   postgres_data:
     external: true
@@ -794,7 +736,6 @@ volumes:
   grafana_data:
   caddy_data:
   caddy_config:
-  agentmemory_data:
 
 
 networks:
