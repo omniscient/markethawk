@@ -40,11 +40,6 @@ services:
       - /app/node_modules
     command: npm run dev -- --host
 
-  backlog-scheduler:
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - .:/workspace/project:ro
-
 # Named volumes used in service overrides above must be declared here.
 # Docker Compose requires named volumes referenced in an override file to
 # appear in its own top-level volumes: block (even as an empty stub), otherwise
