@@ -572,31 +572,6 @@ services:
       - stockscanner-network
     restart: unless-stopped
 
-  # Docker Socket Proxy (scheduler) — allows container lifecycle ops (create/run/stop/delete) via POST+CONTAINERS for `docker compose run`; BUILD/EXEC/NETWORKS/VOLUMES are denied
-  docker-socket-proxy-scheduler:
-    image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
-    container_name: markethawk-docker-socket-proxy-scheduler
-    restart: unless-stopped
-    environment:
-      CONTAINERS: 1
-      IMAGES: 1
-      POST: 1
-      # `docker compose run dark-factory` (dispatch) must look up the service's
-      # networks (factory-network, stockscanner-network) and its scheduler_state
-      # volume before creating the container — both were 0, which 403'd every
-      # dispatch after a proxy recreate. BUILD/EXEC stay 0 (run never builds/execs).
-      NETWORKS: 1
-      VOLUMES: 1
-      BUILD: 0
-      SERVICES: 0
-      EXEC: 0
-      AUTH: 0
-      SECRETS: 0
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - factory-network
-
   # Docker Socket Proxy (factory) — full verbs for dark-factory: build/exec/networks/volumes + EXEC fixes postgres-probe
   docker-socket-proxy-factory:
     image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
@@ -637,66 +612,6 @@ services:
       - factory-network
     profiles:
       - factory
-      - scheduler
-
-  # Dark Factory — autonomous development agent (run on demand)
-  dark-factory:
-    image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: dark-factory/Dockerfile
-    container_name: markethawk-dark-factory
-    env_file:
-      - path: .archon/.env
-        required: true
-    environment:
-      DOCKER_HOST: tcp://docker-socket-proxy-factory:2375
-      SEQ_URL: http://seq:5341
-    volumes:
-      - scheduler_state:/var/lib/dark-factory
-    depends_on:
-      - docker-socket-proxy-factory
-      - buildkit
-    networks:
-      - factory-network
-      - stockscanner-network
-    logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://host.docker.internal:12201"
-        tag: "dark-factory"
-    profiles:
-      - factory
-
-  # Backlog Scheduler — polls GitHub board and dispatches dark factory runs
-  backlog-scheduler:
-    image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: dark-factory/Dockerfile
-    container_name: backlog-scheduler
-    restart: unless-stopped
-    entrypoint: ["/opt/dark-factory/scheduler.sh"]
-    env_file:
-      - path: .archon/.env
-        required: true
-    environment:
-      FACTORY_IMAGE: "ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}"
-      DOCKER_HOST: tcp://docker-socket-proxy-scheduler:2375
-    depends_on:
-      - docker-socket-proxy-scheduler
-    # Bind-mount (.:/workspace/project:ro) is restored in docker-compose.override.yml for local dev.
-    volumes:
-      - scheduler_state:/var/lib/dark-factory
-    networks:
-      - factory-network
-      - stockscanner-network
-    logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://host.docker.internal:12201"
-        tag: "backlog-scheduler"
-    profiles:
       - scheduler
 
   # TimesFM forecast worker — dedicated Celery worker for the 'forecasting' queue.
@@ -868,7 +783,6 @@ volumes:
   ib_gateway_settings:
     external: true
     name: markethawk_ib_gateway_settings
-  scheduler_state:
   buildkit_cache:
   timesfm_cache:
   # Regular named volume (not tmpfs) so all containers (backend + celery-worker)
