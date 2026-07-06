@@ -64,9 +64,12 @@ jobs:
 
             # Run migrations before starting services so the backend never briefly serves
             # traffic against a stale schema. Uses run --rm (not exec) so this works even
-            # when the backend is not yet running. Postgres must be up (service_healthy).
+            # when the backend is not yet running. Override the backend entrypoint here:
+            # /entrypoint.sh runs `alembic check`, which correctly fails on a stale DB
+            # and would otherwise prevent the upgrade command from reaching Alembic.
+            # Postgres must be up (service_healthy).
             if [ "$RUN_MIGRATIONS" = "true" ]; then
-              docker compose run --rm backend python -m alembic upgrade head
+              docker compose run --rm --entrypoint python backend -m alembic upgrade head
             fi
 
             # Restart services with updated images
