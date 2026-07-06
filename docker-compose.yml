@@ -572,31 +572,6 @@ services:
       - stockscanner-network
     restart: unless-stopped
 
-  # Docker Socket Proxy (scheduler) — allows container lifecycle ops (create/run/stop/delete) via POST+CONTAINERS for `docker compose run`; BUILD/EXEC/NETWORKS/VOLUMES are denied
-  docker-socket-proxy-scheduler:
-    image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
-    container_name: markethawk-docker-socket-proxy-scheduler
-    restart: unless-stopped
-    environment:
-      CONTAINERS: 1
-      IMAGES: 1
-      POST: 1
-      # `docker compose run dark-factory` (dispatch) must look up the service's
-      # networks (factory-network, stockscanner-network) and its scheduler_state
-      # volume before creating the container — both were 0, which 403'd every
-      # dispatch after a proxy recreate. BUILD/EXEC stay 0 (run never builds/execs).
-      NETWORKS: 1
-      VOLUMES: 1
-      BUILD: 0
-      SERVICES: 0
-      EXEC: 0
-      AUTH: 0
-      SECRETS: 0
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - factory-network
-
   # Docker Socket Proxy (factory) — full verbs for dark-factory: build/exec/networks/volumes + EXEC fixes postgres-probe
   docker-socket-proxy-factory:
     image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
@@ -637,66 +612,6 @@ services:
       - factory-network
     profiles:
       - factory
-      - scheduler
-
-  # Dark Factory — autonomous development agent (run on demand)
-  dark-factory:
-    image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: dark-factory/Dockerfile
-    container_name: markethawk-dark-factory
-    env_file:
-      - path: .archon/.env
-        required: true
-    environment:
-      DOCKER_HOST: tcp://docker-socket-proxy-factory:2375
-      SEQ_URL: http://seq:5341
-    volumes:
-      - scheduler_state:/var/lib/dark-factory
-    depends_on:
-      - docker-socket-proxy-factory
-      - buildkit
-    networks:
-      - factory-network
-      - stockscanner-network
-    logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://host.docker.internal:12201"
-        tag: "dark-factory"
-    profiles:
-      - factory
-
-  # Backlog Scheduler — polls GitHub board and dispatches dark factory runs
-  backlog-scheduler:
-    image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: dark-factory/Dockerfile
-    container_name: backlog-scheduler
-    restart: unless-stopped
-    entrypoint: ["/opt/dark-factory/scheduler.sh"]
-    env_file:
-      - path: .archon/.env
-        required: true
-    environment:
-      FACTORY_IMAGE: "ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}"
-      DOCKER_HOST: tcp://docker-socket-proxy-scheduler:2375
-    depends_on:
-      - docker-socket-proxy-scheduler
-    # Bind-mount (.:/workspace/project:ro) is restored in docker-compose.override.yml for local dev.
-    volumes:
-      - scheduler_state:/var/lib/dark-factory
-    networks:
-      - factory-network
-      - stockscanner-network
-    logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://host.docker.internal:12201"
-        tag: "backlog-scheduler"
-    profiles:
       - scheduler
 
   # TimesFM forecast worker — dedicated Celery worker for the 'forecasting' queue.
@@ -794,64 +709,6 @@ services:
       resources:
         limits:
           memory: 128M
-
-  # agentmemory — spike evaluation only, never starts in default stack.
-  # Evaluates rohitg00/agentmemory as a structured/indexed backend for .archon/memory/*.md.
-  # Architecture: two services — init (permissions) + engine (HTTP API on port 3111).
-  # The agentmemory Node.js worker connects to the engine via host port 6791 (mapped from container port 49134).
-  #
-  # Start sequence:
-  #   docker compose --profile agentmemory-spike up -d agentmemory-init agentmemory-engine
-  #   # wait for engine healthy, then run the eval:
-  #   bash dark-factory/scripts/eval_agentmemory.sh
-  #
-  # See: docs/superpowers/specs/2026-06-27-agentmemory-memory-backend-spike.md
-
-  # Init: fix /data ownership for distroless engine (UID 65532) — runs once and exits.
-  agentmemory-init:
-    image: busybox:1.36
-    container_name: agentmemory-init
-    user: "0:0"
-    profiles:
-      - agentmemory-spike
-    volumes:
-      - agentmemory_data:/data
-    entrypoint: ["sh", "-c", "chown -R 65532:65532 /data && chmod 755 /data"]
-    restart: "no"
-
-  # Engine: iiidev/iii provides the HTTP API and state store.
-  # Uses --use-default-config (in-memory adapters, sufficient for spike evaluation).
-  # The agentmemory npm worker (node process on host) connects via host port 6791
-  # and registers /agentmemory/* endpoints with the engine at runtime.
-  # Run the worker: AGENTMEMORY_ENGINE_URL=ws://localhost:6791 npx agentmemory start
-  agentmemory-engine:
-    image: iiidev/iii:0.11.2
-    container_name: agentmemory-engine
-    command: ["--use-default-config"]
-    user: "65532:65532"
-    profiles:
-      - agentmemory-spike
-    depends_on:
-      agentmemory-init:
-        condition: service_completed_successfully
-    ports:
-      - "127.0.0.1:6789:3111"    # HTTP REST API
-      - "127.0.0.1:6790:3112"    # Stream API
-      - "127.0.0.1:6791:49134"   # Worker WebSocket (agentmemory npm connects here)
-    volumes:
-      - agentmemory_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "cat /proc/1/status >/dev/null"]
-      interval: 5s
-      timeout: 3s
-      retries: 6
-    networks:
-      - stockscanner-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
 volumes:
   postgres_data:
     external: true
@@ -868,7 +725,6 @@ volumes:
   ib_gateway_settings:
     external: true
     name: markethawk_ib_gateway_settings
-  scheduler_state:
   buildkit_cache:
   timesfm_cache:
   # Regular named volume (not tmpfs) so all containers (backend + celery-worker)
@@ -880,7 +736,6 @@ volumes:
   grafana_data:
   caddy_data:
   caddy_config:
-  agentmemory_data:
 
 
 networks:

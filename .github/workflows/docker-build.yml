@@ -67,25 +67,3 @@ jobs:
       - name: Build frontend image (no push)
         if: steps.detect.outputs.build == 'true'
         run: docker build -f frontend/Dockerfile -t markethawk-frontend:pr ./frontend
-
-  docker-dark-factory:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 0
-      - name: Detect dark-factory image changes
-        id: detect
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if git diff --name-only "$BASE_SHA" HEAD \
-              | grep -qE '^dark-factory/Dockerfile$'; then
-            echo "build=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "No dark-factory image inputs changed — nothing to build."
-          fi
-      - name: Build dark-factory image (no push)
-        if: steps.detect.outputs.build == 'true'
-        run: docker build -f dark-factory/Dockerfile -t markethawk-dark-factory:pr .

@@ -44,50 +44,8 @@ jobs:
         working-directory: backend
         run: ruff check .
 
-      - name: Validate Archon workflow YAML
-        shell: python
-        run: |
-          import glob, sys, yaml
-          errors = []
-          for path in sorted(glob.glob('.archon/workflows/*.yaml')):
-              try:
-                  yaml.safe_load(open(path))
-              except yaml.YAMLError as e:
-                  errors.append(f'{path}: {e}')
-          if errors:
-              print('Archon workflow YAML validation failed:')
-              for e in errors:
-                  print(f'  {e}')
-              sys.exit(1)
-          print(f'All {len(glob.glob(".archon/workflows/*.yaml"))} workflow file(s) valid.')
-
-          # Semantic DAG check: OR-join nodes must declare a skip-tolerant trigger_rule.
-          # Catches the class of regression introduced by ce9e4a3 (issue #224).
-          sys.path.insert(0, 'dark-factory/scripts')
-          from check_workflow_dag import check as dag_check
-          dag_errors = dag_check('.archon/workflows/archon-dark-factory.yaml')
-          if dag_errors:
-              print('Archon workflow DAG validation failed:')
-              for e in dag_errors:
-                  print(f'  {e}')
-              sys.exit(1)
-          print('DAG trigger_rule check passed.')
-
-          # when: expression lint: reject parentheses and mixed &&/|| operators.
-          # Catches the class of regression from PR #359 (issue #397/403).
-          from check_workflow_when import check as when_check
-          when_errors = []
-          for path in sorted(glob.glob('.archon/workflows/*.yaml')):
-              when_errors.extend(when_check(path))
-          if when_errors:
-              print('Archon workflow when: expression lint failed:')
-              for e in when_errors:
-                  print(f'  {e}')
-              sys.exit(1)
-          print('when: expression lint passed for all workflow file(s).')
-
       - name: Check preview credentials not leaked to non-preview compose files
-        run: bash dark-factory/scripts/check_preview_creds.sh
+        run: bash scripts/check_preview_creds.sh
 
       - name: Dependency audit
         run: |
@@ -192,24 +150,6 @@ jobs:
           JWT_SECRET_KEY: ci-test-only-not-secret-0123456789abcdef
           REDIS_PASSWORD: ci-redis-dummy-password-0123456789abcdef
         run: python -m alembic check
-
-  factory-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.12"
-
-      - name: Install test deps
-        run: pip install pytest pytest-mock pyyaml
-
-      - name: Run factory_core tests
-        run: python -m pytest dark-factory/tests/ -v
-        env:
-          PYTHONPATH: dark-factory/scripts
 
   adapter-validate:
     name: Factory adapter validation
