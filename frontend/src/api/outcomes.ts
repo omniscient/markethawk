@@ -237,6 +237,42 @@ export interface AISignalBrief {
   forbidden_claims: string[];
 }
 
+export interface GeneratedNarrativeProvenance {
+  claim: string;
+  source_fields: string[];
+}
+
+export interface GeneratedNarrativePayload {
+  text: string;
+  prompt_version: string;
+  brief_schema_version: string;
+  brief_fingerprint: string;
+  provenance: GeneratedNarrativeProvenance[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AISignalNarrativeResponse {
+  brief: AISignalBrief;
+  narrative: GeneratedNarrativePayload | null;
+  cache: { status: string };
+  rejection?: { reason: string };
+}
+
+export interface SignalPostMortemPayload extends GeneratedNarrativePayload {
+  outcome_status: string;
+  known_at_signal_time: Record<string, unknown>;
+  expected_behavior: Record<string, unknown>;
+  realized_outcome: Record<string, unknown>;
+}
+
+export interface SignalPostMortemResponse {
+  brief: AISignalBrief;
+  post_mortem: SignalPostMortemPayload | null;
+  cache: { status: string };
+  rejection?: { reason: string };
+}
+
 export interface RegimeSlice {
   sample_size: number;
   win_rate_pct: number | null;
@@ -369,6 +405,20 @@ export const fetchHistoricalAnalogs = async (
 
 export const fetchAISignalBrief = async (eventId: number): Promise<AISignalBrief> => {
   const response = await apiClient.get(`/outcomes/event/${eventId}/ai-signal-brief`);
+  return response.data;
+};
+
+export const fetchAISignalNarrative = async (
+  eventId: number,
+): Promise<AISignalNarrativeResponse> => {
+  const response = await apiClient.get(`/outcomes/event/${eventId}/ai-signal-narrative`);
+  return response.data;
+};
+
+export const fetchSignalPostMortem = async (
+  eventId: number,
+): Promise<SignalPostMortemResponse> => {
+  const response = await apiClient.get(`/outcomes/event/${eventId}/signal-post-mortem`);
   return response.data;
 };
 

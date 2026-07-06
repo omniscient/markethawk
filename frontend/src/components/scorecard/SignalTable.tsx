@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Check, X, Sparkles } from 'lucide-react';
-import { fetchAISignalBrief } from '../../api/outcomes';
-import type { AISignalBrief } from '../../api/outcomes';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Check, X, Sparkles, RefreshCw, AlertTriangle } from 'lucide-react';
+import { fetchAISignalBrief, fetchAISignalNarrative, fetchSignalPostMortem } from '../../api/outcomes';
+import type { AISignalBrief, AISignalNarrativeResponse, GeneratedNarrativePayload, SignalPostMortemPayload, SignalPostMortemResponse } from '../../api/outcomes';
+import { getLLMStatus } from '../../api/system';
+import type { LLMStatus } from '../../api/system';
 import { useSignals } from '../../hooks/useScorecard';
 
 interface SignalTableProps {
@@ -359,8 +361,278 @@ const SignalIntelligencePanel: React.FC<{ eventId: number }> = ({ eventId }) => 
           </ul>
         </div>
       )}
+
+      <AINarrativeLayerControls eventId={eventId} />
     </div>
   );
+};
+
+type AILayer = 'narrative' | 'post_mortem';
+
+const AINarrativeLayerControls: React.FC<{ eventId: number }> = ({ eventId }) => {
+  const [activeLayer, setActiveLayer] = useState<AILayer | null>(null);
+
+  const llmStatusQuery = useQuery<LLMStatus>({
+    queryKey: ['llmStatus'],
+    queryFn: getLLMStatus,
+  });
+  const narrativeQuery = useQuery<AISignalNarrativeResponse>({
+    queryKey: ['aiSignalNarrative', eventId],
+    queryFn: () => fetchAISignalNarrative(eventId),
+    enabled: activeLayer === 'narrative',
+  });
+  const postMortemQuery = useQuery<SignalPostMortemResponse>({
+    queryKey: ['signalPostMortem', eventId],
+    queryFn: () => fetchSignalPostMortem(eventId),
+    enabled: activeLayer === 'post_mortem',
+  });
+
+  const status = llmStatusQuery.data;
+  const narrativeEnabled = Boolean(status?.enabled && status.allowed_features.includes('scanner_narrative'));
+  const postMortemEnabled = Boolean(status?.enabled && status.allowed_features.includes('post_mortem'));
+
+  if (llmStatusQuery.isLoading) {
+    return (
+      <div className="mt-3 rounded border border-gray-800 bg-gray-900/30 p-3 text-xs text-gray-400">
+        Checking AI layer availability...
+      </div>
+    );
+  }
+
+  if (llmStatusQuery.isError || !narrativeEnabled && !postMortemEnabled) {
+    return (
+      <div className="mt-3 rounded border border-gray-800 bg-gray-900/30 p-3">
+        <div className="flex items-start gap-2">
+          <Sparkles className="mt-0.5 h-4 w-4 text-gray-500" />
+          <div>
+            <div className="text-xs font-semibold text-gray-300">AI narrative layers disabled</div>
+            <div className="mt-1 text-xs text-gray-500">
+              Deterministic explanations, analogs, and outcome facts remain available.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const loadLayer = (layer: AILayer) => {
+    if (activeLayer === layer) {
+      if (layer === 'narrative') void narrativeQuery.refetch();
+      if (layer === 'post_mortem') void postMortemQuery.refetch();
+      return;
+    }
+    setActiveLayer(layer);
+  };
+
+  return (
+    <div className="mt-3 rounded border border-blue-900/50 bg-blue-950/10 p-3">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold text-blue-100">Optional AI narrative layers</div>
+          <div className="mt-1 text-xs text-blue-200/70">
+            Generated text is separate from the deterministic brief above.
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {narrativeEnabled && (
+            <button
+              type="button"
+              onClick={() => loadLayer('narrative')}
+              aria-pressed={activeLayer === 'narrative'}
+              className={aiLayerButtonClass(activeLayer === 'narrative')}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Load AI narrative
+            </button>
+          )}
+          {postMortemEnabled && (
+            <button
+              type="button"
+              onClick={() => loadLayer('post_mortem')}
+              aria-pressed={activeLayer === 'post_mortem'}
+              className={aiLayerButtonClass(activeLayer === 'post_mortem')}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Load post-mortem
+            </button>
+          )}
+        </div>
+      </div>
+
+      {activeLayer === null && (
+        <div className="rounded border border-gray-800 bg-gray-950/30 p-3 text-xs text-gray-400">
+          Select an enabled layer to generate or refresh AI text for this event.
+        </div>
+      )}
+      {activeLayer === 'narrative' && (
+        <GeneratedLayerPanel
+          title="Generated AI Narrative"
+          loadingText="Generating AI narrative..."
+          failedText="AI narrative failed"
+          rejectedText="AI narrative was rejected"
+          data={narrativeQuery.data}
+          payload={narrativeQuery.data?.narrative ?? null}
+          cacheStatus={narrativeQuery.data?.cache.status}
+          rejectionReason={narrativeQuery.data?.rejection?.reason}
+          isLoading={narrativeQuery.isFetching && !narrativeQuery.data}
+          isError={narrativeQuery.isError}
+          onRefresh={() => void narrativeQuery.refetch()}
+        />
+      )}
+      {activeLayer === 'post_mortem' && (
+        <GeneratedLayerPanel
+          title="Generated Post-Mortem"
+          loadingText="Generating post-mortem..."
+          failedText="Post-mortem failed"
+          rejectedText="Post-mortem was rejected"
+          data={postMortemQuery.data}
+          payload={postMortemQuery.data?.post_mortem ?? null}
+          cacheStatus={postMortemQuery.data?.cache.status}
+          rejectionReason={postMortemQuery.data?.rejection?.reason}
+          isLoading={postMortemQuery.isFetching && !postMortemQuery.data}
+          isError={postMortemQuery.isError}
+          onRefresh={() => void postMortemQuery.refetch()}
+        />
+      )}
+    </div>
+  );
+};
+
+const aiLayerButtonClass = (active: boolean) => (
+  `inline-flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+    active
+      ? 'border-blue-400 bg-blue-500/20 text-blue-100'
+      : 'border-gray-700 bg-gray-900/60 text-gray-300 hover:border-blue-500 hover:text-blue-100'
+  }`
+);
+
+const GeneratedLayerPanel: React.FC<{
+  title: string;
+  loadingText: string;
+  failedText: string;
+  rejectedText: string;
+  data: AISignalNarrativeResponse | SignalPostMortemResponse | undefined;
+  payload: GeneratedNarrativePayload | SignalPostMortemPayload | null;
+  cacheStatus: string | undefined;
+  rejectionReason: string | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  onRefresh: () => void;
+}> = ({
+  title,
+  loadingText,
+  failedText,
+  rejectedText,
+  data,
+  payload,
+  cacheStatus,
+  rejectionReason,
+  isLoading,
+  isError,
+  onRefresh,
+}) => {
+  if (isLoading) {
+    return (
+      <div className="rounded border border-blue-900/50 bg-gray-950/40 p-3 text-xs text-blue-100">
+        {loadingText}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <GeneratedLayerMessage tone="error" title={failedText}>
+        The generated layer could not be loaded. Deterministic facts are still shown above.
+      </GeneratedLayerMessage>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  if (!payload) {
+    if (cacheStatus === 'rejected') {
+      return (
+        <GeneratedLayerMessage tone="warning" title={rejectedText}>
+          {rejectionReason ?? 'Generated text did not pass provenance checks.'}
+        </GeneratedLayerMessage>
+      );
+    }
+    return (
+      <GeneratedLayerMessage tone="muted" title={cacheStatusLabel(cacheStatus)}>
+        {cacheStatus === 'incomplete_outcome'
+          ? rejectionReason ?? 'Outcome summary is incomplete or unavailable.'
+          : 'No generated text is available for this layer.'}
+      </GeneratedLayerMessage>
+    );
+  }
+
+  const sourceClaims = payload.provenance.map((entry) => entry.claim).filter(Boolean);
+
+  return (
+    <div className="rounded border border-blue-900/50 bg-gray-950/40 p-3">
+      <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-sm font-semibold text-blue-50">{title}</div>
+            <span className="rounded border border-blue-800/70 bg-blue-950/50 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-200">
+              {cacheStatusLabel(cacheStatus)}
+            </span>
+          </div>
+          {sourceClaims.length > 0 && (
+            <div className="mt-1 text-xs text-blue-200/70">
+              Sources: {sourceClaims.join(', ')}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="inline-flex items-center gap-1 rounded border border-gray-700 px-2 py-1 text-[11px] font-semibold text-gray-300 hover:border-blue-500 hover:text-blue-100"
+        >
+          <RefreshCw className="h-3 w-3" />
+          Refresh
+        </button>
+      </div>
+      <p className="text-sm leading-6 text-gray-200">{payload.text}</p>
+    </div>
+  );
+};
+
+const GeneratedLayerMessage: React.FC<{
+  tone: 'error' | 'warning' | 'muted';
+  title: string;
+  children: React.ReactNode;
+}> = ({ tone, title, children }) => {
+  const toneClass = {
+    error: 'border-red-900/60 bg-red-950/20 text-red-200',
+    warning: 'border-yellow-800/60 bg-yellow-950/20 text-yellow-100',
+    muted: 'border-gray-800 bg-gray-950/30 text-gray-400',
+  }[tone];
+
+  return (
+    <div className={`rounded border p-3 text-xs ${toneClass}`}>
+      <div className="mb-1 flex items-center gap-1.5 font-semibold">
+        {tone !== 'muted' && <AlertTriangle className="h-3.5 w-3.5" />}
+        {title}
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+};
+
+const cacheStatusLabel = (status: string | undefined): string => {
+  const labels: Record<string, string> = {
+    disabled: 'Disabled',
+    hit: 'Cached',
+    miss: 'Generated',
+    stale_regenerated: 'Regenerated from stale cache',
+    rejected: 'Rejected',
+    incomplete_outcome: 'Outcome incomplete',
+  };
+  if (!status) return 'Unknown';
+  return labels[status] ?? status.replace(/_/g, ' ');
 };
 
 const BriefBlock: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (

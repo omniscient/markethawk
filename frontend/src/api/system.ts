@@ -26,6 +26,18 @@ export interface StorageStats {
   total: { bytes: number; formatted: string };
 }
 
+export interface LLMStatus {
+  enabled: boolean;
+  provider_state: 'disabled' | 'degraded' | 'available';
+  allowed_features: string[];
+  limits: {
+    timeout_seconds: number;
+    max_tokens: number;
+    max_cost_usd_per_call: number;
+  };
+  metrics: Record<string, unknown>;
+}
+
 // ---- API calls ------------------------------------------------------------ //
 
 export const getSystemInfo = async (): Promise<SystemInfo> => {
@@ -40,6 +52,11 @@ export const getSystemStatus = async (): Promise<SystemStatus> => {
 
 export const getStorageStats = async (): Promise<StorageStats> => {
   const response = await apiClient.get('/system/storage');
+  return response.data;
+};
+
+export const getLLMStatus = async (): Promise<LLMStatus> => {
+  const response = await apiClient.get('/system/llm-status');
   return response.data;
 };
 

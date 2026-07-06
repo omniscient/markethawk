@@ -42,16 +42,16 @@ describe('AlertBadge', () => {
 
   it('has accessible label for high severity', () => {
     render(<AlertBadge alert={makeAlert({ severity: 'high' })} />);
-    expect(screen.getByLabelText('high severity')).toBeInTheDocument();
+    expect(screen.getByLabelText('volume alert, high severity')).toBeInTheDocument();
   });
 
   it('has accessible label for medium severity', () => {
     render(<AlertBadge alert={makeAlert({ severity: 'medium' })} />);
-    expect(screen.getByLabelText('medium severity')).toBeInTheDocument();
+    expect(screen.getByLabelText('volume alert, medium severity')).toBeInTheDocument();
   });
 
   it('has accessible label for low severity', () => {
     render(<AlertBadge alert={makeAlert({ severity: 'low' })} />);
-    expect(screen.getByLabelText('low severity')).toBeInTheDocument();
+    expect(screen.getByLabelText('volume alert, low severity')).toBeInTheDocument();
   });
 });
