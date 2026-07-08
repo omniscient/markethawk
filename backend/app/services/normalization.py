@@ -40,6 +40,33 @@ logger = logging.getLogger(__name__)
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
+async def _wait_out_open_breaker(is_futures: bool) -> None:
+    """
+    If the relevant provider breaker is open, sleep until it can half-open
+    instead of letting every subsequent fix fail instantly.  One transient
+    provider outage must not silently void the rest of the normalization run.
+    """
+    from app.core.circuit_breakers import IBKR_BREAKER, POLYGON_BREAKER
+    from app.core.config import settings
+
+    breaker = IBKR_BREAKER if is_futures else POLYGON_BREAKER
+    if breaker.current_state == "open":
+        wait_s = (
+            settings.IBKR_CB_RESET_TIMEOUT
+            if is_futures
+            else settings.POLYGON_CB_RESET_TIMEOUT
+        ) + 1
+        logger.warning(
+            f"[normalize] {'IBKR' if is_futures else 'Polygon'} circuit breaker "
+            f"open — waiting {wait_s}s for reset before continuing"
+        )
+        await asyncio.sleep(wait_s)
+
+
+def _is_breaker_open_error(exc: Exception) -> bool:
+    return "circuit breaker open" in str(exc)
+
+
 def _parse_date(dt_str: Optional[str]) -> Optional[datetime]:
     """Parse an ISO datetime string (with or without fractional seconds)."""
     if not dt_str:
@@ -460,6 +487,8 @@ class NormalizationService:
                 f" gaps={result.get('gap_count', 0)}"
             )
 
+            combo_hit_open_breaker = False
+
             try:
                 # 1. Dedup
                 if result.get("duplicate_count", 0) > 0:
@@ -475,6 +504,7 @@ class NormalizationService:
                     fixes = _plan_fixes(result)
                     for fix in fixes:
                         try:
+                            await _wait_out_open_breaker(is_futures)
                             if is_futures:
                                 exchange = _get_futures_exchange(db, ticker)
                                 added = await _sync_futures_range(
@@ -512,6 +542,8 @@ class NormalizationService:
                             logger.error(
                                 f"  fix {fix['type']} failed for {combo_key}: {e}"
                             )
+                            if _is_breaker_open_error(e):
+                                combo_hit_open_breaker = True
                             errors.append(
                                 {
                                     "combo": combo_key,
@@ -522,11 +554,17 @@ class NormalizationService:
 
             except Exception as e:
                 logger.error(f"[normalize] error on {combo_key}: {e}")
+                if _is_breaker_open_error(e):
+                    combo_hit_open_breaker = True
                 errors.append({"combo": combo_key, "fix": "top-level", "error": str(e)})
 
-            # Checkpoint after every combo so we can resume
-            processed.append(combo_key)
-            processed_set.add(combo_key)
+            # Checkpoint after every combo so we can resume.  Combos whose
+            # fixes were rejected by an open circuit breaker are NOT marked
+            # processed — a resume run must retry them once the provider
+            # recovers, instead of permanently skipping their fixes.
+            if not combo_hit_open_breaker:
+                processed.append(combo_key)
+                processed_set.add(combo_key)
 
             checkpoint_data = {
                 "status": "running",

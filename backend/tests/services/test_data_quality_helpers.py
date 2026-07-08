@@ -2,10 +2,11 @@
 Tests for data_quality module pure helper functions — no DB required.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from app.services.data_quality import (
     _count_weekdays_between,
+    _estimate_expected_bars,
     _grade_color,
     _score_to_grade,
 )
@@ -85,3 +86,53 @@ def test_weekend_days_not_counted():
     monday = date(2024, 1, 8)
     # strictly between Fri and Mon: Sat, Sun → 0 weekdays
     assert _count_weekdays_between(friday, monday) == 0
+
+
+# ── _estimate_expected_bars ───────────────────────────────────────────────────
+
+
+def _day_of_hour_bars(year, month, day, count):
+    """Generate `count` hourly timestamps within one calendar date."""
+    return [datetime(year, month, day, 4 + i) for i in range(count)]
+
+
+def test_stocks_sparse_days_are_organic_no_partial_penalty():
+    # Illiquid stock: bar count varies 8–16 per day. Verified against the
+    # provider this is organic trading activity, not missing data — so for
+    # stocks expected must equal actual (no partial-day penalty).
+    timestamps = (
+        _day_of_hour_bars(2026, 6, 22, 16)
+        + _day_of_hour_bars(2026, 6, 23, 8)
+        + _day_of_hour_bars(2026, 6, 24, 11)
+        + _day_of_hour_bars(2026, 6, 25, 9)
+    )
+    expected, detail = _estimate_expected_bars(timestamps, "hour", 1, is_futures=False)
+    assert expected == len(timestamps)
+    assert detail["partial_days"] == []
+    assert detail["partial_day_count"] == 0
+
+
+def test_futures_partial_days_still_penalized():
+    # Futures sessions are uniform — a below-P90 day (above the stub
+    # threshold) is a genuine shortfall and keeps the P90 yardstick.
+    timestamps = (
+        _day_of_hour_bars(2026, 6, 22, 16)
+        + _day_of_hour_bars(2026, 6, 23, 16)
+        + _day_of_hour_bars(2026, 6, 24, 16)
+        + _day_of_hour_bars(2026, 6, 25, 12)
+    )
+    expected, detail = _estimate_expected_bars(timestamps, "hour", 1, is_futures=True)
+    assert expected == 16 * 4
+    assert detail["partial_day_count"] == 1
+
+
+def test_stocks_full_close_holiday_day_still_excluded():
+    # Bars on a full_close holiday are anomalous and excluded from the
+    # expected count for stocks too.
+    timestamps = _day_of_hour_bars(2026, 6, 22, 16) + _day_of_hour_bars(2026, 6, 19, 3)
+    holiday_map = {date(2026, 6, 19): "full_close"}
+    expected, detail = _estimate_expected_bars(
+        timestamps, "hour", 1, holiday_map, is_futures=False
+    )
+    assert expected == 16
+    assert detail["holiday_day_count"] == 1

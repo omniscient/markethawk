@@ -596,6 +596,62 @@ def sync_futures_aggregates(  # pragma: no cover
         db.close()
 
 
+@celery_app.task(
+    bind=True, max_retries=0, name="app.tasks.sync_universe_aggregates_nightly"
+)
+def sync_universe_aggregates_nightly(self):
+    """
+    Nightly top-up of aggregate bars for every active universe.
+
+    Without this, universe data only refreshes on manual sync/normalization
+    runs and drifts stale within days — tripping the staleness banner on the
+    Scanner page even when the stored history is otherwise complete.
+
+    Reuses universe_orchestrator.sync_missing_aggregates, which queues one
+    sync task per ticker × (timespan, multiplier) combo from the last stored
+    bar up to today.
+    """
+    from app.models.stock_universe import StockUniverse
+    from app.services.universe_orchestrator import sync_missing_aggregates
+
+    _task_name = "sync_universe_aggregates_nightly"
+    _start = _time.monotonic()
+    db: Session = SessionLocal()
+    try:
+        universes = (
+            db.query(StockUniverse).filter(StockUniverse.is_active.is_(True)).all()
+        )
+        logger.info(
+            "🌙 Nightly universe aggregate sync: %d active universe(s)",
+            len(universes),
+        )
+        for universe in universes:
+            try:
+                result = sync_missing_aggregates(universe.id, db)
+                logger.info(
+                    "  universe %s (id=%s): %s",
+                    universe.name,
+                    universe.id,
+                    result.get("message", result.get("status")),
+                )
+            except Exception as exc:
+                logger.error(
+                    "  universe %s (id=%s) sync failed: %s",
+                    universe.name,
+                    universe.id,
+                    exc,
+                )
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
+    except Exception:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
+        raise
+    finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
+        db.close()
+
+
 @celery_app.task(bind=True, max_retries=3, name="app.tasks.sync_stock_splits")
 def sync_stock_splits(self):
     """

@@ -1,6 +1,6 @@
 import logging
 import time as _time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -57,15 +57,22 @@ def compute_universe_data_health(db: Session, universe_id: int) -> dict:
     """
     Lightweight health sweep for a single universe.
 
-    Queries MAX(timestamp) per ticker (day/1 timespan) and detects gaps using
-    quality_helpers. Returns a summary dict with staleness/gap metrics.
+    Staleness: MAX(timestamp) per ticker (day/1 timespan).
+    Gaps: universe-wide day holes — weekdays where far fewer tickers than
+    usual have a day bar (a systemic sync outage signature).  Per-ticker gap
+    counting is deliberately NOT used: on illiquid small-cap universes a
+    missing day bar almost always means the stock didn't trade that day
+    (verified against the provider), not that data is missing.
+
+    Returns a summary dict with staleness/gap metrics.
     Does NOT write to UniverseQualityReport.
     """
+    from app.models.market_holiday import MarketHoliday
     from app.models.stock_aggregate import StockAggregate
     from app.models.stock_universe_ticker import StockUniverseTicker
-    from app.services.quality_helpers import _count_weekdays_between, _detect_gaps
+    from app.services.quality_helpers import _detect_universe_day_holes
 
-    staleness_hours_threshold, gap_min_weekdays, _ = _load_quality_thresholds(db)
+    staleness_hours_threshold, _gap_min_weekdays, _ = _load_quality_thresholds(db)
 
     tickers = (
         db.query(StockUniverseTicker.ticker)
@@ -89,9 +96,7 @@ def compute_universe_data_health(db: Session, universe_id: int) -> dict:
 
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     stale_count = 0
-    gapped_count = 0
     worst_staleness_hours = 0.0
-    worst_gap_days = 0.0
 
     for ticker in ticker_list:
         # MAX(timestamp) staleness check — day bars only (lightweight)
@@ -116,33 +121,71 @@ def compute_universe_data_health(db: Session, universe_id: int) -> dict:
         if staleness_h > staleness_hours_threshold:
             stale_count += 1
 
-        # Gap detection — day bars
-        timestamps = (
-            db.query(StockAggregate.timestamp)
-            .filter(
-                StockAggregate.ticker == ticker,
-                StockAggregate.timespan == "day",
-                StockAggregate.multiplier == 1,
-            )
-            .order_by(StockAggregate.timestamp.asc())
-            .limit(2000)
-            .all()
-        )
-        ts_list = [r.timestamp for r in timestamps]
-        gaps = _detect_gaps(ts_list, "day", 1)
+    # ── Systemic day-hole detection (last 90 days) ────────────────────────────
+    # The last 2 calendar days are excluded: bars not yet synced there are
+    # staleness, already alarmed above, not a mid-history hole.
+    window_start = (now_utc - timedelta(days=90)).date()
+    window_end = (now_utc - timedelta(days=2)).date()
 
-        for gap in gaps:
-            weekdays_in_gap = _count_weekdays_between(
-                gap["from"].date(), gap["to"].date()
-            )
-            if weekdays_in_gap >= gap_min_weekdays:
-                gapped_count += 1
-                worst_gap_days = max(worst_gap_days, weekdays_in_gap)
-                break  # one gap per ticker is enough to flag it
+    day_count_rows = (
+        db.query(
+            func.date(StockAggregate.timestamp).label("d"),
+            func.count(func.distinct(StockAggregate.ticker)).label("n"),
+        )
+        .filter(
+            StockAggregate.ticker.in_(ticker_list),
+            StockAggregate.timespan == "day",
+            StockAggregate.multiplier == 1,
+            StockAggregate.timestamp >= window_start,
+        )
+        .group_by(func.date(StockAggregate.timestamp))
+        .all()
+    )
+    counts_by_day = {r.d: r.n for r in day_count_rows}
+
+    holiday_rows = (
+        db.query(MarketHoliday.date)
+        .filter(
+            MarketHoliday.exchange == "NYSE",
+            MarketHoliday.event_type == "full_close",
+            MarketHoliday.date >= window_start,
+            MarketHoliday.date <= window_end,
+        )
+        .all()
+    )
+    holidays = {r.date for r in holiday_rows}
+
+    holes = _detect_universe_day_holes(
+        counts_by_day, window_start, window_end, holidays
+    )
+
+    trading_days_checked = sum(
+        1
+        for i in range((window_end - window_start).days + 1)
+        if (window_start + timedelta(days=i)).weekday() < 5
+        and (window_start + timedelta(days=i)) not in holidays
+    )
+    gapped_count = len(holes)
+
+    # Longest run of consecutive hole trading-days
+    worst_gap_days = 0.0
+    run = 0
+    prev_hole = None
+    for hole in holes:
+        if prev_hole is not None and (hole - prev_hole).days <= 3:
+            run += 1
+        else:
+            run = 1
+        worst_gap_days = max(worst_gap_days, float(run))
+        prev_hole = hole
 
     n = len(ticker_list)
     stale_pct = round(stale_count / n * 100, 1) if n > 0 else 0.0
-    gapped_pct = round(gapped_count / n * 100, 1) if n > 0 else 0.0
+    gapped_pct = (
+        round(gapped_count / trading_days_checked * 100, 1)
+        if trading_days_checked > 0
+        else 0.0
+    )
 
     _, _, alert_pct = _load_quality_thresholds(db)
     degraded = stale_pct > alert_pct or gapped_pct > alert_pct
