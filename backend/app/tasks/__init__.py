@@ -28,6 +28,7 @@ from app.tasks.sync import (
     sync_stock_splits,
     sync_ticker_details,
     sync_tickers_batch,
+    sync_universe_aggregates_nightly,
     trigger_tweet_monitor,
 )
 from app.tasks.trading import (
@@ -49,6 +50,7 @@ __all__ = [
     "poll_massive_news",
     "sync_futures_aggregates",
     "sync_stock_splits",
+    "sync_universe_aggregates_nightly",
     "trigger_tweet_monitor",
     # scanning
     "evaluate_scanner_alerts",

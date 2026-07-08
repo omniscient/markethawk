@@ -50,8 +50,18 @@ jobs:
       - name: Dependency audit
         run: |
           pip install pip-audit
+          # Accepted advisories (all transitive via python-jose[cryptography]==3.4.0;
+          # revisit when we migrate off python-jose — see backend/requirements.txt):
+          #   PYSEC-2022-42969 / PYSEC-2026-1325 — ecdsa Minerva P-256 timing
+          #     side-channels. No fix (maintainers declare side-channels out of
+          #     scope); require local timing of signature *generation*. Not
+          #     reachable: JWT signing uses server-held trusted keys via the
+          #     cryptography backend, not an attacker-facing signing oracle.
+          #   CVE-2026-30922 — pyasn1 0.4.8 ReDoS; fix (0.6.3) uninstallable
+          #     (python-jose pins pyasn1<0.5.0). Also in .trivyignore.
           pip-audit -r backend/requirements.txt \
             --ignore-vuln PYSEC-2022-42969 \
+            --ignore-vuln PYSEC-2026-1325 \
             --ignore-vuln CVE-2026-30922
 
       - name: Run tests

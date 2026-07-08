@@ -57,6 +57,10 @@ pywebpush==2.0.0
 # (HIGH ReDoS CVE-2026-30922, fixed only in 0.6.3 — uninstallable here). The CVE
 # is accepted in both pip-audit (ci.yml --ignore-vuln) and .trivyignore; the
 # ReDoS is not reachable because JWT keys are trusted config, not attacker input.
+# It also pulls in ecdsa 0.19.2 (Minerva P-256 timing side-channels
+# PYSEC-2022-42969 / PYSEC-2026-1325 — no fix, out of scope upstream; accepted in
+# pip-audit). Not reachable: signing uses server-held trusted keys via the
+# cryptography backend, not an attacker-facing signing oracle.
 # Revisit if we migrate off python-jose (e.g. to PyJWT).
 python-jose[cryptography]==3.4.0
 bcrypt==5.0.0

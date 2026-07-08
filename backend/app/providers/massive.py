@@ -22,6 +22,17 @@ from app.providers.base import BaseDataProvider
 logger = logging.getLogger(__name__)
 
 
+def _is_plan_limit_error(exc: BaseException) -> bool:
+    """
+    True when Polygon rejected the request because the account's plan does not
+    cover the requested data (e.g. historical windows beyond the plan's
+    lookback).  These failures are permanent for the given request and say
+    nothing about provider availability, so they are raised non-retryable and
+    excluded from circuit-breaker fail counting.
+    """
+    return "NOT_AUTHORIZED" in str(exc)
+
+
 class MassiveDataProvider(BaseDataProvider):
     """
     Polygon.io data provider ('Massive' is the internal alias used in this project).
@@ -188,7 +199,7 @@ class MassiveDataProvider(BaseDataProvider):
                 f"Polygon fetch failed for {symbol} {timespan}×{multiplier}: {e}",
                 provider="massive",
                 endpoint="get_aggs",
-                is_retryable=True,
+                is_retryable=not _is_plan_limit_error(e),
             ) from e
 
     def get_ticker_details(self, symbol: str) -> Dict[str, Any]:
