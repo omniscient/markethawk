@@ -278,6 +278,28 @@ export interface ScannerStatusBlock {
   sparkline: ScannerSparklinePoint[];
 }
 
+export interface ScannerCoverageRange {
+  start: string;
+  end: string;
+  runs: number;
+  events: number;
+}
+
+export interface ScannerCoverageGap {
+  start: string;
+  end: string;
+  weekdays: number;
+}
+
+export interface ScannerCoverage {
+  scanner_type: string;
+  universe_id: number;
+  latest_covered: string | null;
+  latest_trading_day: string;
+  covered: ScannerCoverageRange[];
+  gaps: ScannerCoverageGap[];
+}
+
 export interface MarketStats {
   activeAlerts: number;
   avgVolumeSpike: number;

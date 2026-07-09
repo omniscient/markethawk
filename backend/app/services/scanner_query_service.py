@@ -1,7 +1,7 @@
 """ScannerQueryService — DB aggregation queries extracted from routers/scanner.py."""
 
-from datetime import timezone
-from typing import Any, Optional
+from datetime import date, timedelta, timezone
+from typing import Any, Optional, TypedDict
 
 import sqlalchemy as sa
 from sqlalchemy import distinct, func
@@ -12,6 +12,101 @@ from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.signal_review import SignalReview
 from app.models.system_config import SystemConfig
 from app.services.scan_orchestrator import compute_next_run
+
+
+class CoverageRange(TypedDict):
+    start: date
+    end: date
+    runs: int
+    events: int
+
+
+def _is_weekday(day: date) -> bool:
+    return day.weekday() < 5
+
+
+def _next_weekday(day: date) -> date:
+    candidate = day + timedelta(days=1)
+    while not _is_weekday(candidate):
+        candidate += timedelta(days=1)
+    return candidate
+
+
+def _weekday_count(start: date, end: date) -> int:
+    if end < start:
+        return 0
+    count = 0
+    day = start
+    while day <= end:
+        if _is_weekday(day):
+            count += 1
+        day += timedelta(days=1)
+    return count
+
+
+def _subtract_weekdays(end: date, weekdays: int) -> date:
+    if weekdays <= 1:
+        return end
+    remaining = weekdays - 1
+    day = end
+    while remaining > 0:
+        day -= timedelta(days=1)
+        if _is_weekday(day):
+            remaining -= 1
+    return day
+
+
+def merge_coverage_ranges(ranges: list[CoverageRange]) -> list[CoverageRange]:
+    ordered = sorted(ranges, key=lambda item: (item["start"], item["end"]))
+    merged: list[CoverageRange] = []
+    for item in ordered:
+        if item["end"] < item["start"]:
+            continue
+        if not merged:
+            merged.append(item.copy())
+            continue
+        current = merged[-1]
+        if item["start"] <= _next_weekday(current["end"]):
+            if item["end"] > current["end"]:
+                current["end"] = item["end"]
+            current["runs"] += item["runs"]
+            current["events"] += item["events"]
+        else:
+            merged.append(item.copy())
+    return merged
+
+
+def _coverage_gaps(
+    covered: list[CoverageRange],
+    right_boundary: date,
+) -> list[dict[str, Any]]:
+    if not covered:
+        start = _subtract_weekdays(right_boundary, 30)
+        return [
+            {
+                "start": start,
+                "end": right_boundary,
+                "weekdays": _weekday_count(start, right_boundary),
+            }
+        ]
+
+    gaps: list[dict[str, Any]] = []
+    for previous, next_range in zip(covered, covered[1:]):
+        start = previous["end"] + timedelta(days=1)
+        end = next_range["start"] - timedelta(days=1)
+        weekdays = _weekday_count(start, end)
+        if weekdays > 0:
+            gaps.append({"start": start, "end": end, "weekdays": weekdays})
+
+    latest_covered = covered[-1]["end"]
+    if latest_covered < right_boundary:
+        start = latest_covered + timedelta(days=1)
+        weekdays = _weekday_count(start, right_boundary)
+        if weekdays > 0:
+            gaps.append(
+                {"start": start, "end": right_boundary, "weekdays": weekdays}
+            )
+    return gaps
 
 
 class ScannerQueryService:
@@ -98,6 +193,47 @@ class ScannerQueryService:
             "success_rate": success_rate,
             "avg_events_per_scan": avg_events,
             "sparkline": sparkline,
+        }
+
+    @staticmethod
+    def get_coverage(
+        db: Session,
+        scanner_type: str,
+        universe_id: int,
+        latest_trading_day: Optional[date] = None,
+    ) -> dict[str, Any]:
+        latest_trading_day = latest_trading_day or date.today()
+        rows = (
+            db.query(ScannerRun)
+            .filter(
+                ScannerRun.scanner_type == scanner_type,
+                ScannerRun.universe_id == universe_id,
+                ScannerRun.status == "completed",
+                ScannerRun.scan_start_date.isnot(None),
+                ScannerRun.scan_end_date.isnot(None),
+            )
+            .order_by(ScannerRun.scan_start_date.asc(), ScannerRun.scan_end_date.asc())
+            .all()
+        )
+        ranges: list[CoverageRange] = [
+            {
+                "start": row.scan_start_date,
+                "end": min(row.scan_end_date, latest_trading_day),
+                "runs": 1,
+                "events": row.events_detected or 0,
+            }
+            for row in rows
+            if row.scan_start_date <= latest_trading_day
+        ]
+        covered = merge_coverage_ranges(ranges)
+        latest_covered = covered[-1]["end"] if covered else None
+        return {
+            "scanner_type": scanner_type,
+            "universe_id": universe_id,
+            "latest_covered": latest_covered,
+            "latest_trading_day": latest_trading_day,
+            "covered": covered,
+            "gaps": _coverage_gaps(covered, latest_trading_day),
         }
 
     @staticmethod

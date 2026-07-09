@@ -6,7 +6,15 @@ import Button from '../../components/ui/Button';
 import ScannerConfig from '../../components/ScannerConfig';
 import { todayIso } from '../../hooks/useScannerState';
 import { ScanStatusCard } from './ScanStatusCard';
-import type { ScannerConfig as ScannerConfigType, StockUniverse, ScannerStatusBlock, ScannerRunResponse } from '../../api/scanner';
+import { CoveragePanel } from './CoveragePanel';
+import type {
+  ScannerConfig as ScannerConfigType,
+  StockUniverse,
+  ScannerStatusBlock,
+  ScannerRunResponse,
+  ScannerCoverage,
+  ScannerCoverageGap,
+} from '../../api/scanner';
 
 const DateRangePresets: React.FC<{
   onSelect: (_start: string, _end: string) => void;
@@ -55,6 +63,10 @@ export interface ScanConfigPanelProps {
   onRunScan: () => void;
   onCancelScan: () => void;
   statusBlock: ScannerStatusBlock | undefined;
+  coverage: ScannerCoverage | undefined;
+  loadingCoverage: boolean;
+  onScanGap: (gap: ScannerCoverageGap) => void;
+  onFillAllGaps: (gaps: ScannerCoverageGap[]) => void;
   scanHistory: ScannerRunResponse[];
   loadingHistory: boolean;
   scanError: string | null;
@@ -67,6 +79,7 @@ export function ScanConfigPanel({
   selectedConfig, onSelectConfig, selectedUniverse, onSelectUniverse,
   scanStartDate, onScanStartDate, scanEndDate, onScanEndDate,
   isScanning, onRunScan, onCancelScan, statusBlock,
+  coverage, loadingCoverage, onScanGap, onFillAllGaps,
   scanHistory, loadingHistory, scanError, onDismissError,
   scannerMutationPending,
 }: ScanConfigPanelProps) {
@@ -134,6 +147,13 @@ export function ScanConfigPanel({
         </div>
         <div className="space-y-4">
           <ScanStatusCard isScanning={isScanning} statusBlock={statusBlock} selectedUniverse={selectedUniverse} universes={universes} />
+          <CoveragePanel
+            coverage={coverage}
+            isLoading={loadingCoverage}
+            isScanning={isScanning}
+            onScanGap={onScanGap}
+            onFillAllGaps={onFillAllGaps}
+          />
           <Card title="Quick Actions" icon={Zap}>
             <div className="space-y-2">
               <Button variant="secondary" size="sm" fullWidth icon={Clock}>Schedule Scan</Button>

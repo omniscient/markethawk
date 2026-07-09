@@ -3,12 +3,13 @@ Integration tests for scanner API endpoints.
 Runs against a real Postgres DB (via testcontainers).
 """
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.main import app
+from app.models.scanner_run import ScannerRun
 from app.utils.session import get_market_today
 from tests.fixtures.core import (
     seed_monitored_stocks,
@@ -296,6 +297,71 @@ def test_scan_status_block_sparkline(db: Session):
     assert isinstance(data["sparkline"], list)
     assert len(data["sparkline"]) >= 1
     assert "events_detected" in data["sparkline"][0]
+
+
+# ---------------------------------------------------------------------------
+# GET /api/scanner/coverage
+# ---------------------------------------------------------------------------
+
+
+def test_coverage_endpoint_returns_merged_ranges_and_gaps(
+    db: Session, monkeypatch
+):
+    universes = seed_universes(db)
+    universe_id = universes[0].id
+    db.add_all(
+        [
+            ScannerRun(
+                scanner_type="liquidity_hunt",
+                universe_id=universe_id,
+                status="completed",
+                scan_start_date=date(2026, 3, 26),
+                scan_end_date=date(2026, 5, 22),
+                events_detected=194,
+            ),
+            ScannerRun(
+                scanner_type="liquidity_hunt",
+                universe_id=universe_id,
+                status="cancelled",
+                scan_start_date=date(2026, 5, 25),
+                scan_end_date=date(2026, 6, 5),
+                events_detected=999,
+            ),
+            ScannerRun(
+                scanner_type="liquidity_hunt",
+                universe_id=universe_id,
+                status="completed",
+                scan_start_date=date(2026, 7, 8),
+                scan_end_date=date(2026, 7, 8),
+                events_detected=6,
+            ),
+        ]
+    )
+    db.flush()
+    monkeypatch.setattr(
+        "app.routers.scanner._latest_completed_trading_day",
+        lambda: date(2026, 7, 9),
+    )
+
+    response = client.get(
+        f"/api/v1/scanner/coverage?scanner_type=liquidity_hunt&universe_id={universe_id}"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "scanner_type": "liquidity_hunt",
+        "universe_id": universe_id,
+        "latest_covered": "2026-07-08",
+        "latest_trading_day": "2026-07-09",
+        "covered": [
+            {"start": "2026-03-26", "end": "2026-05-22", "runs": 1, "events": 194},
+            {"start": "2026-07-08", "end": "2026-07-08", "runs": 1, "events": 6},
+        ],
+        "gaps": [
+            {"start": "2026-05-23", "end": "2026-07-07", "weekdays": 32},
+            {"start": "2026-07-09", "end": "2026-07-09", "weekdays": 1},
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------

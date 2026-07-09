@@ -7,6 +7,7 @@ import type {
   ScannerRangeResponse,
   ScannerRunResponse,
   ScannerStatusBlock,
+  ScannerCoverage,
 } from './types';
 
 /** Enqueue a scan. Returns immediately with task/scan IDs; progress arrives via WS. */
@@ -44,5 +45,15 @@ export const fetchScanStatusBlock = async (
   const params: Record<string, unknown> = { scanner_type: scannerType };
   if (universeId != null) params.universe_id = universeId;
   const response = await apiClient.get('/scanner/scan-status-block', { params });
+  return response.data;
+};
+
+export const fetchScannerCoverage = async (
+  scannerType: string,
+  universeId: number,
+): Promise<ScannerCoverage> => {
+  const response = await apiClient.get('/scanner/coverage', {
+    params: { scanner_type: scannerType, universe_id: universeId },
+  });
   return response.data;
 };
