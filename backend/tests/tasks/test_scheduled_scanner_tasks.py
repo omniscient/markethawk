@@ -1,5 +1,6 @@
 """Unit tests for scheduled scanner task logic and startup validation."""
 
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -164,6 +165,73 @@ def _make_cfg(id, universe_id, scanner_type="liquidity_hunt", is_active=True):
         "Fixed task must not call cfg.parameters.get('universe_id')"
     )
     return cfg
+
+
+@pytest.mark.parametrize(
+    ("task_name", "scanner_type", "scan_patch"),
+    [
+        (
+            "run_liquidity_hunt_scheduled",
+            "liquidity_hunt",
+            "app.services.liquidity_hunt.run_liquidity_hunt_scan",
+        ),
+        (
+            "run_pocket_pivot_scheduled",
+            "pocket_pivot",
+            "app.services.pocket_pivot.run_pocket_pivot_scan",
+        ),
+        (
+            "run_trend_pullback_scheduled",
+            "trend_pullback",
+            "app.services.trend_pullback_scan.run_trend_pullback_scan",
+        ),
+    ],
+)
+def test_scheduled_scanner_persists_completed_scanner_run(
+    task_name, scanner_type, scan_patch
+):
+    """Each 02:00 beat scanner must leave an auditable ScannerRun row."""
+    import app.tasks.scanning as scanning_module
+    from app.models.scanner_config import ScannerConfig
+    from app.models.scanner_run import ScannerRun
+
+    cfg = _make_cfg(id=7, universe_id=42, scanner_type=scanner_type)
+    tickers = [MagicMock(ticker="AAPL"), MagicMock(ticker="MSFT")]
+
+    def _make_query_mock(return_rows):
+        q = MagicMock()
+        q.filter.return_value.all.return_value = return_rows
+        return q
+
+    mock_db = MagicMock()
+    mock_db.query.side_effect = lambda model: (
+        _make_query_mock([cfg]) if model is ScannerConfig else _make_query_mock(tickers)
+    )
+
+    with (
+        patch("app.tasks.scanning.SessionLocal", return_value=mock_db),
+        patch("app.utils.session.get_market_today", return_value=date(2026, 6, 3)),
+        patch("app.tasks.scanning.asyncio.run", return_value=[{}, {}]),
+        patch(scan_patch, return_value=[]),
+    ):
+        getattr(scanning_module, task_name).run()
+
+    added_runs = [
+        call.args[0]
+        for call in mock_db.add.call_args_list
+        if isinstance(call.args[0], ScannerRun)
+    ]
+    assert len(added_runs) == 1
+    run = added_runs[0]
+    assert run.scanner_type == scanner_type
+    assert run.universe_id == cfg.universe_id
+    assert run.status == "completed"
+    assert run.stocks_scanned == len(tickers)
+    assert run.events_detected == 2
+    assert run.scan_start_date == date(2026, 6, 3)
+    assert run.scan_end_date == date(2026, 6, 3)
+    assert isinstance(run.execution_time_ms, int)
+    assert run.execution_time_ms >= 0
 
 
 class TestRunLiquidityHuntScheduledFixed:
