@@ -9,7 +9,10 @@ from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.scanner_run import ScannerRun
 from app.models.signal_review import SignalReview
 from app.models.stock_universe import StockUniverse
-from app.services.scanner_query_service import ScannerQueryService
+from app.services.scanner_query_service import (
+    ScannerQueryService,
+    merge_coverage_ranges,
+)
 
 
 @pytest.fixture
@@ -90,6 +93,119 @@ def test_get_scan_status_block_no_runs_returns_nones(db):
     assert result["last_run"] is None
     assert result["success_rate"] is None
     assert result["sparkline"] == []
+
+
+# ── coverage ────────────────────────────────────────────────────────────────
+
+
+def test_merge_coverage_ranges_merges_overlaps_and_trading_day_adjacency():
+    ranges = merge_coverage_ranges(
+        [
+            {
+                "start": date(2026, 3, 26),
+                "end": date(2026, 4, 3),
+                "runs": 1,
+                "events": 10,
+            },
+            {
+                "start": date(2026, 4, 1),
+                "end": date(2026, 4, 10),
+                "runs": 1,
+                "events": 7,
+            },
+            {
+                "start": date(2026, 4, 13),
+                "end": date(2026, 4, 13),
+                "runs": 1,
+                "events": 2,
+            },
+        ]
+    )
+
+    assert ranges == [
+        {
+            "start": date(2026, 3, 26),
+            "end": date(2026, 4, 13),
+            "runs": 3,
+            "events": 19,
+        }
+    ]
+
+
+def test_get_coverage_uses_completed_runs_only_and_reports_interior_and_trailing_gaps(
+    db, universe
+):
+    runs = [
+        ScannerRun(
+            scanner_type="liquidity_hunt",
+            universe_id=universe.id,
+            status="completed",
+            scan_start_date=date(2026, 3, 26),
+            scan_end_date=date(2026, 5, 22),
+            events_detected=194,
+        ),
+        ScannerRun(
+            scanner_type="liquidity_hunt",
+            universe_id=universe.id,
+            status="failed",
+            scan_start_date=date(2026, 5, 25),
+            scan_end_date=date(2026, 6, 5),
+            events_detected=999,
+        ),
+        ScannerRun(
+            scanner_type="liquidity_hunt",
+            universe_id=universe.id,
+            status="completed",
+            scan_start_date=date(2026, 7, 8),
+            scan_end_date=date(2026, 7, 8),
+            events_detected=6,
+        ),
+    ]
+    db.add_all(runs)
+    db.flush()
+
+    result = ScannerQueryService.get_coverage(
+        db,
+        "liquidity_hunt",
+        universe.id,
+        latest_trading_day=date(2026, 7, 9),
+    )
+
+    assert result["latest_covered"] == date(2026, 7, 8)
+    assert result["latest_trading_day"] == date(2026, 7, 9)
+    assert result["covered"] == [
+        {
+            "start": date(2026, 3, 26),
+            "end": date(2026, 5, 22),
+            "runs": 1,
+            "events": 194,
+        },
+        {
+            "start": date(2026, 7, 8),
+            "end": date(2026, 7, 8),
+            "runs": 1,
+            "events": 6,
+        },
+    ]
+    assert result["gaps"] == [
+        {"start": date(2026, 5, 23), "end": date(2026, 7, 7), "weekdays": 32},
+        {"start": date(2026, 7, 9), "end": date(2026, 7, 9), "weekdays": 1},
+    ]
+
+
+def test_get_coverage_empty_state_offers_default_first_scan_window(db, universe):
+    result = ScannerQueryService.get_coverage(
+        db,
+        "liquidity_hunt",
+        universe.id,
+        latest_trading_day=date(2026, 7, 9),
+    )
+
+    assert result["covered"] == []
+    assert result["latest_covered"] is None
+    assert result["gaps"] == [
+        {"start": date(2026, 5, 29), "end": date(2026, 7, 9), "weekdays": 30}
+    ]
 
 
 # ── get_signal_quality_distribution ────────────────────────────────────────

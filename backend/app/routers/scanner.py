@@ -31,6 +31,7 @@ from app.schemas import (
     ClearEventsResponse,
     PreMarketMoversResponse,
     ScannerConfigResponse,
+    ScannerCoverageResponse,
     ScannerEventResponse,
     ScannerRangeRequest,
     ScannerRunAsyncResponse,
@@ -50,7 +51,7 @@ from app.services import StockDataService
 from app.services.scan_orchestrator import get_scan_progress, request_scan_cancel
 from app.services.scanner import ScannerService
 from app.services.scanner_query_service import ScannerQueryService
-from app.utils.session import get_market_today
+from app.utils.session import get_market_now, get_market_today
 from app.utils.time import utc_now
 
 router = APIRouter(prefix="/api/v1/scanner", tags=["scanner"])
@@ -63,6 +64,17 @@ def _last_completed_weekday() -> "date":
     d = get_market_today() - _td(days=1)
     while d.weekday() >= 5:  # Saturday=5, Sunday=6
         d -= _td(days=1)
+    return d
+
+
+def _latest_completed_trading_day() -> "date":
+    now = get_market_now()
+    if now.weekday() < 5 and (now.hour, now.minute) >= (16, 0):
+        d = now.date()
+    else:
+        d = now.date() - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
     return d
 
 
@@ -563,6 +575,22 @@ def get_scan_status_block(
         db, scanner_type, universe_id=universe_id
     )
     return ScannerStatusBlockResponse(**data)
+
+
+@router.get("/coverage", response_model=ScannerCoverageResponse)
+def get_scanner_coverage(
+    scanner_type: str,
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """Derived scan coverage for one scanner type and universe."""
+    data = ScannerQueryService.get_coverage(
+        db,
+        scanner_type,
+        universe_id,
+        latest_trading_day=_latest_completed_trading_day(),
+    )
+    return ScannerCoverageResponse(**data)
 
 
 @router.get("/configs", response_model=List[ScannerConfigResponse])
