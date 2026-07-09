@@ -244,6 +244,51 @@ def _compute_data_degraded(universe_id: int, db: Session) -> bool:
         return True
 
 
+def _start_scheduled_scanner_run(
+    db: Session,
+    scanner_type: str,
+    universe_id: int,
+    event_date: date,
+    stocks_scanned: int,
+):
+    from app.models.scanner_run import ScannerRun
+
+    run = ScannerRun(
+        scanner_type=scanner_type,
+        universe_id=universe_id,
+        status="running",
+        stocks_scanned=stocks_scanned,
+        scan_start_date=event_date,
+        scan_end_date=event_date,
+    )
+    db.add(run)
+    db.commit()
+    return run
+
+
+def _finish_scheduled_scanner_run(
+    db: Session,
+    run,
+    started_at: float,
+    events_detected: int,
+) -> None:
+    run.status = "completed"
+    run.events_detected = events_detected
+    run.execution_time_ms = int((_time.monotonic() - started_at) * 1000)
+    db.commit()
+
+
+def _fail_scheduled_scanner_run(db: Session, run, started_at: float, exc: Exception):
+    try:
+        db.rollback()
+    except Exception:
+        pass
+    run.status = "failed"
+    run.error_message = str(exc)
+    run.execution_time_ms = int((_time.monotonic() - started_at) * 1000)
+    db.commit()
+
+
 def _run_universe_scan_logic(
     scan_id: str,
     scanner_type: str,
@@ -609,13 +654,29 @@ def run_liquidity_hunt_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "liquidity_hunt", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_liquidity_hunt_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "liquidity_hunt", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_liquidity_hunt_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "liquidity_hunt scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,
@@ -802,13 +863,29 @@ def run_pocket_pivot_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "pocket_pivot", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_pocket_pivot_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "pocket_pivot", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_pocket_pivot_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "pocket_pivot scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,
@@ -887,13 +964,29 @@ def run_trend_pullback_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "trend_pullback", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_trend_pullback_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "trend_pullback", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_trend_pullback_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "trend_pullback scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,
