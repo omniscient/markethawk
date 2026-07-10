@@ -32,12 +32,9 @@ graph TD
         agentmemoryengine["agentmemory-engine :3111 (profile: agentmemory-spike)"]
     end
 
-    subgraph factory["factory-network"]
+    subgraph factory["factory-network (external — see omniscient/dark-factory)"]
         proxyfactory["docker-socket-proxy-factory :2375"]
-        proxyscheduler["docker-socket-proxy-scheduler :2375"]
-        darkfactory["dark-factory (factory profile)"]
-        scheduler["backlog-scheduler (scheduler profile)"]
-        buildkit["buildkit :1234 (factory/scheduler profiles)"]
+        buildkit["buildkit :1234"]
     end
 
     dockersock[/"Docker socket\n/var/run/docker.sock"\]
@@ -78,10 +75,6 @@ graph TD
     jaeger -->|OTLP| beat
 
     proxyfactory -->|":ro"| dockersock
-    proxyscheduler -->|":ro"| dockersock
-    darkfactory -->|"tcp :2375"| proxyfactory
-    darkfactory -->|"buildx tcp :1234"| buildkit
-    scheduler -->|"tcp :2375"| proxyscheduler
 
     seqgelf -->|"GELF → HTTP"| seq
     forecastworker --> postgres
@@ -98,7 +91,7 @@ graph TD
 |---|---|---|---|
 | `markethawk-backend` | `backend`, `celery-worker`, `celery-beat`, `live-scanner`, `tweet-monitor`, `flower` | `appuser` (uid 1000) | Non-root; created in `backend/Dockerfile` |
 | `markethawk-frontend` | `frontend` | `node` | Non-root; default node image user |
-| `markethawk-dark-factory` | `dark-factory`, `backlog-scheduler` | `factory` (uid 1000) | Non-root; created in `dark-factory/Dockerfile` |
+| `markethawk-dark-factory` | _(extracted — now built in [omniscient/dark-factory](https://github.com/omniscient/dark-factory))_ | — | Scheduler and factory containers run from the standalone factory repo; this stack no longer builds or owns this image |
 | `markethawk-forecast` | `forecast-worker` | `root` | Exception: HuggingFace model weights (~800 MB) cached at `/root/.cache/huggingface` via `timesfm_cache` named volume; converting to non-root requires relocating the cache path (tracked as a separate follow-up) |
 | `markethawk-db-restore-drill` | `db-restore-drill` | `postgres` | Runs as the postgres system user (required to run `initdb` / `postgres` daemon); no Docker socket access. |
 

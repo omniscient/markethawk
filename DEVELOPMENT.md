@@ -121,8 +121,6 @@ The base `docker-compose.yml` runs **baked images** — source bind-mounts are a
 - `celery-beat` — restores `./backend:/app:ro`
 - `live-scanner` — restores `./backend:/app:ro`
 - `frontend` — restores `./frontend:/app` and `/app/node_modules`, switches command back to `npm run dev`
-- `backlog-scheduler` — restores `.:/workspace/project:ro`
-
 Services with no source bind-mount (`flower`, `forecast-worker`, and all infrastructure services) are unchanged in both files.
 
 **Run the stable baked-image stack without the override (live/CI mode):**
@@ -427,23 +425,21 @@ bash scripts/codeindex.sh
 
 ## Dark Factory Eval Flywheel
 
+> **The Dark Factory has been extracted to [omniscient/dark-factory](https://github.com/omniscient/dark-factory).** The eval corpus (`evals/factory-failures.jsonl`) and replay harness now live there. The information below describes how the circuit-breaker behaviour works; for the implementation details see the factory repo.
+
 When the factory circuit-breaker trips (after `MAX_RETRIES` failed runs), it:
 1. Moves the issue to **Blocked** and labels it `needs-discussion`
 2. Applies the `factory-regression` label — marks this failure for the replay benchmark suite
 3. Generates a post-mortem comment (`<!-- df-post-mortem -->`) via a haiku agent explaining the probable root cause
-4. Appends one line to `dark-factory/evals/factory-failures.jsonl` and commits it to the feature branch
+4. Appends one line to `evals/factory-failures.jsonl` in the dark-factory repo and commits it to the feature branch
 
 ### Querying the failure corpus
 
 ```bash
-# List all promoted failures
-cat dark-factory/evals/factory-failures.jsonl | jq .
-
-# Failures by phase
-cat dark-factory/evals/factory-failures.jsonl | jq 'select(.phase == "fix")'
-
 # GitHub label query (requires gh CLI)
 gh issue list --repo omniscient/markethawk --label factory-regression
+
+# Post-mortem comments are on the issue directly — no local file needed
 ```
 
 ### Reading post-mortems
@@ -452,10 +448,7 @@ Post-mortem comments are posted directly on the issue and are included automatic
 
 ### Replay harness (C3 — future work)
 
-The `dark-factory/evals/factory-failures.jsonl` corpus is designed for a future replay harness (architecture review candidate C3) that will re-run failed issues against new factory versions to measure regression rates. The JSONL schema is:
-```json
-{"issue": 123, "title": "...", "phase": "fix", "exit_code": 1, "postmortem": "...", "promoted_at": "2026-06-12T09:00:00Z"}
-```
+The failure corpus is designed for a future replay harness that will re-run failed issues against new factory versions to measure regression rates. See `evals/` in [omniscient/dark-factory](https://github.com/omniscient/dark-factory) for the JSONL schema and tooling.
 
 ## Security Notes
 
