@@ -23,6 +23,15 @@ vi.mock('axios', () => ({
   },
 }));
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
+
 import { wsUrl } from './client';
 
 describe('wsUrl', () => {
@@ -47,7 +56,7 @@ describe('apiClient refresh handling', () => {
 
   it('shares one refresh request between concurrent eligible 401 responses', async () => {
     const [, reject] = mocks.apiClient.interceptors.response.use.mock.calls[0];
-    const refresh = Promise.withResolvers<void>();
+    const refresh = createDeferred<void>();
     mocks.unversionedClient.post.mockReturnValue(refresh.promise);
     mocks.apiClient.mockImplementation((config) => Promise.resolve(config));
 
