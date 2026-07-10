@@ -1,6 +1,6 @@
 """ScannerQueryService — DB aggregation queries extracted from routers/scanner.py."""
 
-from datetime import date, timedelta, timezone
+from datetime import date, timedelta
 from typing import Any, Optional, TypedDict
 
 import sqlalchemy as sa
@@ -12,6 +12,7 @@ from app.models.scanner_outcome_summary import ScannerOutcomeSummary
 from app.models.signal_review import SignalReview
 from app.models.system_config import SystemConfig
 from app.services.scan_orchestrator import compute_next_run
+from app.utils.time import ensure_utc
 
 
 class CoverageRange(TypedDict):
@@ -127,7 +128,7 @@ class ScannerQueryService:
         if last_run_record is not None:
             ts = last_run_record.created_at
             if ts is not None and ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
+                ts = ensure_utc(ts)
             last_run_info = {
                 "timestamp": ts,
                 "status": last_run_record.status,
@@ -150,7 +151,7 @@ class ScannerQueryService:
         sparkline = [
             {
                 "created_at": (
-                    r.created_at.replace(tzinfo=timezone.utc).isoformat()
+                    ensure_utc(r.created_at).isoformat()
                     if r.created_at and r.created_at.tzinfo is None
                     else r.created_at.isoformat()
                     if r.created_at

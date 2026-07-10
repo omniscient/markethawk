@@ -23,7 +23,7 @@ line-length = 88
 target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I"]
+select = ["E", "W", "F", "I", "DTZ003", "DTZ004"]
 ignore = [
     "E501",   # line-too-long: not auto-fixable; deferred to a follow-up cleanup issue
     "E711",   # comparison-to-none: SQLAlchemy uses == None to generate IS NULL in SQL

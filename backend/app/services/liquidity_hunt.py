@@ -15,7 +15,7 @@ import logging
 import math
 import time as _time
 from collections import defaultdict
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
@@ -37,7 +37,7 @@ from app.services.catalyst_parser import CatalystParser
 from app.services.data_readiness import DataReadinessService
 from app.services.scanner_explanations import build_liquidity_hunt_explanation
 from app.utils.session import get_market_today
-from app.utils.time import to_utc_naive
+from app.utils.time import ensure_utc, to_utc_naive
 
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
@@ -308,7 +308,7 @@ def _get_rolling_baselines(
         lambda: {"pre": [], "post": [], "regular": []}
     )
     for r in rows:
-        ts_et = r.timestamp.replace(tzinfo=timezone.utc).astimezone(_ET)
+        ts_et = ensure_utc(r.timestamp).astimezone(_ET)
         d = ts_et.date()
         if r.is_pre_market:
             daily[d]["pre"].append(r)

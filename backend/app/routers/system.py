@@ -4,7 +4,6 @@ System-level information and status router.
 
 import asyncio
 import logging
-from datetime import timezone
 from typing import Any, Dict, Optional
 
 import redis.asyncio as aioredis
@@ -19,6 +18,7 @@ from app.models.system_config import SystemConfig
 from app.models.user import User
 from app.services.llm_observability import LLMObservabilityService
 from app.services.system_service import SystemService
+from app.utils.time import ensure_utc
 
 router = APIRouter(prefix="/api/v1/system", tags=["system"])
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def get_system_status(db: Session = Depends(get_db)):
         if last_run and last_run.created_at:
             ts = last_run.created_at
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
+                ts = ensure_utc(ts)
             last_scan_at = ts.isoformat()
 
         ibkr_host = getattr(settings, "IBKR_HOST", "127.0.0.1")

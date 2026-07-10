@@ -12,6 +12,7 @@ from app.models.futures_contract import FuturesContract
 from app.providers import DataProviderFactory
 from app.services.futures_contracts import MAX_HISTORY_YEARS, FuturesContractService
 from app.services.futures_rollovers import FuturesRolloversService
+from app.utils.time import ensure_utc
 
 logger = logging.getLogger(__name__)
 
@@ -258,7 +259,7 @@ class FuturesAggregatesService:
                 tzinfo=timezone.utc
             )
             to_dt_filter = (
-                datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                ensure_utc(datetime.strptime(to_date, "%Y-%m-%d"))
                 if to_date
                 else now_utc
             )
