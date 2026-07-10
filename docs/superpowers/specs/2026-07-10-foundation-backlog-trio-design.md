@@ -1,7 +1,7 @@
 # Foundation Backlog Trio Design
 
-**Date:** 2026-07-10  
-**Issues:** #425, #503, #632  
+**Date:** 2026-07-10
+**Issues:** #425, #503, #632
 **Status:** approved for implementation
 
 ## Goal
