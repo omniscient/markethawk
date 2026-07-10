@@ -280,9 +280,7 @@ class IBKRDataProvider(BaseDataProvider):
             # Normalise to 8-digit format
             expiry_8 = expiry_str.ljust(8, "0")[:8]
             try:
-                expiry_dt = datetime.strptime(expiry_8, "%Y%m%d").replace(
-                    tzinfo=timezone.utc
-                )
+                expiry_dt = ensure_utc(datetime.strptime(expiry_8, "%Y%m%d"))
             except ValueError:
                 continue
 
