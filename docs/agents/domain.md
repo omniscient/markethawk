@@ -51,7 +51,7 @@ Dark Factory memory entries carry `project:` and `agentId:` tags:
 
 Today, `dark-factory-validate.md` and `dark-factory-conformance.md` do not read memory at all, so no leak is possible. When a validation or security agent begins reading memory, a follow-up ticket must add an `allow_agent_ids=` parameter to `load_memory()` that filters by `agentId:` at load time. Until that ticket is implemented, validation/security agents must not call `load_memory()`.
 
-Role ID constants are defined in `dark-factory/scripts/agent_roles.sh`. The current 13 stable roles are:
+Role ID constants are defined in [`scripts/agent_roles.sh`](https://github.com/omniscient/dark-factory/blob/main/scripts/agent_roles.sh) in the dark-factory repo. The current 13 stable roles are:
 
 | Constant | Value |
 |---|---|

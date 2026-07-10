@@ -121,39 +121,15 @@ You're ready. Pick an issue from the [backlog](https://github.com/omniscient/mar
 
 ## Dark Factory (Autonomous Docker Development)
 
-An isolated Docker container that autonomously develops features from GitHub issues. Runs Claude Code inside a sandboxed environment with no host access. Preview stacks and the dark-factory container deliberately omit `docker-compose.override.yml` and always run baked images — do not rely on bind-mount behavior in autonomous workflows.
+> **The Dark Factory has been extracted to its own repo: [omniscient/dark-factory](https://github.com/omniscient/dark-factory).** The scheduler, Dockerfile, entrypoint, bench suite, and all harness code live there. This repo carries only the target-side adapter (`.factory/`) and agent memory (`.archon/memory/`).
+
+The factory is an isolated Docker container that autonomously develops features from GitHub issues — running Claude Code in a sandboxed environment with its own preview stacks per issue.
 
 ### Quick Start
 
-```bash
-# Build the dark factory image (first time only)
-docker compose --profile factory build dark-factory
+See the standalone factory repo for setup and operation: [`omniscient/dark-factory — deploy/`](https://github.com/omniscient/dark-factory/tree/main/deploy)
 
-# Start a new feature from a GitHub issue
-docker compose --profile factory run --rm dark-factory "Fix issue #3"
-
-# Iterate after reviewing the preview and leaving feedback
-docker compose --profile factory run --rm dark-factory "Continue issue #3"
-
-# Tear down preview and merge when satisfied
-docker compose --profile factory run --rm dark-factory "Close issue #3"
-```
-
-### Prerequisites
-
-Add to `.archon/.env` (not `.env` — keep AI credentials separate):
-```
-# Option A: Use your Claude Max subscription (recommended — no per-token cost)
-# Generate with: claude setup-token
-CLAUDE_CODE_OAUTH_TOKEN=<token-from-setup-token>
-
-# Option B: Use Anthropic API key (pay-per-token)
-# ANTHROPIC_API_KEY=sk-ant-...
-
-GH_TOKEN=ghp_...
-```
-
-The `GH_TOKEN` should be a fine-grained PAT scoped to `omniscient/markethawk` with `repo` permissions.
+The MarketHawk-specific instance config lives at `deploy/instances/markethawk/instance.env` in that repo.
 
 ### Preview Environments
 
@@ -161,13 +137,9 @@ Each issue gets its own preview stack on deterministic ports:
 - Frontend: `http://localhost:1{NN}33` (e.g. `:10333` for issue #3)
 - Backend: `http://localhost:1{NN}80` (e.g. `:10380` for issue #3)
 
-Preview URLs are included in the PR body. The preview persists after the factory exits so you can browse and test.
-
-### Architecture
-
-See [dark factory design spec](archive/2026-05-02-dark-factory-design.md) for the full architecture, security model, and container topology.
+Preview URLs are included in the PR body. The `docker-socket-proxy-factory` and `buildkit` services in this repo's `docker-compose.yml` remain in place to support preview builds on this host.
 
 ### Memory
 
-- **Memory contract** — stable schema, lifecycle, and writer-role rules: [`docs/agents/dark-factory-memory-contract.md`](agents/dark-factory-memory-contract.md)
-- **Memory v2 operator guide** — rollout, fallback, maintenance, security: [`docs/agents/dark-factory-memory-v2.md`](agents/dark-factory-memory-v2.md)
+- **Memory contract** — stable schema, lifecycle, and writer-role rules: [omniscient/dark-factory — docs/dark-factory-memory-contract.md](https://github.com/omniscient/dark-factory/blob/main/docs/dark-factory-memory-contract.md)
+- **Memory v2 operator guide** — rollout, fallback, maintenance: [omniscient/dark-factory — docs/dark-factory-memory-v2.md](https://github.com/omniscient/dark-factory/blob/main/docs/dark-factory-memory-v2.md)
