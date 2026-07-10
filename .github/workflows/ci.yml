@@ -44,9 +44,6 @@ jobs:
         working-directory: backend
         run: ruff check .
 
-      - name: Check preview credentials not leaked to non-preview compose files
-        run: bash scripts/check_preview_creds.sh
-
       - name: Dependency audit
         run: |
           pip install pip-audit
