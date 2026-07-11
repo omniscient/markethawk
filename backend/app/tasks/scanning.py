@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import time as _time
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from types import SimpleNamespace
 
 import redis
@@ -14,7 +14,7 @@ from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 from app.models.monitored_stock import MonitoredStock
 from app.services.quality_gate import quality_gate_service
-from app.utils.time import utc_now
+from app.utils.time import ensure_utc, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -154,8 +154,6 @@ def _compute_data_degraded(universe_id: int, db: Session) -> bool:
     and returns True if affected_pct > quality_alert_pct.
     Non-blocking: any failure defaults to True (degraded) rather than aborting scan.
     """
-    from datetime import datetime, timezone
-
     from app.models.system_config import SystemConfig
     from app.models.universe_quality_report import UniverseQualityReport
 
@@ -185,7 +183,7 @@ def _compute_data_degraded(universe_id: int, db: Session) -> bool:
         if not report or not report.generated_at:
             return True
 
-        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        now_utc = utc_now()
         report_age_hours = (now_utc - report.generated_at).total_seconds() / 3600
         if report_age_hours > staleness_hours:
             return True
@@ -398,7 +396,7 @@ def _run_universe_scan_logic(
         return {
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
-            "started_at": started_at.replace(tzinfo=timezone.utc).isoformat(),
+            "started_at": ensure_utc(started_at).isoformat(),
             "tickers": len(tickers),
             "total_days": len(trading_days),
             "events_detected": events_total,
@@ -560,7 +558,7 @@ def run_range_scan(
     r.set(
         f"scan:{ticker}:range",
         json.dumps(
-            {"task_ids": [task_id], "started_at": datetime.utcnow().isoformat()}
+            {"task_ids": [task_id], "started_at": utc_now().isoformat()}
         ),
         ex=14400,
     )

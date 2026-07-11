@@ -52,7 +52,7 @@ from app.services.scan_orchestrator import get_scan_progress, request_scan_cance
 from app.services.scanner import ScannerService
 from app.services.scanner_query_service import ScannerQueryService
 from app.utils.session import get_market_now, get_market_today
-from app.utils.time import utc_now
+from app.utils.time import ensure_utc, utc_now
 
 router = APIRouter(prefix="/api/v1/scanner", tags=["scanner"])
 
@@ -175,7 +175,7 @@ def run_scanner(
 
     started_at = scanner_run.created_at
     if started_at and started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
+        started_at = ensure_utc(started_at)
 
     return ScannerRunAsyncResponse(
         scan_id=scan_id,
@@ -216,7 +216,7 @@ def get_scan_status(scan_id: str, db: Session = Depends(get_db)):
 
     started_at = run.created_at
     if started_at and started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
+        started_at = ensure_utc(started_at)
 
     return ScannerRunStatusResponse(
         scan_id=str(run.uuid),

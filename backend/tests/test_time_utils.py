@@ -1,9 +1,9 @@
-"""Unit tests for app/utils/time.py — utc_now() and to_utc_naive()."""
+"""Unit tests for app/utils/time.py time normalization helpers."""
 
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from app.utils.time import to_utc_naive, utc_now
+from app.utils.time import ensure_utc, to_utc_naive, utc_now
 
 
 class TestUtcNow:
@@ -16,6 +16,26 @@ class TestUtcNow:
         result = utc_now()
         after = datetime.now(timezone.utc).replace(tzinfo=None)
         assert before <= result <= after
+
+
+class TestEnsureUtc:
+    def test_naive_datetime_gains_utc_without_changing_clock_value(self):
+        naive = datetime(2024, 1, 15, 12, 0, 0)
+
+        result = ensure_utc(naive)
+
+        assert result == datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        assert result.tzinfo is timezone.utc
+
+    def test_aware_utc_datetime_is_returned_by_identity(self):
+        aware = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+
+        assert ensure_utc(aware) is aware
+
+    def test_aware_non_utc_datetime_is_returned_by_identity(self):
+        aware = datetime(2024, 1, 15, 12, 0, 0, tzinfo=ZoneInfo("America/New_York"))
+
+        assert ensure_utc(aware) is aware
 
 
 class TestToUtcNaive:

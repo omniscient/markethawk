@@ -190,9 +190,7 @@ def sync_ticker_details(self, ticker: str, delay_seconds: float = 15.0):
                         stmt.sector = None
 
                     stmt.homepage_url = results.get("homepage_url")
-                    stmt.last_details_update = datetime.now(timezone.utc).replace(
-                        tzinfo=None
-                    )
+                    stmt.last_details_update = utc_now()
 
                     db.commit()
                     logger.info(f"✅ Updated details for {ticker}")
@@ -452,9 +450,7 @@ def poll_massive_news(self, limit: int = 50, force: bool = False):
             headers = {"Authorization": f"Bearer {settings.POLYGON_API_KEY}"}
 
             # Ensure we don't fetch archaic news
-            seven_days_ago = datetime.now(timezone.utc).replace(
-                tzinfo=None
-            ) - timedelta(days=7)
+            seven_days_ago = utc_now() - timedelta(days=7)
             query_params["published_utc.gte"] = seven_days_ago.strftime("%Y-%m-%d")
 
             with httpx.Client(timeout=30.0) as client:

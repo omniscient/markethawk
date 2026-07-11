@@ -1,6 +1,6 @@
 import logging
 import time as _time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -94,7 +94,7 @@ def compute_universe_data_health(db: Session, universe_id: int) -> dict:
             "grade": "A",
         }
 
-    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_utc = utc_now()
     stale_count = 0
     worst_staleness_hours = 0.0
 

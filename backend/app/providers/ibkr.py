@@ -24,6 +24,7 @@ from app.core.config import settings
 from app.core.metrics import ibkr_connection_status
 from app.exceptions import ProviderError
 from app.providers.base import BaseDataProvider
+from app.utils.time import ensure_utc
 
 logger = logging.getLogger(__name__)
 
@@ -279,9 +280,7 @@ class IBKRDataProvider(BaseDataProvider):
             # Normalise to 8-digit format
             expiry_8 = expiry_str.ljust(8, "0")[:8]
             try:
-                expiry_dt = datetime.strptime(expiry_8, "%Y%m%d").replace(
-                    tzinfo=timezone.utc
-                )
+                expiry_dt = ensure_utc(datetime.strptime(expiry_8, "%Y%m%d"))
             except ValueError:
                 continue
 
@@ -579,7 +578,7 @@ class IBKRDataProvider(BaseDataProvider):
         now_utc = datetime.now(timezone.utc)
         end_dt = (
             min(
-                datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                ensure_utc(datetime.strptime(to_date, "%Y-%m-%d"))
                 + timedelta(days=1, seconds=-1),
                 now_utc,
             )
@@ -587,7 +586,7 @@ class IBKRDataProvider(BaseDataProvider):
             else now_utc
         )
         start_dt = (
-            datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            ensure_utc(datetime.strptime(from_date, "%Y-%m-%d"))
             if from_date
             else end_dt - timedelta(days=3650)  # 10 years default
         )
@@ -748,7 +747,7 @@ class IBKRDataProvider(BaseDataProvider):
         if isinstance(bar_date, datetime):
             if bar_date.tzinfo is None:
                 # ib_insync already decoded the Unix ts into a naive UTC datetime
-                return bar_date.replace(tzinfo=timezone.utc)
+                return ensure_utc(bar_date)
             return bar_date.astimezone(timezone.utc)
 
         # String fallback (formatDate=1 legacy or date-only daily bars)
@@ -756,7 +755,7 @@ class IBKRDataProvider(BaseDataProvider):
         for fmt in ("%Y%m%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y%m%d", "%Y-%m-%d"):
             try:
                 dt = datetime.strptime(s, fmt)
-                return dt.replace(tzinfo=timezone.utc)
+                return ensure_utc(dt)
             except ValueError:
                 continue
         raise ValueError(f"IBKRDataProvider: Cannot parse bar date: {bar_date!r}")
