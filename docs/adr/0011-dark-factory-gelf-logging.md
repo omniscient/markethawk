@@ -4,6 +4,8 @@
 **Status**: Accepted
 **Issue**: [#105 — post-mortem debugging gap](https://github.com/omniscient/markethawk/issues/105) _(incident that motivated this)_
 
+> **Note (2026-07-10):** The Dark Factory implementation described here was extracted to [omniscient/dark-factory](https://github.com/omniscient/dark-factory) on 2026-07-06 (MarketHawk commit 148652f). This ADR records the MarketHawk-side decision to adopt the factory; the factory's own architecture and operational docs live in that repo.
+
 ## Context
 
 Dark factory containers run with `--rm` (the scheduler dispatches via `docker compose run -d --rm`). Docker's default JSON log driver keeps logs only while the container exists — once removed, they're gone. This makes post-mortem debugging impossible.
