@@ -172,8 +172,8 @@ jobs:
           repository: omniscient/dark-factory
           path: _dark-factory
 
-      - name: Install pyyaml
-        run: pip install pyyaml
+      - name: Install factory_core dependencies
+        run: pip install pyyaml aiohttp
 
       - name: Schema-validate .factory/adapter.yaml against the extracted factory
         run: |
