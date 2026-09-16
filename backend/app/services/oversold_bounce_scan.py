@@ -270,5 +270,7 @@ register(
         description="Identifies oversold stocks showing early reversal signals.",
         run=_run,
         supports_date_range=True,
+        asset_classes=("stocks",),
+        default_parameters={},
     )
 )

@@ -738,7 +738,8 @@ for _key, _display, _desc in [
         "Post-market liquidity concentration scanner.",
     ),
 ]:
-    # All three keys share the same _orchestrator_run — run_liquidity_hunt_scan emits all variant types.
+    # All three keys share the same _orchestrator_run and DEFAULT_CONFIG —
+    # run_liquidity_hunt_scan emits all variant types.
     register(
         ScannerDescriptor(
             key=_key,
@@ -746,5 +747,7 @@ for _key, _display, _desc in [
             description=_desc,
             run=_orchestrator_run,
             supports_date_range=True,
+            asset_classes=("stocks",),
+            default_parameters=DEFAULT_CONFIG,
         )
     )

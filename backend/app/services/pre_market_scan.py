@@ -605,11 +605,7 @@ async def run_pre_market_scan(
             .scalar()
         )
         if _max_bar_ts is not None and isinstance(_max_bar_ts, datetime):
-            _bar_utc = (
-                _max_bar_ts
-                if _max_bar_ts.tzinfo
-                else ensure_utc(_max_bar_ts)
-            )
+            _bar_utc = _max_bar_ts if _max_bar_ts.tzinfo else ensure_utc(_max_bar_ts)
             scan_data_to_detection_seconds.labels(
                 scanner_type="pre_market_volume_spike"
             ).observe((datetime.now(timezone.utc) - _bar_utc).total_seconds())
@@ -643,5 +639,7 @@ register(
         description="Detects stocks with >4x average volume in the pre-market window.",
         run=_run,
         supports_date_range=True,
+        asset_classes=("stocks",),
+        default_parameters={},
     )
 )

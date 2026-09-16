@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+import app.services.liquidity_hunt  # noqa: F401 — self-registers at import time
+import app.services.oversold_bounce_scan  # noqa: F401
+import app.services.pocket_pivot  # noqa: F401
+import app.services.pre_market_scan  # noqa: F401
 import app.services.scan_orchestrator as orchestrator
+import app.services.trend_pullback_scan  # noqa: F401
 from app.exceptions import ExtensionDuplicateError
 from app.services.scan_orchestrator import ScannerDescriptor, get_all, register, run
 
@@ -129,6 +134,41 @@ def test_liquidity_hunt_variants_registered():
         assert orchestrator._REGISTRY.get(key) is not None, (
             f"Expected {key!r} in registry"
         )
+
+
+def test_built_in_scanners_register_seven_keys_with_metadata():
+    from app.services.liquidity_hunt import DEFAULT_CONFIG as LIQUIDITY_HUNT_PARAMS
+    from app.services.pocket_pivot import _DEFAULT_PARAMS as POCKET_PIVOT_PARAMS
+    from app.services.trend_pullback_scan import (
+        _DEFAULT_PARAMS as TREND_PULLBACK_PARAMS,
+    )
+
+    expected_keys = {
+        "pre_market_volume_spike",
+        "oversold_bounce",
+        "liquidity_hunt",
+        "liquidity_hunt_pre",
+        "liquidity_hunt_post",
+        "pocket_pivot",
+        "trend_pullback",
+    }
+    all_descriptors = {d.key: d for d in get_all()}
+    assert expected_keys <= set(all_descriptors)
+
+    for key in expected_keys:
+        assert all_descriptors[key].asset_classes == ("stocks",), key
+
+    assert all_descriptors["pocket_pivot"].default_parameters == POCKET_PIVOT_PARAMS
+    assert all_descriptors["pocket_pivot"].default_parameters["lookback_days"] == 10
+    assert all_descriptors["trend_pullback"].default_parameters == TREND_PULLBACK_PARAMS
+    assert all_descriptors["trend_pullback"].default_parameters["trend_sma_fast"] == 50
+    for key in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
+        assert all_descriptors[key].default_parameters == LIQUIDITY_HUNT_PARAMS
+    assert (
+        all_descriptors["liquidity_hunt"].default_parameters["volume_ratio_min"] == 4.0
+    )
+    assert all_descriptors["oversold_bounce"].default_parameters == {}
+    assert all_descriptors["pre_market_volume_spike"].default_parameters == {}
 
 
 # ── New orchestration functions ────────────────────────────────────────────
