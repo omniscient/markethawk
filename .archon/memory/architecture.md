@@ -22,6 +22,7 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+- [AVOID] Do not build IBKR auto-failover for stock bars/snapshots in the pre-market scanner path: IBKRDataProvider.get_bars()/get_snapshots() (backend/app/providers/ibkr.py) are hard stubs returning [] — IBKR is futures-only at the BaseDataProvider interface. Even with stock support, IBKR pacing limits (60 historical requests/10min) make it unusable for bulk-scanning thousands of tickers inside the 4:00-9:30 pre-market window. Full-universe scans use alert-and-degrade only (issue #388); only the curated Active Watchlist (already IBKR-sourced via live_scanner/, bypassing BaseDataProvider entirely) gets real IBKR data. <!-- issue:#388 date:2026-09-16 expires:2027-03-16 source:refine agent:refine scope:architecture path:backend/app/providers/ -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
