@@ -12,6 +12,7 @@ from app.models.futures_contract import FuturesContract
 from app.providers import DataProviderFactory
 from app.services.futures_contracts import MAX_HISTORY_YEARS, FuturesContractService
 from app.services.futures_rollovers import FuturesRolloversService
+from app.utils.time import ensure_utc
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +70,7 @@ class FuturesAggregatesService:
 
         now = datetime.now(timezone.utc)
         try:
-            expiry_dt = datetime.strptime(contract_month, "%Y%m%d").replace(
-                tzinfo=timezone.utc
-            )
+            expiry_dt = ensure_utc(datetime.strptime(contract_month, "%Y%m%d"))
         except ValueError:
             return {
                 "status": "error",
@@ -80,8 +79,8 @@ class FuturesAggregatesService:
 
         natural_to = min(expiry_dt, now)
         if to_date:
-            caller_to = datetime.strptime(to_date, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
+            caller_to = ensure_utc(
+                datetime.strptime(to_date, "%Y-%m-%d")
             ) + timedelta(days=1, seconds=-1)
             effective_to = min(caller_to, natural_to)
         else:
@@ -254,11 +253,9 @@ class FuturesAggregatesService:
 
         if from_date:
             now_utc = datetime.now(timezone.utc)
-            from_dt_filter = datetime.strptime(from_date, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
+            from_dt_filter = ensure_utc(datetime.strptime(from_date, "%Y-%m-%d"))
             to_dt_filter = (
-                datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                ensure_utc(datetime.strptime(to_date, "%Y-%m-%d"))
                 if to_date
                 else now_utc
             )
@@ -269,13 +266,9 @@ class FuturesAggregatesService:
                 c
                 for c in contracts
                 if (
-                    datetime.strptime(c.contract_month, "%Y%m%d").replace(
-                        tzinfo=timezone.utc
-                    )
+                    ensure_utc(datetime.strptime(c.contract_month, "%Y%m%d"))
                     >= min_expiry
-                    and datetime.strptime(c.contract_month, "%Y%m%d").replace(
-                        tzinfo=timezone.utc
-                    )
+                    and ensure_utc(datetime.strptime(c.contract_month, "%Y%m%d"))
                     <= max_expiry
                 )
             ]

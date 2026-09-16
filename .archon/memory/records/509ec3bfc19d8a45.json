@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-04",
+      "evidence_tag": null,
+      "issue": 210,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-04",
+  "id": "509ec3bfc19d8a45",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "`check_pr_mergeable()` calls `gh pr view --json mergeable --jq '.mergeable'`; GitHub returns the string \"CONFLICTING\", \"MERGEABLE\", or \"UNKNOWN\". Always skip UNKNOWN \u2014 GitHub hasn't computed mergeability yet and will compute it on the next poll.",
+  "superseded_by": null,
+  "supersedes": []
+}

@@ -6,12 +6,18 @@ import {
   fetchIntervals,
   fetchDistribution,
   fetchSignals,
+  fetchRegimeBreakdown,
+  fetchExplanationTraits,
+  fetchExplanationArchetypes,
   triggerBackfill,
   Scorecard,
   EdgeDecayPoint,
   IntervalBreakdown,
   DistributionPoint,
   SignalListResponse,
+  RegimeBreakdownResponse,
+  ExplanationTraitPerformance,
+  ExplanationArchetypeResponse,
   BackfillRequest,
   BackfillResponse,
 } from '../api/outcomes';
@@ -83,6 +89,39 @@ export const useSignals = (
   });
 };
 
+export const useRegimeBreakdown = (
+  scannerType: string | undefined,
+  params?: { start_date?: string; end_date?: string },
+) => {
+  return useQuery<RegimeBreakdownResponse>({
+    queryKey: ['regimeBreakdown', scannerType, params],
+    queryFn: () => fetchRegimeBreakdown(scannerType!, params),
+    enabled: !!scannerType,
+  });
+};
+
+export const useExplanationTraits = (
+  scannerType: string | undefined,
+  params?: { start_date?: string; end_date?: string; severity?: string },
+) => {
+  return useQuery<ExplanationTraitPerformance>({
+    queryKey: ['explanationTraits', scannerType, params],
+    queryFn: () => fetchExplanationTraits({ scanner_type: scannerType!, ...params }),
+    enabled: !!scannerType,
+  });
+};
+
+export const useExplanationArchetypes = (
+  scannerType: string | undefined,
+  params?: { start_date?: string; end_date?: string; severity?: string },
+) => {
+  return useQuery<ExplanationArchetypeResponse>({
+    queryKey: ['explanationArchetypes', scannerType, params],
+    queryFn: () => fetchExplanationArchetypes({ scanner_type: scannerType!, ...params }),
+    enabled: !!scannerType,
+  });
+};
+
 export const useBackfillMutation = () => {
   const queryClient = useQueryClient();
   return useMutation<BackfillResponse, Error, BackfillRequest>({
@@ -92,6 +131,7 @@ export const useBackfillMutation = () => {
       queryClient.invalidateQueries({ queryKey: ['edgeDecay'] });
       queryClient.invalidateQueries({ queryKey: ['intervals'] });
       queryClient.invalidateQueries({ queryKey: ['distribution'] });
+      queryClient.invalidateQueries({ queryKey: ['regimeBreakdown'] });
     },
   });
 };

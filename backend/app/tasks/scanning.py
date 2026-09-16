@@ -2,7 +2,8 @@ import asyncio
 import json
 import logging
 import time as _time
-from datetime import date, datetime, timezone
+from datetime import date, datetime
+from types import SimpleNamespace
 
 import redis
 from sqlalchemy.orm import Session
@@ -12,7 +13,8 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 from app.models.monitored_stock import MonitoredStock
-from app.utils.time import utc_now
+from app.services.quality_gate import quality_gate_service
+from app.utils.time import ensure_utc, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +145,148 @@ def _run_range_scan_logic(
     return events_detected
 
 
+def _compute_data_degraded(universe_id: int, db: Session) -> bool:
+    """
+    Return True if the universe data is degraded at scan start time.
+
+    Reads the latest UniverseQualityReport; if missing or generated >staleness_hours ago,
+    treats as degraded. Otherwise counts stale/gapped tickers from report_data.tickers
+    and returns True if affected_pct > quality_alert_pct.
+    Non-blocking: any failure defaults to True (degraded) rather than aborting scan.
+    """
+    from app.models.system_config import SystemConfig
+    from app.models.universe_quality_report import UniverseQualityReport
+
+    try:
+        keys = [
+            "quality_staleness_hours",
+            "quality_gap_min_weekdays",
+            "quality_alert_pct",
+        ]
+        cfg_rows = db.query(SystemConfig).filter(SystemConfig.key.in_(keys)).all()
+        cfg = {r.key: r.value for r in cfg_rows}
+
+        def _int(key, default):
+            try:
+                return int(cfg.get(key, default))
+            except (ValueError, TypeError):
+                return default
+
+        staleness_hours = _int("quality_staleness_hours", 48)
+        alert_pct = _int("quality_alert_pct", 20)
+
+        report = (
+            db.query(UniverseQualityReport)
+            .filter(UniverseQualityReport.universe_id == universe_id)
+            .first()
+        )
+        if not report or not report.generated_at:
+            return True
+
+        now_utc = utc_now()
+        report_age_hours = (now_utc - report.generated_at).total_seconds() / 3600
+        if report_age_hours > staleness_hours:
+            return True
+
+        if not report.report_data:
+            return True
+
+        ticker_entries = report.report_data.get("tickers", [])
+        if not ticker_entries:
+            return True
+
+        # Count stale/gapped unique tickers from the per-ticker report entries.
+        # Each entry has: ticker, last_bar (ISO str or datetime), gap_count (int).
+        # A ticker is stale if last_bar is None or older than staleness_hours.
+        # A ticker is gapped if gap_count > 0 (gaps already filtered by _detect_gaps weekday check).
+        ticker_flags: dict = {}
+        for entry in ticker_entries:
+            sym = entry.get("ticker")
+            if not sym:
+                continue
+            if sym not in ticker_flags:
+                ticker_flags[sym] = {"stale": False, "gapped": False}
+
+            last_bar = entry.get("last_bar")
+            if last_bar is None:
+                ticker_flags[sym]["stale"] = True
+            elif not ticker_flags[sym]["stale"]:
+                if isinstance(last_bar, str):
+                    try:
+                        last_bar_dt = datetime.fromisoformat(
+                            last_bar.replace("Z", "+00:00")
+                        ).replace(tzinfo=None)
+                    except Exception:
+                        ticker_flags[sym]["stale"] = True
+                        continue
+                else:
+                    last_bar_dt = last_bar
+                if (now_utc - last_bar_dt).total_seconds() / 3600 > staleness_hours:
+                    ticker_flags[sym]["stale"] = True
+
+            if entry.get("gap_count", 0) > 0:
+                ticker_flags[sym]["gapped"] = True
+
+        total = len(ticker_flags)
+        if total == 0:
+            return True
+
+        stale_count = sum(1 for v in ticker_flags.values() if v["stale"])
+        gapped_count = sum(1 for v in ticker_flags.values() if v["gapped"])
+        affected_pct = max(stale_count, gapped_count) / total * 100
+
+        return affected_pct > alert_pct
+
+    except Exception as exc:
+        logger.warning("_compute_data_degraded: error reading quality report: %s", exc)
+        return True
+
+
+def _start_scheduled_scanner_run(
+    db: Session,
+    scanner_type: str,
+    universe_id: int,
+    event_date: date,
+    stocks_scanned: int,
+):
+    from app.models.scanner_run import ScannerRun
+
+    run = ScannerRun(
+        scanner_type=scanner_type,
+        universe_id=universe_id,
+        status="running",
+        stocks_scanned=stocks_scanned,
+        scan_start_date=event_date,
+        scan_end_date=event_date,
+    )
+    db.add(run)
+    db.commit()
+    return run
+
+
+def _finish_scheduled_scanner_run(
+    db: Session,
+    run,
+    started_at: float,
+    events_detected: int,
+) -> None:
+    run.status = "completed"
+    run.events_detected = events_detected
+    run.execution_time_ms = int((_time.monotonic() - started_at) * 1000)
+    db.commit()
+
+
+def _fail_scheduled_scanner_run(db: Session, run, started_at: float, exc: Exception):
+    try:
+        db.rollback()
+    except Exception:
+        pass
+    run.status = "failed"
+    run.error_message = str(exc)
+    run.execution_time_ms = int((_time.monotonic() - started_at) * 1000)
+    db.commit()
+
+
 def _run_universe_scan_logic(
     scan_id: str,
     scanner_type: str,
@@ -197,6 +341,42 @@ def _run_universe_scan_logic(
     run.stocks_scanned = len(tickers)
     run.scan_start_date = start
     run.scan_end_date = end
+    run.data_degraded = _compute_data_degraded(universe_id, db)
+
+    gate_metadata = None
+    try:
+        _gate_req = SimpleNamespace(
+            policy="advisory",
+            universe_id=universe_id,
+            scanner_type=scanner_type,
+            ticker=None,
+            requirements=None,
+        )
+        _assessment = quality_gate_service.assess(db, _gate_req)
+        run.quality_gate = json.loads(json.dumps(_assessment.model_dump(), default=str))
+        gate_metadata = {
+            "tier": _assessment.verdict.value,
+            "warnings": [
+                {"code": w.code.value, "severity": w.severity, "message": w.message}
+                for w in _assessment.warnings
+            ],
+            "schema_version": _assessment.schema_version,
+        }
+        if _assessment.verdict.value != "trusted":
+            logger.warning(
+                "run_universe_scan %s: quality gate verdict=%s for universe=%s scanner=%s",
+                scan_id,
+                _assessment.verdict.value,
+                universe_id,
+                scanner_type,
+            )
+    except Exception as _gate_exc:
+        logger.exception(
+            "run_universe_scan %s: quality gate assessment failed (degrading gracefully): %s",
+            scan_id,
+            _gate_exc,
+        )
+
     db.commit()
 
     started_at = utc_now()
@@ -216,7 +396,7 @@ def _run_universe_scan_logic(
         return {
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
-            "started_at": started_at.replace(tzinfo=timezone.utc).isoformat(),
+            "started_at": ensure_utc(started_at).isoformat(),
             "tickers": len(tickers),
             "total_days": len(trading_days),
             "events_detected": events_total,
@@ -267,7 +447,12 @@ def _run_universe_scan_logic(
         try:
             day_events = asyncio.run(
                 _orchestrator.run(
-                    scanner_type, tickers, db=db, event_date=day, scanner_run=run
+                    scanner_type,
+                    tickers,
+                    db=db,
+                    event_date=day,
+                    scanner_run=run,
+                    gate_metadata=gate_metadata,
                 )
             )
         except Exception as e:
@@ -373,7 +558,7 @@ def run_range_scan(
     r.set(
         f"scan:{ticker}:range",
         json.dumps(
-            {"task_ids": [task_id], "started_at": datetime.utcnow().isoformat()}
+            {"task_ids": [task_id], "started_at": utc_now().isoformat()}
         ),
         ex=14400,
     )
@@ -467,13 +652,29 @@ def run_liquidity_hunt_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "liquidity_hunt", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_liquidity_hunt_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "liquidity_hunt", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_liquidity_hunt_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "liquidity_hunt scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,
@@ -660,13 +861,29 @@ def run_pocket_pivot_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "pocket_pivot", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_pocket_pivot_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "pocket_pivot", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_pocket_pivot_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "pocket_pivot scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,
@@ -745,13 +962,29 @@ def run_trend_pullback_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "trend_pullback", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_trend_pullback_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "trend_pullback", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_trend_pullback_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "trend_pullback scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,
@@ -762,6 +995,96 @@ def run_trend_pullback_scheduled(self):
     except Exception as exc:
         celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
         logger.exception("run_trend_pullback_scheduled failed: %s", exc)
+        raise self.retry(exc=exc)
+    finally:
+        celery_task_duration_seconds.labels(task_name=_task_name).observe(
+            _time.monotonic() - _start
+        )
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Nightly replay-diff task — 04:00 UTC weekdays
+# ---------------------------------------------------------------------------
+
+
+def _run_replay_diff_logic(db: Session, scan_date: date) -> None:
+    """Testable core of run_replay_diff_nightly. No Celery/OTel context needed."""
+    import app.services.liquidity_hunt  # noqa: F401
+    import app.services.oversold_bounce_scan  # noqa: F401
+    import app.services.pocket_pivot  # noqa: F401
+    import app.services.pre_market_scan  # noqa: F401
+    import app.services.scan_orchestrator as _orchestrator
+    import app.services.trend_pullback_scan  # noqa: F401
+    from app.models.scanner_config import ScannerConfig
+    from app.services.replay_diff_service import run_replay_diff_for_scanner
+
+    all_descriptors = _orchestrator.get_all()
+    eligible = [d for d in all_descriptors if d.supports_date_range]
+
+    if not eligible:
+        logger.warning("run_replay_diff_nightly: no eligible scanner descriptors found")
+        return
+
+    for descriptor in eligible:
+        scanner_type = descriptor.key
+        configs = (
+            db.query(ScannerConfig)
+            .filter(
+                ScannerConfig.scanner_type == scanner_type,
+                ScannerConfig.is_active.is_(True),
+            )
+            .all()
+        )
+        if not configs:
+            logger.info(
+                "replay_diff: no active ScannerConfig for scanner_type=%s, skipping",
+                scanner_type,
+            )
+            continue
+
+        # Collect tickers from all active universes for this scanner type
+        tickers_seen: set = set()
+        for cfg in configs:
+            if cfg.universe_id is None:
+                continue
+            rows = (
+                db.query(MonitoredStock)
+                .filter(
+                    MonitoredStock.universe_id == cfg.universe_id,
+                    MonitoredStock.is_active.is_(True),
+                )
+                .all()
+            )
+            tickers_seen.update(ms.ticker for ms in rows)
+
+        tickers = sorted(tickers_seen)
+        try:
+            run_replay_diff_for_scanner(scanner_type, scan_date, tickers, db)
+        except Exception as exc:
+            logger.exception(
+                "replay_diff: run_replay_diff_for_scanner failed scanner=%s date=%s: %s",
+                scanner_type,
+                scan_date,
+                exc,
+            )
+
+
+@celery_app.task(bind=True, max_retries=1, name="app.tasks.run_replay_diff_nightly")
+def run_replay_diff_nightly(self):
+    """04:00 UTC weekdays: re-run yesterday's scans and diff vs live signals."""
+    from datetime import timedelta
+
+    _task_name = "run_replay_diff_nightly"
+    _start = _time.monotonic()
+    db: Session = SessionLocal()
+    try:
+        yesterday = date.today() - timedelta(days=1)
+        _run_replay_diff_logic(db, yesterday)
+        celery_tasks_total.labels(task_name=_task_name, status="success").inc()
+    except Exception as exc:
+        celery_tasks_total.labels(task_name=_task_name, status="failure").inc()
+        logger.exception("run_replay_diff_nightly failed: %s", exc)
         raise self.retry(exc=exc)
     finally:
         celery_task_duration_seconds.labels(task_name=_task_name).observe(

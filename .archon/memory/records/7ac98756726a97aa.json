@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-12",
+      "evidence_tag": null,
+      "issue": 289,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-12",
+  "id": "7ac98756726a97aa",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Copy shared entrypoint scripts to `/entrypoint.sh` (outside `/app`) in `backend/Dockerfile` \u2014 not to `./entrypoint.sh` or `/app/entrypoint.sh`. The `docker-compose.override.yml` local-dev bind-mount `./backend:/app:ro` shadows the entire `/app` directory, so any file placed inside `/app` is invisible at runtime in dev; files outside `/app` are unaffected.",
+  "superseded_by": null,
+  "supersedes": []
+}

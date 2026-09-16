@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-22",
+      "evidence_tag": null,
+      "issue": 495,
+      "source": "conformance"
+    }
+  ],
+  "expires_at": "2026-12-22",
+  "id": "c1ad5a6ee36d6ff6",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "frontend/src/components/ \u2014 Do not implement a spec-named separate component file inline inside its consuming component. If the spec names `TrustGateBanner.tsx` as a separate file, it must be a separate file \u2014 inlining breaks the spec's file-structure contract.",
+  "superseded_by": null,
+  "supersedes": []
+}

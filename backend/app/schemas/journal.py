@@ -2,16 +2,18 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.common import Ticker
 
 
 class TagBase(BaseModel):
-    name: str
+    name: str = Field(..., max_length=50)
     color: Optional[str] = None
 
 
 class TagCreate(TagBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class TagSchema(TagBase):
@@ -26,11 +28,11 @@ class ExecutionBase(BaseModel):
     price: Decimal
     quantity: Decimal
     commission: Optional[Decimal] = Decimal("0.0")
-    external_id: Optional[str] = None
+    external_id: Optional[str] = Field(default=None, max_length=100)
 
 
 class ExecutionCreate(ExecutionBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class ExecutionSchema(ExecutionBase):
@@ -41,7 +43,7 @@ class ExecutionSchema(ExecutionBase):
 
 
 class TradeBase(BaseModel):
-    symbol: str
+    symbol: Ticker
     status: str = "open"
     side: Optional[str] = None
     open_date: Optional[datetime] = None
@@ -53,16 +55,18 @@ class TradeBase(BaseModel):
     net_pnl: Optional[Decimal] = None
     commissions: Optional[Decimal] = Decimal("0.0")
     return_pct: Optional[Decimal] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=4096)
 
 
 class TradeCreate(TradeBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class TradeUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: Optional[str] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=4096)
     tag_ids: Optional[List[int]] = None
 
 

@@ -28,14 +28,13 @@ graph TD
         seqgelf["seq-gelf :12201/udp"]
         forecastworker["forecast-worker (profile: forecasting)"]
         dbbackup["db-backup"]
+        dbrestoredrill["db-restore-drill"]
+        agentmemoryengine["agentmemory-engine :3111 (profile: agentmemory-spike)"]
     end
 
-    subgraph factory["factory-network"]
+    subgraph factory["factory-network (external — see omniscient/dark-factory)"]
         proxyfactory["docker-socket-proxy-factory :2375"]
-        proxyscheduler["docker-socket-proxy-scheduler :2375"]
-        darkfactory["dark-factory (factory profile)"]
-        scheduler["backlog-scheduler (scheduler profile)"]
-        buildkit["buildkit :1234 (factory/scheduler profiles)"]
+        buildkit["buildkit :1234"]
     end
 
     dockersock[/"Docker socket\n/var/run/docker.sock"\]
@@ -76,17 +75,25 @@ graph TD
     jaeger -->|OTLP| beat
 
     proxyfactory -->|":ro"| dockersock
-    proxyscheduler -->|":ro"| dockersock
-    darkfactory -->|"tcp :2375"| proxyfactory
-    darkfactory -->|"buildx tcp :1234"| buildkit
-    scheduler -->|"tcp :2375"| proxyscheduler
 
     seqgelf -->|"GELF → HTTP"| seq
     forecastworker --> postgres
     forecastworker --> redis
     dbbackup -->|"pg_dump"| postgres
     dbbackup -->|"failure events"| seq
+    dbrestoredrill -->|"read backups :ro"| dbbackup
+    dbrestoredrill -->|"drill events"| seq
 ```
+
+### Container Users
+
+| Image | Services | Runtime user | Notes |
+|---|---|---|---|
+| `markethawk-backend` | `backend`, `celery-worker`, `celery-beat`, `live-scanner`, `tweet-monitor`, `flower` | `appuser` (uid 1000) | Non-root; created in `backend/Dockerfile` |
+| `markethawk-frontend` | `frontend` | `node` | Non-root; default node image user |
+| `markethawk-dark-factory` | _(extracted — now built in [omniscient/dark-factory](https://github.com/omniscient/dark-factory))_ | — | Scheduler and factory containers run from the standalone factory repo; this stack no longer builds or owns this image |
+| `markethawk-forecast` | `forecast-worker` | `root` | Exception: HuggingFace model weights (~800 MB) cached at `/root/.cache/huggingface` via `timesfm_cache` named volume; converting to non-root requires relocating the cache path (tracked as a separate follow-up) |
+| `markethawk-db-restore-drill` | `db-restore-drill` | `postgres` | Runs as the postgres system user (required to run `initdb` / `postgres` daemon); no Docker socket access. |
 
 ## Scan Execution Flow
 
@@ -175,7 +182,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 
 | File | Responsibility |
 |------|---------------|
-| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date)` is the single dispatch entry point from `tasks/scanning.py`. `get_all()` enumerates entries for `GET /api/v1/scanner/types`. `compute_next_run(scanner_type)` returns next scheduled fire time. `get_scan_progress(redis_url, universe_id, scanner_type)` reads Redis progress state. `request_scan_cancel(redis_url, scan_id)` sets Redis cancel flag. `enqueue_scan(db, request)` creates `ScannerRun` row and dispatches Celery task. |
+| `scan_orchestrator.py` | Scanner registry and orchestrator. `ScannerDescriptor` frozen dataclass; `_REGISTRY` populated via `register()` at import time. `run(scanner_type, tickers, db, event_date, scanner_run=None, gate_metadata=None)` is the single dispatch entry point from `tasks/scanning.py`; threads `gate_metadata` to registered scanner descriptors. `get_all()` enumerates entries for `GET /api/v1/scanner/types`. `compute_next_run(scanner_type)` returns next scheduled fire time. `get_scan_progress(redis_url, universe_id, scanner_type)` reads Redis progress state. `request_scan_cancel(redis_url, scan_id)` sets Redis cancel flag. `enqueue_scan(db, request)` creates `ScannerRun` row and dispatches Celery task. |
 | `scanner_query_service.py` | `ScannerQueryService` — DB aggregation queries extracted from `routers/scanner.py`. `get_scan_status_block()` builds the Scan Status card payload. `get_signal_quality_distribution()` computes decile outcome stats. `get_review_stats()` aggregates signal review coverage, acceptance rate, and rejection reasons. |
 | `system_service.py` | `SystemService` — business logic extracted from `routers/system.py`. `get_market_status()` returns the current ET session. `check_ibkr_reachable()` socket probe. `format_bytes()` human-readable size. `get_storage_stats()` per-table PostgreSQL size queries. `get_active_tasks()` async Redis + DB poll for the `/ws/tasks` WebSocket. |
 | `pre_market_scan.py` | Self-registers `"pre_market_volume_spike"` in the orchestrator. Pipeline staged into `_detect` (pure, no DB) → `_enrich` (batch, calls `_enrich_one` per passing signal) → `_persist` (all DB writes + single commit). `RawSignal`/`EnrichedSignal` dataclasses as stage boundaries. Helpers: `_load_timesfm_config`, `_compute_volatility_regime`, `_build_timing_features`, `_build_catalyst_features`. Per-ticker `scanner.evaluate_ticker` OTel spans remain in the orchestrator. Uses lazy imports for `ScannerService`/`_scanner_mod` to avoid circular import. |
@@ -203,13 +210,18 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `journal_service.py` | Trade journal CRUD operations. |
 | `websocket_manager.py` | Polygon.io WebSocket manager (singleton). Maintains a live subscription to Polygon's feed; publishes updates to Redis pub/sub channels (`stock_updates:{ticker}:{resolution}`, `watchlist:live_data`). Also exposes an in-process fan-out registry (`register`/`unregister`/`fan_out`) used by the ticker and watchlist WS handlers to avoid per-connection Redis subscriptions. |
 | `normalization.py` | Data normalization helpers (price/volume units, split adjustments). |
-| `data_quality.py` | Quality checks and `UniverseQualityReport` generation. |
-| `auto_trade_service.py` | `AutoTradeExecutor` — full auto-trade lifecycle (guard checks, sizing, IBKR submission). `approve_order(order, strategy, db)` handles paper vs. live approval. `cancel_order(order, db)` cancels via IBKR or marks paper cancelled. `get_account()` fetches IBKR account summary with graceful fallback. `get_stats(db, days)` computes P&L, win rate, and status breakdown. |
-| `stats.py` | Aggregate statistics helpers for dashboard metrics. `StatsService.get_scorecard()` filters by quality-gate tier (`trusted` default; `include_warnings`/`include_all` opt-ins) and returns `gate_status` tier counts. `get_signals()` exposes per-event `gate_tier`. |
+| `data_quality.py` | Quality checks and `UniverseQualityReport` generation. Imports `_detect_gaps` and `_count_weekdays_between` from `quality_helpers.py` (re-exported for backward compat). |
+| `quality_helpers.py` | Shared pure helpers for gap/staleness analysis: `_detect_gaps(timestamps, timespan, multiplier)` and `_count_weekdays_between(d1, d2)`. Used by both `data_quality.py` and the `check_aggregate_staleness` Celery task. |
+| `quality_gate.py` | `QualityGateService` — converts `UniverseQualityReport.report_data` into a versioned `quality_gate.v1` assessment. `_build_assessment(report_data, data_requirements, scope, policy)` — pure function: all policy/verdict/issue logic, no DB. `_derive_verdict(issues, policy)` — maps blocker/warning issues to verdict under strict/advisory policy. `QualityGateService.assess(self, db, request)` — thin DB wrapper: fetches `UniverseQualityReport`, optionally fetches `ScannerConfig.data_requirements` when `scanner_type` provided, then delegates to `_build_assessment`. Module exports `quality_gate_service: QualityGateServiceProtocol` singleton (defined in `schemas/quality_gate.py`); consumers depend on the singleton rather than the class, so new evidence types require no consumer edits. Three active issue codes: `missing_bars`, `provider_gap`, `insufficient_lookback`. Four codes (`stale_quote`, `split_dividend_anomaly`, `session_mismatch`, `survivorship_bias`) are defined for API stability but not yet emitted. |
+| `auto_trade_service.py` | `AutoTradeExecutor` — full auto-trade lifecycle decomposed into six private methods: `_validate_basics` (rule/strategy/kill-switch/max_position_usd), `_check_idempotency` (one order per symbol/strategy/day), `_validate_quality_gate` (strict quality gate re-assessment), `_validate_concurrency` (daily count + open position limits), `_validate_session` (session eligibility), `_size_position` (trigger price, side, equity, sizing → `PositionCalc`). `maybe_execute()` owns the Redis distributed lock and steps 11–12 (order creation + IBKR submit/park). `approve_order(order, strategy, db)` handles paper vs. live approval. `cancel_order(order, db)` cancels via IBKR or marks paper cancelled. `get_account()` fetches IBKR account summary with graceful fallback. `get_stats(db, days)` computes P&L, win rate, and status breakdown. |
+| `stats.py` | Aggregate statistics helpers for dashboard metrics. `StatsService.get_scorecard()` filters by quality-gate tier (`trusted` default; `include_warnings`/`include_all` opt-ins), returns `gate_status` tier counts, and joins `SignalReview` for a trailing `review_window_days` window to compute precision/coverage/verdict fields. `get_signals()` exposes per-event `gate_tier`. |
 | `event_helpers.py` | Utility functions for `ScannerEvent` construction and querying. |
 | `backtest_service.py` | Daily-bar replay engine. `_simulate_trade()` — pure function; simulates one position with conservative intrabar rule (both stop and target hit on same bar → stop wins), market/limit entry, stop/target/time-stop/delisting exits. `run_backtest_logic()` — orchestrates signal sourcing (existing ScannerEvents first, in-memory scanner fallback), bar-presence-based ticker eligibility (survivorship-bias avoidance), `_compute_stats()` for aggregate metrics. |
-| `alert_service.py` | `AlertRuleService` — rule matching (scanner type + severity + cooldown filters). `NotificationDispatcher` — fan-out to browser push / email / Google Chat / webhook channels; records `AlertDeliveryLog`. `save_event()` — centralized write path for scanner events: computes severity (`low`/`medium`/`high` enforced) and validates JSONB dicts (`indicators`, `criteria_met`, `enrichment`) are JSON-serializable before persisting. |
+| `alert_service.py` | `AlertRuleService` — rule matching (scanner type + severity + cooldown filters). `NotificationDispatcher` — fan-out to browser push / email / Google Chat / webhook channels; records `AlertDeliveryLog`. `save_event()` — centralized write path for scanner events: computes severity (`low`/`medium`/`high` enforced) and validates JSONB dicts; accepts optional `gate_metadata` dict — stamped into `metadata_["quality_gate"]` for new events only (upsert path preserves any existing stamp). Injects current HMM regime via `RegimeService.get_regime_at_date()` into the `ScannerEvent.regime` column. |
+| `system_notifier.py` | `notify_system(title, body, severity, dedupe_key, channels, db, cooldown_seconds)` — generic email + browser-push delivery for **non-scanner** events (e.g. autopilot, circuit-breaker trips, preview failures). Reuses `NotificationDispatcher._send_email` (to `OPS_ALERT_EMAIL`; skipped when unset) and `_push_to_subscriptions`. Best-effort in-process dedupe cache keyed by `dedupe_key` (60-min cooldown, per-process — resets on restart). Fail-soft: each channel is attempted independently, failures logged not raised; returns a per-channel status dict (`sent`/`sent:<n>`/`skipped`/`suppressed`/`failed:<reason>`). |
+| `regime_service.py` | `RegimeService` — HMM-based market regime detection. `train_and_persist(db)` — fetches rolling 2-year SPY daily bars from `stock_aggregates`, builds 3-feature matrix (`daily_return`, `rolling_vol_20d`, `rolling_skew_20d`), fits `GaussianHMM` (2–5 states, BIC-driven), persists serialised model to `regime_models` table and writes current regime to Redis key `regime:current` (25 h TTL). `get_current_regime()` — Redis read. `get_regime_at_date(db, date)` — Redis fast-path for today, DB predict for historical dates. State labels: `high_volatility` (highest vol), `risk_off` (lowest return), `risk_on` (highest return), `low_vol_drift`/`transition` for extras. |
 | `statistical_discovery.py` | Pure-Python statistical analysis service: `build_feature_matrix`, `compute_correlations` (Pearson + Spearman), `compute_shap_weights` (LightGBM + SHAP), `run_kmeans`, `compute_conditional_stats`, `generate_label`. No DB dependencies; accepts DataFrames, returns typed dicts. |
+| `replay_diff_service.py` | Nightly replay-diff pipeline. `_collect_live_signals(scanner_type, scan_date, db)` — reads live `ScannerEvent` rows. `_run_replay(scanner_type, tickers, scan_date, db)` — runs scanner with all `save_event` bindings patched via `contextlib.ExitStack` (targets: `liquidity_hunt._save_event`, `pocket_pivot._save_event`, `trend_pullback_scan._save_event`, `ScannerService._save_event`). `_compute_diff(live, replay)` — pure; flags missing-in-replay and >5% metric deltas on `volume_ratio`/`gap_pct`. `run_replay_diff_for_scanner(scanner_type, scan_date, tickers, db)` — entry point: upserts `ScannerReplayDiff`, emits `markethawk_replay_drift_signals_total` counter, Seq log, and `notify_system` warning on drift. |
 
 ### Providers (`app/providers/`)
 
@@ -224,19 +236,20 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | File | Endpoints |
 |------|-----------|
 | `auth.py` | `GET /api/auth/status` (bootstrap check), `POST /api/auth/register` (first-user only), `POST /api/auth/login` (sets HttpOnly JWT cookies), `POST /api/auth/logout`, `POST /api/auth/refresh`, `GET /api/auth/me` |
-| `scanner.py` | `/api/v1/scanner/run`, `/api/v1/scanner/results` (eager-loads reviews, default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/v1/scanner/history`, `/api/v1/scanner/signal-quality-distribution`, `POST /api/v1/scanner/events/{uuid}/review` (submit verdict), `GET /api/v1/scanner/events/reviews?scanner_type=` (list with `liquidity_hunt` alias), `GET /api/v1/scanner/reviews/stats` (coverage, acceptance rate, by-type breakdown) |
-| `universe.py` | `/api/v1/universe/*` — CRUD for stock universes and memberships |
+| `scanner.py` | `/api/v1/scanner/run`, `/api/v1/scanner/results` (eager-loads reviews, default sort: `signal_quality_score DESC`; supports `start_date`/`end_date` filters), `/api/v1/scanner/history`, `/api/v1/scanner/signal-quality-distribution`, `POST /api/v1/scanner/events/{uuid}/review` (submit verdict), `GET /api/v1/scanner/events/reviews?scanner_type=` (list with `liquidity_hunt` alias), `GET /api/v1/scanner/reviews/stats` (coverage, acceptance rate, by-type breakdown), `GET /api/v1/scanner/replay-diffs?scanner_type=&days=30` (last N days of nightly replay-diff records, max days=90) |
+| `universe.py` | `/api/v1/universe/*` — CRUD for stock universes and memberships. `GET /api/v1/universe/{id}/data-health` — lightweight staleness/gap summary (5-min cache); returns `{degraded, stale_pct, gapped_pct, worst_staleness_hours, grade}`. |
+| `data_quality.py` | `POST /api/v1/data-quality/gate` — preflight data-quality gate; returns a `QualityGateAssessment` (trust tier + gap/staleness findings) for a universe before running a scan/backtest workflow, via `QualityGateService.assess()`. |
 | `stocks.py` | `/api/v1/stocks/*` — historical data, ticker search, stock details |
 | `news.py` | `/api/v1/news/*` — news articles and preferences |
 | `live_data.py` | `/api/v1/live/ws/{ticker}/{resolution}` — per-symbol WebSocket (shared fan-out via `websocket_manager`); `/api/v1/live/ws/watchlist` — watchlist-wide WebSocket (all symbols + alerts, shared fan-out); `/api/v1/live/ws/scan-task/{task_id}` — Celery task progress stream. All three endpoints enforce per-user/global connection caps, idle (5 min) and lifetime (8 h) timeouts, and Origin validation. |
 | `futures.py` | `/api/v1/futures/*` — `GET /history/{symbol}`, `GET /contracts/{symbol}`, `GET /rollovers/{symbol}`, `POST /download/{symbol}` (catalog refresh), `GET /providers` |
 | `journal.py` | `/api/v1/journal/*` — trade journal entries |
 | `watchlist.py` | `/api/v1/watchlist/*` — active watchlist CRUD (list, add, update notes, remove) |
-| `health.py` | `GET /api/health` — liveness probe; `GET /api/ready` — readiness probe (DB `SELECT 1` + Redis `PING`, HTTP 200/503 with per-probe latency; auth and rate-limit exempt; used by compose healthcheck and frontend `depends_on`) |
+| `health.py` | `GET /api/health` — liveness probe; `GET /api/ready` — readiness probe (DB `SELECT 1` + Redis `PING`, HTTP 200/503 with per-probe latency; auth and rate-limit exempt; used by compose healthcheck and frontend `depends_on`). Response also includes informational `live_data` field (IBKR socket probe) that does **not** affect the HTTP status — backend stays 200/ready during IBKR outages. |
 | `system.py` | `/api/v1/system/*` — configuration, status |
-| `outcomes.py` | `/api/v1/outcomes/*` — scorecard (`include_warnings`, `include_all` params; returns `gate_filter`/`gate_status` counts), intervals, distribution, edge decay, signals (each item carries `gate_tier`), event detail, backfill; `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
+| `outcomes.py` | `/api/v1/outcomes/*` — scorecard (`include_warnings`, `include_all`, `regime`, and `review_window_days` params; returns `gate_filter`/`gate_status` counts plus review-side fields: `precision_pct`, `review_coverage_pct`, `verdict_counts`, `top_reject_reasons`, `review_sample_n`), intervals, distribution, edge decay, signals (each item carries `gate_tier`), event detail, backfill; `GET /regime-breakdown/{scanner_type}` (per-regime win rate, avg MFE/MAE); `POST /analyze` (trigger analysis), `GET /correlations`, `GET /analysis/latest` |
 | `tweets.py` | `GET /api/v1/tweets/recent` — recent TweetSignals (filter by classification/promoted); `WS /api/v1/tweets/feed` — live WebSocket stream of all new tweet signals from Redis `tweet_signals:all` channel |
-| `alerts.py` | `GET /api/v1/alerts/stats` (dashboard header cards), `GET/POST /api/v1/alerts/rules` (list / create), `PATCH/DELETE /api/v1/alerts/rules/{id}`, `POST /api/v1/alerts/rules/{id}/test` (dry-run match against recent events), `GET /api/v1/alerts/logs` (delivery audit trail), `GET/POST /api/v1/alerts/push/vapid-key`, `GET /api/v1/alerts/push/generate-keys`, `POST /api/v1/alerts/push/subscribe`, `DELETE /api/v1/alerts/push/unsubscribe`, `POST /api/v1/alerts/infrastructure` (Grafana alerting webhook) |
+| `alerts.py` | `GET /api/v1/alerts/stats` (dashboard header cards), `GET/POST /api/v1/alerts/rules` (list / create), `PATCH/DELETE /api/v1/alerts/rules/{id}`, `POST /api/v1/alerts/rules/{id}/test` (dry-run match against recent events), `GET /api/v1/alerts/logs` (delivery audit trail), `GET/POST /api/v1/alerts/push/vapid-key`, `GET /api/v1/alerts/push/generate-keys`, `POST /api/v1/alerts/push/subscribe`, `DELETE /api/v1/alerts/push/unsubscribe`, `POST /api/v1/alerts/infrastructure` (Grafana alerting webhook), `POST /api/v1/alerts/system` (generic system notification — server-to-server; `X-Internal-Token` shared secret; 503 if `INTERNAL_API_TOKEN` unset, 401 on mismatch, 422 if `title`/`body` missing; CSRF-exempt) |
 | `auto_trading.py` | `GET/POST /api/v1/trading/strategies` (list / create), `GET/PATCH/DELETE /api/v1/trading/strategies/{id}`, `GET /api/v1/trading/orders` (list with status filter), `GET /api/v1/trading/orders/{id}`, `POST /api/v1/trading/orders/{id}/approve`, `POST /api/v1/trading/orders/{id}/reject`, `POST /api/v1/trading/orders/{id}/cancel`, `GET /api/v1/trading/account` (IBKR account summary), `GET /api/v1/trading/stats` (P&L, win rate, status breakdown), `GET/PATCH /api/v1/trading/config` |
 | `backtest.py` | `POST /api/v1/backtest/runs` (enqueue a new backtest run, HTTP 202), `GET /api/v1/backtest/runs` (list runs; filterable by scanner_type, strategy_id), `GET /api/v1/backtest/runs/{uuid}` (poll status + full trade list) |
 
@@ -245,8 +258,9 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | Model | Table | Purpose |
 |-------|-------|---------|
 | `ActiveWatchlist` | `active_watchlist` | Manually curated symbols under live observation. Soft limit: 50. Fields: `symbol`, `security_type` (STK/FUT), `exchange`, `notes`, `added_at`. |
-| `ScannerRun` | `scanner_runs` | One row per scan execution; stores timing, config snapshot, hit count |
-| `ScannerEvent` | `scanner_events` | One row per ticker that passed all criteria in a run. Carries `signal_quality_score` (Float, indexed DESC NULLS LAST) computed at write time by `signal_ranker.py`. Also written by the live scanner. |
+| `ScannerRun` | `scanner_runs` | One row per scan execution; stores timing, config snapshot, hit count. `data_degraded` (Boolean, nullable) — set at scan start from `UniverseQualityReport`; True when input data was stale/gapped. `quality_gate` (JSONB, nullable) — full `QualityGateAssessment` persisted at scan start for interactive `run_universe_scan` runs; null for nightly scheduled and live scanner runs. |
+| `ScannerEvent` | `scanner_events` | One row per ticker that passed all criteria in a run. Carries `signal_quality_score` (Float, indexed DESC NULLS LAST) computed at write time by `signal_ranker.py`. `regime` (String(30), nullable, indexed) — HMM regime label stamped at write time by `save_event()`. Also written by the live scanner. |
+| `RegimeModel` | `regime_models` | Persists serialised `GaussianHMM` artifacts from `RegimeService.train_and_persist()`. Fields: `version`, `status` (active\|archived), `n_states`, `model_b64` (base64+pickle), `feature_set`/`state_label_mapping` (JSONB), `data_start_date`/`data_end_date`, `bic_score`, `trained_at`. Composite index on `(status, version)`. |
 | `ScannerConfig` | `scanner_configs` | Saved scanner parameter sets. Carries `universe_id` FK (non-null, backfilled default 1) that drives scheduled beat tasks (`run_liquidity_hunt_scheduled`, `run_pocket_pivot_scheduled`); `parameters` JSONB holds scanner-specific knobs (lookback, price/volume floors). |
 | `StockUniverse` | `stock_universes` | Named groups of tickers (e.g., "Russell 2000 Small Caps") |
 | `StockUniverseTicker` | `stock_universe_tickers` | Universe membership records |
@@ -266,6 +280,7 @@ Domain-typed exceptions raised at service/provider public boundaries so callers 
 | `SignalAnalysisRun` | `signal_analysis_runs` | Anchor table for each statistical analysis execution; stores `correlation_matrix` and `feature_weights` as JSONB, status, event count |
 | `SignalCluster` | `signal_clusters` | One K-means cluster archetype per analysis run; stores centroid, return_profile (per-interval stats), event count, auto-generated label |
 | `SignalReview` | `signal_reviews` | User-submitted verdict (confirmed/rejected/enhanced/uncertain) on a `ScannerEvent`; FK → `scanner_events.id` CASCADE; supports `reject_reason` and `enhance_suggestion` JSONB. Written by `/validate-scanner` skill and frontend ReviewControls. Latest review exposed via `ScannerEvent.latest_review` @property. |
+| `ScannerReplayDiff` | `scanner_replay_diffs` | One nightly replay-diff record per (scanner_type, scan_date). Scalar columns: `status` (clean\|drift\|insufficient_data\|no_live_events), `has_drift`, counts. JSONB: `missing_in_replay`, `new_in_replay`, `metric_deltas`, `drift_kinds`. Unique on `(scanner_type, scan_date)`. |
 | `MonitoredAccount` | `monitored_accounts` | X (Twitter) accounts tracked by the tweet-monitor service. Stores `handle`, `platform`, `poll_interval_seconds`, `last_tweet_id` for dedup, and per-account `classification_config` JSONB for keyword overrides. |
 | `TweetSignal` | `tweet_signals` | One row per scraped tweet. Records `classification` (CALLOUT/CELEBRATION/UPDATE/RETWEET/UNKNOWN), `confidence` score, extracted `tickers`/`price_levels` JSONB, `direction`, and `promoted` flag. FK to `scanner_events` when promoted. |
 | `User` | `users` | Operator account. Fields: `id` (UUID PK), `username` (unique), `password_hash` (bcrypt), `created_at`, `is_active`. First user created via bootstrap endpoint; additional users blocked at the application layer. |
@@ -530,6 +545,9 @@ All custom metrics are registered in `app/core/metrics.py` and exported at `GET 
 | `http_request_duration_seconds` | Histogram | `method`, `handler` | `main.py` middleware |
 | `scanner_events_total` | Counter | `scanner_type` | `scanner.py`, `liquidity_hunt.py` |
 | `scan_duration_seconds` | Histogram | `scanner_type` | `scanner.py`, `liquidity_hunt.py` |
+| `scan_last_success_timestamp` | Gauge (`livemax`) | `scanner_type` | all scanner services |
+| `scan_data_to_detection_seconds` | Histogram | `scanner_type` | `pre_market_scan.py` |
+| `scan_failed_tickers_ratio` | Gauge (`livemax`) | `scanner_type` | all scanner services |
 | `polygon_api_calls_total` | Counter | `endpoint` | `providers/massive.py` |
 | `ibkr_connection_status` | Gauge | — | `providers/ibkr.py` |
 | `celery_tasks_total` | Counter | `task_name`, `status` | all task files |
@@ -538,13 +556,14 @@ All custom metrics are registered in `app/core/metrics.py` and exported at `GET 
 | `db_pool_size` | Gauge | — | `main.py` lifespan |
 | `db_pool_checked_out` | Gauge | — | `main.py` lifespan |
 | `db_pool_overflow` | Gauge | — | `main.py` lifespan |
+| `markethawk_replay_drift_signals_total` | Counter | `scanner_type`, `kind` | `replay_diff_service.py` |
 
 ### Grafana dashboards (`grafana/provisioning/dashboards/`)
 
 Four pre-provisioned dashboards load automatically from the `grafana/provisioning/` directory:
 
 - **API Overview** — request rate, error rate, P95 latency, WebSocket connections, DB pool
-- **Scanner Performance** — events/min per scanner type, scan durations, Polygon API call rate, IBKR status
+- **Scanner Performance** — events/min per scanner type, scan durations, Polygon API call rate, IBKR status; p95 duration vs. 120s SLO line, last-success age, bar-to-signal latency p50
 - **Celery Tasks** — success/failure rates and P95 duration per task
 - **Infrastructure** — IBKR status, DB pool utilization, WebSocket count
 

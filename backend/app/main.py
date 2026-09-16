@@ -31,12 +31,14 @@ from app.routers import (
     auth_router,
     auto_trading_router,
     backtest_router,
+    data_quality_router,
     futures_router,
     health_router,
     journal_router,
     live_data_router,
     news_router,
     outcomes_router,
+    replay_router,
     scanner_router,
     stocks_router,
     system_router,
@@ -49,7 +51,11 @@ from app.services.websocket_manager import websocket_manager
 # CSRF header check — module-level so it is importable by the test suite without
 # triggering the full create_app() factory. Pure ASGI (not BaseHTTPMiddleware) to
 # avoid the chunked-gzip termination bug described at the AuthMiddleware comment below.
-CSRF_EXEMPT_PREFIXES = ("/api/auth/", "/api/v1/alerts/infrastructure")
+CSRF_EXEMPT_PREFIXES = (
+    "/api/auth/",
+    "/api/v1/alerts/infrastructure",
+    "/api/v1/alerts/system",
+)
 CSRF_MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
@@ -185,6 +191,12 @@ def create_app() -> FastAPI:
     )
     logging.getLogger().addFilter(OtelTraceIdFilter())
 
+    # Redact known-secret patterns from every log record before it reaches Seq (F-LOG-01).
+    # Local import mirrors the instrument_fastapi pattern below — avoids a circular import.
+    from app.core.log_filters import install_redacting_filter
+
+    install_redacting_filter()
+
     # Centralized SQL Logging
     # Centralized SQL Logging
     if settings.LOG_LEVEL == "DEBUG":
@@ -277,6 +289,7 @@ def create_app() -> FastAPI:
         "/api/ready",
         "/metrics",
         "/api/v1/alerts/infrastructure",
+        "/api/v1/alerts/system",
     )
     _doc_prefixes = ("/docs", "/redoc", "/openapi.json")
     EXEMPT_PREFIXES = _base_exempt + (_doc_prefixes if settings.DOCS_ENABLED else ())
@@ -431,8 +444,10 @@ def create_app() -> FastAPI:
     app.include_router(watchlist_router)
     app.include_router(auto_trading_router)
     app.include_router(outcomes_router)
+    app.include_router(replay_router)
     app.include_router(tweets_router)
     app.include_router(backtest_router)
+    app.include_router(data_quality_router)
 
     # Populate scan_orchestrator registry — must be after router includes.
     # importlib avoids the local variable `app` shadowing the package name.
@@ -476,8 +491,12 @@ def create_app() -> FastAPI:
                 traceback.format_exception(type(exc), exc, exc.__traceback__)
             )
 
-            # Hash traceback to generate deterministic Error ID
-            error_hash = hashlib.md5(tb_string.encode("utf-8")).hexdigest()[:8]
+            # Hash traceback to generate a deterministic Error ID. Non-cryptographic
+            # use (error fingerprint only) — usedforsecurity=False keeps it legal
+            # under FIPS and documents intent for SAST.
+            error_hash = hashlib.md5(
+                tb_string.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()[:8]
             error_id = f"ERR-{error_hash}"
 
             # Send to Tracking System (Seq) - handled internally as background task

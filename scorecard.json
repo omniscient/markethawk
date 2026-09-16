@@ -1,51 +1,51 @@
 {
-  "generated_at": "2026-06-11T22:26:19.158457+00:00",
+  "generated_at": "2026-06-26T13:33:46.755710+00:00",
   "window": {
     "since": "2026-05-01",
-    "until": "2026-06-11"
+    "until": "2026-06-26"
   },
   "triad": {
-    "merged_clean": 99,
-    "merged_with_edits": 8,
-    "closed": 9,
-    "open": 2,
-    "merge_rate_pct": 92.2
+    "merged_clean": 151,
+    "merged_with_edits": 17,
+    "closed": 12,
+    "open": 0,
+    "merge_rate_pct": 93.3
   },
   "rework": {
-    "regression_count": 0,
-    "merged_factory_prs": 107,
-    "rework_rate_pct": 0.0
+    "regression_count": 28,
+    "merged_factory_prs": 168,
+    "rework_rate_pct": 16.7
   },
   "churn": {
-    "added_lines": 39724,
-    "surviving_lines": 34956,
-    "churn_pct": 12.0,
-    "commits_analyzed": 178,
-    "commits_too_young": 263
+    "added_lines": 163535,
+    "surviving_lines": 58280,
+    "churn_pct": 64.4,
+    "commits_analyzed": 538,
+    "commits_too_young": 128
   },
   "by_size": {
-    "S": {
-      "merged_clean": 22,
-      "merged_with_edits": 3,
-      "closed": 0,
-      "open": 1
-    },
-    "M": {
-      "merged_clean": 33,
-      "merged_with_edits": 3,
-      "closed": 0,
-      "open": 1
-    },
     "unknown": {
-      "merged_clean": 28,
+      "merged_clean": 48,
       "merged_with_edits": 2,
-      "closed": 8,
+      "closed": 10,
       "open": 0
     },
     "L": {
-      "merged_clean": 16,
-      "merged_with_edits": 0,
+      "merged_clean": 22,
+      "merged_with_edits": 3,
       "closed": 0,
+      "open": 0
+    },
+    "M": {
+      "merged_clean": 51,
+      "merged_with_edits": 8,
+      "closed": 0,
+      "open": 0
+    },
+    "S": {
+      "merged_clean": 30,
+      "merged_with_edits": 4,
+      "closed": 1,
       "open": 0
     },
     "XL": {
@@ -987,18 +987,514 @@
     {
       "number": 342,
       "title": "Implement trend_pullback daily scanner (trend-following pullback signals)",
-      "classification": "open",
+      "classification": "merged_clean",
       "issue": 299,
       "size": "M",
-      "merged_at": null
+      "merged_at": "2026-06-11T23:47:22Z"
     },
     {
       "number": 344,
       "title": "[dark-factory] Guard against OR-join trigger_rule regressions in the workflow DAG",
-      "classification": "open",
+      "classification": "merged_clean",
       "issue": 224,
       "size": "S",
+      "merged_at": "2026-06-11T23:48:18Z"
+    },
+    {
+      "number": 348,
+      "title": "[arch-v3][MED] Stage run_pre_market_scan into detect/enrich/persist pipeline (346-line function)",
+      "classification": "merged_clean",
+      "issue": 288,
+      "size": "unknown",
+      "merged_at": "2026-06-12T11:22:58Z"
+    },
+    {
+      "number": 351,
+      "title": "[arch-v3][MED] Add readiness probe (DB/Redis) + migration gate in deploy path",
+      "classification": "merged_clean",
+      "issue": 289,
+      "size": "unknown",
+      "merged_at": "2026-06-12T09:43:20Z"
+    },
+    {
+      "number": 352,
+      "title": "feat(infra): run backend container as non-root appuser (#258)",
+      "classification": "closed",
+      "issue": 258,
+      "size": "unknown",
       "merged_at": null
+    },
+    {
+      "number": 353,
+      "title": "[arch-v3][MED] Tweet-monitor cookie auth: expiry alerting or official API (3 reviews unticketed)",
+      "classification": "merged_clean",
+      "issue": 290,
+      "size": "unknown",
+      "merged_at": "2026-06-12T09:54:52Z"
+    },
+    {
+      "number": 354,
+      "title": "Baseline-green gate: smoke origin/main before any factory run",
+      "classification": "merged_clean",
+      "issue": 332,
+      "size": "S",
+      "merged_at": "2026-06-12T09:47:49Z"
+    },
+    {
+      "number": 356,
+      "title": "Run Record: one structured per-run record of every stage verdict (gen_ai.* to Seq + runs.jsonl)",
+      "classification": "merged_clean",
+      "issue": 333,
+      "size": "M",
+      "merged_at": "2026-06-12T09:57:36Z"
+    },
+    {
+      "number": 357,
+      "title": "Deepen the Gate seam: layered gate policy, judge calibration audit, blast-radius human gate",
+      "classification": "merged_clean",
+      "issue": 334,
+      "size": "L",
+      "merged_at": "2026-06-12T10:00:07Z"
+    },
+    {
+      "number": 358,
+      "title": "Failure-to-eval flywheel: post-mortem stage on circuit-break, failures become eval tasks",
+      "classification": "merged_clean",
+      "issue": 336,
+      "size": "M",
+      "merged_at": "2026-06-12T15:14:27Z"
+    },
+    {
+      "number": 359,
+      "title": "Replay benchmark: pass^k suite of replayed closed issues to regression-test the harness",
+      "classification": "merged_clean",
+      "issue": 335,
+      "size": "L",
+      "merged_at": "2026-06-12T14:54:50Z"
+    },
+    {
+      "number": 367,
+      "title": "[arch-v3][LOW] SQL aggregates in get_trade_stats + selectinload pagination fix",
+      "classification": "merged_clean",
+      "issue": 291,
+      "size": "unknown",
+      "merged_at": "2026-06-12T15:15:06Z"
+    },
+    {
+      "number": 399,
+      "title": "test(frontend): scope-correct PageLoader tests (not in spec #250)",
+      "classification": "closed",
+      "issue": 311,
+      "size": "unknown",
+      "merged_at": null
+    },
+    {
+      "number": 400,
+      "title": "test(frontend): scope-correct ScorecardDetail tests (spec #250 non-goal)",
+      "classification": "merged_clean",
+      "issue": 309,
+      "size": "unknown",
+      "merged_at": "2026-06-12T20:45:15Z"
+    },
+    {
+      "number": 401,
+      "title": "Implement automated database backups with retention",
+      "classification": "merged_clean",
+      "issue": 90,
+      "size": "M",
+      "merged_at": "2026-06-12T20:54:23Z"
+    },
+    {
+      "number": 405,
+      "title": "test(frontend): scope-correct AlertBadges tests (not in spec #250)",
+      "classification": "merged_clean",
+      "issue": 313,
+      "size": "unknown",
+      "merged_at": "2026-06-13T03:04:07Z"
+    },
+    {
+      "number": 406,
+      "title": "test(frontend): scope-correct ActiveWatchlist tests (not in spec #250)",
+      "classification": "merged_clean",
+      "issue": 312,
+      "size": "unknown",
+      "merged_at": "2026-06-13T03:03:30Z"
+    },
+    {
+      "number": 407,
+      "title": "test(frontend): scope-correct PreMarketMovers tests (not in spec #250)",
+      "classification": "merged_clean",
+      "issue": 314,
+      "size": "unknown",
+      "merged_at": "2026-06-13T03:20:32Z"
+    },
+    {
+      "number": 408,
+      "title": "test(frontend): scope-correct ScorecardOverview tests (not in spec #250)",
+      "classification": "merged_clean",
+      "issue": 315,
+      "size": "unknown",
+      "merged_at": "2026-06-13T03:21:15Z"
+    },
+    {
+      "number": 409,
+      "title": "test(frontend): scope-correct Settings tests (not in spec #250)",
+      "classification": "merged_clean",
+      "issue": 316,
+      "size": "unknown",
+      "merged_at": "2026-06-13T03:05:02Z"
+    },
+    {
+      "number": 410,
+      "title": "[security] F-AUTH-01: Swagger/openapi.json/metrics unauthenticated in production",
+      "classification": "merged_clean",
+      "issue": 369,
+      "size": "S",
+      "merged_at": "2026-06-13T03:33:40Z"
+    },
+    {
+      "number": 411,
+      "title": "feat(infra): run dark-factory container as non-root factory user",
+      "classification": "merged_clean",
+      "issue": 261,
+      "size": "unknown",
+      "merged_at": "2026-06-13T03:01:46Z"
+    },
+    {
+      "number": 412,
+      "title": "[arch-v3][LOW] Make Trivy block on HIGH/CRITICAL + add password min-length policy",
+      "classification": "merged_with_edits",
+      "issue": 293,
+      "size": "S",
+      "merged_at": "2026-06-13T03:21:45Z"
+    },
+    {
+      "number": 413,
+      "title": "feat(infra): run frontend container as non-root node user",
+      "classification": "merged_clean",
+      "issue": 259,
+      "size": "unknown",
+      "merged_at": "2026-06-13T13:36:49Z"
+    },
+    {
+      "number": 414,
+      "title": "test-infra: add postgres discovery fallback when testcontainers exec is blocked",
+      "classification": "merged_clean",
+      "issue": 360,
+      "size": "unknown",
+      "merged_at": "2026-06-13T19:38:20Z"
+    },
+    {
+      "number": 415,
+      "title": "[security] F-NET-01: Redis has no authentication (requirepass unset)",
+      "classification": "merged_with_edits",
+      "issue": 370,
+      "size": "M",
+      "merged_at": "2026-06-15T17:41:34Z"
+    },
+    {
+      "number": 416,
+      "title": "[arch-v3][LOW] Validate JSONB writes + enforce severity enum + channel_config schema",
+      "classification": "merged_with_edits",
+      "issue": 292,
+      "size": "M",
+      "merged_at": "2026-06-14T14:57:06Z"
+    },
+    {
+      "number": 417,
+      "title": "[arch-v3][LOW] Decompose frontend god files: api/scanner.ts (787) + QualityReportModal.tsx (753)",
+      "classification": "merged_clean",
+      "issue": 294,
+      "size": "M",
+      "merged_at": "2026-06-13T17:22:20Z"
+    },
+    {
+      "number": 418,
+      "title": "Update ARCHITECTURE.md to document /api/ready readiness endpoint",
+      "classification": "merged_clean",
+      "issue": 350,
+      "size": "unknown",
+      "merged_at": "2026-06-13T09:40:52Z"
+    },
+    {
+      "number": 420,
+      "title": "Single config interface: config.yaml as sole source of factory policy",
+      "classification": "merged_clean",
+      "issue": 338,
+      "size": "S",
+      "merged_at": "2026-06-13T09:39:39Z"
+    },
+    {
+      "number": 422,
+      "title": "factory: dedupe scope-enforcement findings before filing tickets",
+      "classification": "merged_clean",
+      "issue": 384,
+      "size": "M",
+      "merged_at": "2026-06-13T13:35:34Z"
+    },
+    {
+      "number": 423,
+      "title": "[security] F-FRONT-01: External-content URLs without allowlist; no CSP",
+      "classification": "merged_with_edits",
+      "issue": 381,
+      "size": "M",
+      "merged_at": "2026-06-13T18:47:29Z"
+    },
+    {
+      "number": 437,
+      "title": "Extract tested factory core from entrypoint/scheduler/de-conflict bash glue",
+      "classification": "merged_with_edits",
+      "issue": 337,
+      "size": "L",
+      "merged_at": "2026-06-13T18:56:15Z"
+    },
+    {
+      "number": 447,
+      "title": "Backtest harness core: daily-bar replay of TradingStrategy vs scan signals",
+      "classification": "merged_with_edits",
+      "issue": 301,
+      "size": "L",
+      "merged_at": "2026-06-14T15:27:39Z"
+    },
+    {
+      "number": 505,
+      "title": "ci: lint .archon/workflows when: expressions against Archon grammar",
+      "classification": "merged_clean",
+      "issue": 403,
+      "size": "S",
+      "merged_at": "2026-06-14T14:56:22Z"
+    },
+    {
+      "number": 510,
+      "title": "Plan stage implemented the full feature on the refine branch (#339) instead of stopping at the plan",
+      "classification": "merged_clean",
+      "issue": 390,
+      "size": "M",
+      "merged_at": "2026-06-14T20:16:22Z"
+    },
+    {
+      "number": 511,
+      "title": "test(frontend): quality-pass the 7 OOS test files from #250 (executes epic #383 decision)",
+      "classification": "merged_clean",
+      "issue": 396,
+      "size": "M",
+      "merged_at": "2026-06-14T20:06:46Z"
+    },
+    {
+      "number": 512,
+      "title": "observability: pre-market scan latency SLO \u2014 metrics + missed-slot alerts",
+      "classification": "merged_with_edits",
+      "issue": 391,
+      "size": "M",
+      "merged_at": "2026-06-15T12:11:57Z"
+    },
+    {
+      "number": 513,
+      "title": "[security] F-DOCKER-01: socket-proxy BUILD/POST + preview compose weak creds",
+      "classification": "merged_clean",
+      "issue": 379,
+      "size": "M",
+      "merged_at": "2026-06-15T01:13:28Z"
+    },
+    {
+      "number": 514,
+      "title": "[security] F-WS-01: WebSocket resource exhaustion (no conn/msg caps, per-conn pubsub)",
+      "classification": "merged_clean",
+      "issue": 377,
+      "size": "M",
+      "merged_at": "2026-06-15T01:14:26Z"
+    },
+    {
+      "number": 515,
+      "title": "feat: HMM regime detection stamps and filters scanner events (#106)",
+      "classification": "merged_with_edits",
+      "issue": 106,
+      "size": "L",
+      "merged_at": "2026-06-15T15:30:38Z"
+    },
+    {
+      "number": 519,
+      "title": "Preview env fails on every implement run: BuildKit 403 through docker-socket-proxy (+ EXEC:0 second wall)",
+      "classification": "merged_clean",
+      "issue": 436,
+      "size": "M",
+      "merged_at": "2026-06-15T01:32:01Z"
+    },
+    {
+      "number": 520,
+      "title": "Exclude untrusted events from trusted Scorecard metrics",
+      "classification": "merged_clean",
+      "issue": 497,
+      "size": "M",
+      "merged_at": "2026-06-15T01:33:16Z"
+    },
+    {
+      "number": 524,
+      "title": "Scheduler dependencies_met() strands issues whose dependency is closed but off-board",
+      "classification": "merged_clean",
+      "issue": 389,
+      "size": "S",
+      "merged_at": "2026-06-15T12:54:30Z"
+    },
+    {
+      "number": 562,
+      "title": "docs(docker): document root-user exception in Dockerfile.forecast",
+      "classification": "merged_clean",
+      "issue": 329,
+      "size": "unknown",
+      "merged_at": "2026-06-20T03:53:45Z"
+    },
+    {
+      "number": 563,
+      "title": "enhance(pg_discovery): guard isinstance(containers, list) on Docker API response",
+      "classification": "merged_clean",
+      "issue": 429,
+      "size": "unknown",
+      "merged_at": "2026-06-20T11:05:17Z"
+    },
+    {
+      "number": 565,
+      "title": "cleanup(dark-factory): factory-failures.jsonl accumulates OOS telemetry entries on feature branches",
+      "classification": "merged_clean",
+      "issue": 431,
+      "size": "unknown",
+      "merged_at": "2026-06-20T11:06:24Z"
+    },
+    {
+      "number": 566,
+      "title": "docs(architecture): ARCHITECTURE.md buildkit subgraph should be tracked as in-scope doc for #436",
+      "classification": "merged_clean",
+      "issue": 516,
+      "size": "unknown",
+      "merged_at": "2026-06-20T11:07:27Z"
+    },
+    {
+      "number": 567,
+      "title": "chore(codeindex): docs/codeindex-hotspots.md OOS line-count refreshes committed on feature branches",
+      "classification": "merged_clean",
+      "issue": 561,
+      "size": "unknown",
+      "merged_at": "2026-06-20T11:09:06Z"
+    },
+    {
+      "number": 568,
+      "title": "fix(dark-factory): unparseable when: fails the run loudly \u2014 pin Archon f83fb556 (#402)",
+      "classification": "merged_clean",
+      "issue": 402,
+      "size": "S",
+      "merged_at": "2026-06-20T14:50:51Z"
+    },
+    {
+      "number": 572,
+      "title": "feat(backtest): 5-scanner x strategy comparison run (#302)",
+      "classification": "merged_clean",
+      "issue": 302,
+      "size": "M",
+      "merged_at": "2026-06-20T14:53:09Z"
+    },
+    {
+      "number": 575,
+      "title": "Revisit dispatch ceiling (C9) \u2014 re-measure success-by-size/type",
+      "classification": "merged_clean",
+      "issue": 355,
+      "size": "M",
+      "merged_at": "2026-06-20T16:45:37Z"
+    },
+    {
+      "number": 580,
+      "title": "Outcome dashboard: per-scanner ScannerOutcomeSummary aggregates in UI",
+      "classification": "merged_clean",
+      "issue": 303,
+      "size": "M",
+      "merged_at": "2026-06-21T03:54:32Z"
+    },
+    {
+      "number": 583,
+      "title": "feat(notifications): generic system-notification path (email/push) for non-scanner events",
+      "classification": "closed",
+      "issue": 570,
+      "size": "S",
+      "merged_at": null
+    },
+    {
+      "number": 586,
+      "title": "Expose data quality gate preflight API",
+      "classification": "merged_clean",
+      "issue": 493,
+      "size": "M",
+      "merged_at": "2026-06-21T19:52:10Z"
+    },
+    {
+      "number": 589,
+      "title": "Revisit dispatch ceiling (C9) - re-measure success-by-size/type",
+      "classification": "merged_clean",
+      "issue": 394,
+      "size": "S",
+      "merged_at": "2026-06-21T19:53:18Z"
+    },
+    {
+      "number": 593,
+      "title": "data-quality: gap/staleness detection on aggregates + corporate-action handling",
+      "classification": "merged_clean",
+      "issue": 387,
+      "size": "L",
+      "merged_at": "2026-06-21T19:55:03Z"
+    },
+    {
+      "number": 597,
+      "title": "Add reusable data quality gate contract and service",
+      "classification": "merged_clean",
+      "issue": 492,
+      "size": "L",
+      "merged_at": "2026-06-21T21:15:32Z"
+    },
+    {
+      "number": 598,
+      "title": "scanner: nightly replay-diff \u2014 re-run yesterday's scans and diff vs live signals",
+      "classification": "merged_with_edits",
+      "issue": 392,
+      "size": "M",
+      "merged_at": "2026-06-22T13:03:31Z"
+    },
+    {
+      "number": 599,
+      "title": "feat: weekly restore drill \u2014 verify backups via throwaway postgres (#386)",
+      "classification": "merged_clean",
+      "issue": 386,
+      "size": "M",
+      "merged_at": "2026-06-22T02:00:02Z"
+    },
+    {
+      "number": 600,
+      "title": "chaos: IBKR gateway kill-test \u2014 verify live-scanner degradation and recovery",
+      "classification": "merged_clean",
+      "issue": 393,
+      "size": "M",
+      "merged_at": "2026-06-22T01:57:14Z"
+    },
+    {
+      "number": 603,
+      "title": "feat: apply advisory data quality gate to scanner runs (#494)",
+      "classification": "merged_clean",
+      "issue": 494,
+      "size": "L",
+      "merged_at": "2026-06-22T11:44:04Z"
+    },
+    {
+      "number": 604,
+      "title": "Show data quality trust status in scanner and quality UI",
+      "classification": "merged_clean",
+      "issue": 495,
+      "size": "L",
+      "merged_at": "2026-06-22T11:44:23Z"
+    },
+    {
+      "number": 605,
+      "title": "cleanup(dark-factory): orphaned seed files in dark-factory/seed/seed/ from prior failed run",
+      "classification": "merged_clean",
+      "issue": 518,
+      "size": "unknown",
+      "merged_at": "2026-06-22T11:44:17Z"
     }
   ]
 }

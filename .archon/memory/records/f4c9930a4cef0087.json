@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-10",
+      "evidence_tag": null,
+      "issue": 250,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-10",
+  "id": "f4c9930a4cef0087",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "Coverage threshold formula (issue #250 ratchet series): `floor(actual) - 3`, clamped to min 30 for statements/lines and 22 for branches/functions. Run `npx vitest run --coverage` to get actuals; update `frontend/vitest.config.ts` thresholds block. CI gate = threshold \u2264 actual, so if clamped threshold exceeds actual, add more tests first.",
+  "superseded_by": null,
+  "supersedes": []
+}

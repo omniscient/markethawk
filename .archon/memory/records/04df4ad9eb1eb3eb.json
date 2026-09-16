@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-13",
+      "evidence_tag": "test-output",
+      "issue": 312,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-13",
+  "id": "04df4ad9eb1eb3eb",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "When asserting absence of a CSS class (e.g. `text-positive`) in a `WatchlistRow` test, choose a live-data fixture whose other cells (`SessionCell` for `regular` also uses `text-positive`) do not share that class \u2014 or scope the query: `container.querySelector('td:nth-child(2) span.text-positive')`.",
+  "superseded_by": null,
+  "supersedes": []
+}
