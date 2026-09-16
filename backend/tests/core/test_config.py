@@ -99,3 +99,21 @@ def test_redis_url_password_special_chars_are_encoded():
     s = Settings(REDIS_PASSWORD=password)
     assert "%40%3A" in s.REDIS_URL
     assert f":{password}@" not in s.REDIS_URL
+
+
+def test_extension_modules_parses_comma_separated_string(monkeypatch):
+    monkeypatch.setenv("MARKETHAWK_EXTENSION_MODULES", "a, b,,c")
+    s = Settings(_env_file=None)
+    assert s.MARKETHAWK_EXTENSION_MODULES == ["a", "b", "c"]
+
+
+def test_extension_modules_empty_string_yields_empty_list(monkeypatch):
+    monkeypatch.setenv("MARKETHAWK_EXTENSION_MODULES", "")
+    s = Settings(_env_file=None)
+    assert s.MARKETHAWK_EXTENSION_MODULES == []
+
+
+def test_extension_modules_unset_yields_empty_list(monkeypatch):
+    monkeypatch.delenv("MARKETHAWK_EXTENSION_MODULES", raising=False)
+    s = Settings(_env_file=None)
+    assert s.MARKETHAWK_EXTENSION_MODULES == []
