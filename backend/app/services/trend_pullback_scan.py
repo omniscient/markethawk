@@ -37,7 +37,7 @@ _LOG = logging.getLogger(__name__)
 
 _LOOKBACK_DAYS = 300  # bars fetched; 252 needed + buffer
 
-DEFAULT_CONFIG: dict[str, Any] = {
+_DEFAULT_PARAMS: dict[str, Any] = {
     "trend_sma_fast": 50,
     "trend_sma_slow": 200,
     "sma_rising_lookback": 20,
@@ -290,7 +290,7 @@ async def run_trend_pullback_scan(
         elif end_date is None:
             end_date = start_date
 
-        cfg: dict[str, Any] = {**DEFAULT_CONFIG, **(config or {})}
+        cfg: dict[str, Any] = {**_DEFAULT_PARAMS, **(config or {})}
 
         results: list[dict[str, Any]] = []
         counts = {
@@ -451,5 +451,7 @@ register(
         ),
         run=_orchestrator_run,
         supports_date_range=True,
+        asset_classes=("stocks",),
+        default_parameters=_DEFAULT_PARAMS,
     )
 )

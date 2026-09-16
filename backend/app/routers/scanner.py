@@ -90,6 +90,8 @@ def list_scanner_types():
             "display_name": d.display_name,
             "description": d.description,
             "supports_date_range": d.supports_date_range,
+            "asset_classes": list(d.asset_classes),
+            "default_parameters": dict(d.default_parameters),
         }
         for d in get_all()
     ]

@@ -39,7 +39,7 @@ from app.utils.time import to_utc_naive
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
 
-DEFAULT_CONFIG: dict[str, Any] = {
+_DEFAULT_PARAMS: dict[str, Any] = {
     "lookback_days": 10,
     "min_lookback_days": 5,
     "price_floor": 5.00,
@@ -193,7 +193,7 @@ async def run_pocket_pivot_scan(
         elif end_date is None:
             end_date = start_date
 
-        cfg: dict[str, Any] = {**DEFAULT_CONFIG, **(config or {})}
+        cfg: dict[str, Any] = {**_DEFAULT_PARAMS, **(config or {})}
         lookback_days: int = int(cfg["lookback_days"])
         min_lookback_days: int = int(cfg["min_lookback_days"])
         price_floor: float = float(cfg["price_floor"])
@@ -441,5 +441,7 @@ register(
         ),
         run=_orchestrator_run,
         supports_date_range=True,
+        asset_classes=("stocks",),
+        default_parameters=_DEFAULT_PARAMS,
     )
 )

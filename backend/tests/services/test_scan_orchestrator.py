@@ -4,24 +4,31 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+import app.services.liquidity_hunt  # noqa: F401 — self-registers at import time
+import app.services.oversold_bounce_scan  # noqa: F401
+import app.services.pocket_pivot  # noqa: F401
+import app.services.pre_market_scan  # noqa: F401
 import app.services.scan_orchestrator as orchestrator
+import app.services.trend_pullback_scan  # noqa: F401
+from app.exceptions import ExtensionDuplicateError
 from app.services.scan_orchestrator import ScannerDescriptor, get_all, register, run
 
 
 @pytest.fixture(autouse=True)
 def isolated_registry():
-    original = dict(orchestrator._REGISTRY)
+    original = orchestrator._REGISTRY.get_all()
     yield
     orchestrator._REGISTRY.clear()
-    orchestrator._REGISTRY.update(original)
+    for desc in original:
+        orchestrator._REGISTRY.register(desc, replace=True)
 
 
 def test_register_adds_descriptor():
     fn = AsyncMock(return_value=[])
     desc = ScannerDescriptor(key="test", display_name="Test", description="d", run=fn)
     register(desc)
-    assert "test" in orchestrator._REGISTRY
-    assert orchestrator._REGISTRY["test"] is desc
+    assert orchestrator._REGISTRY.get("test") is not None
+    assert orchestrator._REGISTRY.get("test") is desc
 
 
 def test_get_all_includes_registered():
@@ -45,8 +52,15 @@ def test_run_dispatches_to_registered_fn():
 
 
 def test_run_raises_for_unknown_type():
-    with pytest.raises(ValueError, match="Unknown scanner type: 'does_not_exist'"):
+    fn = AsyncMock(return_value=[])
+    register(
+        ScannerDescriptor(key="known_key", display_name="K", description="d", run=fn)
+    )
+    with pytest.raises(
+        ValueError, match="Unknown scanner type: 'does_not_exist'"
+    ) as exc_info:
         asyncio.run(run("does_not_exist", [], db=None, event_date=date.today()))
+    assert "known_key" in str(exc_info.value)
 
 
 def test_scanner_descriptor_is_frozen():
@@ -63,11 +77,43 @@ def test_register_returns_descriptor():
     assert returned is desc
 
 
+def test_descriptor_new_fields_default():
+    fn = AsyncMock(return_value=[])
+    desc = ScannerDescriptor(
+        key="defaults_test", display_name="D", description="d", run=fn
+    )
+    assert desc.asset_classes == ("stocks",)
+    assert desc.default_parameters == {}
+
+
+def test_duplicate_key_raises_without_replace():
+    fn = AsyncMock(return_value=[])
+    register(
+        ScannerDescriptor(key="dup_test", display_name="A", description="d", run=fn)
+    )
+    with pytest.raises(ExtensionDuplicateError):
+        register(
+            ScannerDescriptor(key="dup_test", display_name="B", description="d", run=fn)
+        )
+
+
+def test_duplicate_key_with_replace_succeeds():
+    fn = AsyncMock(return_value=[])
+    register(
+        ScannerDescriptor(key="replace_test", display_name="A", description="d", run=fn)
+    )
+    replacement = ScannerDescriptor(
+        key="replace_test", display_name="B", description="d", run=fn
+    )
+    register(replacement, replace=True)
+    assert orchestrator._REGISTRY.get("replace_test") is replacement
+
+
 def test_pre_market_scanner_registered():
     import app.services.pre_market_scan  # noqa: F401
 
-    assert "pre_market_volume_spike" in orchestrator._REGISTRY
-    desc = orchestrator._REGISTRY["pre_market_volume_spike"]
+    desc = orchestrator._REGISTRY.get("pre_market_volume_spike")
+    assert desc is not None
     assert desc.display_name == "Pre-Market Volume Spike"
     assert desc.supports_date_range is True
 
@@ -75,8 +121,8 @@ def test_pre_market_scanner_registered():
 def test_oversold_bounce_scanner_registered():
     import app.services.oversold_bounce_scan  # noqa: F401
 
-    assert "oversold_bounce" in orchestrator._REGISTRY
-    desc = orchestrator._REGISTRY["oversold_bounce"]
+    desc = orchestrator._REGISTRY.get("oversold_bounce")
+    assert desc is not None
     assert desc.display_name == "Oversold Bounce"
     assert desc.supports_date_range is True
 
@@ -85,7 +131,111 @@ def test_liquidity_hunt_variants_registered():
     import app.services.liquidity_hunt  # noqa: F401
 
     for key in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
-        assert key in orchestrator._REGISTRY, f"Expected {key!r} in registry"
+        assert orchestrator._REGISTRY.get(key) is not None, (
+            f"Expected {key!r} in registry"
+        )
+
+
+def test_built_in_scanners_register_seven_keys_with_metadata():
+    from app.services.liquidity_hunt import DEFAULT_CONFIG as LIQUIDITY_HUNT_PARAMS
+    from app.services.pocket_pivot import _DEFAULT_PARAMS as POCKET_PIVOT_PARAMS
+    from app.services.trend_pullback_scan import (
+        _DEFAULT_PARAMS as TREND_PULLBACK_PARAMS,
+    )
+
+    expected_keys = {
+        "pre_market_volume_spike",
+        "oversold_bounce",
+        "liquidity_hunt",
+        "liquidity_hunt_pre",
+        "liquidity_hunt_post",
+        "pocket_pivot",
+        "trend_pullback",
+    }
+    all_descriptors = {d.key: d for d in get_all()}
+    assert expected_keys <= set(all_descriptors)
+
+    for key in expected_keys:
+        assert all_descriptors[key].asset_classes == ("stocks",), key
+
+    assert all_descriptors["pocket_pivot"].default_parameters == POCKET_PIVOT_PARAMS
+    assert all_descriptors["pocket_pivot"].default_parameters["lookback_days"] == 10
+    assert all_descriptors["trend_pullback"].default_parameters == TREND_PULLBACK_PARAMS
+    assert all_descriptors["trend_pullback"].default_parameters["trend_sma_fast"] == 50
+    for key in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
+        assert all_descriptors[key].default_parameters == LIQUIDITY_HUNT_PARAMS
+    assert (
+        all_descriptors["liquidity_hunt"].default_parameters["volume_ratio_min"] == 4.0
+    )
+    assert all_descriptors["oversold_bounce"].default_parameters == {}
+    assert all_descriptors["pre_market_volume_spike"].default_parameters == {}
+
+
+import json
+import sys
+
+from app.core.extensions import load_extension_modules
+
+
+@pytest.fixture
+def fake_scanner_package(tmp_path, monkeypatch):
+    """Write a temp package to sys.path so importlib genuinely executes its body
+    (mirrors app.core.extensions' own test fixture in test_extensions.py)."""
+    created_names = []
+
+    def _write(name: str, body: str) -> None:
+        package_dir = tmp_path / name
+        package_dir.mkdir()
+        (package_dir / "__init__.py").write_text(body)
+        monkeypatch.syspath_prepend(str(tmp_path))
+        created_names.append(name)
+
+    yield _write
+
+    for name in created_names:
+        sys.modules.pop(name, None)
+
+
+def test_private_module_registers_and_runs_through_loader(
+    tmp_path, fake_scanner_package
+):
+    call_log = tmp_path / "call_log.json"
+    fake_scanner_package(
+        "fake_private_scanner_ext",
+        "import json\n"
+        "from pathlib import Path\n"
+        "from app.services.scan_orchestrator import ScannerDescriptor, register\n"
+        "\n"
+        "async def _run(tickers, db, event_date, scanner_run=None, gate_metadata=None):\n"
+        f"    Path(r'{call_log}').write_text(json.dumps({{\n"
+        "        'tickers': tickers, 'event_date': str(event_date),\n"
+        "        'scanner_run': scanner_run, 'gate_metadata': gate_metadata,\n"
+        "    }))\n"
+        "    return [{'ticker': tickers[0]}]\n"
+        "\n"
+        "register(ScannerDescriptor(\n"
+        "    key='private_test_scanner',\n"
+        "    display_name='Private Test Scanner',\n"
+        "    description='d',\n"
+        "    run=_run,\n"
+        "    asset_classes=('stocks',),\n"
+        "    default_parameters={'threshold': 1.0},\n"
+        "))\n",
+    )
+
+    load_extension_modules(["fake_private_scanner_ext"])
+
+    today = date(2026, 5, 23)
+    result = asyncio.run(
+        run("private_test_scanner", ["AAPL"], db=None, event_date=today)
+    )
+    assert result == [{"ticker": "AAPL"}]
+    assert json.loads(call_log.read_text()) == {
+        "tickers": ["AAPL"],
+        "event_date": "2026-05-23",
+        "scanner_run": None,
+        "gate_metadata": None,
+    }
 
 
 # ── New orchestration functions ────────────────────────────────────────────
