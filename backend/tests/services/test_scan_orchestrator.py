@@ -171,6 +171,73 @@ def test_built_in_scanners_register_seven_keys_with_metadata():
     assert all_descriptors["pre_market_volume_spike"].default_parameters == {}
 
 
+import json
+import sys
+
+from app.core.extensions import load_extension_modules
+
+
+@pytest.fixture
+def fake_scanner_package(tmp_path, monkeypatch):
+    """Write a temp package to sys.path so importlib genuinely executes its body
+    (mirrors app.core.extensions' own test fixture in test_extensions.py)."""
+    created_names = []
+
+    def _write(name: str, body: str) -> None:
+        package_dir = tmp_path / name
+        package_dir.mkdir()
+        (package_dir / "__init__.py").write_text(body)
+        monkeypatch.syspath_prepend(str(tmp_path))
+        created_names.append(name)
+
+    yield _write
+
+    for name in created_names:
+        sys.modules.pop(name, None)
+
+
+def test_private_module_registers_and_runs_through_loader(
+    tmp_path, fake_scanner_package
+):
+    call_log = tmp_path / "call_log.json"
+    fake_scanner_package(
+        "fake_private_scanner_ext",
+        "import json\n"
+        "from pathlib import Path\n"
+        "from app.services.scan_orchestrator import ScannerDescriptor, register\n"
+        "\n"
+        "async def _run(tickers, db, event_date, scanner_run=None, gate_metadata=None):\n"
+        f"    Path(r'{call_log}').write_text(json.dumps({{\n"
+        "        'tickers': tickers, 'event_date': str(event_date),\n"
+        "        'scanner_run': scanner_run, 'gate_metadata': gate_metadata,\n"
+        "    }))\n"
+        "    return [{'ticker': tickers[0]}]\n"
+        "\n"
+        "register(ScannerDescriptor(\n"
+        "    key='private_test_scanner',\n"
+        "    display_name='Private Test Scanner',\n"
+        "    description='d',\n"
+        "    run=_run,\n"
+        "    asset_classes=('stocks',),\n"
+        "    default_parameters={'threshold': 1.0},\n"
+        "))\n",
+    )
+
+    load_extension_modules(["fake_private_scanner_ext"])
+
+    today = date(2026, 5, 23)
+    result = asyncio.run(
+        run("private_test_scanner", ["AAPL"], db=None, event_date=today)
+    )
+    assert result == [{"ticker": "AAPL"}]
+    assert json.loads(call_log.read_text()) == {
+        "tickers": ["AAPL"],
+        "event_date": "2026-05-23",
+        "scanner_run": None,
+        "gate_metadata": None,
+    }
+
+
 # ── New orchestration functions ────────────────────────────────────────────
 
 from unittest.mock import patch
