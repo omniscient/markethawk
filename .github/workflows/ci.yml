@@ -184,9 +184,22 @@ jobs:
           sys.path.insert(0, '_dark-factory/scripts')
           from factory_core import adapter, adapter_defaults
           merged = adapter.load('$GITHUB_WORKSPACE')
+          # OD1 (#848): list-valued safety keys may be a local SUPERSET of the factory
+          # defaults (hardening added by #808); removals and any other drift still fail.
           for key in ('components', 'safety', 'memory_routing', 'deconflict'):
-              assert merged[key] == adapter_defaults.DEFAULTS[key], f'MIRROR DRIFT in {key}'
-          print('MIRROR-EQUAL')"
+              want, got = adapter_defaults.DEFAULTS[key], merged[key]
+              if key == 'safety' and isinstance(want, dict) and isinstance(got, dict):
+                  assert set(got) >= set(want), f'MIRROR DRIFT in safety: missing keys {sorted(set(want) - set(got))}'
+                  for sub, wv in want.items():
+                      gv = got[sub]
+                      if isinstance(wv, list) and isinstance(gv, list):
+                          missing = [x for x in wv if x not in gv]
+                          assert not missing, f'MIRROR DRIFT in safety.{sub}: removed {missing}'
+                      else:
+                          assert gv == wv, f'MIRROR DRIFT in safety.{sub}'
+              else:
+                  assert got == want, f'MIRROR DRIFT in {key}'
+          print('MIRROR-EQUAL (safety: superset-tolerant)')"
 
       - name: Hooks are executable and parse
         run: |
