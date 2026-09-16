@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
           cache: pip
@@ -44,57 +44,19 @@ jobs:
         working-directory: backend
         run: ruff check .
 
-      - name: Validate Archon workflow YAML
-        shell: python
-        run: |
-          import glob, sys, yaml
-          errors = []
-          for path in sorted(glob.glob('.archon/workflows/*.yaml')):
-              try:
-                  yaml.safe_load(open(path))
-              except yaml.YAMLError as e:
-                  errors.append(f'{path}: {e}')
-          if errors:
-              print('Archon workflow YAML validation failed:')
-              for e in errors:
-                  print(f'  {e}')
-              sys.exit(1)
-          print(f'All {len(glob.glob(".archon/workflows/*.yaml"))} workflow file(s) valid.')
-
-          # Semantic DAG check: OR-join nodes must declare a skip-tolerant trigger_rule.
-          # Catches the class of regression introduced by ce9e4a3 (issue #224).
-          sys.path.insert(0, 'dark-factory/scripts')
-          from check_workflow_dag import check as dag_check
-          dag_errors = dag_check('.archon/workflows/archon-dark-factory.yaml')
-          if dag_errors:
-              print('Archon workflow DAG validation failed:')
-              for e in dag_errors:
-                  print(f'  {e}')
-              sys.exit(1)
-          print('DAG trigger_rule check passed.')
-
-          # when: expression lint: reject parentheses and mixed &&/|| operators.
-          # Catches the class of regression from PR #359 (issue #397/403).
-          from check_workflow_when import check as when_check
-          when_errors = []
-          for path in sorted(glob.glob('.archon/workflows/*.yaml')):
-              when_errors.extend(when_check(path))
-          if when_errors:
-              print('Archon workflow when: expression lint failed:')
-              for e in when_errors:
-                  print(f'  {e}')
-              sys.exit(1)
-          print('when: expression lint passed for all workflow file(s).')
-
-      - name: Check preview credentials not leaked to non-preview compose files
-        run: bash dark-factory/scripts/check_preview_creds.sh
-
       - name: Dependency audit
         run: |
           pip install pip-audit
+          # Accepted advisories (transitive via python-jose[cryptography]; revisit
+          # when we migrate off python-jose — see backend/requirements.txt):
+          #   PYSEC-2022-42969 / PYSEC-2026-1325 — ecdsa Minerva P-256 timing
+          #     side-channels. No fix (maintainers declare side-channels out of
+          #     scope); require local timing of signature *generation*. Not
+          #     reachable: JWT signing uses server-held trusted keys via the
+          #     cryptography backend, not an attacker-facing signing oracle.
           pip-audit -r backend/requirements.txt \
             --ignore-vuln PYSEC-2022-42969 \
-            --ignore-vuln CVE-2026-30922
+            --ignore-vuln PYSEC-2026-1325
 
       - name: Run tests
         working-directory: backend
@@ -162,7 +124,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
           cache: pip
@@ -193,23 +155,58 @@ jobs:
           REDIS_PASSWORD: ci-redis-dummy-password-0123456789abcdef
         run: python -m alembic check
 
-  factory-tests:
+  adapter-validate:
+    name: Factory adapter validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      # dark-factory repo is public; clone provides factory_core.adapter + adapter_defaults
+      # without requiring GHCR package-visibility grants (checkout variant, P2 Task 6).
+      - name: Checkout dark-factory (public, factory_core.adapter loader)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          python-version: "3.12"
+          repository: omniscient/dark-factory
+          path: _dark-factory
 
-      - name: Install test deps
-        run: pip install pytest pytest-mock pyyaml
+      - name: Install pyyaml
+        run: pip install pyyaml aiohttp
 
-      - name: Run factory_core tests
-        run: python -m pytest dark-factory/tests/ -v
-        env:
-          PYTHONPATH: dark-factory/scripts
+      - name: Schema-validate .factory/adapter.yaml against the extracted factory
+        run: |
+          PYTHONPATH=_dark-factory/scripts python -m factory_core.adapter \
+            --clone-dir "$GITHUB_WORKSPACE" --validate
+
+      - name: Assert mirrored values equal factory defaults
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, '_dark-factory/scripts')
+          from factory_core import adapter, adapter_defaults
+          merged = adapter.load('$GITHUB_WORKSPACE')
+          # OD1 (#848): list-valued safety keys may be a local SUPERSET of the factory
+          # defaults (hardening added by #808); removals and any other drift still fail.
+          for key in ('components', 'safety', 'memory_routing', 'deconflict'):
+              want, got = adapter_defaults.DEFAULTS[key], merged[key]
+              if key == 'safety' and isinstance(want, dict) and isinstance(got, dict):
+                  assert set(got) >= set(want), f'MIRROR DRIFT in safety: missing keys {sorted(set(want) - set(got))}'
+                  for sub, wv in want.items():
+                      gv = got[sub]
+                      if isinstance(wv, list) and isinstance(gv, list):
+                          missing = [x for x in wv if x not in gv]
+                          assert not missing, f'MIRROR DRIFT in safety.{sub}: removed {missing}'
+                      else:
+                          assert gv == wv, f'MIRROR DRIFT in safety.{sub}'
+              else:
+                  assert got == want, f'MIRROR DRIFT in {key}'
+          print('MIRROR-EQUAL (safety: superset-tolerant)')"
+
+      - name: Hooks are executable and parse
+        run: |
+          for h in .factory/hooks/*; do
+            [ -x "$h" ] || { echo "not executable: $h" >&2; exit 1; }
+            bash -n "$h"
+          done
 
   sast:
     runs-on: ubuntu-latest
@@ -217,7 +214,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
 

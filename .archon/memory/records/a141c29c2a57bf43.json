@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-06",
+      "evidence_tag": null,
+      "issue": 198,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-06",
+  "id": "a141c29c2a57bf43",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "jsdom-level patches (e.g. `globalThis.Notification = { permission: 'default' }`) belong in `frontend/src/test-setup.ts`, not in per-file `beforeAll` blocks. Moving them there makes the patch available to every test file automatically.",
+  "superseded_by": null,
+  "supersedes": []
+}

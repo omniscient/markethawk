@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-05",
+      "evidence_tag": null,
+      "issue": 193,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-05",
+  "id": "a3d8d6767049d25a",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "`frontend/tsconfig.test.json` extends `tsconfig.json` with `\"types\": [\"vite/client\", \"vitest/globals\"]`, relaxed `noUnusedLocals`/`noUnusedParameters`, and `\"include\"` limited to test files \u2014 used for IDE test-file support and optional `tsc -p tsconfig.test.json --noEmit` gate.",
+  "superseded_by": null,
+  "supersedes": []
+}

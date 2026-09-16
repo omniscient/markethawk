@@ -16,7 +16,9 @@ from app.core.metrics import (
 )
 from app.exceptions import DataFetchError, ProviderError, ScanError
 from app.models.stock_aggregate import StockAggregate
+from app.services.data_readiness import DataReadinessService
 from app.services.scan_orchestrator import ScannerDescriptor, register
+from app.services.scanner_explanations import build_oversold_bounce_explanation
 from app.utils.session import get_market_today
 from app.utils.time import to_utc_naive
 
@@ -180,6 +182,15 @@ async def run_oversold_bounce_scan(
                     }
 
                     enrichment = enrichment_batch.get(ticker.upper(), {})
+                    event_gate_metadata = (
+                        DataReadinessService.event_quality_gate_metadata(
+                            db=db,
+                            ticker=ticker,
+                            scanner_type="oversold_bounce",
+                            event_date=event_date,
+                            base_metadata=gate_metadata,
+                        )
+                    )
                     event_dict = ScannerService._save_event(
                         db=db,
                         ticker=ticker,
@@ -192,7 +203,12 @@ async def run_oversold_bounce_scan(
                         opening_price=float(today["Open"]),
                         closing_price=float(today["Close"]),
                         ranker_config=ranker_config,
-                        gate_metadata=gate_metadata,
+                        gate_metadata=event_gate_metadata,
+                        explanation=build_oversold_bounce_explanation(
+                            indicators=indicators,
+                            criteria_met=criteria_met,
+                            gate_metadata=event_gate_metadata,
+                        ),
                     )
                     results.append(event_dict)
                     scanner_events_total.labels(scanner_type="oversold_bounce").inc()

@@ -3,7 +3,7 @@ Outcomes router — scanner signal quality and outcome tracking endpoints.
 """
 
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import ValidationError
@@ -32,8 +32,19 @@ from app.schemas.outcome import (
     SignalListResponse,
 )
 from app.schemas.regime import RegimeBreakdownResponse
+from app.services.ai_signal_brief import AISignalBriefService
+from app.services.analyst_qa_service import AnalystQAService
 from app.services.data_readiness import DataReadinessService
+from app.services.embedding_service import EmbeddingService
+from app.services.explanation_archetype_service import ExplanationArchetypeService
+from app.services.explanation_trait_performance import (
+    ExplanationTraitPerformanceService,
+)
+from app.services.historical_analog_service import HistoricalAnalogService
 from app.services.outcome_service import OutcomeService
+from app.services.scanner_event_narrative import ScannerEventNarrativeService
+from app.services.semantic_signal_search import SemanticSignalSearchService
+from app.services.signal_post_mortem import SignalPostMortemService
 from app.services.stats import StatsService
 from app.utils.db import get_or_404
 
@@ -58,6 +69,44 @@ def get_outcome_date_range(
             status_code=422,
             detail="; ".join(e["msg"] for e in exc.errors()),
         ) from exc
+
+
+def _analog_event_payload(event: ScannerEvent) -> dict[str, Any]:
+    explanation = event.explanation or {}
+    return {
+        "id": event.id,
+        "ticker": event.ticker,
+        "event_date": event.event_date.isoformat() if event.event_date else None,
+        "scanner_type": event.scanner_type,
+        "summary": event.summary,
+        "severity": event.severity,
+        "why": list(explanation.get("why") or []),
+        "criteria_passed": _criteria_payload(explanation.get("criteria_passed") or {}),
+        "criteria_failed": _criteria_payload(explanation.get("criteria_failed") or {}),
+        "warnings": [
+            {
+                "code": str(warning.get("code") or "quality_warning"),
+                "severity": warning.get("severity"),
+                "message": warning.get("message") or warning.get("code"),
+                "affected_inputs": warning.get("affected_inputs") or [],
+            }
+            for warning in explanation.get("data_quality_warnings") or []
+        ],
+    }
+
+
+def _criteria_payload(criteria: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "key": key,
+            "label": criterion.get("label") or key,
+            "observed": criterion.get("observed"),
+            "threshold": criterion.get("threshold"),
+            "operator": criterion.get("operator"),
+            "importance": criterion.get("importance"),
+        }
+        for key, criterion in sorted(criteria.items())
+    ]
 
 
 @router.get("/scorecard")
@@ -107,6 +156,42 @@ def get_scorecard_by_type(
         include_warnings=include_warnings,
         include_all=include_all,
         review_window_days=review_window_days,
+    )
+
+
+@router.get("/traits/{scanner_type}")
+def get_explanation_trait_performance(
+    scanner_type: str,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
+    severity: Optional[str] = None,
+    min_sample_size: int = Query(default=5, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    return ExplanationTraitPerformanceService().aggregate(
+        db,
+        scanner_type=scanner_type,
+        start_date=date_range.start_date,
+        end_date=date_range.end_date,
+        severity=severity,
+        min_sample_size=min_sample_size,
+    )
+
+
+@router.get("/archetypes/{scanner_type}")
+def get_explanation_archetypes(
+    scanner_type: str,
+    date_range: OutcomeDateRange = Depends(get_outcome_date_range),
+    severity: Optional[str] = None,
+    min_sample_size: int = Query(default=5, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    return ExplanationArchetypeService().latest_performance(
+        db,
+        scanner_type=scanner_type,
+        start_date=date_range.start_date,
+        end_date=date_range.end_date,
+        severity=severity,
+        min_sample_size=min_sample_size,
     )
 
 
@@ -196,6 +281,139 @@ def get_event_outcome(
     )
 
     return EventOutcomeResponse(summary=summary, snapshots=snapshots)
+
+
+@router.get("/semantic-search")
+def semantic_search(
+    query: str = Query(..., min_length=1),
+    top_k: int = Query(default=10, ge=1, le=50),
+    source_type: list[str] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    return EmbeddingService().search(
+        db,
+        query_text=query,
+        top_k=top_k,
+        source_types=source_type,
+    )
+
+
+@router.get("/semantic-signal-search")
+def semantic_signal_search(
+    query: str = Query(..., min_length=1),
+    top_k: int = Query(default=10, ge=1, le=50),
+    source_type: list[str] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    return SemanticSignalSearchService().find_for_text(
+        db,
+        query_text=query,
+        top_k=top_k,
+        source_types=source_type,
+    )
+
+
+@router.get("/analyst-qa")
+def analyst_qa_for_events(
+    question: str = Query(..., min_length=1),
+    scanner_type: str | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    return AnalystQAService().answer_for_events(
+        db,
+        question=question,
+        scanner_type=scanner_type,
+        limit=limit,
+    )
+
+
+@router.get("/event/{event_id}/ai-signal-brief")
+def get_ai_signal_brief(
+    event_id: int,
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return AISignalBriefService().build(db, event)
+
+
+@router.get("/event/{event_id}/ai-signal-narrative")
+def get_ai_signal_narrative(
+    event_id: int,
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return ScannerEventNarrativeService().build(db, event)
+
+
+@router.get("/event/{event_id}/signal-post-mortem")
+def get_signal_post_mortem(
+    event_id: int,
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return SignalPostMortemService().build(db, event)
+
+
+@router.get("/event/{event_id}/semantic-matches")
+def get_event_semantic_matches(
+    event_id: int,
+    top_k: int = Query(default=10, ge=1, le=50),
+    source_type: list[str] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return SemanticSignalSearchService().find_for_event(
+        db,
+        event,
+        top_k=top_k,
+        source_types=source_type,
+    )
+
+
+@router.get("/event/{event_id}/analyst-qa")
+def analyst_qa_for_event(
+    event_id: int,
+    question: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+):
+    event = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    return AnalystQAService().answer_for_event(db, event, question=question)
+
+
+@router.get("/event/{event_id}/historical-analogs")
+def get_historical_analogs(
+    event_id: int,
+    limit: int = Query(default=5, ge=1, le=25),
+    min_sample_size: int = Query(default=5, ge=1, le=100),
+    same_scanner_only: bool = True,
+    db: Session = Depends(get_db),
+):
+    target = get_or_404(db, ScannerEvent, event_id, "ScannerEvent")
+    result = HistoricalAnalogService().find_similar_events(
+        db,
+        target_event_id=target.id,
+        limit=limit,
+        min_sample_size=min_sample_size,
+        same_scanner_only=same_scanner_only,
+    )
+    analog_ids = [analog["event_id"] for analog in result["analogs"]]
+    events_by_id = {
+        event.id: event
+        for event in db.query(ScannerEvent).filter(ScannerEvent.id.in_(analog_ids)).all()
+    }
+    return {
+        **result,
+        "target_event": _analog_event_payload(target),
+        "analogs": [
+            {
+                **analog,
+                "event": _analog_event_payload(events_by_id[analog["event_id"]]),
+            }
+            for analog in result["analogs"]
+            if analog["event_id"] in events_by_id
+        ],
+    }
 
 
 @router.get("/readiness/{ticker}", response_model=ReadinessResponse)

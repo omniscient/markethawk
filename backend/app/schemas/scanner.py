@@ -160,6 +160,28 @@ class ScannerStatusBlockResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ScannerCoverageRange(BaseModel):
+    start: date
+    end: date
+    runs: int
+    events: int
+
+
+class ScannerCoverageGap(BaseModel):
+    start: date
+    end: date
+    weekdays: int
+
+
+class ScannerCoverageResponse(BaseModel):
+    scanner_type: str
+    universe_id: int
+    latest_covered: Optional[date] = None
+    latest_trading_day: date
+    covered: List[ScannerCoverageRange] = []
+    gaps: List[ScannerCoverageGap] = []
+
+
 class ClearEventsResponse(BaseModel):
     ticker: str
     deleted_count: int

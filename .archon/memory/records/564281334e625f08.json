@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-03",
+      "evidence_tag": null,
+      "issue": 159,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-03",
+  "id": "564281334e625f08",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Pre-commit hooks that invoke advisory/optional tools (e.g. `codeindex-blast`) must always exit 0 \u2014 use `|| true` or `; exit 0`. A non-zero exit from a pre-commit hook blocks the commit and will abort an autonomous factory run.",
+  "superseded_by": null,
+  "supersedes": []
+}

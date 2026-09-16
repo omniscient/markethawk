@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import time as _time
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from types import SimpleNamespace
 
 import redis
@@ -13,8 +13,8 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
 from app.models.monitored_stock import MonitoredStock
-from app.services.quality_gate import QualityGateService
-from app.utils.time import utc_now
+from app.services.quality_gate import quality_gate_service
+from app.utils.time import ensure_utc, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -154,8 +154,6 @@ def _compute_data_degraded(universe_id: int, db: Session) -> bool:
     and returns True if affected_pct > quality_alert_pct.
     Non-blocking: any failure defaults to True (degraded) rather than aborting scan.
     """
-    from datetime import datetime, timezone
-
     from app.models.system_config import SystemConfig
     from app.models.universe_quality_report import UniverseQualityReport
 
@@ -185,7 +183,7 @@ def _compute_data_degraded(universe_id: int, db: Session) -> bool:
         if not report or not report.generated_at:
             return True
 
-        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        now_utc = utc_now()
         report_age_hours = (now_utc - report.generated_at).total_seconds() / 3600
         if report_age_hours > staleness_hours:
             return True
@@ -242,6 +240,51 @@ def _compute_data_degraded(universe_id: int, db: Session) -> bool:
     except Exception as exc:
         logger.warning("_compute_data_degraded: error reading quality report: %s", exc)
         return True
+
+
+def _start_scheduled_scanner_run(
+    db: Session,
+    scanner_type: str,
+    universe_id: int,
+    event_date: date,
+    stocks_scanned: int,
+):
+    from app.models.scanner_run import ScannerRun
+
+    run = ScannerRun(
+        scanner_type=scanner_type,
+        universe_id=universe_id,
+        status="running",
+        stocks_scanned=stocks_scanned,
+        scan_start_date=event_date,
+        scan_end_date=event_date,
+    )
+    db.add(run)
+    db.commit()
+    return run
+
+
+def _finish_scheduled_scanner_run(
+    db: Session,
+    run,
+    started_at: float,
+    events_detected: int,
+) -> None:
+    run.status = "completed"
+    run.events_detected = events_detected
+    run.execution_time_ms = int((_time.monotonic() - started_at) * 1000)
+    db.commit()
+
+
+def _fail_scheduled_scanner_run(db: Session, run, started_at: float, exc: Exception):
+    try:
+        db.rollback()
+    except Exception:
+        pass
+    run.status = "failed"
+    run.error_message = str(exc)
+    run.execution_time_ms = int((_time.monotonic() - started_at) * 1000)
+    db.commit()
 
 
 def _run_universe_scan_logic(
@@ -309,7 +352,7 @@ def _run_universe_scan_logic(
             ticker=None,
             requirements=None,
         )
-        _assessment = QualityGateService.assess(db, _gate_req)
+        _assessment = quality_gate_service.assess(db, _gate_req)
         run.quality_gate = json.loads(json.dumps(_assessment.model_dump(), default=str))
         gate_metadata = {
             "tier": _assessment.verdict.value,
@@ -353,7 +396,7 @@ def _run_universe_scan_logic(
         return {
             "start_date": start.isoformat(),
             "end_date": end.isoformat(),
-            "started_at": started_at.replace(tzinfo=timezone.utc).isoformat(),
+            "started_at": ensure_utc(started_at).isoformat(),
             "tickers": len(tickers),
             "total_days": len(trading_days),
             "events_detected": events_total,
@@ -515,7 +558,7 @@ def run_range_scan(
     r.set(
         f"scan:{ticker}:range",
         json.dumps(
-            {"task_ids": [task_id], "started_at": datetime.utcnow().isoformat()}
+            {"task_ids": [task_id], "started_at": utc_now().isoformat()}
         ),
         ex=14400,
     )
@@ -609,13 +652,29 @@ def run_liquidity_hunt_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "liquidity_hunt", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_liquidity_hunt_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "liquidity_hunt", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_liquidity_hunt_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "liquidity_hunt scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,
@@ -802,13 +861,29 @@ def run_pocket_pivot_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "pocket_pivot", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_pocket_pivot_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "pocket_pivot", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_pocket_pivot_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "pocket_pivot scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,
@@ -887,13 +962,29 @@ def run_trend_pullback_scheduled(self):
                     cfg.universe_id,
                     cfg.id,
                 )
+                run_started = _time.monotonic()
+                scanner_run = _start_scheduled_scanner_run(
+                    db, "trend_pullback", cfg.universe_id, event_date, 0
+                )
+                _finish_scheduled_scanner_run(db, scanner_run, run_started, 0)
                 continue
 
-            results = asyncio.run(
-                run_trend_pullback_scan(
-                    tickers, db, start_date=event_date, end_date=event_date
-                )
+            run_started = _time.monotonic()
+            scanner_run = _start_scheduled_scanner_run(
+                db, "trend_pullback", cfg.universe_id, event_date, len(tickers)
             )
+            try:
+                results = asyncio.run(
+                    run_trend_pullback_scan(
+                        tickers, db, start_date=event_date, end_date=event_date
+                    )
+                )
+                _finish_scheduled_scanner_run(
+                    db, scanner_run, run_started, len(results)
+                )
+            except Exception as exc:
+                _fail_scheduled_scanner_run(db, scanner_run, run_started, exc)
+                raise
             logger.info(
                 "trend_pullback scheduled scan for universe %s on %s: %d events",
                 cfg.universe_id,

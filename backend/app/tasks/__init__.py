@@ -1,4 +1,10 @@
 from app.tasks.backtest import run_backtest
+from app.tasks.embeddings import (
+    embed_generated_narrative_source,
+    embed_news_article_source,
+    embed_scanner_event_sources,
+)
+from app.tasks.explanations import backfill_scanner_explanations
 from app.tasks.quality import (
     analyze_signal_features,
     analyze_universe_quality,
@@ -6,6 +12,7 @@ from app.tasks.quality import (
     normalize_universe_quality,
 )
 from app.tasks.regime import backfill_regime_labels, update_regime_model
+from app.tasks.replay import run_signal_replay
 from app.tasks.scanning import (
     evaluate_scanner_alerts,
     run_liquidity_hunt_scheduled,
@@ -21,6 +28,7 @@ from app.tasks.sync import (
     sync_stock_splits,
     sync_ticker_details,
     sync_tickers_batch,
+    sync_universe_aggregates_nightly,
     trigger_tweet_monitor,
 )
 from app.tasks.trading import (
@@ -32,6 +40,8 @@ from app.tasks.trading import (
 __all__ = [
     # backtest
     "run_backtest",
+    "run_signal_replay",
+    "backfill_scanner_explanations",
     # sync
     "sync_tickers_batch",
     "sync_ticker_details",
@@ -40,6 +50,7 @@ __all__ = [
     "poll_massive_news",
     "sync_futures_aggregates",
     "sync_stock_splits",
+    "sync_universe_aggregates_nightly",
     "trigger_tweet_monitor",
     # scanning
     "evaluate_scanner_alerts",
@@ -59,4 +70,8 @@ __all__ = [
     # regime
     "update_regime_model",
     "backfill_regime_labels",
+    # embeddings
+    "embed_news_article_source",
+    "embed_scanner_event_sources",
+    "embed_generated_narrative_source",
 ]

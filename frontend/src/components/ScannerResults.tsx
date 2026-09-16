@@ -11,6 +11,7 @@ import {
 import Card from './ui/Card';
 import Ticker from './Ticker';
 import ReviewControls from './ReviewControls';
+import ScannerExplanationPanel from './ScannerExplanationPanel';
 import TrustGateBanner from './TrustGateBanner';
 import { ScannerEvent, ScannerDiagnostics, QualityGateAssessment } from '../api/scanner';
 import { safeExternalUrl } from '../utils/url';
@@ -298,6 +299,7 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     <p className="text-sm font-medium text-gray-200 line-clamp-1" title={event.summary}>
                       {event.summary}
                     </p>
+                    <ScannerExplanationPanel explanation={event.explanation ?? null} />
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
                     <div className="flex flex-wrap gap-2 text-[10px] font-bold">

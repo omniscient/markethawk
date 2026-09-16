@@ -35,6 +35,7 @@ class ScannerEventResponse(BaseModel):
     indicators: Dict[str, Any] = Field(default_factory=dict)
     criteria_met: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict, alias="metadata_")
+    explanation: Optional[Dict[str, Any]] = None
 
     created_at: datetime
     updated_at: datetime

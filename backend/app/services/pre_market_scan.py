@@ -24,7 +24,7 @@ from app.services.scan_enrichment import _SECTOR_ETF_MAP
 from app.services.scan_orchestrator import ScannerDescriptor, register
 from app.services.timeseries_forecast import compute_anomaly_score
 from app.utils.session import get_market_today
-from app.utils.time import to_utc_naive
+from app.utils.time import ensure_utc, to_utc_naive
 
 if TYPE_CHECKING:
     from app.models.scanner_run import ScannerRun
@@ -194,7 +194,7 @@ def _build_timing_features(
     if last_pre:
         bar_ts = last_pre.timestamp
         if bar_ts.tzinfo is None:
-            bar_ts = bar_ts.replace(tzinfo=timezone.utc)
+            bar_ts = ensure_utc(bar_ts)
         bar_ts_et = bar_ts.astimezone(_ET)
         pm_open_et = datetime.combine(event_date, time(4, 0), tzinfo=_ET)
         timing = {
@@ -228,9 +228,9 @@ def _build_catalyst_features(
     if cat_latest is not None and last_pre is not None:
         ref_ts = last_pre.timestamp
         if ref_ts.tzinfo is None:
-            ref_ts = ref_ts.replace(tzinfo=timezone.utc)
+            ref_ts = ensure_utc(ref_ts)
         if cat_latest.tzinfo is None:
-            cat_latest = cat_latest.replace(tzinfo=timezone.utc)
+            cat_latest = ensure_utc(cat_latest)
         result["catalyst_recency_hours"] = round(
             (ref_ts - cat_latest).total_seconds() / 3600, 2
         )
@@ -411,10 +411,34 @@ def _persist(
     scanner_run: Optional[Any],
     gate_metadata: Optional[Dict[str, Any]] = None,
 ) -> list[Dict[str, Any]]:
+    from app.services.data_readiness import DataReadinessService
     from app.services.scanner import ScannerService
+    from app.services.scanner_explanations import build_pre_market_volume_explanation
+    from app.services.signal_ranker import compute_signal_quality_score
 
     results = []
     for signal in enriched:
+        signal_quality_score = None
+        if (
+            ranker_config
+            and ranker_config.get("enabled")
+            and ranker_config.get("weights")
+        ):
+            signal_quality_score = compute_signal_quality_score(
+                signal.indicators, ranker_config["weights"]
+            )
+        event_gate_metadata = DataReadinessService.event_quality_gate_metadata(
+            db=db,
+            ticker=signal.raw.ticker,
+            scanner_type="pre_market_volume_spike",
+            event_date=event_date,
+            base_metadata=gate_metadata,
+        )
+        explanation = build_pre_market_volume_explanation(
+            signal,
+            signal_quality_score=signal_quality_score,
+            gate_metadata=event_gate_metadata,
+        )
         event_dict = ScannerService._save_event(
             db=db,
             ticker=signal.raw.ticker,
@@ -427,7 +451,8 @@ def _persist(
             opening_price=signal.day_metrics.get("opening_price", 0.0),
             closing_price=signal.day_metrics.get("closing_price"),
             ranker_config=ranker_config,
-            gate_metadata=gate_metadata,
+            gate_metadata=event_gate_metadata,
+            explanation=explanation,
         )
         results.append(event_dict)
         scanner_events_total.labels(scanner_type="pre_market_volume_spike").inc()
@@ -583,7 +608,7 @@ async def run_pre_market_scan(
             _bar_utc = (
                 _max_bar_ts
                 if _max_bar_ts.tzinfo
-                else _max_bar_ts.replace(tzinfo=timezone.utc)
+                else ensure_utc(_max_bar_ts)
             )
             scan_data_to_detection_seconds.labels(
                 scanner_type="pre_market_volume_spike"

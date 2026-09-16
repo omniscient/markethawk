@@ -158,6 +158,15 @@ services:
       SEQ_URL: http://seq:5341
       WATCHFILES_FORCE_POLLING: "true"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Optional LLM features are disabled by default and require an allowlist.
+      LLM_FEATURES_ENABLED: ${LLM_FEATURES_ENABLED:-false}
+      LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-800}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-10.0}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      LLM_RETRY_BACKOFF_SECONDS: ${LLM_RETRY_BACKOFF_SECONDS:-0.5}
+      LLM_ALLOWED_FEATURES: ${LLM_ALLOWED_FEATURES:-}
       IBKR_HOST: ib-gateway
       IBKR_PORT: 4004
       IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
@@ -246,6 +255,15 @@ services:
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       WATCHFILES_FORCE_POLLING: "true"
+      # Optional LLM features are disabled by default and require an allowlist.
+      LLM_FEATURES_ENABLED: ${LLM_FEATURES_ENABLED:-false}
+      LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-800}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-10.0}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      LLM_RETRY_BACKOFF_SECONDS: ${LLM_RETRY_BACKOFF_SECONDS:-0.5}
+      LLM_ALLOWED_FEATURES: ${LLM_ALLOWED_FEATURES:-}
       IBKR_HOST: ib-gateway
       IBKR_PORT: 4004
       IBKR_CLIENT_ID: ${IBKR_CLIENT_ID:-10}
@@ -337,6 +355,15 @@ services:
       SEQ_URL: http://seq:5341
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       PYTHONDONTWRITEBYTECODE: "1"
+      # Optional LLM features are disabled by default and require an allowlist.
+      LLM_FEATURES_ENABLED: ${LLM_FEATURES_ENABLED:-false}
+      LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-800}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-10.0}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      LLM_RETRY_BACKOFF_SECONDS: ${LLM_RETRY_BACKOFF_SECONDS:-0.5}
+      LLM_ALLOWED_FEATURES: ${LLM_ALLOWED_FEATURES:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_SERVICE_NAME: markethawk-beat
       # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
@@ -545,31 +572,6 @@ services:
       - stockscanner-network
     restart: unless-stopped
 
-  # Docker Socket Proxy (scheduler) — allows container lifecycle ops (create/run/stop/delete) via POST+CONTAINERS for `docker compose run`; BUILD/EXEC/NETWORKS/VOLUMES are denied
-  docker-socket-proxy-scheduler:
-    image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
-    container_name: markethawk-docker-socket-proxy-scheduler
-    restart: unless-stopped
-    environment:
-      CONTAINERS: 1
-      IMAGES: 1
-      POST: 1
-      # `docker compose run dark-factory` (dispatch) must look up the service's
-      # networks (factory-network, stockscanner-network) and its scheduler_state
-      # volume before creating the container — both were 0, which 403'd every
-      # dispatch after a proxy recreate. BUILD/EXEC stay 0 (run never builds/execs).
-      NETWORKS: 1
-      VOLUMES: 1
-      BUILD: 0
-      SERVICES: 0
-      EXEC: 0
-      AUTH: 0
-      SECRETS: 0
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - factory-network
-
   # Docker Socket Proxy (factory) — full verbs for dark-factory: build/exec/networks/volumes + EXEC fixes postgres-probe
   docker-socket-proxy-factory:
     image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
@@ -610,66 +612,6 @@ services:
       - factory-network
     profiles:
       - factory
-      - scheduler
-
-  # Dark Factory — autonomous development agent (run on demand)
-  dark-factory:
-    image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: dark-factory/Dockerfile
-    container_name: markethawk-dark-factory
-    env_file:
-      - path: .archon/.env
-        required: true
-    environment:
-      DOCKER_HOST: tcp://docker-socket-proxy-factory:2375
-      SEQ_URL: http://seq:5341
-    volumes:
-      - scheduler_state:/var/lib/dark-factory
-    depends_on:
-      - docker-socket-proxy-factory
-      - buildkit
-    networks:
-      - factory-network
-      - stockscanner-network
-    logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://host.docker.internal:12201"
-        tag: "dark-factory"
-    profiles:
-      - factory
-
-  # Backlog Scheduler — polls GitHub board and dispatches dark factory runs
-  backlog-scheduler:
-    image: ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: dark-factory/Dockerfile
-    container_name: backlog-scheduler
-    restart: unless-stopped
-    entrypoint: ["/opt/dark-factory/scheduler.sh"]
-    env_file:
-      - path: .archon/.env
-        required: true
-    environment:
-      FACTORY_IMAGE: "ghcr.io/omniscient/markethawk-dark-factory:${IMAGE_TAG:-latest}"
-      DOCKER_HOST: tcp://docker-socket-proxy-scheduler:2375
-    depends_on:
-      - docker-socket-proxy-scheduler
-    # Bind-mount (.:/workspace/project:ro) is restored in docker-compose.override.yml for local dev.
-    volumes:
-      - scheduler_state:/var/lib/dark-factory
-    networks:
-      - factory-network
-      - stockscanner-network
-    logging:
-      driver: gelf
-      options:
-        gelf-address: "udp://host.docker.internal:12201"
-        tag: "backlog-scheduler"
-    profiles:
       - scheduler
 
   # TimesFM forecast worker — dedicated Celery worker for the 'forecasting' queue.
@@ -767,7 +709,6 @@ services:
       resources:
         limits:
           memory: 128M
-
 volumes:
   postgres_data:
     external: true
@@ -784,7 +725,6 @@ volumes:
   ib_gateway_settings:
     external: true
     name: markethawk_ib_gateway_settings
-  scheduler_state:
   buildkit_cache:
   timesfm_cache:
   # Regular named volume (not tmpfs) so all containers (backend + celery-worker)
@@ -803,5 +743,4 @@ networks:
     driver: bridge
   factory-network:
     driver: bridge
-
 

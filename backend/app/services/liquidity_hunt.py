@@ -15,7 +15,7 @@ import logging
 import math
 import time as _time
 from collections import defaultdict
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
@@ -34,8 +34,10 @@ from app.models.stock_split import StockSplit
 from app.models.ticker_reference import TickerReference
 from app.services.alert_service import save_event as _save_event
 from app.services.catalyst_parser import CatalystParser
+from app.services.data_readiness import DataReadinessService
+from app.services.scanner_explanations import build_liquidity_hunt_explanation
 from app.utils.session import get_market_today
-from app.utils.time import to_utc_naive
+from app.utils.time import ensure_utc, to_utc_naive
 
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
@@ -306,7 +308,7 @@ def _get_rolling_baselines(
         lambda: {"pre": [], "post": [], "regular": []}
     )
     for r in rows:
-        ts_et = r.timestamp.replace(tzinfo=timezone.utc).astimezone(_ET)
+        ts_et = ensure_utc(r.timestamp).astimezone(_ET)
         d = ts_et.date()
         if r.is_pre_market:
             daily[d]["pre"].append(r)
@@ -541,6 +543,15 @@ async def run_liquidity_hunt_scan(
                             event_date,
                             session_metrics["pre_vol"],
                         )
+                        event_gate_metadata = (
+                            DataReadinessService.event_quality_gate_metadata(
+                                db=db,
+                                ticker=ticker,
+                                scanner_type="liquidity_hunt_pre",
+                                event_date=event_date,
+                                base_metadata=gate_metadata,
+                            )
+                        )
                         event_dict = _save_event(
                             db=db,
                             ticker=ticker,
@@ -552,7 +563,14 @@ async def run_liquidity_hunt_scan(
                             previous_close=prior_day_close,
                             opening_price=session_metrics["regular_open"],
                             closing_price=session_metrics["regular_close"],
-                            gate_metadata=gate_metadata,
+                            gate_metadata=event_gate_metadata,
+                            explanation=build_liquidity_hunt_explanation(
+                                scanner_type="liquidity_hunt_pre",
+                                indicators=indicators_pre,
+                                criteria_met=criteria_pre,
+                                gate_metadata=event_gate_metadata,
+                                config=config,
+                            ),
                         )
                         results.append(event_dict)
                         counts["fired_pre"] += 1
@@ -584,6 +602,15 @@ async def run_liquidity_hunt_scan(
                                 event_date,
                                 session_metrics["post_vol"],
                             )
+                            event_gate_metadata = (
+                                DataReadinessService.event_quality_gate_metadata(
+                                    db=db,
+                                    ticker=ticker,
+                                    scanner_type="liquidity_hunt_post",
+                                    event_date=event_date,
+                                    base_metadata=gate_metadata,
+                                )
+                            )
                             event_dict = _save_event(
                                 db=db,
                                 ticker=ticker,
@@ -595,7 +622,14 @@ async def run_liquidity_hunt_scan(
                                 previous_close=event_date_regular_close,
                                 opening_price=session_metrics["regular_open"],
                                 closing_price=session_metrics["regular_close"],
-                                gate_metadata=gate_metadata,
+                                gate_metadata=event_gate_metadata,
+                                explanation=build_liquidity_hunt_explanation(
+                                    scanner_type="liquidity_hunt_post",
+                                    indicators=indicators_post,
+                                    criteria_met=criteria_post,
+                                    gate_metadata=event_gate_metadata,
+                                    config=config,
+                                ),
                             )
                             results.append(event_dict)
                             counts["fired_post"] += 1

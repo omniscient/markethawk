@@ -129,6 +129,26 @@ def test_clean_pocket_pivot_fires():
     assert mock_save.call_args.kwargs["scanner_type"] == "pocket_pivot"
 
 
+def test_clean_pocket_pivot_persists_explanation():
+    today = {"close": 14.72, "volume": 350_000}
+    _, _, mock_save = _run_scan(
+        today,
+        prior_close=14.15,
+        lookback_bars=_STANDARD_LOOKBACK,
+        enrichment={
+            **_EMPTY_ENRICHMENT,
+            "catalyst_tags": ["earnings"],
+        },
+    )
+
+    explanation = mock_save.call_args.kwargs["explanation"]
+
+    assert explanation["schema_version"] == "scanner_explanation.v1"
+    assert "pocket_pivot.volume_over_max_down" in explanation["criteria_passed"]
+    assert explanation["confidence_inputs"]["down_days_in_lookback"] == 4
+    assert explanation["evidence"]["reconstructed"] is False
+
+
 # ---------------------------------------------------------------------------
 # Scenario 2: Down day — up-day check fails
 # ---------------------------------------------------------------------------

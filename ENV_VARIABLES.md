@@ -53,6 +53,25 @@ These must be set before starting the stack. The application will start without 
 
 ---
 
+## Optional LLM Features
+
+LLM-powered narratives and semantic intelligence are disabled by default. Setting provider/model values alone does not affect deterministic scanner explainability; callers must explicitly enable LLM features and opt feature areas into the allowlist.
+
+Allowed feature areas: `scanner_narrative`, `alert_copy`, `post_mortem`, `semantic_search`, `analyst_qa`, `embeddings`.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LLM_FEATURES_ENABLED` | `false` | Master flag for optional LLM feature paths. When `false`, LLM guardrails deny every feature area. |
+| `LLM_PROVIDER` | `disabled` | Provider selector. Supported values: `disabled`, `openai`, `anthropic`, `local`. Must be non-`disabled` when `LLM_FEATURES_ENABLED=true`. |
+| `LLM_MODEL` | `` (empty) | Model identifier for the selected provider. Required when `LLM_FEATURES_ENABLED=true`. |
+| `LLM_MAX_TOKENS` | `800` | Maximum output tokens allowed for one LLM call. Must be greater than zero. |
+| `LLM_TIMEOUT_SECONDS` | `10.0` | Per-call timeout in seconds. Must be greater than zero. |
+| `LLM_MAX_RETRIES` | `1` | Maximum retry attempts after an LLM call failure. Must be zero or greater. |
+| `LLM_RETRY_BACKOFF_SECONDS` | `0.5` | Backoff delay between retry attempts in seconds. Must be greater than zero. |
+| `LLM_ALLOWED_FEATURES` | `` (empty) | Comma-separated allowlist of feature areas permitted to use LLMs, e.g. `scanner_narrative,semantic_search`. Unknown areas fail startup validation. |
+
+---
+
 ## System Notifications
 
 Generic (non-scanner) email + browser-push notifications via `notify_system()` and `POST /api/v1/alerts/system`. Used by server-to-server callers such as the dark-factory scheduler.
@@ -200,3 +219,35 @@ curl http://localhost:8000/health
 3. Read it in `backend/app/core/config.py` via `os.getenv("VAR_NAME", "default")`.
 4. Restart containers: `docker-compose down && docker-compose up -d`.
 5. Document it in this file.
+
+
+---
+
+## Live Trading Safety Controls
+
+These variables control the non-bypassable order guards added at the `place_bracket_order` chokepoint (F-TRADE-01). They must be set at the container/env level — **they are not API-settable**.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LIVE_TRADING_ARMED` | `false` | **Must be explicitly set to `true` to allow live IBKR order placement.** Defaults to `false` — any container without this env var set will refuse all live orders with `PermissionError`. Requires container restart to change. |
+| `TRADING_KILL_SWITCH` | `` (unset) | Boot-time env override for the emergency halt. Uses **deny-list semantics**: the switch is considered *disengaged* only if the value is one of `""` (unset), `0`, `false`, `no`, or `off` (case-insensitive, whitespace stripped). Any other value — including `1`, `true`, `yes`, `on`, or custom tokens — is treated as **ENGAGED** and all live orders are blocked with `PermissionError`. Requires a container restart to change; for instant runtime control use the Redis key below. |
+| `MAX_ORDER_NOTIONAL` | `10000.0` | Hard USD notional cap per order. Uses the **highest** available price (entry, target, or stop) so short orders cannot circumvent the cap by using a low-side target price. Orders exceeding this raise `ValueError` before connecting to IBKR. Override if your live account trades larger sizes (e.g. `MAX_ORDER_NOTIONAL=50000`). |
+| `MAX_ORDER_QTY` | `200` | Hard shares-per-order cap. Orders with `quantity > MAX_ORDER_QTY` raise `ValueError`. Override for large-cap positions where 200 shares is too restrictive. |
+
+> **Breaking default:** Any container currently placing live IBKR orders **must** set `LIVE_TRADING_ARMED=true` before deploying this change, or live order placement will be blocked. The default is intentionally safe/conservative.
+
+### Redis runtime kill switch
+
+The kill switch has a **Redis-backed runtime layer** (`trading:kill_switch` key) that can halt live orders instantly **without a container restart**:
+
+```bash
+# Engage — halt all live orders immediately
+docker exec stockscanner-redis redis-cli -a "$REDIS_PASSWORD" set trading:kill_switch 1
+
+# Disengage — resume live orders
+docker exec stockscanner-redis redis-cli -a "$REDIS_PASSWORD" del trading:kill_switch
+```
+
+**Fail-closed behavior:** If Redis is unreachable (connection refused, timeout, server down), the kill switch is treated as **ENGAGED** and all live orders are blocked. This is intentional — it is safer to halt trading than to place orders when the safety infrastructure is unavailable. A 1-second socket timeout prevents a hung Redis from blocking order placement indefinitely.
+
+Either the env var (boot-time) **or** the Redis key (runtime) engaging is sufficient to halt trading. They are independent; both must be clear for orders to proceed.

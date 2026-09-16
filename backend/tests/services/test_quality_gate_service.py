@@ -1,5 +1,5 @@
 """
-Unit tests for quality_gate._build_assessment and QualityGateService.assess().
+Unit tests for quality_gate._build_assessment and quality_gate_service.assess().
 No DB fixture required for builder tests — all use plain dict inputs.
 """
 
@@ -271,11 +271,11 @@ def test_continuity_below_70_advisory_is_warning():
 
 
 def test_assess_wrapper_with_complete_report():
-    """QualityGateService.assess() delegates to _build_assessment correctly."""
+    """quality_gate_service.assess() delegates to _build_assessment correctly."""
     from unittest.mock import MagicMock
 
     from app.schemas.data_quality import GateRequest
-    from app.services.quality_gate import QualityGateService
+    from app.services.quality_gate import quality_gate_service
 
     mock_report = MagicMock()
     mock_report.status = "complete"
@@ -300,7 +300,7 @@ def test_assess_wrapper_with_complete_report():
     mock_db.query.return_value.filter.return_value.all.return_value = []
 
     body = GateRequest(universe_id=1, policy="strict", consumer="scanner")
-    result = QualityGateService.assess(db=mock_db, request=body)
+    result = quality_gate_service.assess(db=mock_db, request=body)
     assert result.verdict == QualityGateVerdict.trusted
     assert result.trusted is True
     assert result.score == 92.0
@@ -311,13 +311,13 @@ def test_assess_wrapper_missing_report_strict():
     from unittest.mock import MagicMock
 
     from app.schemas.data_quality import GateRequest
-    from app.services.quality_gate import QualityGateService
+    from app.services.quality_gate import quality_gate_service
 
     mock_db = MagicMock()
     mock_db.query.return_value.filter.return_value.first.return_value = None
 
     body = GateRequest(universe_id=99, policy="strict", consumer="scanner")
-    result = QualityGateService.assess(db=mock_db, request=body)
+    result = quality_gate_service.assess(db=mock_db, request=body)
     assert result.verdict == QualityGateVerdict.blocked
 
 
@@ -326,7 +326,7 @@ def test_assess_wrapper_incomplete_report_strict():
     from unittest.mock import MagicMock
 
     from app.schemas.data_quality import GateRequest
-    from app.services.quality_gate import QualityGateService
+    from app.services.quality_gate import quality_gate_service
 
     mock_report = MagicMock()
     mock_report.status = "running"
@@ -340,7 +340,7 @@ def test_assess_wrapper_incomplete_report_strict():
     mock_db.query.return_value.filter.return_value.first.return_value = mock_report
 
     body = GateRequest(universe_id=5, policy="strict", consumer="scanner")
-    result = QualityGateService.assess(db=mock_db, request=body)
+    result = quality_gate_service.assess(db=mock_db, request=body)
     assert result.verdict == QualityGateVerdict.blocked
     assert any(i.code == QualityIssueCode.missing_bars for i in result.issues)
 
@@ -663,11 +663,11 @@ def test_survivorship_off_skips():
 
 def test_assess_backtesting_consumer_emits_survivorship_blocker():
     from app.schemas.data_quality import GateRequest
-    from app.services.quality_gate import QualityGateService
+    from app.services.quality_gate import quality_gate_service
 
     mock_db = _mock_db_with_clean_report()
     body = GateRequest(universe_id=1, policy="strict", consumer="backtesting")
-    result = QualityGateService.assess(db=mock_db, request=body)
+    result = quality_gate_service.assess(db=mock_db, request=body)
     assert any(
         i.code == QualityIssueCode.survivorship_bias and i.severity == "blocker"
         for i in result.issues
@@ -678,33 +678,33 @@ def test_assess_backtesting_consumer_emits_survivorship_blocker():
 
 def test_assess_scorecard_consumer_emits_survivorship_blocker():
     from app.schemas.data_quality import GateRequest
-    from app.services.quality_gate import QualityGateService
+    from app.services.quality_gate import quality_gate_service
 
     mock_db = _mock_db_with_clean_report()
     body = GateRequest(universe_id=1, policy="strict", consumer="scorecard")
-    result = QualityGateService.assess(db=mock_db, request=body)
+    result = quality_gate_service.assess(db=mock_db, request=body)
     assert any(i.code == QualityIssueCode.survivorship_bias for i in result.issues)
     assert result.verdict == QualityGateVerdict.blocked
 
 
 def test_assess_scanner_consumer_no_survivorship():
     from app.schemas.data_quality import GateRequest
-    from app.services.quality_gate import QualityGateService
+    from app.services.quality_gate import quality_gate_service
 
     mock_db = _mock_db_with_clean_report()
     body = GateRequest(universe_id=1, policy="strict", consumer="scanner")
-    result = QualityGateService.assess(db=mock_db, request=body)
+    result = quality_gate_service.assess(db=mock_db, request=body)
     assert not any(i.code == QualityIssueCode.survivorship_bias for i in result.issues)
     assert result.verdict == QualityGateVerdict.trusted
 
 
 def test_assess_advisory_backtesting_consumer_is_warning():
     from app.schemas.data_quality import GateRequest
-    from app.services.quality_gate import QualityGateService
+    from app.services.quality_gate import quality_gate_service
 
     mock_db = _mock_db_with_clean_report()
     body = GateRequest(universe_id=1, policy="advisory", consumer="backtesting")
-    result = QualityGateService.assess(db=mock_db, request=body)
+    result = quality_gate_service.assess(db=mock_db, request=body)
     surv = [i for i in result.issues if i.code == QualityIssueCode.survivorship_bias]
     assert surv and surv[0].severity == "warning"
     assert result.verdict == QualityGateVerdict.warning

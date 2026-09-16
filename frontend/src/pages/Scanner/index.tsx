@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   runScanner, fetchScannerConfigs, fetchStockUniverses, fetchScannerResults,
   fetchScannerHistory, handleApiError, fetchScanStatus,
-  fetchScanStatusBlock,
+  fetchScanStatusBlock, fetchScannerCoverage,
+  type ScannerCoverageGap,
 } from '../../api/scanner';
 import { getDataHealth } from '../../api/universe';
 import {
@@ -19,6 +20,8 @@ const Scanner: React.FC = () => {
   const state = useScannerState();
   const queryClient = useQueryClient();
   const { attachWebSocket } = useScannerWs(state, queryClient);
+  const [pendingGapQueue, setPendingGapQueue] = React.useState<ScannerCoverageGap[]>([]);
+  const gapChainSawActiveScan = React.useRef(false);
 
   const { data: configs, isLoading: loadingConfigs } = useQuery({
     queryKey: ['scannerConfigs'],
@@ -38,6 +41,13 @@ const Scanner: React.FC = () => {
   const { data: statusBlock } = useQuery({
     queryKey: ['scanStatusBlock', state.selectedConfig, state.selectedUniverse],
     queryFn: () => fetchScanStatusBlock(state.selectedConfig, state.selectedUniverse),
+    refetchInterval: state.isScanning ? 5000 : false,
+  });
+
+  const { data: coverage, isLoading: loadingCoverage } = useQuery({
+    queryKey: ['scannerCoverage', state.selectedConfig, state.selectedUniverse],
+    queryFn: () => fetchScannerCoverage(state.selectedConfig, state.selectedUniverse!),
+    enabled: !!state.selectedUniverse && !!state.selectedConfig,
     refetchInterval: state.isScanning ? 5000 : false,
   });
 
@@ -125,6 +135,56 @@ const Scanner: React.FC = () => {
     });
   };
 
+  const runGap = (gap: ScannerCoverageGap) => {
+    if (!state.selectedUniverse || !state.selectedConfig) {
+      state.setScanError('Please select a universe and a scanner type');
+      return;
+    }
+    state.setScanError(null);
+    scannerMutation.mutate({
+      scanner_type: state.selectedConfig,
+      universe_id: state.selectedUniverse,
+      tickers: [],
+      dry_run: false,
+      start_date: gap.start,
+      end_date: gap.end,
+    });
+  };
+
+  const handleScanGap = (gap: ScannerCoverageGap) => {
+    setPendingGapQueue([]);
+    gapChainSawActiveScan.current = false;
+    runGap(gap);
+  };
+
+  const handleFillAllGaps = (gaps: ScannerCoverageGap[]) => {
+    if (gaps.length === 0) return;
+    const [first, ...rest] = gaps;
+    setPendingGapQueue(rest);
+    gapChainSawActiveScan.current = false;
+    runGap(first);
+  };
+
+  React.useEffect(() => {
+    if (state.activeScan) {
+      gapChainSawActiveScan.current = true;
+      return;
+    }
+    if (
+      gapChainSawActiveScan.current &&
+      !state.isScanning &&
+      !scannerMutation.isPending &&
+      !state.scanError &&
+      pendingGapQueue.length > 0
+    ) {
+      const [next, ...rest] = pendingGapQueue;
+      setPendingGapQueue(rest);
+      gapChainSawActiveScan.current = false;
+      runGap(next);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- runGap reads current scanner selection and mutation state
+  }, [state.activeScan, state.isScanning, scannerMutation.isPending, state.scanError, pendingGapQueue]);
+
   const handleCancelScanner = async () => {
     if (!state.activeScan) return;
     try {
@@ -158,6 +218,7 @@ const Scanner: React.FC = () => {
           localStorage.removeItem(ACTIVE_SCAN_LS_KEY);
           queryClient.invalidateQueries({ queryKey: ['scannerResults'] });
           queryClient.invalidateQueries({ queryKey: ['scannerHistory'] });
+          queryClient.invalidateQueries({ queryKey: ['scannerCoverage'] });
         }
       })
       .catch(() => localStorage.removeItem(ACTIVE_SCAN_LS_KEY));
@@ -185,7 +246,9 @@ const Scanner: React.FC = () => {
         scanStartDate={state.scanStartDate} onScanStartDate={state.setScanStartDate}
         scanEndDate={state.scanEndDate} onScanEndDate={state.setScanEndDate}
         isScanning={state.isScanning} onRunScan={handleRunScanner} onCancelScan={handleCancelScanner}
-        statusBlock={statusBlock} scanHistory={scanHistory ?? []} loadingHistory={loadingHistory}
+        statusBlock={statusBlock} coverage={coverage} loadingCoverage={loadingCoverage}
+        onScanGap={handleScanGap} onFillAllGaps={handleFillAllGaps}
+        scanHistory={scanHistory ?? []} loadingHistory={loadingHistory}
         scanError={state.scanError} onDismissError={() => state.setScanError(null)}
         scannerMutationPending={scannerMutation.isPending}
       />

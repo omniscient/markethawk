@@ -75,6 +75,55 @@ describe('ScannerResults', () => {
     fireEvent.click(screen.getByText(/^date$/i));
     expect(onSort).toHaveBeenCalledWith('event_date');
   });
+
+  it('renders scanner explanation evidence when present', () => {
+    const explainedEvent = makeEvent({
+      explanation: {
+        schema_version: 'scanner_explanation.v1',
+        why: ['Pre-market volume was 5.20x the 20-day average.'],
+        criteria_passed: {
+          'premarket.volume_spike': {
+            label: 'Volume spike',
+            observed: 5.2,
+            threshold: 4,
+            operator: '>=',
+            unit: 'x',
+          },
+        },
+        criteria_failed: {
+          'premarket.liquidity': {
+            label: 'Baseline liquidity',
+            observed: 125000,
+            threshold: 500000,
+            operator: '>',
+            unit: 'shares',
+          },
+        },
+        confidence_inputs: {},
+        data_quality_warnings: [
+          {
+            code: 'stale_bars',
+            severity: 'medium',
+            message: 'Some bars are older than expected.',
+            affected_inputs: ['minute_aggregates'],
+          },
+        ],
+        evidence: {
+          reconstructed: true,
+          reconstruction_quality: 'best_effort',
+        },
+      },
+    });
+    const results = { ...emptyResults, events_detected: 1, events: [explainedEvent] };
+
+    renderWithQuery(<ScannerResults results={results} />);
+
+    expect(screen.getByText('Pre-market volume was 5.20x the 20-day average.')).toBeInTheDocument();
+    expect(screen.getByText('Volume spike')).toBeInTheDocument();
+    expect(screen.getByText('Baseline liquidity')).toBeInTheDocument();
+    expect(screen.getByText('Rebuilt')).toBeInTheDocument();
+    expect(screen.getByText('Some bars are older than expected.')).toBeInTheDocument();
+  });
 });
 
 const makeGate = (overrides: Partial<QualityGateAssessment> = {}): QualityGateAssessment => ({

@@ -38,6 +38,7 @@ from app.routers import (
     live_data_router,
     news_router,
     outcomes_router,
+    replay_router,
     scanner_router,
     stocks_router,
     system_router,
@@ -443,6 +444,7 @@ def create_app() -> FastAPI:
     app.include_router(watchlist_router)
     app.include_router(auto_trading_router)
     app.include_router(outcomes_router)
+    app.include_router(replay_router)
     app.include_router(tweets_router)
     app.include_router(backtest_router)
     app.include_router(data_quality_router)

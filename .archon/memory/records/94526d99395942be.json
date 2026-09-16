@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-13",
+      "evidence_tag": null,
+      "issue": 381,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-13",
+  "id": "94526d99395942be",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "The CSP `style-src` directive in `caddy/Caddyfile` must include `'unsafe-inline'` \u2014 Tailwind v4 (`@tailwindcss/vite`) and Recharts inject runtime inline styles that cannot be nonce'd; removing it breaks all chart rendering.",
+  "superseded_by": null,
+  "supersedes": []
+}

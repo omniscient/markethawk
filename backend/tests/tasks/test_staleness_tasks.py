@@ -2,7 +2,7 @@
 Tests for check_aggregate_staleness task and compute_universe_data_health helper.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 
@@ -301,52 +301,69 @@ class TestComputeDataDegraded:
         )
 
 
-class TestWorstGapDaysIsWeekdays:
-    def test_worst_gap_days_counts_weekdays_not_calendar_days(self):
-        """aggregate_gap_days gauge must report weekday span, not calendar-day span.
-        Monday→next Monday = 7 calendar days but 5 weekdays."""
+class TestUniverseWideDayHoles:
+    """The health sweep flags *universe-wide* day holes (a systemic sync outage
+    where far fewer tickers than usual have a bar), not per-ticker no-trade
+    gaps — an isolated illiquid ticker that didn't trade is not a data hole.
+    ``worst_gap_days`` is the longest run of consecutive hole days.
+
+    Hole *detection* is unit-tested in test_quality_helpers.py; here we assert
+    that compute_universe_data_health wires the detected holes into the
+    gapped_count / gapped_pct / worst_gap_days metrics correctly.
+    """
+
+    def _run_with_holes(self, holes):
         import app.tasks.quality as q
 
-        monday1 = datetime(2024, 1, 1, 0, 0, 0)  # Monday
-        tuesday = datetime(2024, 1, 2, 0, 0, 0)  # next day (no gap)
-        monday2 = datetime(
-            2024, 1, 8, 0, 0, 0
-        )  # Monday next week (7 cal, 5 weekday gap)
-
+        # Fresh bar so the ticker is not stale — isolates the gap metrics.
+        fresh_ts = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
         ticker_objs = [MagicMock(ticker="AAPL")]
         db = MagicMock()
 
-        call_count = [0]
-
         def _query_side(*args):
-            call_count[0] += 1
             mock = MagicMock()
             mock.filter.return_value.all.return_value = ticker_objs
-            # MAX timestamp returns monday2
-            mock.filter.return_value.scalar.return_value = monday2
-            # Gap timestamps: monday1, tuesday, then a big jump to monday2
-            ts_rows = [
-                MagicMock(timestamp=monday1),
-                MagicMock(timestamp=tuesday),
-                MagicMock(timestamp=monday2),
-            ]
-            mock.filter.return_value.order_by.return_value.limit.return_value.all.return_value = ts_rows
+            mock.filter.return_value.scalar.return_value = fresh_ts
+            mock.filter.return_value.group_by.return_value.all.return_value = []
             return mock
 
         db.query.side_effect = _query_side
 
-        with patch(
-            "app.tasks.quality._load_quality_thresholds", return_value=(48, 2, 20)
+        # compute_universe_data_health imports the helper locally, so patch it
+        # at its source module.
+        with (
+            patch(
+                "app.tasks.quality._load_quality_thresholds", return_value=(48, 2, 20)
+            ),
+            patch(
+                "app.services.quality_helpers._detect_universe_day_holes",
+                return_value=holes,
+            ),
         ):
-            result = q.compute_universe_data_health(db, universe_id=1)
+            return q.compute_universe_data_health(db, universe_id=1)
 
-        # The gap from tuesday (Jan 2) to monday2 (Jan 8) spans 5 weekdays (Wed-Thu-Fri + Mon)
-        # wait: Jan 2 (Tue) to Jan 8 (Mon): weekdays strictly between = Wed3,Thu4,Fri5 = 3 weekdays
-        # Actually _count_weekdays_between(Jan2, Jan8) counts strictly between:
-        # Jan3(Wed), Jan4(Thu), Jan5(Fri) = 3 weekdays
-        # Calendar days = 6 (Jan2 to Jan8)
-        # worst_gap_days should be 3 (weekdays), not 6 (calendar)
-        assert result["worst_gap_days"] < 6, (
-            f"worst_gap_days={result['worst_gap_days']} should be weekday count (<6), not calendar days"
-        )
-        assert result["worst_gap_days"] >= 1, "should detect at least 1 weekday in gap"
+    def test_no_holes_not_gapped(self):
+        result = self._run_with_holes([])
+        assert result["gapped_count"] == 0
+        assert result["worst_gap_days"] == 0.0
+        assert result["gapped_pct"] == 0.0
+
+    def test_isolated_holes_counted_but_run_length_one(self):
+        # Two holes two weeks apart → 2 holes, but no consecutive run
+        holes = [date(2026, 6, 4), date(2026, 6, 18)]
+        result = self._run_with_holes(holes)
+        assert result["gapped_count"] == 2
+        assert result["worst_gap_days"] == 1.0
+        assert result["gapped_pct"] > 0
+
+    def test_consecutive_holes_report_run_length(self):
+        # Three consecutive weekdays down → a 3-day systemic outage
+        holes = [date(2026, 6, 2), date(2026, 6, 3), date(2026, 6, 4)]
+        result = self._run_with_holes(holes)
+        assert result["worst_gap_days"] == 3.0
+
+    def test_run_bridges_weekend(self):
+        # Fri + following Mon (3 calendar days) is one continuous outage
+        holes = [date(2026, 6, 5), date(2026, 6, 8)]
+        result = self._run_with_holes(holes)
+        assert result["worst_gap_days"] == 2.0

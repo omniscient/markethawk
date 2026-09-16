@@ -15,6 +15,7 @@ from app.schemas.quality_gate import (
     QualityGateIssue,
     QualityGatePolicy,
     QualityGateScope,
+    QualityGateServiceProtocol,
     QualityGateVerdict,
     QualityIssueCode,
 )
@@ -481,8 +482,8 @@ def _build_assessment(
 
 
 class QualityGateService:
-    @staticmethod
     def assess(
+        self,
         db: Session,
         request,
     ) -> QualityGateAssessment:
@@ -583,3 +584,6 @@ class QualityGateService:
             market_holidays=market_holidays,
             survivorship_scope=survivorship_scope,
         )
+
+
+quality_gate_service: QualityGateServiceProtocol = QualityGateService()

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.regime_model import RegimeModel
 from app.models.stock_aggregate import StockAggregate
+from app.utils.time import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class RegimeService:
     @staticmethod
     def _fetch_spy_bars(db: Session) -> pd.DataFrame:
         """Load SPY daily bars from stock_aggregates (rolling 2-year window)."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=730)).replace(tzinfo=None)
+        cutoff = utc_now() - timedelta(days=730)
         rows = (
             db.query(StockAggregate)
             .filter(
@@ -189,7 +190,7 @@ class RegimeService:
         next_version = db.query(RegimeModel).count() + 1
         data_start = df["date"].min() if "date" in df.columns else None
         data_end = df["date"].max() if "date" in df.columns else None
-        trained_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        trained_at = utc_now()
 
         new_model = RegimeModel(
             version=next_version,

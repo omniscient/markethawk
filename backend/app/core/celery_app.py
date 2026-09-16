@@ -101,6 +101,13 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.update_regime_model",
         "schedule": crontab(minute="0", hour="21", day_of_week="1-5"),
     },
+    # Nightly universe aggregate top-up: 01:30 UTC Tue–Sat covers each Mon–Fri
+    # session after the 20:00 ET after-market close (00:00/01:00 UTC).
+    # Keeps active universes fresh so the staleness banner reflects real issues.
+    "sync-universe-aggregates-nightly": {
+        "task": "app.tasks.sync_universe_aggregates_nightly",
+        "schedule": crontab(minute="30", hour="1", day_of_week="2-6"),
+    },
     # Aggregate staleness/gap sweep: 03:00 UTC weekdays (post-close + after nightly sync)
     "check-aggregate-staleness-nightly": {
         "task": "app.tasks.check_aggregate_staleness",

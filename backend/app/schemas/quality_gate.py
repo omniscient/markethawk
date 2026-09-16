@@ -13,9 +13,21 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 from pydantic import BaseModel, ConfigDict
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
 
 class QualityIssueCode(str, Enum):
@@ -72,3 +84,8 @@ class QualityGateAssessment(BaseModel):
     issues: List[QualityGateIssue] = []
     warnings: List[QualityGateIssue] = []
     generated_at: datetime
+
+
+@runtime_checkable
+class QualityGateServiceProtocol(Protocol):
+    def assess(self, db: "Session", request: Any) -> QualityGateAssessment: ...

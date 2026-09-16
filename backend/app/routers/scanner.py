@@ -15,6 +15,7 @@ from fastapi import (
     Request,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
 from sqlalchemy.orm import Session, selectinload
 
@@ -30,6 +31,7 @@ from app.schemas import (
     ClearEventsResponse,
     PreMarketMoversResponse,
     ScannerConfigResponse,
+    ScannerCoverageResponse,
     ScannerEventResponse,
     ScannerRangeRequest,
     ScannerRunAsyncResponse,
@@ -49,8 +51,8 @@ from app.services import StockDataService
 from app.services.scan_orchestrator import get_scan_progress, request_scan_cancel
 from app.services.scanner import ScannerService
 from app.services.scanner_query_service import ScannerQueryService
-from app.utils.session import get_market_today
-from app.utils.time import utc_now
+from app.utils.session import get_market_now, get_market_today
+from app.utils.time import ensure_utc, utc_now
 
 router = APIRouter(prefix="/api/v1/scanner", tags=["scanner"])
 
@@ -62,6 +64,17 @@ def _last_completed_weekday() -> "date":
     d = get_market_today() - _td(days=1)
     while d.weekday() >= 5:  # Saturday=5, Sunday=6
         d -= _td(days=1)
+    return d
+
+
+def _latest_completed_trading_day() -> "date":
+    now = get_market_now()
+    if now.weekday() < 5 and (now.hour, now.minute) >= (16, 0):
+        d = now.date()
+    else:
+        d = now.date() - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
     return d
 
 
@@ -162,7 +175,7 @@ def run_scanner(
 
     started_at = scanner_run.created_at
     if started_at and started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
+        started_at = ensure_utc(started_at)
 
     return ScannerRunAsyncResponse(
         scan_id=scan_id,
@@ -203,7 +216,7 @@ def get_scan_status(scan_id: str, db: Session = Depends(get_db)):
 
     started_at = run.created_at
     if started_at and started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
+        started_at = ensure_utc(started_at)
 
     return ScannerRunStatusResponse(
         scan_id=str(run.uuid),
@@ -432,6 +445,21 @@ def get_scanner_results(
     return results
 
 
+@router.post("/explanations/backfill", status_code=status.HTTP_202_ACCEPTED)
+def queue_scanner_explanation_backfill(
+    scanner_type: Optional[str] = None,
+    limit: int = Query(500, ge=1, le=5000),
+):
+    """Queue a best-effort explanation backfill for historical scanner events."""
+    from app.tasks.explanations import backfill_scanner_explanations
+
+    task = backfill_scanner_explanations.delay(
+        scanner_type=scanner_type,
+        limit=limit,
+    )
+    return {"status": "queued", "task_id": task.id}
+
+
 @router.get("/signal-quality-distribution")
 def get_signal_quality_distribution(
     scanner_type: Optional[str] = None,
@@ -547,6 +575,22 @@ def get_scan_status_block(
         db, scanner_type, universe_id=universe_id
     )
     return ScannerStatusBlockResponse(**data)
+
+
+@router.get("/coverage", response_model=ScannerCoverageResponse)
+def get_scanner_coverage(
+    scanner_type: str,
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """Derived scan coverage for one scanner type and universe."""
+    data = ScannerQueryService.get_coverage(
+        db,
+        scanner_type,
+        universe_id,
+        latest_trading_day=_latest_completed_trading_day(),
+    )
+    return ScannerCoverageResponse(**data)
 
 
 @router.get("/configs", response_model=List[ScannerConfigResponse])

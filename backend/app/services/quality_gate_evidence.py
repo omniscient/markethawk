@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -23,6 +23,7 @@ from app.models.stock_universe_ticker import StockUniverseTicker
 from app.models.universe_quality_report import UniverseQualityReport
 from app.services.split_adjustment import SplitAdjustmentService
 from app.utils.session import session_for_ts
+from app.utils.time import ensure_utc
 
 _ET = ZoneInfo("America/New_York")
 
@@ -240,7 +241,7 @@ def _scanner_parameters(scanner_config: Optional[ScannerConfig]) -> dict:
 def _et_date(ts: datetime):
     """Eastern-time calendar date for a (naive-UTC or aware) bar timestamp."""
     if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
+        ts = ensure_utc(ts)
     return ts.astimezone(_ET).date()
 
 

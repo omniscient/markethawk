@@ -6,8 +6,8 @@ Extracted from data_quality.py so the lightweight nightly staleness/gap sweep
 DataQualityService.
 """
 
-from datetime import timedelta
-from typing import Dict, List
+from datetime import date, timedelta
+from typing import Dict, List, Optional, Set
 
 
 def _count_weekdays_between(d1, d2) -> int:
@@ -52,11 +52,11 @@ def _detect_gaps(timestamps: List, timespan: str, multiplier: int) -> List[Dict]
         if diff_seconds < threshold_seconds:
             continue
 
-        calendar_days = (curr.date() - prev.date()).days
-        if calendar_days <= 3:
-            weekdays = _count_weekdays_between(prev.date(), curr.date())
-            if weekdays <= 1:
-                continue
+        # ≤1 weekday between the bars means the span is a weekend or a
+        # holiday long weekend (e.g. Fri→Tue over Memorial Day) — not a gap.
+        weekdays = _count_weekdays_between(prev.date(), curr.date())
+        if weekdays <= 1:
+            continue
 
         missing_bars = max(0, int(diff_seconds / expected_seconds) - 1)
         gaps.append(
@@ -69,3 +69,41 @@ def _detect_gaps(timestamps: List, timespan: str, multiplier: int) -> List[Dict]
         )
 
     return gaps
+
+
+def _detect_universe_day_holes(
+    counts_by_day: Dict[date, int],
+    start: date,
+    end: date,
+    holidays: Optional[Set[date]] = None,
+) -> List[date]:
+    """
+    Detect universe-wide day-bar holes: weekdays where far fewer tickers than
+    usual have a day bar.
+
+    Per-ticker missing day bars are indistinguishable from organic no-trade
+    days on illiquid tickers (verified bar-for-bar against the provider), so
+    ticker-level gap counting over-alarms on small-cap universes.  A genuine
+    sync outage instead shows up as a calendar day where the number of tickers
+    with bars collapses relative to the norm.
+
+    ``counts_by_day`` maps date → number of tickers with a day bar that date.
+    A weekday inside [start, end] (excluding known holidays) is a hole when
+    its ticker count is below 50 % of the median active day's count.
+    """
+    holidays = holidays or set()
+
+    active_counts = sorted(v for v in counts_by_day.values() if v > 0)
+    if not active_counts:
+        return []
+    median = active_counts[len(active_counts) // 2]
+    threshold = median * 0.5
+
+    holes: List[date] = []
+    d = start
+    while d <= end:
+        if d.weekday() < 5 and d not in holidays:
+            if counts_by_day.get(d, 0) < threshold:
+                holes.append(d)
+        d += timedelta(days=1)
+    return holes

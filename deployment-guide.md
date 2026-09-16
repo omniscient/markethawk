@@ -213,7 +213,7 @@ The Caddyfile redirects all HTTP (`:80`) requests to HTTPS and sets `Strict-Tran
 ## Deploying from GHCR
 
 Images are published to GitHub Container Registry on every merge to `main`.  
-Three images are maintained: `markethawk-backend`, `markethawk-frontend`, `markethawk-dark-factory`.
+Two images are maintained by this repo: `markethawk-backend`, `markethawk-frontend`. The `markethawk-dark-factory` image is now built and published by [omniscient/dark-factory](https://github.com/omniscient/dark-factory).
 
 Each push produces two tags:
 - `sha-{SHORT_SHA}` — permanent, points to that exact commit
@@ -225,8 +225,8 @@ To deploy a specific tag, set `IMAGE_TAG` before running Compose commands:
 ```bash
 # Deploy a specific SHA tag
 export IMAGE_TAG=sha-abc1234
-docker compose pull backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
-docker compose up -d backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
+docker compose pull backend celery-worker celery-beat live-scanner flower frontend
+docker compose up -d backend celery-worker celery-beat live-scanner flower frontend
 
 # Run migrations after deploying
 docker compose exec -T backend python -m alembic upgrade head
@@ -247,8 +247,8 @@ To roll back to a prior release, pin `IMAGE_TAG` to any previous SHA tag before 
 
 # 2. Pin IMAGE_TAG and restart services
 export IMAGE_TAG=sha-abc1234
-docker compose pull backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
-docker compose up -d backend celery-worker celery-beat live-scanner flower frontend backlog-scheduler
+docker compose pull backend celery-worker celery-beat live-scanner flower frontend
+docker compose up -d backend celery-worker celery-beat live-scanner flower frontend
 ```
 
 If the rollback target is behind a database migration, roll back the schema first:

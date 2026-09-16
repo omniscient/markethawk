@@ -22,6 +22,7 @@ Grade scale
 import logging
 from collections import defaultdict
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -63,14 +64,25 @@ def _estimate_expected_bars(
     timespan: str,
     multiplier: int,
     holiday_map: Optional[Dict] = None,
+    is_futures: bool = False,
 ):
     """
     Empirical P90 approach: group by date, take the 90th-percentile bar count
     per active day, multiply by number of active days.  Self-calibrates to
     whatever session type was originally requested (pre-market, full day, etc.).
 
-    Stub-day correction
-    ───────────────────
+    Asset-class correction
+    ──────────────────────
+    The P90 yardstick only makes sense when sessions produce a uniform bar
+    count — true for futures (continuous CME sessions), false for stocks:
+    an illiquid ticker emits intraday bars only for periods with trades, so
+    day-to-day bar-count variation is organic trading activity, not missing
+    data (verified bar-for-bar against the provider).  For stocks every day
+    with data therefore counts as complete (expected = actual); shortfalls
+    surface via gap detection, integrity checks, and the staleness sweep.
+
+    Stub-day correction (futures)
+    ─────────────────────────────
     Some calendar dates naturally hold far fewer bars than a full session:
       • Sunday opens: the CME session starts at 18:00 ET Sunday but the UTC
         date only captures 1–2 hours of bars before rolling to Monday.
@@ -129,6 +141,12 @@ def _estimate_expected_bars(
             # Abbreviated session — whatever bars exist are correct, no penalty
             expected += cnt
             holiday_days += 1
+
+        elif not is_futures:
+            # Stocks: intraday bars only exist for periods with trades, so a
+            # below-P90 day is organic activity, not missing data — no penalty
+            expected += cnt
+            full_days += 1
 
         elif cnt < stub_threshold:
             # Organic stub (Sunday open boundary, single-day holiday without a
@@ -267,7 +285,7 @@ def _analyze_ticker_timespan(
 
     # ── Coverage ──────────────────────────────────────────────────────────────
     expected_bars, coverage_detail = _estimate_expected_bars(
-        timestamps, timespan, multiplier, holiday_map
+        timestamps, timespan, multiplier, holiday_map, is_futures=is_futures
     )
     coverage_pct = min(
         100.0, (actual_bars / expected_bars * 100) if expected_bars > 0 else 100.0
@@ -343,6 +361,40 @@ def _analyze_ticker_timespan(
 
 
 class DataQualityService:
+    @staticmethod
+    def summarize_event_bars(rows: List[Any], timespan: str, multiplier: int) -> Dict:
+        """Return event-scoped integrity/continuity counts for aggregate rows."""
+        bad_bar_count = 0
+        timestamps = []
+        for row in rows:
+            timestamps.append(row.timestamp)
+            high = Decimal(row.high)
+            low = Decimal(row.low)
+            open_ = Decimal(row.open)
+            close = Decimal(row.close)
+            volume = int(row.volume)
+            if (
+                high < low
+                or high < open_
+                or high < close
+                or low > open_
+                or low > close
+                or open_ <= 0
+                or close <= 0
+                or high <= 0
+                or low <= 0
+                or volume < 0
+            ):
+                bad_bar_count += 1
+
+        duplicate_count = len(timestamps) - len(set(timestamps))
+        gaps = _detect_gaps(timestamps, timespan, multiplier)
+        return {
+            "bad_bar_count": bad_bar_count,
+            "duplicate_count": duplicate_count,
+            "gap_count": len(gaps),
+        }
+
     @staticmethod
     def analyze_universe(db: Session, universe_id: int) -> Dict:
         """

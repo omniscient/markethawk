@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-14",
+      "evidence_tag": "test-output",
+      "issue": 377,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-14",
+  "id": "aabcd84dd4d2e916",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "`WebSocketException(code=1008)` raised inside the route handler body (not only from a FastAPI Dependency) is caught by Starlette and closes the connection before `websocket.accept()` returns to the client \u2014 so an `async with ws_connection_slot(user_id):` context manager in the handler body (before `await websocket.accept()`) correctly delivers 1008 without needing a separate Dependency.",
+  "superseded_by": null,
+  "supersedes": []
+}

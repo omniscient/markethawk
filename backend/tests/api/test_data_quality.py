@@ -57,7 +57,7 @@ def test_gate_trusted(db: Session):
     assessment = _assessment(QualityGateVerdict.trusted, QualityGatePolicy.strict, u.id)
 
     with patch(
-        "app.routers.data_quality.QualityGateService.assess", return_value=assessment
+        "app.routers.data_quality.quality_gate_service.assess", return_value=assessment
     ):
         response = client.post(
             _GATE_URL,
@@ -78,7 +78,7 @@ def test_gate_warning(db: Session):
     )
 
     with patch(
-        "app.routers.data_quality.QualityGateService.assess", return_value=assessment
+        "app.routers.data_quality.quality_gate_service.assess", return_value=assessment
     ):
         response = client.post(
             _GATE_URL,
@@ -96,7 +96,7 @@ def test_gate_blocked(db: Session):
     assessment = _assessment(QualityGateVerdict.blocked, QualityGatePolicy.strict, u.id)
 
     with patch(
-        "app.routers.data_quality.QualityGateService.assess", return_value=assessment
+        "app.routers.data_quality.quality_gate_service.assess", return_value=assessment
     ):
         response = client.post(
             _GATE_URL,
@@ -114,7 +114,7 @@ def test_gate_skipped(db: Session):
     assessment = _assessment(QualityGateVerdict.skipped, QualityGatePolicy.off, u.id)
 
     with patch(
-        "app.routers.data_quality.QualityGateService.assess", return_value=assessment
+        "app.routers.data_quality.quality_gate_service.assess", return_value=assessment
     ):
         response = client.post(
             _GATE_URL,
@@ -137,7 +137,7 @@ def test_gate_with_requirements_and_date_range(db: Session):
     assessment = _assessment(QualityGateVerdict.trusted, QualityGatePolicy.strict, u.id)
 
     with patch(
-        "app.routers.data_quality.QualityGateService.assess", return_value=assessment
+        "app.routers.data_quality.quality_gate_service.assess", return_value=assessment
     ) as mock_assess:
         response = client.post(
             _GATE_URL,
