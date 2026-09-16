@@ -45,6 +45,7 @@ These must be set before starting the stack. The application will start without 
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime in days. Stored in Redis; deleting the Redis key revokes the session. |
 | `COOKIE_SECURE` | `true` | When `true`, auth cookies are sent with the `Secure` flag (HTTPS only). Set to `false` only for local HTTP dev — `docker-compose.override.yml` does this automatically. |
 | `CORS_ORIGINS` | `["http://localhost:3333"]` | JSON array of allowed frontend origins (e.g. `["http://localhost:3333","https://your-domain.com"]`). Wildcard `*` is intentionally rejected; list explicit origins instead. |
+| `MARKETHAWK_EXTENSION_MODULES` | `[]` (none) | Comma-separated list of extension modules to import at startup (e.g. `myedge.scanners,myedge.risk`) — NOT a JSON array, unlike `CORS_ORIGINS` above. Host-operator-only: set only in the host `.env` file, never via any runtime API. Imported with the full privileges of the backend and worker processes. |
 | `DB_POOL_SIZE` | `20` | SQLAlchemy connection pool size per process. Increase if you add more Celery workers. |
 | `DB_POOL_MAX_OVERFLOW` | `10` | Extra connections allowed above `DB_POOL_SIZE` during bursts. |
 | `DB_POOL_PRE_PING` | `true` | When `true`, tests each connection before use to automatically recover after PostgreSQL restarts. |
