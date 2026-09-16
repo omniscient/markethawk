@@ -141,3 +141,56 @@ class UniverseValidationError(MarketHawkError):
     def __init__(self, message: str, universe_id: int | None = None):
         super().__init__(message, is_retryable=False, universe_id=universe_id)
         self.universe_id = universe_id
+
+
+class ExtensionImportError(MarketHawkError):
+    """Raised when a configured extension module fails to import."""
+
+    def __init__(self, message: str, *, module_name: str, original_error: str, **ctx):
+        super().__init__(
+            message,
+            is_retryable=False,
+            module_name=module_name,
+            original_error=original_error,
+            **ctx,
+        )
+        self.module_name = module_name
+        self.original_error = original_error
+
+
+class ExtensionDescriptorError(MarketHawkError):
+    """Raised when an extension descriptor fails registry validation."""
+
+    def __init__(self, message: str, *, descriptor_repr: str, field: str, **ctx):
+        super().__init__(
+            message,
+            is_retryable=False,
+            descriptor_repr=descriptor_repr,
+            field=field,
+            **ctx,
+        )
+        self.descriptor_repr = descriptor_repr
+        self.field = field
+
+
+class ExtensionDuplicateError(MarketHawkError):
+    """Raised when a registry key is already registered and replace=False."""
+
+    def __init__(self, message: str, *, key: str, **ctx):
+        super().__init__(message, is_retryable=False, key=key, **ctx)
+        self.key = key
+
+
+class ExtensionRuntimeError(MarketHawkError):
+    """Raised when a registered extension fails during execution."""
+
+    def __init__(self, message: str, *, key: str, original_error: str, **ctx):
+        super().__init__(
+            message,
+            is_retryable=True,
+            key=key,
+            original_error=original_error,
+            **ctx,
+        )
+        self.key = key
+        self.original_error = original_error
