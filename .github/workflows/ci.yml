@@ -170,7 +170,7 @@ jobs:
           path: _dark-factory
 
       - name: Install pyyaml
-        run: pip install pyyaml
+        run: pip install pyyaml aiohttp
 
       - name: Schema-validate .factory/adapter.yaml against the extracted factory
         run: |
