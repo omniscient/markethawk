@@ -47,19 +47,16 @@ jobs:
       - name: Dependency audit
         run: |
           pip install pip-audit
-          # Accepted advisories (all transitive via python-jose[cryptography]==3.4.0;
-          # revisit when we migrate off python-jose — see backend/requirements.txt):
+          # Accepted advisories (transitive via python-jose[cryptography]; revisit
+          # when we migrate off python-jose — see backend/requirements.txt):
           #   PYSEC-2022-42969 / PYSEC-2026-1325 — ecdsa Minerva P-256 timing
           #     side-channels. No fix (maintainers declare side-channels out of
           #     scope); require local timing of signature *generation*. Not
           #     reachable: JWT signing uses server-held trusted keys via the
           #     cryptography backend, not an attacker-facing signing oracle.
-          #   CVE-2026-30922 — pyasn1 0.4.8 ReDoS; fix (0.6.3) uninstallable
-          #     (python-jose pins pyasn1<0.5.0). Also in .trivyignore.
           pip-audit -r backend/requirements.txt \
             --ignore-vuln PYSEC-2022-42969 \
-            --ignore-vuln PYSEC-2026-1325 \
-            --ignore-vuln CVE-2026-30922
+            --ignore-vuln PYSEC-2026-1325
 
       - name: Run tests
         working-directory: backend
@@ -173,7 +170,7 @@ jobs:
           path: _dark-factory
 
       - name: Install pyyaml
-        run: pip install pyyaml
+        run: pip install pyyaml aiohttp
 
       - name: Schema-validate .factory/adapter.yaml against the extracted factory
         run: |
@@ -187,9 +184,22 @@ jobs:
           sys.path.insert(0, '_dark-factory/scripts')
           from factory_core import adapter, adapter_defaults
           merged = adapter.load('$GITHUB_WORKSPACE')
+          # OD1 (#848): list-valued safety keys may be a local SUPERSET of the factory
+          # defaults (hardening added by #808); removals and any other drift still fail.
           for key in ('components', 'safety', 'memory_routing', 'deconflict'):
-              assert merged[key] == adapter_defaults.DEFAULTS[key], f'MIRROR DRIFT in {key}'
-          print('MIRROR-EQUAL')"
+              want, got = adapter_defaults.DEFAULTS[key], merged[key]
+              if key == 'safety' and isinstance(want, dict) and isinstance(got, dict):
+                  assert set(got) >= set(want), f'MIRROR DRIFT in safety: missing keys {sorted(set(want) - set(got))}'
+                  for sub, wv in want.items():
+                      gv = got[sub]
+                      if isinstance(wv, list) and isinstance(gv, list):
+                          missing = [x for x in wv if x not in gv]
+                          assert not missing, f'MIRROR DRIFT in safety.{sub}: removed {missing}'
+                      else:
+                          assert gv == wv, f'MIRROR DRIFT in safety.{sub}'
+              else:
+                  assert got == want, f'MIRROR DRIFT in {key}'
+          print('MIRROR-EQUAL (safety: superset-tolerant)')"
 
       - name: Hooks are executable and parse
         run: |
