@@ -1,3 +1,4 @@
+import logging
 import os
 
 from celery import Celery
@@ -5,11 +6,14 @@ from celery.schedules import crontab
 from celery.signals import (
     after_setup_logger,
     after_setup_task_logger,
+    worker_init,
     worker_process_shutdown,
     worker_ready,
 )
 
 from app.core.config import settings
+from app.core.extensions import load_extension_modules
+from app.exceptions import ExtensionImportError
 
 celery_app = Celery(
     "stockscanner",
@@ -27,6 +31,17 @@ def _install_log_redaction(logger, **kwargs):
     from app.core.log_filters import install_redacting_filter
 
     install_redacting_filter()
+
+
+@worker_init.connect
+def _load_extension_modules(**_kwargs):
+    try:
+        load_extension_modules(settings.MARKETHAWK_EXTENSION_MODULES)
+    except ExtensionImportError as exc:
+        logging.getLogger(__name__).critical(
+            "Extension load failed; worker will not start: %s", exc
+        )
+        raise SystemExit(1) from exc
 
 
 celery_app.conf.update(

@@ -457,6 +457,13 @@ def create_app() -> FastAPI:
     importlib.import_module("app.services.oversold_bounce_scan")
     importlib.import_module("app.services.liquidity_hunt")
 
+    # Load user-configured extension modules (MARKETHAWK_EXTENSION_MODULES env var).
+    # Must come after built-in imports so built-in registrations are already
+    # present when extension modules attempt to build on top of them.
+    from app.core.extensions import load_extension_modules
+
+    load_extension_modules(settings.MARKETHAWK_EXTENSION_MODULES)
+
     # Log a clear warning at startup whenever trace-exposure mode is enabled
     _expose_traces = settings.ENVIRONMENT.lower() in ("development", "debug")
     if _expose_traces:

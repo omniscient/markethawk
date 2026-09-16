@@ -3,10 +3,11 @@ Application configuration using pydantic-settings.
 """
 
 from functools import lru_cache
+from typing import Annotated
 from urllib.parse import quote
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LLM_ALLOWED_FEATURE_AREAS = frozenset(
     {
@@ -68,6 +69,14 @@ class Settings(BaseSettings):
 
     # CORS — JSON array format in .env: CORS_ORIGINS=["http://localhost:3333","https://example.com"]
     CORS_ORIGINS: list[str] = ["http://localhost:3333"]
+
+    # Extension modules — comma-separated; NOT a JSON array (contrast with CORS_ORIGINS above).
+    # NoDecode stops pydantic-settings from JSON-decoding the raw env/.env value before
+    # validation; without it a bare comma-separated string (and the empty string) raises
+    # SettingsError at startup. Host-operator-only — see app/core/extensions.py docstring
+    # for the trust boundary.
+    # Example: MARKETHAWK_EXTENSION_MODULES=myedge.scanners,myedge.risk
+    MARKETHAWK_EXTENSION_MODULES: Annotated[list[str], NoDecode] = []
 
     # Auth
     JWT_SECRET_KEY: str = Field(default="", repr=False)
@@ -259,6 +268,13 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator("MARKETHAWK_EXTENSION_MODULES", mode="before")
+    @classmethod
+    def split_extension_modules(cls, v):
+        if isinstance(v, str):
+            return [m.strip() for m in v.split(",") if m.strip()]
+        return v
+
     @model_validator(mode="after")
     def validate_llm_guardrails(self) -> "Settings":
         unknown_features = self.llm_allowed_feature_set - LLM_ALLOWED_FEATURE_AREAS
@@ -271,9 +287,13 @@ class Settings(BaseSettings):
             )
         if self.LLM_FEATURES_ENABLED:
             if self.LLM_PROVIDER == "disabled":
-                raise ValueError("LLM_PROVIDER must be configured when LLM features are enabled")
+                raise ValueError(
+                    "LLM_PROVIDER must be configured when LLM features are enabled"
+                )
             if not self.LLM_MODEL.strip():
-                raise ValueError("LLM_MODEL must be configured when LLM features are enabled")
+                raise ValueError(
+                    "LLM_MODEL must be configured when LLM features are enabled"
+                )
         return self
 
     @property

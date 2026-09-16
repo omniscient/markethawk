@@ -35,7 +35,7 @@ flower==2.0.1
 
 # Environment Variables
 python-dotenv==1.2.2
-pydantic-settings>=2.0,<3.0
+pydantic-settings>=2.7,<3.0
 
 # Testing
 pytest==9.0.3
