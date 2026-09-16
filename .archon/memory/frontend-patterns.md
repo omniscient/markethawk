@@ -85,6 +85,18 @@ Entries are advisory. If an entry conflicts with CLAUDE.md or ARCHITECTURE.md, f
 
 - [AVOID] Do not rely on spec line-count yield estimates to predict which priority files will be sufficient for a coverage ratchet — with `all: true` and a large untested denominator, actual coverage yield per file can be 30–40% lower than estimated; always run `npx vitest run --coverage` after each batch and continue past the spec's priority list per D1 until the gate clears. <!-- issue:#250 date:2026-06-10 expires:2026-12-10 source:conformance path:frontend/src/ -->
 
+## Frontend: Data Quality Type Contracts
+
+- [AVOID] frontend/src/api/scanner/ — Do not simplify or flatten TypeScript interface shapes for API types that must match a backend contract. Wrong literal codes (e.g. `provider_gap` vs `provider_gaps`), dropped required fields, flattened nested objects, or renamed remediation fields break the wiring contract when the backend endpoint ships. Always use the exact shapes specified in the plan. <!-- issue:#495 date:2026-06-22 expires:2026-12-22 source:conformance -->
+
+- [AVOID] frontend/src/components/ — Do not implement a spec-named separate component file inline inside its consuming component. If the spec names `TrustGateBanner.tsx` as a separate file, it must be a separate file — inlining breaks the spec's file-structure contract. <!-- issue:#495 date:2026-06-22 expires:2026-12-22 source:conformance -->
+
+- [AVOID] frontend/src/components/ — Do not substitute a looser prop type on a component when the spec defines a typed prop (e.g. `warnings: QualityGateIssue[]`). The consumer should cast at the call site (`event.metadata.quality_warnings as QualityGateIssue[]`), keeping the component interface strict. <!-- issue:#495 date:2026-06-22 expires:2026-12-22 source:conformance -->
+
+- [AVOID] frontend/src/components/QualityReportModal/ — Do not render an "always visible when prop is present" component inside a conditional guard like `{rd && !isAnalyzing && (...)}`. If the spec says render it before the spinner, put it as the first child before all guards. <!-- issue:#495 date:2026-06-22 expires:2026-12-22 source:conformance -->
+
+- [AVOID] frontend/src/components/ — Architecture section descriptions are functional requirements. "compact run-level advisory banner that embeds TrustGateSummary in an expandable panel" means the banner must have a toggle that reveals a full TrustGateSummary — not a flat non-expandable strip. When the Architecture section names a specific composition pattern, implement it. <!-- issue:#495 date:2026-06-22 expires:2026-12-22 source:conformance -->
+
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from

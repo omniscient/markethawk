@@ -3,9 +3,22 @@ Application configuration using pydantic-settings.
 """
 
 from functools import lru_cache
+from urllib.parse import quote
 
-from pydantic import field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LLM_ALLOWED_FEATURE_AREAS = frozenset(
+    {
+        "scanner_narrative",
+        "alert_copy",
+        "post_mortem",
+        "semantic_search",
+        "analyst_qa",
+        "embeddings",
+    }
+)
+LLM_SUPPORTED_PROVIDERS = frozenset({"disabled", "openai", "anthropic", "local"})
 
 
 class Settings(BaseSettings):
@@ -14,14 +27,16 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
     # Database - REQUIRED
-    DATABASE_URL: str
+    DATABASE_URL: str = Field(repr=False)
 
     # Polygon.io API - REQUIRED
-    POLYGON_API_KEY: str
+    POLYGON_API_KEY: str = Field(repr=False)
     POLYGON_DELAYED: bool = True
     LIVE_WEBSOCKET_ENABLED: bool = True
 
-    # Redis / Celery
+    # Redis / Celery - REDIS_PASSWORD is REQUIRED (no default): an omitted value
+    # must fail startup, not silently fall back to an unauthenticated URL (F-NET-01).
+    REDIS_PASSWORD: str
     REDIS_URL: str = "redis://redis:6379/0"
     RATE_LIMITING_ENABLED: bool = True
 
@@ -34,6 +49,10 @@ class Settings(BaseSettings):
     # "production" hides internals and only returns error_id.
     # Default is "production" so that an unset env var NEVER leaks stack traces.
     ENVIRONMENT: str = "production"
+
+    # Live scanner: when True, use MockLiveAdapter instead of IBKRLiveAdapter.
+    # Set to "true" in CI environments that lack IBKR paper credentials.
+    LIVE_SCANNER_MOCK: bool = False
 
     # Error Tracking
     # SEQ_URL: base URL for the Seq container (no trailing slash).
@@ -51,7 +70,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:3333"]
 
     # Auth
-    JWT_SECRET_KEY: str = ""
+    JWT_SECRET_KEY: str = Field(default="", repr=False)
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -97,22 +116,54 @@ class Settings(BaseSettings):
     # Must differ from IBKR_CLIENT_ID and from the live scanner's clientId (5).
     IBKR_TRADING_CLIENT_ID: int = 11
 
+    # ── Live trading safety controls ──────────────────────────────────────────────
+    # LIVE_TRADING_ARMED: must be explicitly True in env to allow real orders.
+    # Not API-settable — requires container/env access to change.
+    LIVE_TRADING_ARMED: bool = False
+    # TRADING_KILL_SWITCH: also checked via os.getenv() at call time for
+    # real-time halt without restart. Settings field provides startup visibility.
+    TRADING_KILL_SWITCH: bool = False
+    MAX_ORDER_NOTIONAL: float = 10_000.0  # USD hard cap per order
+    MAX_ORDER_QTY: int = 200  # shares hard cap per order
+
     # ── Email / SMTP (Alert Notifications) ────────────────────────────────
     # Use Gmail + an App Password (not your real Gmail password).
     # Generate one at: https://myaccount.google.com/apppasswords
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
+    SMTP_PASSWORD: str = Field(default="", repr=False)
     SMTP_FROM_EMAIL: str = "MarketHawk Alerts <noreply@example.com>"
+
+    # System notifications (generic non-scanner alerts). Both optional/empty-default —
+    # NEVER make these required-no-default (would break the smoke gate, cf. REDIS_PASSWORD).
+    OPS_ALERT_EMAIL: str = ""
+    INTERNAL_API_TOKEN: str = Field(default="", repr=False)
 
     # ── Web Push / VAPID (Browser Push Notifications) ─────────────────────
     # Generate a key pair once with: python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print('PRIV:', v.private_pem().decode()); print('PUB:', v.public_key)"
     # Or use the /api/alerts/push/generate-keys endpoint on first run.
-    VAPID_PRIVATE_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = Field(default="", repr=False)
     VAPID_PUBLIC_KEY: str = ""
     # Must be a mailto: or https: URL identifying the push sender
     VAPID_CLAIMS_EMAIL: str = "mailto:admin@example.com"
+
+    # Scanner SLO thresholds — documented in ENV_VARIABLES.md
+    SCAN_DURATION_SLO_SECONDS: int = 120
+    SCAN_STALENESS_SLO_SECONDS: int = 900
+
+    # Optional LLM features. These remain disabled by default and are only
+    # consulted by explicit LLM feature paths; deterministic explainability is
+    # intentionally independent of these provider settings.
+    LLM_FEATURES_ENABLED: bool = False
+    LLM_PROVIDER: str = "disabled"
+    LLM_MODEL: str = ""
+    LLM_MAX_TOKENS: int = Field(default=800, gt=0)
+    LLM_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0)
+    LLM_MAX_RETRIES: int = Field(default=1, ge=0)
+    LLM_RETRY_BACKOFF_SECONDS: float = Field(default=0.5, gt=0)
+    LLM_MAX_COST_USD_PER_CALL: float = Field(default=0.0, ge=0)
+    LLM_ALLOWED_FEATURES: str = ""
 
     # ── WebSocket resource limits ──────────────────────────────────────────
     # Single-process in-memory counters (see app/core/ws_limits.py).
@@ -150,6 +201,54 @@ class Settings(BaseSettings):
     def normalize_environment(cls, v: str) -> str:
         return v.lower()
 
+    @field_validator("LLM_PROVIDER")
+    @classmethod
+    def normalize_llm_provider(cls, v: str) -> str:
+        provider = v.strip().lower()
+        if provider not in LLM_SUPPORTED_PROVIDERS:
+            supported = ", ".join(sorted(LLM_SUPPORTED_PROVIDERS))
+            raise ValueError(f"LLM_PROVIDER must be one of: {supported}")
+        return provider
+
+    @field_validator("LIVE_TRADING_ARMED")
+    @classmethod
+    def warn_live_trading_armed(cls, v: bool) -> bool:
+        if v:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "LIVE_TRADING_ARMED=True — live order placement is ENABLED at the env level."
+            )
+        return v
+
+    @field_validator("REDIS_PASSWORD")
+    @classmethod
+    def validate_redis_password(cls, v: str) -> str:
+        if not v:
+            raise ValueError(
+                "REDIS_PASSWORD is required — Redis runs with requirepass and an "
+                "unauthenticated connection is refused. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(24))'"
+            )
+        if len(v) < 16:
+            raise ValueError(
+                "REDIS_PASSWORD must be at least 16 characters. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(24))'"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _build_redis_url(self) -> "Settings":
+        if self.REDIS_PASSWORD:
+            if "://" not in self.REDIS_URL:
+                raise ValueError("REDIS_URL must include a scheme (e.g. redis://...)")
+            scheme, rest = self.REDIS_URL.split("://", 1)
+            if "@" in rest:
+                rest = rest.split("@", 1)[1]
+            encoded = quote(self.REDIS_PASSWORD, safe="")
+            self.REDIS_URL = f"{scheme}://:{encoded}@{rest}"
+        return self
+
     @field_validator("JWT_SECRET_KEY")
     @classmethod
     def validate_jwt_secret_key(cls, v: str) -> str:
@@ -159,6 +258,31 @@ class Settings(BaseSettings):
                 "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(48))'"
             )
         return v
+
+    @model_validator(mode="after")
+    def validate_llm_guardrails(self) -> "Settings":
+        unknown_features = self.llm_allowed_feature_set - LLM_ALLOWED_FEATURE_AREAS
+        if unknown_features:
+            unknown = ", ".join(sorted(unknown_features))
+            supported = ", ".join(sorted(LLM_ALLOWED_FEATURE_AREAS))
+            raise ValueError(
+                f"LLM_ALLOWED_FEATURES contains unsupported feature area(s): {unknown}. "
+                f"Supported areas: {supported}"
+            )
+        if self.LLM_FEATURES_ENABLED:
+            if self.LLM_PROVIDER == "disabled":
+                raise ValueError("LLM_PROVIDER must be configured when LLM features are enabled")
+            if not self.LLM_MODEL.strip():
+                raise ValueError("LLM_MODEL must be configured when LLM features are enabled")
+        return self
+
+    @property
+    def llm_allowed_feature_set(self) -> frozenset[str]:
+        return frozenset(
+            feature.strip()
+            for feature in self.LLM_ALLOWED_FEATURES.split(",")
+            if feature.strip()
+        )
 
 
 @lru_cache()

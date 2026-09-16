@@ -7,19 +7,21 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.common import Ticker
+
 
 class NewsPreferenceBase(BaseModel):
-    tracked_tickers: List[str] = []
+    tracked_tickers: List[Ticker] = []
     tracked_universes: List[int] = []
     refresh_interval_minutes: Optional[int] = 5
 
 
 class NewsPreferenceCreate(NewsPreferenceBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class NewsPreferenceUpdate(NewsPreferenceBase):
-    pass
+    model_config = ConfigDict(extra="forbid")
 
 
 class NewsPreferenceResponse(NewsPreferenceBase):

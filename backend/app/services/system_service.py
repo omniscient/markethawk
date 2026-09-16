@@ -10,7 +10,7 @@ import redis.asyncio as aioredis
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.utils.time import utc_now
+from app.utils.time import ensure_utc, utc_now
 
 logger = __import__("logging").getLogger(__name__)
 
@@ -149,7 +149,7 @@ class SystemService:
             if not ts_str:
                 return False
             try:
-                started = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+                started = ensure_utc(datetime.fromisoformat(ts_str))
                 return (datetime.now(timezone.utc) - started).total_seconds() / 3600 > 4
             except (ValueError, TypeError):
                 return False

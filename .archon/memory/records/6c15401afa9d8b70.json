@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-04",
+      "evidence_tag": null,
+      "issue": 210,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-04",
+  "id": "6c15401afa9d8b70",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "The shared de-conflict step for `continue` runs in `entrypoint.sh` BEFORE the archon call: checkout the feature branch, merge origin/main, apply Tier 1/2/3. Archon then runs on the already-synced branch. The implement agent sees the merge commit in `git log` and understands the sync already happened.",
+  "superseded_by": null,
+  "supersedes": []
+}

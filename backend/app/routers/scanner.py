@@ -15,6 +15,7 @@ from fastapi import (
     Request,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
 from sqlalchemy.orm import Session, selectinload
 
@@ -23,12 +24,14 @@ from app.core.cache import cache_response, get_cached
 from app.core.database import get_db
 from app.core.rate_limits import SCANNER_LIMIT, limiter
 from app.models import MonitoredStock, ScannerConfig, ScannerEvent, ScannerRun
+from app.models.scanner_replay_diff import ScannerReplayDiff
 from app.models.signal_review import SignalReview
 from app.models.user import User
 from app.schemas import (
     ClearEventsResponse,
     PreMarketMoversResponse,
     ScannerConfigResponse,
+    ScannerCoverageResponse,
     ScannerEventResponse,
     ScannerRangeRequest,
     ScannerRunAsyncResponse,
@@ -38,6 +41,7 @@ from app.schemas import (
     ScannerStatsResponse,
     ScannerStatusBlockResponse,
 )
+from app.schemas.scanner import ScannerReplayDiffSchema
 from app.schemas.signal_review import (
     SignalReviewRequest,
     SignalReviewResponse,
@@ -47,8 +51,8 @@ from app.services import StockDataService
 from app.services.scan_orchestrator import get_scan_progress, request_scan_cancel
 from app.services.scanner import ScannerService
 from app.services.scanner_query_service import ScannerQueryService
-from app.utils.session import get_market_today
-from app.utils.time import utc_now
+from app.utils.session import get_market_now, get_market_today
+from app.utils.time import ensure_utc, utc_now
 
 router = APIRouter(prefix="/api/v1/scanner", tags=["scanner"])
 
@@ -60,6 +64,17 @@ def _last_completed_weekday() -> "date":
     d = get_market_today() - _td(days=1)
     while d.weekday() >= 5:  # Saturday=5, Sunday=6
         d -= _td(days=1)
+    return d
+
+
+def _latest_completed_trading_day() -> "date":
+    now = get_market_now()
+    if now.weekday() < 5 and (now.hour, now.minute) >= (16, 0):
+        d = now.date()
+    else:
+        d = now.date() - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
     return d
 
 
@@ -160,7 +175,7 @@ def run_scanner(
 
     started_at = scanner_run.created_at
     if started_at and started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
+        started_at = ensure_utc(started_at)
 
     return ScannerRunAsyncResponse(
         scan_id=scan_id,
@@ -201,7 +216,7 @@ def get_scan_status(scan_id: str, db: Session = Depends(get_db)):
 
     started_at = run.created_at
     if started_at and started_at.tzinfo is None:
-        started_at = started_at.replace(tzinfo=timezone.utc)
+        started_at = ensure_utc(started_at)
 
     return ScannerRunStatusResponse(
         scan_id=str(run.uuid),
@@ -335,7 +350,7 @@ async def scan_run_websocket(
 
 @router.get("/history", response_model=List[ScannerRunResponse])
 def get_scanner_history(
-    limit: int = 20,
+    limit: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
     """Get recent scanner runs."""
@@ -359,15 +374,26 @@ def get_scanner_history(
     ]
 
 
+# Explicit sort allowlist — replaces a reflective getattr(ScannerEvent, ...)
+# lookup that widened the attack surface to arbitrary attributes (CWE-915).
+SCANNER_RESULTS_SORT_COLUMNS = {
+    "signal_quality_score": ScannerEvent.signal_quality_score,
+    "event_date": ScannerEvent.event_date,
+    "ticker": ScannerEvent.ticker,
+    "severity": ScannerEvent.severity,
+    "created_at": ScannerEvent.created_at,
+}
+
+
 @router.get("/results", response_model=List[ScannerEventResponse])
 def get_scanner_results(
     ticker: Optional[str] = None,
     scanner_type: Optional[str] = None,
     event_type: Optional[str] = None,  # Alias for backward compat
     universe_id: Optional[int] = None,
-    sort_by: Optional[str] = "signal_quality_score",
+    sort_by: str = "signal_quality_score",
     sort_order: Optional[str] = "desc",
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=200),
     offset: int = 0,
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
@@ -404,25 +430,34 @@ def get_scanner_results(
     if end_date:
         query = query.filter(ScannerEvent.event_date <= end_date)
 
-    # Sorting logic
-    try:
-        if sort_by:
-            sort_attr = getattr(ScannerEvent, sort_by, ScannerEvent.created_at)
-            if sort_order.lower() == "desc":
-                order_expr = sort_attr.desc().nulls_last()
-            else:
-                order_expr = sort_attr.asc().nulls_last()
-            query = query.order_by(order_expr)
-        else:
-            query = query.order_by(
-                ScannerEvent.signal_quality_score.desc().nulls_last()
-            )
-    except Exception:
-        query = query.order_by(ScannerEvent.created_at.desc())
+    # Sorting — validate against an explicit allowlist (no reflective getattr)
+    sort_attr = SCANNER_RESULTS_SORT_COLUMNS.get(sort_by)
+    if sort_attr is None:
+        raise HTTPException(status_code=422, detail=f"Invalid sort field: {sort_by}")
+    if (sort_order or "desc").lower() == "desc":
+        order_expr = sort_attr.desc().nulls_last()
+    else:
+        order_expr = sort_attr.asc().nulls_last()
+    query = query.order_by(order_expr)
 
     results = query.limit(limit).offset(offset).all()
 
     return results
+
+
+@router.post("/explanations/backfill", status_code=status.HTTP_202_ACCEPTED)
+def queue_scanner_explanation_backfill(
+    scanner_type: Optional[str] = None,
+    limit: int = Query(500, ge=1, le=5000),
+):
+    """Queue a best-effort explanation backfill for historical scanner events."""
+    from app.tasks.explanations import backfill_scanner_explanations
+
+    task = backfill_scanner_explanations.delay(
+        scanner_type=scanner_type,
+        limit=limit,
+    )
+    return {"status": "queued", "task_id": task.id}
 
 
 @router.get("/signal-quality-distribution")
@@ -540,6 +575,22 @@ def get_scan_status_block(
         db, scanner_type, universe_id=universe_id
     )
     return ScannerStatusBlockResponse(**data)
+
+
+@router.get("/coverage", response_model=ScannerCoverageResponse)
+def get_scanner_coverage(
+    scanner_type: str,
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """Derived scan coverage for one scanner type and universe."""
+    data = ScannerQueryService.get_coverage(
+        db,
+        scanner_type,
+        universe_id,
+        latest_trading_day=_latest_completed_trading_day(),
+    )
+    return ScannerCoverageResponse(**data)
 
 
 @router.get("/configs", response_model=List[ScannerConfigResponse])
@@ -706,3 +757,18 @@ def get_review_stats(
         db, scanner_type=scanner_type, start_date=start_date, end_date=end_date
     )
     return SignalReviewStatsResponse(**data)
+
+
+@router.get("/replay-diffs", response_model=List[ScannerReplayDiffSchema])
+def get_replay_diffs(
+    scanner_type: Optional[str] = Query(None),
+    days: int = Query(default=30, ge=1, le=90),
+    db: Session = Depends(get_db),
+):
+    """Return replay-diff records for the last N days (default 30, max 90)."""
+    cutoff = date.today() - timedelta(days=days)
+    q = db.query(ScannerReplayDiff).filter(ScannerReplayDiff.scan_date >= cutoff)
+    if scanner_type:
+        q = q.filter(ScannerReplayDiff.scanner_type == scanner_type)
+    rows = q.order_by(ScannerReplayDiff.scan_date.desc()).all()
+    return rows

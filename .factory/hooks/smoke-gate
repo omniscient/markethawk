@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# MarketHawk smoke-gate hook — CHECK ONLY.
+# Exit 0 = origin/main is green; non-zero = red.
+# Red/green STATE handling (sentinel file, regression ticket, clean-halt exit 0)
+# stays factory-side: dark-factory scripts/hooks.sh wraps this check with
+# _smoke_on_red/_smoke_on_green. Do not add state handling here.
+# Ported from dark-factory smoke_gate.sh _smoke_check_main.
+set -uo pipefail
+
+echo "[smoke-gate hook] Checking frontend TypeScript (tsc)..."
+if ! (cd "${CLONE_DIR}/frontend" \
+      && rm -f tsconfig.app.tsbuildinfo \
+      && npx tsc -p tsconfig.app.json --noEmit 2>&1); then
+  echo "[smoke-gate hook] tsc FAILED — main is red"
+  exit 1
+fi
+
+echo "[smoke-gate hook] Checking backend Python import graph..."
+# Throwaway values: the gate verifies the import graph compiles, NOT that config
+# is real. Settings() instantiates at import time and requires DATABASE_URL /
+# POLYGON_API_KEY / JWT_SECRET_KEY (>=32 chars) / REDIS_PASSWORD (>=16 chars).
+if ! (cd "${CLONE_DIR}/backend" \
+      && DATABASE_URL="postgresql://smoke:smoke@localhost:5432/smoke" \
+         POLYGON_API_KEY="smoke-gate-only-not-a-real-key" \
+         JWT_SECRET_KEY="smoke-gate-only-not-secret-0123456789abcdef" \
+         REDIS_PASSWORD="smoke-gate-only-not-a-real-redis-password" \
+         python -c "import app.main" 2>&1); then
+  echo "[smoke-gate hook] python import FAILED — main is red"
+  exit 1
+fi
+
+echo "[smoke-gate hook] main is green"
+exit 0
