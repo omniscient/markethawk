@@ -188,6 +188,8 @@ services:
       # System notifications (#570) — shared secret for POST /api/v1/alerts/system + ops recipient
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
       OPS_ALERT_EMAIL: ${OPS_ALERT_EMAIL:-}
+      # Host-operator-only extension modules — see ENV_VARIABLES.md
+      MARKETHAWK_EXTENSION_MODULES: ${MARKETHAWK_EXTENSION_MODULES:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -282,6 +284,8 @@ services:
       OTEL_SERVICE_NAME: markethawk-worker
       # JWT auth secret — required by Settings validator (>=32 chars), sourced from .env
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      # Host-operator-only extension modules — see ENV_VARIABLES.md
+      MARKETHAWK_EXTENSION_MODULES: ${MARKETHAWK_EXTENSION_MODULES:-}
     depends_on:
       postgres:
         condition: service_healthy
