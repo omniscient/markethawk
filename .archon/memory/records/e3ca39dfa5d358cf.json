@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-21",
+      "evidence_tag": null,
+      "issue": 493,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-21",
+  "id": "e3ca39dfa5d358cf",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "SlowAPI `@limiter.limit()` requires the `Request` parameter to be named exactly `request` (not `http_request` or any alias) \u2014 SlowAPI inspects the function signature by name and raises `Exception: No \"request\" or \"websocket\" argument on function` at decorator application time if the name doesn't match. All rate-limited handlers in `backend/app/routers/` use `request: Request` for this reason.",
+  "superseded_by": null,
+  "supersedes": []
+}

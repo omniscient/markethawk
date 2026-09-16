@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-14",
+      "evidence_tag": null,
+      "issue": 379,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-14",
+  "id": "4020d186af127aea",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Two per-consumer socket proxies replace the old shared one (issue #379): `docker-socket-proxy-scheduler` (CONTAINERS/IMAGES/POST=1, no BUILD/EXEC/NETWORKS/VOLUMES) for `backlog-scheduler`; `docker-socket-proxy-factory` (all verbs incl. EXEC=1) for `dark-factory`. Both have no `profiles:` key. Wire consumers via `DOCKER_HOST: tcp://docker-socket-proxy-<consumer>:2375` and `depends_on: [docker-socket-proxy-<consumer>]`.",
+  "superseded_by": null,
+  "supersedes": []
+}

@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-27",
+      "evidence_tag": null,
+      "issue": 633,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-27",
+  "id": "2820fabe1745391d",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "codebase",
+  "source_file": "codebase-patterns.md",
+  "summary": "Define service-level `typing.Protocol`s in `schemas/` (not a new `protocols/` folder) \u2014 this is the established contract home for the domain. Export a module-level singleton typed as the Protocol from the concrete service file (`quality_gate_service: QualityGateServiceProtocol = QualityGateService()`); consumers import and call the singleton rather than the class so adding new implementations never requires editing consumers.",
+  "superseded_by": null,
+  "supersedes": []
+}

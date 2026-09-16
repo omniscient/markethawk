@@ -4,10 +4,18 @@ import os
 # Redis (db 1) is not available in the test environment; without this the
 # SlowAPIASGIMiddleware raises ConnectionError on every request.
 os.environ.setdefault("RATE_LIMITING_ENABLED", "false")
+os.environ.setdefault("LIVE_SCANNER_MOCK", "false")
+os.environ.setdefault("LIVE_TRADING_ARMED", "false")
 
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 os.environ.setdefault("POLYGON_API_KEY", "test-key-for-unit-tests-only")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-for-unit-tests-only-aaa")
+os.environ.setdefault("REDIS_PASSWORD", "devpassword1234567890abc")
+os.environ.setdefault("WS_MAX_CONNECTIONS_PER_USER", "10")
+os.environ.setdefault("WS_MAX_CONNECTIONS_GLOBAL", "100")
+os.environ.setdefault("WS_IDLE_TIMEOUT_SECONDS", "300")
+os.environ.setdefault("WS_SCAN_TASK_IDLE_TIMEOUT_SECONDS", "1800")
+os.environ.setdefault("WS_MAX_LIFETIME_SECONDS", "28800")
 
 import logging as _logging
 from contextlib import contextmanager

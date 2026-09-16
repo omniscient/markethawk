@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.schemas.common import BoundedDict
+
 VALID_VERDICTS = {"confirmed", "rejected", "enhanced", "uncertain"}
 VALID_REJECT_REASONS = {
     "noise",
@@ -19,11 +21,13 @@ VALID_REJECT_REASONS = {
 
 
 class SignalReviewCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     scanner_event_id: int
     verdict: str
     reject_reason: Optional[str] = None
     notes: Optional[str] = None
-    enhance_suggestion: Optional[Dict[str, Any]] = None
+    enhance_suggestion: Optional[BoundedDict] = None
 
     @field_validator("verdict")
     @classmethod
@@ -47,10 +51,12 @@ class SignalReviewCreate(BaseModel):
 class SignalReviewRequest(BaseModel):
     """Schema for UUID-based review endpoint where scanner_event_id comes from the URL."""
 
+    model_config = ConfigDict(extra="forbid")
+
     verdict: str
     reject_reason: Optional[str] = None
     notes: Optional[str] = None
-    enhance_suggestion: Optional[Dict[str, Any]] = None
+    enhance_suggestion: Optional[BoundedDict] = None
 
     @field_validator("verdict")
     @classmethod

@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-05",
+      "evidence_tag": null,
+      "issue": 192,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-05",
+  "id": "d60998d094a69d71",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "CSRF_EXEMPT_PREFIXES and AUTH EXEMPT_PREFIXES serve different concerns and must remain separate tuples in `main.py`. Do not merge them \u2014 CSRF exempts pre-authentication paths; auth exempts docs/health/metrics paths that are unrelated to CSRF.",
+  "superseded_by": null,
+  "supersedes": []
+}

@@ -1,0 +1,26 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-13",
+      "evidence_tag": null,
+      "issue": 360,
+      "source": "conformance"
+    }
+  ],
+  "expires_at": "2026-12-13",
+  "id": "b4fd3f9e7b17d26d",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [
+    "backend/tests/"
+  ],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "codebase",
+  "source_file": "codebase-patterns.md",
+  "summary": "Gating probe_running_postgres() behind an env-var (e.g. POSTGRES_DISCOVERY_ENABLED==true) in _testcontainers_url() is a fixture behaviour change that violates spec requirement #2; if a safety concern requires a gate, the spec must be updated to include it \u2014 do not add opt-in gates silently in the implementation",
+  "superseded_by": null,
+  "supersedes": []
+}

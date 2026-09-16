@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MarketHawk — Pipeline Report: 22 Days Later (v1 → v2)</title>
+<style>
+  :root{
+    --bg:#0a0b0e; --bg2:#0e1015; --panel:#13151d; --panel2:#181b24;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --ink:#eceef3; --mut:#9aa0ad; --mut2:#6b7280;
+    --amber:#ff8a3d; --amber-hot:#ff6a1a; --amber-soft:#ffc08a;
+    --cyan:#3fe0c8; --cyan-soft:#8af0e2;
+    --green:#54d18a; --red:#ff6b6b; --violet:#a78bfa;
+    --mono: ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --grad: linear-gradient(135deg,var(--amber-hot),var(--amber-soft));
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;
+       background-image:radial-gradient(1200px 600px at 70% -10%, rgba(255,138,61,.06), transparent 60%);}
+  .wrap{max-width:1080px;margin:0 auto;padding:2.5rem 1.4rem 4rem}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--amber-soft)}
+  h1{font-size:2.5rem;line-height:1.1;margin:.4rem 0 .6rem;font-weight:800;
+     background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h2{font-family:var(--mono);font-size:.95rem;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);
+     margin:2.6rem 0 .9rem;padding-top:1.2rem;border-top:1px solid var(--line)}
+  .sub{color:var(--mut);max-width:64ch}
+  .chips{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0 .4rem}
+  .chip{font-family:var(--mono);font-size:.72rem;color:var(--mut);background:var(--panel);
+        border:1px solid var(--line);border-radius:999px;padding:.3rem .7rem}
+  .thesis{margin-top:1.2rem;padding:1.1rem 1.2rem;background:var(--panel);border:1px solid var(--line);
+           border-left:3px solid var(--amber);border-radius:10px;color:var(--ink)}
+  .grid{display:grid;gap:.8rem}
+  .kpis{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem}
+  .tile .lbl{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut2)}
+  .tile .old{color:var(--mut2);text-decoration:line-through;font-size:.85rem;font-family:var(--mono)}
+  .tile .new{font-size:1.8rem;font-weight:800;font-family:var(--mono);line-height:1.1;margin-top:.15rem}
+  .pill{display:inline-block;font-family:var(--mono);font-size:.7rem;font-weight:700;border-radius:999px;
+        padding:.16rem .5rem;margin-top:.45rem}
+  .pill.up{background:rgba(84,209,138,.14);color:var(--green);border:1px solid rgba(84,209,138,.3)}
+  .pill.warn{background:rgba(255,107,107,.13);color:var(--red);border:1px solid rgba(255,107,107,.3)}
+  .pill.flat{background:rgba(154,160,173,.12);color:var(--mut);border:1px solid var(--line2)}
+  .pill.info{background:rgba(63,224,200,.12);color:var(--cyan);border:1px solid rgba(63,224,200,.3)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1.2rem 1.3rem;margin-top:.4rem}
+  .row{display:grid;grid-template-columns:140px 1fr 70px;align-items:center;gap:.6rem;margin:.32rem 0;font-size:.82rem}
+  .row .name{font-family:var(--mono);color:var(--mut);text-align:right;font-size:.76rem}
+  .row .val{font-family:var(--mono);color:var(--ink);text-align:right}
+  .bartrack{position:relative;height:20px;background:var(--bg2);border:1px solid var(--line);border-radius:5px;overflow:hidden}
+  .bar{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+  .bar.v1{background:rgba(154,160,173,.35);height:8px;top:2px}
+  .bar.v2{background:var(--grad);height:8px;bottom:2px}
+  .wk{display:grid;grid-template-columns:84px 1fr 1fr;gap:.5rem;align-items:center;margin:.28rem 0;font-size:.78rem}
+  .wk .w{font-family:var(--mono);color:var(--mut2);font-size:.72rem}
+  .wkbar{position:relative;height:16px;background:var(--bg2);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+  .wkbar > span{position:absolute;left:0;top:0;bottom:0}
+  .legend{display:flex;gap:1.2rem;font-family:var(--mono);font-size:.72rem;color:var(--mut);margin:.2rem 0 .8rem}
+  .legend i{display:inline-block;width:18px;height:8px;border-radius:3px;vertical-align:middle;margin-right:.35rem}
+  .new-chip{font-family:var(--mono);font-size:.6rem;font-weight:700;color:var(--violet);
+            background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.35);border-radius:999px;padding:.05rem .4rem;margin-left:.4rem}
+  .verdict{background:linear-gradient(135deg,rgba(255,106,26,.10),rgba(255,192,138,.05));
+           border:1px solid var(--line2);border-left:3px solid var(--amber);border-radius:12px;padding:1.3rem 1.4rem;margin-top:.5rem}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+  @media(max-width:720px){.two{grid-template-columns:1fr}}
+  .big{font-size:2rem;font-weight:800;font-family:var(--mono)}
+  footer{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line);color:var(--mut2);
+         font-family:var(--mono);font-size:.72rem}
+  a{color:var(--cyan)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">MarketHawk · Dark Factory delivery pipeline · comparison</div>
+  <h1>Pipeline Report — 22 Days Later</h1>
+  <div class="sub mono" style="color:var(--mut)">v1 (2026-06-04) &nbsp;→&nbsp; v2 (2026-06-26)</div>
+  <div class="chips">
+    <span class="chip">window: 2026-06-04 → 2026-06-26 (~22 days)</span>
+    <span class="chip">+260 issues tracked</span>
+    <span class="chip">×4.9 cumulative AI spend</span>
+    <span class="chip">autonomy 30% → 43%</span>
+  </div>
+  <div class="thesis">
+    The autonomous production line scaled roughly <strong>3× in throughput</strong> and
+    <strong>~5× in cumulative AI spend</strong> while holding <strong>cost-per-ticket essentially flat (~$6.5)</strong>
+    and lifting the autonomous share from <strong>30% → 43%</strong>. The typical ticket got
+    <strong>slower</strong> (median lead 30h → 49h) as the factory added quality gates — but the
+    <strong>worst-case tail tightened</strong> (p85 226h → 201h): more consistent delivery, fewer extreme stragglers,
+    at the price of a higher median.
+  </div>
+
+  <h2>① Headline KPIs</h2>
+  <div class="grid kpis">
+    <div class="tile"><div class="lbl">Issues tracked</div><div class="old">116</div><div class="new">376</div><span class="pill info">×3.2 · +260</span></div>
+    <div class="tile"><div class="lbl">Issues shipped (closed)</div><div class="old">93</div><div class="new">285</div><span class="pill info">×3.1 · +192</span></div>
+    <div class="tile"><div class="lbl">Open backlog</div><div class="old">23</div><div class="new">91</div><span class="pill flat">+68 (creation-led)</span></div>
+    <div class="tile"><div class="lbl">Autonomous tickets</div><div class="old">35</div><div class="new">162</div><span class="pill up">×4.6 · +127</span></div>
+    <div class="tile"><div class="lbl">% autonomous</div><div class="old">30.2%</div><div class="new">43.1%</div><span class="pill up">+12.9 pts</span></div>
+    <div class="tile"><div class="lbl">Total AI spend</div><div class="old">$214.56</div><div class="new">$1,053.30</div><span class="pill info">×4.9 · +$839</span></div>
+    <div class="tile"><div class="lbl">Avg cost / ticket</div><div class="old">$6.13</div><div class="new">$6.50</div><span class="pill flat">+6% · ~flat</span></div>
+    <div class="tile"><div class="lbl">Median lead time</div><div class="old">30.1 h</div><div class="new">49.3 h</div><span class="pill warn">+64% · slower</span></div>
+    <div class="tile"><div class="lbl">p85 lead time</div><div class="old">226.0 h</div><div class="new">200.6 h</div><span class="pill up">−11% · tighter tail</span></div>
+  </div>
+
+  <h2>② Throughput &amp; flow — created vs. closed per week</h2>
+  <div class="card">
+    <div class="legend"><span><i style="background:var(--amber)"></i>created</span><span><i style="background:var(--cyan)"></i>closed</span><span class="mono" style="color:var(--mut2)">bar width ∝ count (max 176, week of 06-08)</span></div>
+    <!-- scale: 176 -> 100% ; px width via calc on % -->
+    <div class="wk"><span class="w">04-27</span><div class="wkbar"><span style="width:8.5%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:0.6%;background:var(--cyan)"></span></div></div>
+    <div class="wk"><span class="w">05-04</span><div class="wkbar"><span style="width:5.7%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:1.7%;background:var(--cyan)"></span></div></div>
+    <div class="wk"><span class="w">05-11</span><div class="wkbar"><span style="width:1.7%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:10.8%;background:var(--cyan)"></span></div></div>
+    <div class="wk"><span class="w">05-18</span><div class="wkbar"><span style="width:4.0%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:6.3%;background:var(--cyan)"></span></div></div>
+    <div class="wk"><span class="w">05-25</span><div class="wkbar"><span style="width:20.5%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:17.6%;background:var(--cyan)"></span></div></div>
+    <div class="wk"><span class="w">06-01</span><div class="wkbar"><span style="width:46.6%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:27.8%;background:var(--cyan)"></span></div></div>
+    <div class="wk"><span class="w">06-08</span><div class="wkbar"><span style="width:100%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:63.1%;background:var(--cyan)"></span></div></div>
+    <div class="wk"><span class="w">06-15</span><div class="wkbar"><span style="width:18.8%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:20.5%;background:var(--cyan)"></span></div></div>
+    <div class="wk"><span class="w">06-22</span><div class="wkbar"><span style="width:8.0%;background:var(--amber)"></span></div><div class="wkbar"><span style="width:13.6%;background:var(--cyan)"></span></div></div>
+    <p class="sub" style="margin-top:1rem;font-size:.85rem">v1 ended at the <span class="mono">06-01</span> week (cum-closed 93, backlog 23). v2 adds a <strong>176-created / 111-closed surge the week of 06-08</strong> (backlog peaks at 104), then <strong>closes outrun creates</strong> in the final two weeks (06-15: 33/36, 06-22: 14/24) — backlog declining 104 → 101 → 91. Cumulative closed: <span class="mono">93 → 285</span>.</p>
+  </div>
+
+  <h2>③ AI cost — cumulative + by pipeline step</h2>
+  <div class="two">
+    <div class="card">
+      <div class="lbl mono" style="color:var(--mut2);font-size:.7rem;letter-spacing:.1em">CUMULATIVE SPEND</div>
+      <div class="big" style="margin:.3rem 0;color:var(--amber-soft)">$214.56 → $1,053.30</div>
+      <div class="bartrack" style="height:14px"><div class="bar" style="height:100%;width:20.4%;background:rgba(154,160,173,.4)"></div></div>
+      <div class="mono" style="font-size:.68rem;color:var(--mut2);margin:.2rem 0 .6rem">v1 was 20% of today's spend</div>
+      <div class="bartrack" style="height:14px"><div class="bar" style="height:100%;width:100%;background:var(--grad)"></div></div>
+      <p class="sub" style="font-size:.82rem;margin-top:.7rem">+$838.74 over ~22 days. Cost-per-ticket held flat (~$6.5), so spend grew with <em>volume</em>, not waste.</p>
+    </div>
+    <div class="card">
+      <div class="lbl mono" style="color:var(--mut2);font-size:.7rem;letter-spacing:.1em">TOKENS / EFFICIENCY READ</div>
+      <p class="sub" style="font-size:.85rem">Average <span class="mono">$6.13 → $6.50</span> per autonomous ticket — a 6% drift despite 4.6× more autonomous runs and added gates. The pipeline stayed cost-efficient as it scaled; the new spend is throughput, not regression.</p>
+      <p class="sub" style="font-size:.85rem;margin-top:.6rem">% autonomous climbed <span class="mono">30.2% → 43.1%</span> — a larger fraction of delivery now flows through the factory rather than by hand.</p>
+    </div>
+  </div>
+  <div class="card">
+    <div class="legend"><span><i style="background:rgba(154,160,173,.5)"></i>v1 ($)</span><span><i style="background:var(--amber)"></i>v2 ($)</span><span class="mono" style="color:var(--mut2)">bar ∝ $ (max $319, implement)</span></div>
+    <div class="row"><span class="name">implement</span><div class="bartrack"><div class="bar v1" style="width:25.3%"></div><div class="bar v2" style="width:100%"></div></div><span class="val">$319</span></div>
+    <div class="row"><span class="name">plan</span><div class="bartrack"><div class="bar v1" style="width:23.5%"></div><div class="bar v2" style="width:83.1%"></div></div><span class="val">$265</span></div>
+    <div class="row"><span class="name">refine</span><div class="bartrack"><div class="bar v1" style="width:6.2%"></div><div class="bar v2" style="width:70.0%"></div></div><span class="val">$223</span></div>
+    <div class="row"><span class="name">conformance</span><div class="bartrack"><div class="bar v1" style="width:4.7%"></div><div class="bar v2" style="width:41.7%"></div></div><span class="val">$133</span></div>
+    <div class="row"><span class="name">code-review<span class="new-chip">NEW</span></span><div class="bartrack"><div class="bar v1" style="width:0%"></div><div class="bar v2" style="width:16.6%"></div></div><span class="val">$53</span></div>
+    <div class="row"><span class="name">validate</span><div class="bartrack"><div class="bar v1" style="width:6.7%"></div><div class="bar v2" style="width:13.5%"></div></div><span class="val">$43</span></div>
+    <div class="row"><span class="name">parse-intent</span><div class="bartrack"><div class="bar v1" style="width:0.4%"></div><div class="bar v2" style="width:2.2%"></div></div><span class="val">$7</span></div>
+    <div class="row"><span class="name">classify-preview</span><div class="bartrack"><div class="bar v1" style="width:0.2%"></div><div class="bar v2" style="width:1.5%"></div></div><span class="val">$5</span></div>
+    <div class="row"><span class="name">revise-advisory<span class="new-chip">NEW</span></span><div class="bartrack"><div class="bar v1" style="width:0%"></div><div class="bar v2" style="width:1.0%"></div></div><span class="val">$3</span></div>
+    <p class="sub" style="margin-top:1rem;font-size:.85rem">The cost <em>shape</em> changed: <strong>refine ×11.3</strong> ($20→$223) and <strong>conformance ×8.8</strong> ($15→$133) grew far faster than implement (×4.0) — the factory poured spend into <strong>refinement and conformance gates</strong>. New stages appeared: <span class="mono">code-review</span> ($53), <span class="mono">revise-advisory</span>, <span class="mono">de-conflict</span>, <span class="mono">bench-mode-probe</span> — the pipeline added review/verification machinery it didn't have at v1.</p>
+  </div>
+
+  <h2>④ Speed — median vs. p85 lead time</h2>
+  <div class="card">
+    <div class="row"><span class="name">median (v1)</span><div class="bartrack"><div class="bar" style="height:100%;width:13.3%;background:rgba(154,160,173,.4)"></div></div><span class="val">30.1 h</span></div>
+    <div class="row"><span class="name">median (v2)</span><div class="bartrack"><div class="bar" style="height:100%;width:21.8%;background:var(--red)"></div></div><span class="val">49.3 h</span></div>
+    <div class="row"><span class="name">p85 (v1)</span><div class="bartrack"><div class="bar" style="height:100%;width:100%;background:rgba(154,160,173,.4)"></div></div><span class="val">226 h</span></div>
+    <div class="row"><span class="name">p85 (v2)</span><div class="bartrack"><div class="bar" style="height:100%;width:88.8%;background:var(--green)"></div></div><span class="val">201 h</span></div>
+    <p class="sub" style="margin-top:1rem;font-size:.85rem"><strong>Median up, p85 down.</strong> The middle of the distribution slowed (more tickets now pass through code-review + conformance gates), but the long tail tightened by 11% — the factory produces <strong>more consistent</strong> outcomes with fewer multi-day stragglers. A classic throughput-vs-latency trade as quality gates land.</p>
+  </div>
+
+  <h2>⑤ Verdict</h2>
+  <div class="verdict">
+    <p style="margin-top:0"><strong>The autonomous line scaled hard and stayed cost-disciplined.</strong> Over 22 days it tripled throughput (93 → 285 shipped), nearly quintupled spend (driven by volume, not unit cost), and moved from a 30%-autonomous operation to 43%. Cost-per-ticket barely moved (~$6.5), which is the headline efficiency signal: the factory got bigger without getting wasteful.</p>
+    <p>The honest cost of that maturity is a <strong>slower median ticket</strong> (30h → 49h) — the price of the new <span class="mono">code-review</span>, <span class="mono">conformance</span>, and <span class="mono">refine</span> gates (the three fastest-growing cost centers). It bought a tighter worst-case tail (p85 −11%) and presumably higher merge quality. <strong>The two leading indicators to watch next:</strong> cost-per-ticket (keep it flat as volume grows) and median lead time (don't let gate-stacking push it past the point of diminishing returns).</p>
+  </div>
+
+  <footer>
+    Comparison of two point-in-time snapshots of <span class="mono">docs/pipeline-report.html</span> — v1 generated 2026-06-05 (data @ 2026-06-04), v2 generated 2026-06-26 (main @ 56ab037). Figures from the committed <span class="mono">metrics.json</span> snapshots (v1 from git history). Cost/health metrics cover the autonomous subset (35 → 162 cost-reported tickets); throughput/speed cover all tracked issues. Self-contained · regenerate via <span class="mono">scripts/generate.sh</span>.
+  </footer>
+
+</div>
+</body>
+</html>

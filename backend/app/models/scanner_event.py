@@ -52,11 +52,19 @@ class ScannerEvent(Base):
     # Enrichment metadata (catalysts, splits, float rotation, etc.)
     metadata_ = Column("metadata", JSONB, nullable=False, default=dict)
 
+    # Scanner-neutral explainability payload.
+    explanation = Column(JSONB, nullable=True)
+
     signal_cluster_id = Column(
         Integer, ForeignKey("signal_clusters.id"), nullable=True, index=True
     )
 
+    scanner_run_id = Column(
+        Integer, ForeignKey("scanner_runs.id"), nullable=True, index=True
+    )
+
     signal_quality_score = Column(Float, nullable=True)
+    regime = Column(String(30), nullable=True, index=True)
 
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(

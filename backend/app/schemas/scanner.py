@@ -2,15 +2,19 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.common import InteractiveDateRange, Ticker
 
 
 class ScannerRunRequest(BaseModel):
     """Schema for scanner run requests."""
 
+    model_config = ConfigDict(extra="forbid")
+
     universe_id: Optional[int] = None
-    tickers: Optional[List[str]] = None
-    scanner_type: str = "pre_market_volume"
+    tickers: Optional[List[Ticker]] = None
+    scanner_type: str = Field(default="pre_market_volume", max_length=50)
     dry_run: bool = False
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -156,18 +160,44 @@ class ScannerStatusBlockResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ScannerCoverageRange(BaseModel):
+    start: date
+    end: date
+    runs: int
+    events: int
+
+
+class ScannerCoverageGap(BaseModel):
+    start: date
+    end: date
+    weekdays: int
+
+
+class ScannerCoverageResponse(BaseModel):
+    scanner_type: str
+    universe_id: int
+    latest_covered: Optional[date] = None
+    latest_trading_day: date
+    covered: List[ScannerCoverageRange] = []
+    gaps: List[ScannerCoverageGap] = []
+
+
 class ClearEventsResponse(BaseModel):
     ticker: str
     deleted_count: int
 
 
-class ScannerRangeRequest(BaseModel):
-    """Schema for a date-range scanner run against a single ticker."""
+class ScannerRangeRequest(InteractiveDateRange):
+    """Schema for a date-range scanner run against a single ticker.
 
-    ticker: str
+    Inherits start_date/end_date plus the 366-day interactive range cap from
+    InteractiveDateRange (F-INPUT-02).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ticker: Ticker
     scanner_types: List[str]
-    start_date: date
-    end_date: date
     fetch_missing_data: bool = True
 
     @field_validator("scanner_types")
@@ -176,3 +206,26 @@ class ScannerRangeRequest(BaseModel):
         if not v:
             raise ValueError("At least one scanner type must be selected")
         return v
+
+
+class ScannerReplayDiffSchema(BaseModel):
+    """API response schema for a ScannerReplayDiff record."""
+
+    id: int
+    scanner_type: str
+    scan_date: date
+    status: str
+    has_drift: bool
+    live_count: int
+    replay_count: int
+    missing_in_replay_count: int
+    new_in_replay_count: int
+    matched_count: int
+    missing_in_replay: List[Any]
+    new_in_replay: List[Any]
+    metric_deltas: List[Any]
+    drift_kinds: List[Any]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

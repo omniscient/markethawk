@@ -9,10 +9,10 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean, Column, DateTime, Float, ForeignKey, Index, Integer,
-    String, Text, UniqueConstraint, create_engine
+    String, Text, UniqueConstraint
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, relationship, Session
+from sqlalchemy.orm import DeclarativeBase, relationship
 
 
 class Base(DeclarativeBase):
@@ -94,6 +94,7 @@ class ScannerEvent(Base):
     indicators = Column(JSONB, default=dict)
     criteria_met = Column(JSONB, default=dict)
     metadata_ = Column("metadata", JSONB, default=dict)
+    explanation = Column(JSONB, nullable=True)
     signal_quality_score = Column(Float, nullable=True)
     created_at = Column(DateTime)
     updated_at = Column(DateTime)

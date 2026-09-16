@@ -1,6 +1,7 @@
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 import bcrypt
 from fastapi import (
@@ -97,3 +98,24 @@ def ws_get_current_user(
     if not user:
         raise WebSocketException(code=1008, reason="Not authenticated")
     return user
+
+
+def verify_ws_origin(websocket: WebSocket) -> None:
+    """Validate the WebSocket handshake Origin header against CORS_ORIGINS.
+
+    Missing Origin is allowed (non-browser / same-origin clients).
+    A present Origin that does not match any entry in CORS_ORIGINS is rejected
+    with WebSocketException(1008) before accept() is called.
+    """
+    origin = websocket.headers.get("origin")
+    if origin is None:
+        return
+
+    settings = get_settings()
+    allowed = set(settings.CORS_ORIGINS)
+
+    # Normalise by stripping trailing slashes for comparison.
+    parsed = urlparse(origin)
+    normalised = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    if normalised not in {o.rstrip("/") for o in allowed}:
+        raise WebSocketException(code=1008, reason="Origin not allowed")

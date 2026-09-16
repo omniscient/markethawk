@@ -57,3 +57,52 @@ def test_ibkr_connection_status_settable():
     assert REGISTRY.get_sample_value("ibkr_connection_status") == 1.0
     ibkr_connection_status.set(0)
     assert REGISTRY.get_sample_value("ibkr_connection_status") == 0.0
+
+
+def test_slo_metrics_registered():
+    """New SLO metrics must be importable and of the correct prometheus_client type."""
+    from prometheus_client import Gauge, Histogram
+
+    from app.core.metrics import (
+        scan_data_to_detection_seconds,
+        scan_failed_tickers_ratio,
+        scan_last_success_timestamp,
+    )
+
+    assert isinstance(scan_last_success_timestamp, Gauge)
+    assert scan_last_success_timestamp._name == "scan_last_success_timestamp"
+    # multiprocess_mode="livemax" ensures the most-recent write survives across
+    # Celery worker processes — verify the kwarg was not omitted.
+    assert scan_last_success_timestamp._multiprocess_mode == "livemax"
+
+    assert isinstance(scan_data_to_detection_seconds, Histogram)
+    assert scan_data_to_detection_seconds._name == "scan_data_to_detection_seconds"
+
+    assert isinstance(scan_failed_tickers_ratio, Gauge)
+    assert scan_failed_tickers_ratio._name == "scan_failed_tickers_ratio"
+    assert scan_failed_tickers_ratio._multiprocess_mode == "livemax"
+
+
+def test_slo_gauge_settable():
+    """scan_last_success_timestamp and scan_failed_tickers_ratio must accept .labels().set()."""
+    from app.core.metrics import scan_failed_tickers_ratio, scan_last_success_timestamp
+
+    scan_last_success_timestamp.labels(scanner_type="pre_market_volume_spike").set(
+        1234567890.0
+    )
+    assert (
+        REGISTRY.get_sample_value(
+            "scan_last_success_timestamp",
+            {"scanner_type": "pre_market_volume_spike"},
+        )
+        == 1234567890.0
+    )
+
+    scan_failed_tickers_ratio.labels(scanner_type="pre_market_volume_spike").set(0.05)
+    assert (
+        REGISTRY.get_sample_value(
+            "scan_failed_tickers_ratio",
+            {"scanner_type": "pre_market_volume_spike"},
+        )
+        == 0.05
+    )

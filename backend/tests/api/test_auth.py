@@ -6,11 +6,35 @@ from app.core.config import get_settings
 
 get_settings.cache_clear()
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _secure_defaults_and_clean_cookies(monkeypatch):
+    """Isolate these tests from the local-dev container's settings overrides.
+
+    docker-compose.override.yml sets COOKIE_SECURE=false / DOCS_ENABLED=true so the
+    dev stack works over plain http. pydantic Settings reads those env vars, so
+    without stripping them the default-asserting tests below would observe the dev
+    values instead of the secure code defaults (COOKIE_SECURE=True, DOCS_ENABLED=False)
+    and fail only inside the dev/factory containers.
+
+    Also reset the module-level client's cookie jar between tests: a login in one test
+    otherwise leaks its access_token into the next (when cookies are non-Secure and
+    thus echoed by the http TestClient), 401-ing against the per-test DB reset.
+    """
+    monkeypatch.delenv("COOKIE_SECURE", raising=False)
+    monkeypatch.delenv("DOCS_ENABLED", raising=False)
+    get_settings.cache_clear()
+    client.cookies.clear()
+    yield
+    get_settings.cache_clear()
+    client.cookies.clear()
 
 
 def test_auth_status_returns_bootstrapped_false_when_no_users(db):

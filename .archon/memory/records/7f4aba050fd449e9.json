@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-13",
+      "evidence_tag": "pre-commit-hook-output",
+      "issue": 294,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-13",
+  "id": "7f4aba050fd449e9",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "The `react-hooks/set-state-in-effect` ESLint rule fires only on the FIRST setState call in a useEffect body (complex values like `new Set()` or conditional `true`/`false` trigger it; simple literal resets like `null`, `'all'`, `0` do not); add `// eslint-disable-next-line react-hooks/set-state-in-effect` before that first call to silence the entire effect \u2014 one comment suffices.",
+  "superseded_by": null,
+  "supersedes": []
+}

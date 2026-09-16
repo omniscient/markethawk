@@ -2,7 +2,12 @@ import os
 
 from celery import Celery
 from celery.schedules import crontab
-from celery.signals import worker_process_shutdown, worker_ready
+from celery.signals import (
+    after_setup_logger,
+    after_setup_task_logger,
+    worker_process_shutdown,
+    worker_ready,
+)
 
 from app.core.config import settings
 
@@ -11,6 +16,23 @@ celery_app = Celery(
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
     include=["app.tasks"],
+)
+
+
+@after_setup_logger.connect
+@after_setup_task_logger.connect
+def _install_log_redaction(logger, **kwargs):
+    # Re-install after Celery resets the root logger, so secrets stay redacted
+    # in worker/beat logs too (F-LOG-01).
+    from app.core.log_filters import install_redacting_filter
+
+    install_redacting_filter()
+
+
+celery_app.conf.update(
+    task_serializer="json",
+    result_serializer="json",
+    accept_content=["json"],
 )
 
 
@@ -73,5 +95,27 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.trigger_tweet_monitor",
         "schedule": 45.0,
         "options": {"expires": 40},
+    },
+    # HMM regime retraining: 21:00 UTC weekdays (17:00 ET / 16:00 EDT — post market-close)
+    "update-regime-model-nightly": {
+        "task": "app.tasks.update_regime_model",
+        "schedule": crontab(minute="0", hour="21", day_of_week="1-5"),
+    },
+    # Nightly universe aggregate top-up: 01:30 UTC Tue–Sat covers each Mon–Fri
+    # session after the 20:00 ET after-market close (00:00/01:00 UTC).
+    # Keeps active universes fresh so the staleness banner reflects real issues.
+    "sync-universe-aggregates-nightly": {
+        "task": "app.tasks.sync_universe_aggregates_nightly",
+        "schedule": crontab(minute="30", hour="1", day_of_week="2-6"),
+    },
+    # Aggregate staleness/gap sweep: 03:00 UTC weekdays (post-close + after nightly sync)
+    "check-aggregate-staleness-nightly": {
+        "task": "app.tasks.check_aggregate_staleness",
+        "schedule": crontab(minute="0", hour="3", day_of_week="1-5"),
+    },
+    # Nightly replay-diff: 04:00 UTC weekdays (after sync + nightly scans complete)
+    "run-replay-diff-nightly": {
+        "task": "app.tasks.run_replay_diff_nightly",
+        "schedule": crontab(minute="0", hour="4", day_of_week="1-5"),
     },
 }

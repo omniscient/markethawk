@@ -115,6 +115,23 @@ def _pullback_bars(
     return bars
 
 
+def _clean_trend_pullback_bars() -> list[MagicMock]:
+    bars = []
+    early_bars = 234
+    for i in range(early_bars):
+        c = 50.0 + 10.0 * (i / (early_bars - 1))
+        bars.append(_bar(c, volume=2_000_000))
+    for i in range(20):
+        c = 60.0 + 10.0 * ((i + 1) / 20)
+        bars.append(_bar(c, volume=2_000_000))
+    for j in range(5):
+        c = 70.0 * (1 - 0.001 * j)
+        bars.append(_bar(c, volume=2_000_000))
+    close = 70.0 * 0.97
+    bars.append(_bar(close, low=close * 0.995, high=close * 1.005, volume=500_000))
+    return bars
+
+
 # ---------------------------------------------------------------------------
 # Scenario 1: Module import
 # ---------------------------------------------------------------------------
@@ -244,6 +261,19 @@ def test_low_dollar_volume_does_not_fire():
     assert diag["fired"] == 0
 
 
+def test_clean_trend_pullback_persists_explanation():
+    bars = _clean_trend_pullback_bars()
+    results, diag, mock_save = _run_scan(lambda db, t, d, lb: bars)
+
+    assert results == [{"ticker": "AAPL"}]
+    assert diag["fired"] == 1
+    explanation = mock_save.call_args.kwargs["explanation"]
+    assert explanation["schema_version"] == "scanner_explanation.v1"
+    assert "trend_pullback.uptrend" in explanation["criteria_passed"]
+    assert "trend_pullback.rsi_reset" in explanation["criteria_passed"]
+    assert explanation["confidence_inputs"]["scanner_type"] == "trend_pullback"
+
+
 # ---------------------------------------------------------------------------
 # Scenario 12: diagnostics populated for 3 tickers
 # ---------------------------------------------------------------------------
@@ -323,3 +353,75 @@ def test_severity_medium_otherwise():
         )
         == "medium"
     )
+
+
+def test_trend_pullback_observes_slo_metrics():
+    """scan_last_success_timestamp and scan_failed_tickers_ratio are set after a run."""
+    import asyncio
+    import time
+    from unittest.mock import MagicMock, patch
+
+    with (
+        patch("app.services.trend_pullback_scan.scanner_events_total"),
+        patch("app.services.trend_pullback_scan.scan_duration_seconds"),
+        patch(
+            "app.services.trend_pullback_scan.scan_last_success_timestamp"
+        ) as mock_ts,
+        patch(
+            "app.services.trend_pullback_scan.scan_failed_tickers_ratio"
+        ) as mock_ratio,
+        patch("app.services.trend_pullback_scan._get_daily_bars", return_value=[]),
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio_lbl = MagicMock()
+        mock_ratio.labels.return_value = mock_ratio_lbl
+
+        from app.services.trend_pullback_scan import run_trend_pullback_scan
+
+        asyncio.run(
+            run_trend_pullback_scan(
+                [], db=MagicMock(), start_date=_EVENT_DATE, end_date=_EVENT_DATE
+            )
+        )
+
+    mock_ts.labels.assert_called_with(scanner_type="trend_pullback")
+    mock_ts_lbl.set.assert_called_once()
+    assert abs(mock_ts_lbl.set.call_args[0][0] - time.time()) < 30
+    mock_ratio.labels.assert_called_with(scanner_type="trend_pullback")
+    mock_ratio_lbl.set.assert_called_once()
+    assert 0.0 <= mock_ratio_lbl.set.call_args[0][0] <= 1.0
+
+
+def test_trend_pullback_total_failure_does_not_mark_success():
+    """Every ticker-day errors -> no last-success bump; duration still observed."""
+    with (
+        patch(
+            "app.services.trend_pullback_scan._get_daily_bars",
+            side_effect=RuntimeError("boom"),
+        ),
+        patch("app.services.trend_pullback_scan.scanner_events_total"),
+        patch("app.services.trend_pullback_scan.scan_duration_seconds") as mock_dur,
+        patch(
+            "app.services.trend_pullback_scan.scan_last_success_timestamp"
+        ) as mock_ts,
+        patch(
+            "app.services.trend_pullback_scan.scan_failed_tickers_ratio"
+        ) as mock_ratio,
+    ):
+        mock_ts_lbl = MagicMock()
+        mock_ts.labels.return_value = mock_ts_lbl
+        mock_ratio.labels.return_value = MagicMock()
+        mock_dur_lbl = MagicMock()
+        mock_dur.labels.return_value = mock_dur_lbl
+
+        from app.services.trend_pullback_scan import run_trend_pullback_scan
+
+        asyncio.run(
+            run_trend_pullback_scan(
+                ["AAA"], db=MagicMock(), start_date=_EVENT_DATE, end_date=_EVENT_DATE
+            )
+        )
+
+    mock_ts_lbl.set.assert_not_called()
+    mock_dur_lbl.observe.assert_called_once()

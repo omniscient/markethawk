@@ -3,6 +3,8 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.common import BatchDateRange
+
 
 class OutcomeSnapshotResponse(BaseModel):
     id: int
@@ -58,6 +60,11 @@ class EdgeDecayPoint(BaseModel):
     sample_size: int
 
 
+class RejectReasonCount(BaseModel):
+    reason: str
+    count: int
+
+
 class ScorecardResponse(BaseModel):
     scanner_type: str
     period: str
@@ -73,6 +80,14 @@ class ScorecardResponse(BaseModel):
     follow_through_rate_pct: Optional[float] = None
     edge_decay: List[EdgeDecayPoint] = []
     interval_breakdown: Dict[str, IntervalBreakdown] = {}
+    gate_filter: str = "trusted"
+    gate_status: Optional[Dict[str, int]] = None
+    # Review-side fields (issue #303) — all optional; null when no reviews in window
+    precision_pct: Optional[float] = None
+    review_coverage_pct: Optional[float] = None
+    verdict_counts: Optional[Dict[str, int]] = None
+    top_reject_reasons: List[RejectReasonCount] = []
+    review_sample_n: int = 0
 
 
 class ReadinessCoverage(BaseModel):
@@ -93,10 +108,12 @@ class ReadinessResponse(BaseModel):
     missing_summary: str
 
 
-class BackfillRequest(BaseModel):
+class BackfillRequest(BatchDateRange):
+    """Inherits start_date/end_date plus the 1830-day batch range cap (F-INPUT-02)."""
+
+    model_config = ConfigDict(extra="forbid")
+
     scanner_type: str
-    start_date: date
-    end_date: date
 
 
 class BackfillResponse(BaseModel):
@@ -119,6 +136,7 @@ class SignalListItem(BaseModel):
     event_date: date
     severity: Optional[str] = None
     summary: Optional[str] = None
+    gate_tier: Optional[str] = None
     opening_price: Optional[float] = None
     previous_close: Optional[float] = None
     closing_price: Optional[float] = None
