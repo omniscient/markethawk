@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-15",
+      "evidence_tag": null,
+      "issue": 391,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-15",
+  "id": "50bf54829386eb84",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "Wrap the scanner body in `try/finally` and call `scan_duration_seconds.observe()` in the `finally` block \u2014 not after the work. If `_persist` or any post-scan query raises, the observation is skipped and p95 is biased low (slow-then-crashing runs silently drop out). Applies to all scanner entry points in `backend/app/services/`.",
+  "superseded_by": null,
+  "supersedes": []
+}

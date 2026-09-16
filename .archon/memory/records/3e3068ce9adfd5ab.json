@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-07",
+      "evidence_tag": null,
+      "issue": 205,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-07",
+  "id": "3e3068ce9adfd5ab",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "Never place connection availability checks (e.g. `if not ib: raise ProviderError(is_retryable=True)`) inside `IBKR_BREAKER.call_async()` \u2014 transient disconnects will increment the failure counter and can open the breaker on non-provider faults. Move connection checks BEFORE the breaker call so only real provider failures count.",
+  "superseded_by": null,
+  "supersedes": []
+}

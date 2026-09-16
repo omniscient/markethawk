@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-20",
+      "evidence_tag": "test-output",
+      "issue": 431,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-20",
+  "id": "6b1d4c3154c6a28d",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Tests that source `entrypoint.sh` via `ENTRYPOINT_SOURCE_ONLY=1 source entrypoint.sh` must: (1) make the empty-arguments check guard-aware (`[ \"${ENTRYPOINT_SOURCE_ONLY:-0}\" != \"1\" ]`); (2) add `|| true` to the INTENT grep pipeline so it survives empty ARGUMENTS under pipefail; (3) call `trap - ERR; set +e; set +o pipefail` immediately after sourcing to reset the entrypoint's ERR trap and strict mode.",
+  "superseded_by": null,
+  "supersedes": []
+}

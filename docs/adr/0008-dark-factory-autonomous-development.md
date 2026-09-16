@@ -3,6 +3,8 @@
 **Date**: 2026-05-28  
 **Status**: Accepted (updated 2026-06-05 — socket proxy implemented, factory user added)
 
+> **Note (2026-07-10):** The Dark Factory implementation described here was extracted to [omniscient/dark-factory](https://github.com/omniscient/dark-factory) on 2026-07-06 (MarketHawk commit 148652f). This ADR records the MarketHawk-side decision to adopt the factory; the factory's own architecture and operational docs live in that repo.
+
 ## Context
 
 Implementing GitHub issues manually requires context-switching between the issue tracker, IDE, terminal, and browser for every feature. The Dark Factory automates the repetitive mechanics: clone, branch, implement, test, preview, PR — leaving the human to read the PR and give feedback.

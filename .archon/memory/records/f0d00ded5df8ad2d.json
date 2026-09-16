@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-03",
+      "evidence_tag": null,
+      "issue": 156,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-03",
+  "id": "f0d00ded5df8ad2d",
+  "kind": "FIX",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "When a migration backfills a FK column (e.g. `UPDATE scanner_configs SET universe_id = 1`), ensure the referenced row exists BEFORE the UPDATE by inserting it with `ON CONFLICT (id) DO NOTHING` \u2014 CI databases start empty (no seed SQL applied), so the FK constraint will fail if the parent row is absent. See migration `c7d8e9f0a1b2` for the pattern.",
+  "superseded_by": null,
+  "supersedes": []
+}

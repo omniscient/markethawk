@@ -2,7 +2,7 @@ import { vi, describe, it, expect } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { renderWithQuery } from '../test-utils/renderWithQuery';
 import ScannerResults from './ScannerResults';
-import type { ScannerEvent } from '../api/scanner';
+import type { ScannerEvent, QualityGateAssessment } from '../api/scanner';
 
 vi.mock('../api/scanner', () => ({
   submitReview: vi.fn().mockResolvedValue({}),
@@ -74,5 +74,130 @@ describe('ScannerResults', () => {
     );
     fireEvent.click(screen.getByText(/^date$/i));
     expect(onSort).toHaveBeenCalledWith('event_date');
+  });
+
+  it('renders scanner explanation evidence when present', () => {
+    const explainedEvent = makeEvent({
+      explanation: {
+        schema_version: 'scanner_explanation.v1',
+        why: ['Pre-market volume was 5.20x the 20-day average.'],
+        criteria_passed: {
+          'premarket.volume_spike': {
+            label: 'Volume spike',
+            observed: 5.2,
+            threshold: 4,
+            operator: '>=',
+            unit: 'x',
+          },
+        },
+        criteria_failed: {
+          'premarket.liquidity': {
+            label: 'Baseline liquidity',
+            observed: 125000,
+            threshold: 500000,
+            operator: '>',
+            unit: 'shares',
+          },
+        },
+        confidence_inputs: {},
+        data_quality_warnings: [
+          {
+            code: 'stale_bars',
+            severity: 'medium',
+            message: 'Some bars are older than expected.',
+            affected_inputs: ['minute_aggregates'],
+          },
+        ],
+        evidence: {
+          reconstructed: true,
+          reconstruction_quality: 'best_effort',
+        },
+      },
+    });
+    const results = { ...emptyResults, events_detected: 1, events: [explainedEvent] };
+
+    renderWithQuery(<ScannerResults results={results} />);
+
+    expect(screen.getByText('Pre-market volume was 5.20x the 20-day average.')).toBeInTheDocument();
+    expect(screen.getByText('Volume spike')).toBeInTheDocument();
+    expect(screen.getByText('Baseline liquidity')).toBeInTheDocument();
+    expect(screen.getByText('Rebuilt')).toBeInTheDocument();
+    expect(screen.getByText('Some bars are older than expected.')).toBeInTheDocument();
+  });
+});
+
+const makeGate = (overrides: Partial<QualityGateAssessment> = {}): QualityGateAssessment => ({
+  verdict: 'trusted',
+  policy: 'advisory',
+  consumer: 'scanner',
+  scanner_type: null,
+  universe_id: null,
+  generated_at: '2026-06-20T00:00:00Z',
+  assessment_id: 'test-gate-1',
+  verdict_reason: '',
+  summary: { blocker_count: 0, warning_count: 0, info_count: 0, affected_ticker_count: 0, total_tickers_evaluated: 0, most_affected_tickers: [], issue_code_counts: {} },
+  issues: [],
+  ...overrides,
+});
+
+describe('ScannerResults — TrustGateBanner', () => {
+  it('does not render banner when qualityGate is absent', () => {
+    renderWithQuery(<ScannerResults results={emptyResults} />);
+    expect(screen.queryByText(/trusted/i)).not.toBeInTheDocument();
+  });
+
+  it('renders trusted banner when qualityGate verdict is trusted', () => {
+    renderWithQuery(
+      <ScannerResults results={emptyResults} qualityGate={makeGate({ verdict: 'trusted' })} />
+    );
+    expect(screen.getByText(/trusted/i)).toBeInTheDocument();
+    expect(screen.getByText('Data quality checks passed')).toBeInTheDocument();
+  });
+
+  it('renders warning banner with warning count', () => {
+    renderWithQuery(
+      <ScannerResults
+        results={emptyResults}
+        qualityGate={makeGate({
+          verdict: 'warning',
+          summary: { blocker_count: 0, warning_count: 2, info_count: 0, affected_ticker_count: 0, total_tickers_evaluated: 0, most_affected_tickers: [], issue_code_counts: {} },
+        })}
+      />
+    );
+    expect(screen.getByText('warning')).toBeInTheDocument();
+    expect(screen.getByText(/2 warnings/i)).toBeInTheDocument();
+  });
+
+  it('renders blocked banner with blocker count', () => {
+    renderWithQuery(
+      <ScannerResults
+        results={emptyResults}
+        qualityGate={makeGate({
+          verdict: 'blocked',
+          summary: { blocker_count: 1, warning_count: 0, info_count: 0, affected_ticker_count: 0, total_tickers_evaluated: 0, most_affected_tickers: [], issue_code_counts: {} },
+        })}
+      />
+    );
+    expect(screen.getByText(/blocked/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 blocker/i)).toBeInTheDocument();
+  });
+});
+
+describe('ScannerResults — QualityWarningBadge', () => {
+  it('renders warning badge for events with quality_warnings in metadata', () => {
+    const eventWithWarnings = makeEvent({
+      id: 3,
+      ticker: 'NVDA',
+      uuid: 'test-uuid-3',
+      metadata: { quality_warnings: ['missing_bars', 'stale_quote_risk'] },
+    });
+    const results = { ...emptyResults, events_detected: 1, events: [eventWithWarnings] };
+    renderWithQuery(<ScannerResults results={results} />);
+    expect(screen.getByTitle(/2 data quality warning/i)).toBeInTheDocument();
+  });
+
+  it('does not render warning badge when quality_warnings is absent', () => {
+    renderWithQuery(<ScannerResults results={resultsWithEvents} />);
+    expect(screen.queryByTitle(/data quality warning/i)).not.toBeInTheDocument();
   });
 });

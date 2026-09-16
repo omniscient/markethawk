@@ -9,7 +9,9 @@ import TickerRow from './TickerRow';
 import DeleteConfirmDialog from './DeleteConfirmDialog';
 import QualityOverviewCard from './QualityOverviewCard';
 import QualityFiltersBar from './QualityFiltersBar';
+import TrustGateSummary from '../TrustGateSummary';
 import type { QualityTickerResult, CoverageDetail, NormalizationProgress, QualityReport } from '../../api/universe';
+import type { QualityGateAssessment } from '../../api/scanner';
 
 vi.mock('../../api/universe', () => ({
   fetchQualityReport: vi.fn().mockResolvedValue(null),
@@ -369,5 +371,127 @@ describe('QualityFiltersBar', () => {
     );
     fireEvent.click(screen.getByText('minute'));
     expect(onChange).toHaveBeenCalledWith('minute');
+  });
+});
+
+// ── TrustGateSummary ──────────────────────────────────────────────────────────
+
+const makeGate = (overrides: Partial<QualityGateAssessment> = {}): QualityGateAssessment => ({
+  verdict: 'trusted',
+  policy: 'advisory',
+  consumer: 'scanner',
+  scanner_type: null,
+  universe_id: null,
+  generated_at: '2026-06-20T00:00:00Z',
+  assessment_id: 'test-gate-1',
+  verdict_reason: '',
+  summary: {
+    blocker_count: 0,
+    warning_count: 0,
+    info_count: 0,
+    affected_ticker_count: 0,
+    total_tickers_evaluated: 0,
+    most_affected_tickers: [],
+    issue_code_counts: {},
+  },
+  issues: [],
+  ...overrides,
+});
+
+describe('TrustGateSummary', () => {
+  it('renders nothing when gate prop is absent', () => {
+    const { container } = renderWithQuery(<TrustGateSummary />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('renders trusted verdict with green styling', () => {
+    renderWithQuery(<TrustGateSummary gate={makeGate({ verdict: 'trusted' })} />);
+    expect(screen.getByText(/trusted/i)).toBeInTheDocument();
+    expect(screen.getByText('Data quality checks passed')).toBeInTheDocument();
+  });
+
+  it('renders warning verdict with amber blocker/warning counts', () => {
+    renderWithQuery(
+      <TrustGateSummary
+        gate={makeGate({
+          verdict: 'warning',
+          summary: {
+            blocker_count: 0,
+            warning_count: 3,
+            info_count: 0,
+            affected_ticker_count: 2,
+            total_tickers_evaluated: 10,
+            most_affected_tickers: [
+              { ticker: 'AAPL', issue_count: 2, max_severity: 'warning' },
+              { ticker: 'TSLA', issue_count: 1, max_severity: 'warning' },
+            ],
+            issue_code_counts: { missing_bars: 3 },
+          },
+        })}
+      />
+    );
+    expect(screen.getByText('warning')).toBeInTheDocument();
+    expect(screen.getByText(/3 warnings/i)).toBeInTheDocument();
+    expect(screen.getByText('AAPL')).toBeInTheDocument();
+  });
+
+  it('renders blocked verdict with blocker count', () => {
+    renderWithQuery(
+      <TrustGateSummary
+        gate={makeGate({
+          verdict: 'blocked',
+          summary: {
+            blocker_count: 2,
+            warning_count: 1,
+            info_count: 0,
+            affected_ticker_count: 1,
+            total_tickers_evaluated: 10,
+            most_affected_tickers: [{ ticker: 'NVDA', issue_count: 2, max_severity: 'blocker' }],
+            issue_code_counts: { provider_gaps: 2 },
+          },
+        })}
+      />
+    );
+    expect(screen.getByText(/blocked/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 blockers/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 warning/i)).toBeInTheDocument();
+  });
+
+  it('renders skipped verdict', () => {
+    renderWithQuery(<TrustGateSummary gate={makeGate({ verdict: 'skipped' })} />);
+    expect(screen.getByText(/skipped/i)).toBeInTheDocument();
+  });
+
+  it('groups issues by issue_code', () => {
+    const gate = makeGate({
+      verdict: 'warning',
+      summary: { blocker_count: 0, warning_count: 2, info_count: 1, affected_ticker_count: 2, total_tickers_evaluated: 10, most_affected_tickers: [], issue_code_counts: {} },
+      issues: [
+        { issue_code: 'missing_bars', severity: 'warning', title: 'Missing Bars', scope: 'ticker', ticker: 'AAPL', asset_class: 'us_equity', affected_inputs: null, detail: {}, remediation: { action: 'backfill', label: 'Backfill', description: 'Run backfill', automated: true } },
+        { issue_code: 'missing_bars', severity: 'warning', title: 'Missing Bars', scope: 'ticker', ticker: 'TSLA', asset_class: 'us_equity', affected_inputs: null, detail: {}, remediation: { action: 'backfill', label: 'Backfill', description: 'Run backfill', automated: true } },
+        { issue_code: 'stale_quote_risk', severity: 'info', title: 'Stale Quote Risk', scope: 'session', ticker: null, asset_class: null, affected_inputs: null, detail: {}, remediation: { action: 'refresh', label: 'Refresh quotes', description: 'Refresh', automated: false } },
+      ],
+    });
+    renderWithQuery(<TrustGateSummary gate={gate} />);
+    // Issues toggle button shows total issue count
+    expect(screen.getByText(/show issues.*3/i)).toBeInTheDocument();
+    // Click to expand
+    fireEvent.click(screen.getByText(/show issues/i));
+    // Two groups: Missing Bars and Stale Quote Risk
+    expect(screen.getByText('Missing Bars')).toBeInTheDocument();
+    expect(screen.getByText('Stale Quote Risk')).toBeInTheDocument();
+  });
+
+  it('expands issues by default when verdict is blocked', () => {
+    const gate = makeGate({
+      verdict: 'blocked',
+      summary: { blocker_count: 1, warning_count: 0, info_count: 0, affected_ticker_count: 0, total_tickers_evaluated: 10, most_affected_tickers: [], issue_code_counts: {} },
+      issues: [
+        { issue_code: 'provider_gaps', severity: 'blocker', title: 'Provider Gap', scope: 'universe', ticker: null, asset_class: null, affected_inputs: null, detail: {}, remediation: { action: 'contact', label: 'Contact provider', description: 'Contact', automated: false } },
+      ],
+    });
+    renderWithQuery(<TrustGateSummary gate={gate} />);
+    // Issues should be visible without clicking expand
+    expect(screen.getByText('Provider Gap')).toBeInTheDocument();
   });
 });

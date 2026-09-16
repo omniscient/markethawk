@@ -35,6 +35,21 @@ export const unversionedClient = axios.create({
   },
 });
 
+let refreshPromise: Promise<void> | null = null;
+
+function refreshAccessToken(): Promise<void> {
+  if (!refreshPromise) {
+    refreshPromise = unversionedClient
+      .post('/auth/refresh')
+      .then(() => undefined)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -44,7 +59,7 @@ apiClient.interceptors.response.use(
     if (status === 401 && !error.config._retried && !error.config.url?.includes('/auth/')) {
       error.config._retried = true;
       try {
-        await unversionedClient.post('/auth/refresh');
+        await refreshAccessToken();
         return apiClient(error.config);
       } catch {
         window.location.href = '/login';

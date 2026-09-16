@@ -1,0 +1,26 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-11",
+      "evidence_tag": null,
+      "issue": 224,
+      "source": "conformance"
+    }
+  ],
+  "expires_at": "2026-12-11",
+  "id": "d37e028133dfb8ac",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [
+    "dark-factory/scripts/"
+  ],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "dark-factory",
+  "source_file": "dark-factory-ops.md",
+  "summary": "Do not add structural OR-join detection (checking whether all upstreams carry a `when:` condition) to a ticket where the spec listed it as Non-Goal (v1) \u2014 it changes what gets built and will be caught as a material conformance deviation even when the intent is to improve coverage.",
+  "superseded_by": null,
+  "supersedes": []
+}

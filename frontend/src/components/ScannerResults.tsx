@@ -6,11 +6,14 @@ import {
   ChevronUp,
   ChevronDown,
   Search,
+  AlertTriangle,
 } from 'lucide-react';
 import Card from './ui/Card';
 import Ticker from './Ticker';
 import ReviewControls from './ReviewControls';
-import { ScannerEvent, ScannerDiagnostics } from '../api/scanner';
+import ScannerExplanationPanel from './ScannerExplanationPanel';
+import TrustGateBanner from './TrustGateBanner';
+import { ScannerEvent, ScannerDiagnostics, QualityGateAssessment } from '../api/scanner';
 import { safeExternalUrl } from '../utils/url';
 
 const TWEET_HOSTS = ['twitter.com', 'x.com', 't.co'];
@@ -30,13 +33,15 @@ interface ScannerResultsProps {
   onSort?: (column: string) => void;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  qualityGate?: QualityGateAssessment;
 }
 
-const ScannerResults: React.FC<ScannerResultsProps> = ({ 
+const ScannerResults: React.FC<ScannerResultsProps> = ({
   results,
   onSort,
   sortBy,
-  sortOrder
+  sortOrder,
+  qualityGate,
 }) => {
   const [filterTicker, setFilterTicker] = useState('');
   const [severityFilter, setSeverityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
@@ -58,6 +63,27 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
         return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
       default:
         return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getRegimeStyle = (regime: string | null | undefined): string => {
+    switch (regime) {
+      case 'risk_on':         return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'risk_off':        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'high_volatility': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'low_vol_drift':   return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      default:                return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    }
+  };
+
+  const getRegimeLabel = (regime: string | null | undefined): string => {
+    switch (regime) {
+      case 'risk_on':         return 'risk-on';
+      case 'risk_off':        return 'risk-off';
+      case 'high_volatility': return 'high-vol';
+      case 'low_vol_drift':   return 'low-vol';
+      case 'transition':      return 'trans';
+      default:                return regime ?? '—';
     }
   };
 
@@ -146,6 +172,8 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
         </div>
       )}
 
+      {qualityGate && <TrustGateBanner gate={qualityGate} />}
+
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-gray-900 border border-gray-800 rounded-lg shadow-inner">
         <div className="flex-1">
@@ -229,11 +257,19 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     {event.event_date}
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
-                    <Ticker 
-                      ticker={event.ticker} 
-                      size="lg" 
-                      showIcon={true} 
-                    />
+                    <div className="flex items-center gap-2">
+                      <Ticker
+                        ticker={event.ticker}
+                        size="lg"
+                        showIcon={true}
+                      />
+                      {Array.isArray(event.metadata?.quality_warnings) &&
+                        (event.metadata.quality_warnings as string[]).length > 0 && (
+                          <QualityWarningBadge
+                            warnings={event.metadata.quality_warnings as string[]}
+                          />
+                        )}
+                    </div>
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
                     <div className="flex flex-col gap-1">
@@ -263,6 +299,7 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     <p className="text-sm font-medium text-gray-200 line-clamp-1" title={event.summary}>
                       {event.summary}
                     </p>
+                    <ScannerExplanationPanel explanation={event.explanation ?? null} />
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
                     <div className="flex flex-wrap gap-2 text-[10px] font-bold">
@@ -280,6 +317,14 @@ const ScannerResults: React.FC<ScannerResultsProps> = ({
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border shadow-sm ${getSeverityStyle(event.severity)}`}>
                       {event.severity}
                     </span>
+                    {event.regime !== undefined && (
+                      <span
+                        className={`ml-1 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border shadow-sm ${getRegimeStyle(event.regime)}`}
+                        title={event.regime ?? 'unknown regime'}
+                      >
+                        {getRegimeLabel(event.regime)}
+                      </span>
+                    )}
                   </td>
                   <td className="py-4 px-4 bg-gray-800">
                     <ScoreQualityBadge
@@ -403,6 +448,25 @@ const ScoreQualityBadge: React.FC<ScoreQualityBadgeProps> = ({ score, criteriaMe
       title={criteriaRatio}
     >
       {score.toFixed(2)}
+    </span>
+  );
+};
+
+interface QualityWarningBadgeProps {
+  warnings: string[];
+}
+
+const QualityWarningBadge: React.FC<QualityWarningBadgeProps> = ({ warnings }) => {
+  const count = warnings.length;
+  if (count === 0) return null;
+
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30"
+      title={`${count} data quality warning${count !== 1 ? 's' : ''}`}
+    >
+      <AlertTriangle className="h-2.5 w-2.5" />
+      {count}
     </span>
   );
 };

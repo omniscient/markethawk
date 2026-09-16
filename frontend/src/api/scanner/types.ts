@@ -15,14 +15,53 @@ export interface ScannerEvent {
   closing_price?: number;
 
   signal_quality_score?: number | null;
+  regime?: string | null;
 
   indicators: Record<string, unknown>;
   criteria_met: Record<string, unknown>;
   metadata: Record<string, unknown>;
+  explanation?: ScannerExplanation | null;
 
   created_at: string;
   updated_at: string;
   latest_review?: SignalReview | null;
+}
+
+export interface ScannerCriterionExplanation {
+  label: string;
+  observed?: unknown;
+  threshold?: unknown;
+  operator: '>' | '>=' | '<' | '<=' | '==' | '!=' | 'exists';
+  unit?: string | null;
+  source?: string | null;
+  lookback?: string | null;
+  importance?: number | null;
+}
+
+export interface ScannerDataQualityWarning {
+  code: string;
+  severity: 'low' | 'medium' | 'high';
+  message: string;
+  affected_inputs: string[];
+}
+
+export interface ScannerExplanationEvidence {
+  reconstructed: boolean;
+  reconstruction_quality?: 'best_effort' | 'partial' | null;
+  generated_at?: string | null;
+  generator_version?: string | null;
+  market_data_asof?: string | null;
+  provider?: string | null;
+}
+
+export interface ScannerExplanation {
+  schema_version: 'scanner_explanation.v1';
+  why: string[];
+  criteria_passed: Record<string, ScannerCriterionExplanation>;
+  criteria_failed: Record<string, ScannerCriterionExplanation>;
+  confidence_inputs: Record<string, unknown>;
+  data_quality_warnings: ScannerDataQualityWarning[];
+  evidence: ScannerExplanationEvidence;
 }
 
 export interface SignalReview {
@@ -93,6 +132,66 @@ export interface ScannerDiagnostics {
   errors?: number;
 }
 
+export type QualityIssueCode =
+  | 'missing_bars'
+  | 'split_dividend_anomaly'
+  | 'stale_quote_risk'
+  | 'provider_gaps'
+  | 'timezone_session_mismatch'
+  | 'survivorship_bias_risk'
+  | 'stale_reference_data';
+
+export type QualityGateVerdict = 'trusted' | 'warning' | 'blocked' | 'skipped';
+
+export interface QualityGateIssue {
+  issue_code: QualityIssueCode;
+  severity: 'blocker' | 'warning' | 'info';
+  title: string;
+  scope: 'ticker' | 'universe' | 'session' | 'provider';
+  ticker: string | null;
+  asset_class: string | null;
+  affected_inputs: {
+    timespans?: string[];
+    date_range?: { start: string; end: string };
+    session?: string;
+    fields?: string[];
+  } | null;
+  detail: Record<string, unknown>;
+  remediation: {
+    action: string;
+    label: string;
+    description: string;
+    automated: boolean;
+  };
+}
+
+export interface QualityGateSummary {
+  blocker_count: number;
+  warning_count: number;
+  info_count: number;
+  affected_ticker_count: number;
+  total_tickers_evaluated: number;
+  most_affected_tickers: Array<{
+    ticker: string;
+    issue_count: number;
+    max_severity: 'blocker' | 'warning' | 'info';
+  }>;
+  issue_code_counts: Partial<Record<QualityIssueCode, number>>;
+}
+
+export interface QualityGateAssessment {
+  verdict: QualityGateVerdict;
+  policy: 'advisory' | 'strict';
+  consumer: string;
+  scanner_type: string | null;
+  universe_id: number | null;
+  generated_at: string;
+  assessment_id: string;
+  verdict_reason: string;
+  summary: QualityGateSummary;
+  issues: QualityGateIssue[];
+}
+
 export interface ScannerRunResponse {
   scan_id: string;
   status: string;
@@ -106,6 +205,7 @@ export interface ScannerRunResponse {
   scan_start_date?: string;
   scan_end_date?: string;
   diagnostics?: ScannerDiagnostics;
+  quality_gate?: QualityGateAssessment;
 }
 
 export interface ScannerRunAsyncResponse {
@@ -176,6 +276,28 @@ export interface ScannerStatusBlock {
   success_rate: number | null;
   avg_events_per_scan: number | null;
   sparkline: ScannerSparklinePoint[];
+}
+
+export interface ScannerCoverageRange {
+  start: string;
+  end: string;
+  runs: number;
+  events: number;
+}
+
+export interface ScannerCoverageGap {
+  start: string;
+  end: string;
+  weekdays: number;
+}
+
+export interface ScannerCoverage {
+  scanner_type: string;
+  universe_id: number;
+  latest_covered: string | null;
+  latest_trading_day: string;
+  covered: ScannerCoverageRange[];
+  gaps: ScannerCoverageGap[];
 }
 
 export interface MarketStats {

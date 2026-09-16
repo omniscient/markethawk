@@ -13,6 +13,7 @@ import {
   Eye,
   Bot,
   Trophy,
+  History,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getSystemStatus, MarketStatus } from '../api/system';
@@ -82,6 +83,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Pre-market Movers', href: '/movers/pre-market', icon: TrendingUp },
     { name: 'Edge Explorer', href: '/edge-explorer', icon: BarChart3 },
     { name: 'Scorecard', href: '/scorecard', icon: Trophy },
+    { name: 'Signal Replay', href: '/replay', icon: History },
     { name: 'Universes', href: '/universes', icon: Database },
     { name: 'Watchlist', href: '/watchlist', icon: Eye },
     { name: 'Journal', href: '/journal', icon: BookOpen },

@@ -3,7 +3,7 @@ Outcomes seed helpers — scanner events, outcome snapshots, and outcome summari
 Each function inserts rows and flushes; the caller's transaction provides rollback.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.scanner_event import ScannerEvent
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.signal_review import SignalReview
 
 
 def seed_outcomes(db: Session) -> dict:
@@ -119,3 +120,95 @@ def seed_outcomes(db: Session) -> dict:
     db.flush()
 
     return {"events": events, "snapshots": snapshots, "summaries": summaries}
+
+
+def _make_gate_meta(tier: str) -> dict:
+    return {"quality_gate": {"tier": tier, "warnings": []}}
+
+
+def seed_outcomes_with_gate_tiers(db: Session) -> dict:
+    """
+    Creates 4 ScannerEvents with explicit quality_gate tiers:
+      - AAPL: trusted  (with complete summary)
+      - MSFT: warning  (with complete summary)
+      - NVDA: blocked  (with complete summary)
+      - AMD:  skipped  (with complete summary)
+    All events for scanner_type='pre_market_volume_spike'.
+    Returns {"events": [...], "summaries": [...]}.
+    """
+    today = date.today()
+    tiers = [
+        ("AAPL", "trusted"),
+        ("MSFT", "warning"),
+        ("NVDA", "blocked"),
+        ("AMD", "skipped"),
+    ]
+
+    events = []
+    for ticker, tier in tiers:
+        ev = ScannerEvent(
+            ticker=ticker,
+            event_date=today,
+            scanner_type="pre_market_volume_spike",
+            summary=f"{ticker} {tier} gate tier",
+            severity="medium",
+            indicators={"volume_spike_ratio": 5.0},
+            criteria_met={"volume_threshold": True},
+            metadata_=_make_gate_meta(tier),
+        )
+        db.add(ev)
+        events.append(ev)
+    db.flush()
+
+    ref_price = Decimal("100.00")
+    summaries = []
+    for ev in events:
+        sm = ScannerOutcomeSummary(
+            scanner_event_id=ev.id,
+            reference_price=ref_price,
+            mfe_pct=Decimal("2.00"),
+            mae_pct=Decimal("0.50"),
+            mfe_mae_ratio=Decimal("4.00"),
+            r_multiple=Decimal("3.00"),
+            eod_pct_change=Decimal("1.50"),
+            follow_through=True,
+            gap_filled=False,
+            is_complete=True,
+        )
+        db.add(sm)
+        summaries.append(sm)
+    db.flush()
+
+    return {"events": events, "summaries": summaries}
+
+
+def seed_reviews(db: Session, events: list) -> list:
+    """
+    Creates SignalReview rows on the first 3 events passed (expected to be
+    pre_market_volume_spike events from seed_outcomes).
+
+    Distribution: 2 confirmed, 1 rejected (reason='noise').
+    With seed_outcomes' 3 complete pre_market_volume_spike summaries (total_signals=3):
+      precision_pct = 2 / (2+1) * 100 = 66.67
+      review_sample_n = 3
+      review_coverage_pct = 3 / 3 * 100 = 100.0
+      top_reject_reasons = [{"reason": "noise", "count": 1}]
+      verdict_counts = {"confirmed": 2, "rejected": 1, "enhanced": 0}
+    """
+    specs = [
+        ("confirmed", None),
+        ("confirmed", None),
+        ("rejected", "noise"),
+    ]
+    reviews = []
+    for event, (verdict, reason) in zip(events[:3], specs):
+        rv = SignalReview(
+            scanner_event_id=event.id,
+            verdict=verdict,
+            reject_reason=reason,
+            reviewed_at=datetime.utcnow(),
+        )
+        db.add(rv)
+        reviews.append(rv)
+    db.flush()
+    return reviews
