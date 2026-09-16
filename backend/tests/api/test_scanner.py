@@ -72,7 +72,9 @@ def test_results_filter_by_ticker(db: Session):
 def test_results_filter_by_scanner_type(db: Session):
     seed_scanner_events(db)
 
-    response = client.get("/api/v1/scanner/results?scanner_type=pre_market_volume_spike")
+    response = client.get(
+        "/api/v1/scanner/results?scanner_type=pre_market_volume_spike"
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -304,9 +306,7 @@ def test_scan_status_block_sparkline(db: Session):
 # ---------------------------------------------------------------------------
 
 
-def test_coverage_endpoint_returns_merged_ranges_and_gaps(
-    db: Session, monkeypatch
-):
+def test_coverage_endpoint_returns_merged_ranges_and_gaps(db: Session, monkeypatch):
     universes = seed_universes(db)
     universe_id = universes[0].id
     db.add_all(
@@ -469,7 +469,14 @@ def test_list_scanner_types():
     assert "liquidity_hunt_pre" in keys
     assert "liquidity_hunt_post" in keys
     for item in data:
-        assert {"key", "display_name", "description", "supports_date_range"} == set(
-            item
-        )
+        assert {
+            "key",
+            "display_name",
+            "description",
+            "supports_date_range",
+            "asset_classes",
+            "default_parameters",
+        } == set(item)
         assert isinstance(item["supports_date_range"], bool)
+        assert isinstance(item["asset_classes"], list)
+        assert isinstance(item["default_parameters"], dict)
