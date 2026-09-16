@@ -8,11 +8,10 @@ import io
 import zipfile
 from datetime import datetime, timedelta
 
-from fastapi import HTTPException
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from starlette.responses import StreamingResponse
 
-from app.exceptions import UniverseNotFoundError
+from app.exceptions import UniverseNotFoundError, UniverseValidationError
 from app.models import StockUniverse, StockUniverseTicker
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.stock_aggregate import StockAggregate
@@ -48,7 +47,7 @@ def export_aggregates(universe_id: int, request, db: Session) -> StreamingRespon
     request.multiplier, request.from_date, request.to_date, request.zip_format.
     ExportAggregatesRequest stays defined in routers/universe.py.
     Raises UniverseNotFoundError if the universe does not exist.
-    Raises HTTPException(400) if no tickers are provided.
+    Raises UniverseValidationError if no tickers are provided.
     """
     universe = db.query(StockUniverse).filter(StockUniverse.id == universe_id).first()
     if not universe:
@@ -56,7 +55,7 @@ def export_aggregates(universe_id: int, request, db: Session) -> StreamingRespon
 
     tickers = request.tickers
     if not tickers:
-        raise HTTPException(status_code=400, detail="No tickers selected")
+        raise UniverseValidationError("No tickers selected", universe_id=universe_id)
 
     futures_set = {
         row.ticker

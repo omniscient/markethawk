@@ -1,2 +1,2 @@
-FROM prom/prometheus:v2.53.0
+FROM prom/prometheus:v3.13.0@sha256:c6b27ea434f8389bfe233fbc7be381cf50587c286e871bc842008f5a1b1908a7
 COPY prometheus.yml /etc/prometheus/prometheus.yml

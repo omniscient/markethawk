@@ -15,6 +15,8 @@ import {
   HistogramSeries,
   createSeriesMarkers,
   SeriesMarker,
+  IPriceLine,
+  LineStyle,
 } from 'lightweight-charts';
 import { calculateDoubleSuperTrend } from '../../utils/indicators';
 import { ScannerEvent } from '../../api/scanner';
@@ -73,6 +75,8 @@ interface StockChartProps {
     wickDownColor?: string;
   };
   showDoubleSuperTrend?: boolean;
+  replayMarkers?: SeriesMarker<Time>[];
+  priceLines?: Array<{ value: number; color: string; label: string }>;
 }
 
 const StockChart: React.FC<StockChartProps> = ({
@@ -85,7 +89,9 @@ const StockChart: React.FC<StockChartProps> = ({
   symbol,
   liveData,
   colors = {},
-  showDoubleSuperTrend = false
+  showDoubleSuperTrend = false,
+  replayMarkers = [],
+  priceLines = [],
 }) => {
   // Helper to shift UTC timestamps to match the browser's local time labels
   const toLocalTime = (utcSeconds: number): number => {
@@ -109,6 +115,7 @@ const StockChart: React.FC<StockChartProps> = ({
   const stLine2SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const stCloudSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  const priceLinesRef = useRef<IPriceLine[]>([]);
   const prevDataLengthRef = useRef<number>(0);
   const currentBarRef = useRef<{
     time: Time;
@@ -412,6 +419,10 @@ const StockChart: React.FC<StockChartProps> = ({
       }
 
       if (markersPluginRef.current) {
+        for (const marker of replayMarkers) {
+          allMarkers.push(marker);
+        }
+
         if (allMarkers.length > 0) {
           allMarkers.sort((a, b) =>
             typeof a.time === 'number' && typeof b.time === 'number'
@@ -453,6 +464,22 @@ const StockChart: React.FC<StockChartProps> = ({
 
       (seriesRef.current as unknown as ISeriesApi<'Line'>).setData(uniqueData as LineData[]);
     }
+
+    if (seriesRef.current) {
+      for (const line of priceLinesRef.current) {
+        seriesRef.current.removePriceLine(line);
+      }
+      priceLinesRef.current = priceLines.map((line) =>
+        seriesRef.current!.createPriceLine({
+          price: line.value,
+          color: line.color,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: line.label,
+        }),
+      );
+    }
     
     // Only fit content on initial load or when data was previously empty
     // This prevents the chart from "jumping" when new historical data is backfilled
@@ -460,7 +487,7 @@ const StockChart: React.FC<StockChartProps> = ({
       chartRef.current?.timeScale().fitContent();
     }
     prevDataLengthRef.current = data.length;
-  }, [data, type, events, timespan, symbol, showDoubleSuperTrend]);
+  }, [data, type, events, timespan, symbol, showDoubleSuperTrend, replayMarkers, priceLines]);
 
   // Reset initialization flag when symbol or timespan changes to allow refitting
   useEffect(() => {

@@ -3,8 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   runScanner, fetchScannerConfigs, fetchStockUniverses, fetchScannerResults,
   fetchScannerHistory, handleApiError, fetchScanStatus,
-  fetchScanStatusBlock,
+  fetchScanStatusBlock, fetchScannerCoverage,
+  type ScannerCoverageGap,
 } from '../../api/scanner';
+import { getDataHealth } from '../../api/universe';
 import {
   useScannerState, ACTIVE_SCAN_LS_KEY, EMPTY_PROGRESS,
   type ActiveScanRef, type LiveProgress,
@@ -18,6 +20,8 @@ const Scanner: React.FC = () => {
   const state = useScannerState();
   const queryClient = useQueryClient();
   const { attachWebSocket } = useScannerWs(state, queryClient);
+  const [pendingGapQueue, setPendingGapQueue] = React.useState<ScannerCoverageGap[]>([]);
+  const gapChainSawActiveScan = React.useRef(false);
 
   const { data: configs, isLoading: loadingConfigs } = useQuery({
     queryKey: ['scannerConfigs'],
@@ -40,6 +44,13 @@ const Scanner: React.FC = () => {
     refetchInterval: state.isScanning ? 5000 : false,
   });
 
+  const { data: coverage, isLoading: loadingCoverage } = useQuery({
+    queryKey: ['scannerCoverage', state.selectedConfig, state.selectedUniverse],
+    queryFn: () => fetchScannerCoverage(state.selectedConfig, state.selectedUniverse!),
+    enabled: !!state.selectedUniverse && !!state.selectedConfig,
+    refetchInterval: state.isScanning ? 5000 : false,
+  });
+
   const { data: existingResults } = useQuery({
     queryKey: ['scannerResults', state.selectedUniverse, state.selectedConfig, state.sortBy, state.sortOrder],
     queryFn: () => fetchScannerResults({
@@ -50,6 +61,13 @@ const Scanner: React.FC = () => {
       limit: 100,
     }),
     enabled: !!state.selectedUniverse && !!state.selectedConfig,
+  });
+
+  const { data: dataHealth } = useQuery({
+    queryKey: ['universeDataHealth', state.selectedUniverse],
+    queryFn: () => getDataHealth(state.selectedUniverse!),
+    enabled: !!state.selectedUniverse,
+    staleTime: 5 * 60 * 1000,
   });
 
   React.useEffect(() => {
@@ -117,6 +135,56 @@ const Scanner: React.FC = () => {
     });
   };
 
+  const runGap = (gap: ScannerCoverageGap) => {
+    if (!state.selectedUniverse || !state.selectedConfig) {
+      state.setScanError('Please select a universe and a scanner type');
+      return;
+    }
+    state.setScanError(null);
+    scannerMutation.mutate({
+      scanner_type: state.selectedConfig,
+      universe_id: state.selectedUniverse,
+      tickers: [],
+      dry_run: false,
+      start_date: gap.start,
+      end_date: gap.end,
+    });
+  };
+
+  const handleScanGap = (gap: ScannerCoverageGap) => {
+    setPendingGapQueue([]);
+    gapChainSawActiveScan.current = false;
+    runGap(gap);
+  };
+
+  const handleFillAllGaps = (gaps: ScannerCoverageGap[]) => {
+    if (gaps.length === 0) return;
+    const [first, ...rest] = gaps;
+    setPendingGapQueue(rest);
+    gapChainSawActiveScan.current = false;
+    runGap(first);
+  };
+
+  React.useEffect(() => {
+    if (state.activeScan) {
+      gapChainSawActiveScan.current = true;
+      return;
+    }
+    if (
+      gapChainSawActiveScan.current &&
+      !state.isScanning &&
+      !scannerMutation.isPending &&
+      !state.scanError &&
+      pendingGapQueue.length > 0
+    ) {
+      const [next, ...rest] = pendingGapQueue;
+      setPendingGapQueue(rest);
+      gapChainSawActiveScan.current = false;
+      runGap(next);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- runGap reads current scanner selection and mutation state
+  }, [state.activeScan, state.isScanning, scannerMutation.isPending, state.scanError, pendingGapQueue]);
+
   const handleCancelScanner = async () => {
     if (!state.activeScan) return;
     try {
@@ -150,6 +218,7 @@ const Scanner: React.FC = () => {
           localStorage.removeItem(ACTIVE_SCAN_LS_KEY);
           queryClient.invalidateQueries({ queryKey: ['scannerResults'] });
           queryClient.invalidateQueries({ queryKey: ['scannerHistory'] });
+          queryClient.invalidateQueries({ queryKey: ['scannerCoverage'] });
         }
       })
       .catch(() => localStorage.removeItem(ACTIVE_SCAN_LS_KEY));
@@ -158,6 +227,17 @@ const Scanner: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {dataHealth?.degraded && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-400 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-500 dark:bg-amber-900/20 dark:text-amber-300">
+          <span className="mt-0.5 text-lg leading-none">⚠️</span>
+          <div className="flex-1 text-sm">
+            <span className="font-semibold">Data quality degraded</span> — this universe has stale or gapped aggregate data
+            (stale: {dataHealth.stale_pct}%, gaps: {dataHealth.gapped_pct}%, grade: {dataHealth.grade}).
+            Scan results may be unreliable.{' '}
+            <a href="/universes" className="underline hover:no-underline">View quality details →</a>
+          </div>
+        </div>
+      )}
       <ScanConfigPanel
         configs={configs ?? []} loadingConfigs={loadingConfigs}
         universes={universes ?? []} loadingUniverses={loadingUniverses}
@@ -166,7 +246,9 @@ const Scanner: React.FC = () => {
         scanStartDate={state.scanStartDate} onScanStartDate={state.setScanStartDate}
         scanEndDate={state.scanEndDate} onScanEndDate={state.setScanEndDate}
         isScanning={state.isScanning} onRunScan={handleRunScanner} onCancelScan={handleCancelScanner}
-        statusBlock={statusBlock} scanHistory={scanHistory ?? []} loadingHistory={loadingHistory}
+        statusBlock={statusBlock} coverage={coverage} loadingCoverage={loadingCoverage}
+        onScanGap={handleScanGap} onFillAllGaps={handleFillAllGaps}
+        scanHistory={scanHistory ?? []} loadingHistory={loadingHistory}
         scanError={state.scanError} onDismissError={() => state.setScanError(null)}
         scannerMutationPending={scannerMutation.isPending}
       />

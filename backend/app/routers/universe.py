@@ -5,7 +5,7 @@ Universe router - CRUD operations for stock universes.
 from typing import List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.core.cache import get_cached, invalidate
@@ -21,6 +21,8 @@ from app.schemas import (
     StockUniverseUpdate,
     UniverseSummary,
 )
+from app.schemas.common import Ticker
+from app.schemas.universe import DataHealthResponse
 from app.services import universe_export, universe_orchestrator
 from app.services.discovery_service import DiscoveryService
 from app.services.universe_stats import UniverseStatsService
@@ -31,7 +33,9 @@ router = APIRouter(prefix="/api/v1/universe", tags=["universe"])
 
 
 class ExportAggregatesRequest(BaseModel):
-    tickers: List[str]
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[Ticker]
     timespan: str = "day"
     multiplier: int = 1
     from_date: Optional[str] = None
@@ -40,14 +44,18 @@ class ExportAggregatesRequest(BaseModel):
 
 
 class DeleteAggregatesRequest(BaseModel):
-    ticker: str
+    model_config = ConfigDict(extra="forbid")
+
+    ticker: Ticker
     asset_class: str  # "stocks" | "futures"
     timespan: Optional[str] = None
     multiplier: Optional[int] = None
 
 
 class NormalizeRequest(BaseModel):
-    target_tickers: Optional[List[str]] = None
+    model_config = ConfigDict(extra="forbid")
+
+    target_tickers: Optional[List[Ticker]] = None
 
 
 @router.post("/create", response_model=StockUniverseResponse)
@@ -114,7 +122,41 @@ def delete_stock_universe(
     universe.is_active = False
     db.commit()
     invalidate("mh:universe:list")
+    invalidate(f"mh:universe:{universe_id}:data-health")
+
+    # Remove gauge label series for this universe to avoid stale metrics
+    try:
+        from app.core.metrics import aggregate_gap_days, aggregate_staleness_hours
+
+        aggregate_staleness_hours.remove(str(universe_id))
+        aggregate_gap_days.remove(str(universe_id))
+    except Exception:
+        pass
+
     return {"message": "Universe deleted successfully"}
+
+
+@router.get("/{universe_id}/data-health", response_model=DataHealthResponse)
+def get_universe_data_health(
+    universe_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Return a lightweight data-health summary for a universe.
+
+    Queries MAX(timestamp) per ticker and detects day-bar gaps.
+    Result is cached for 5 minutes. Use to drive the Scanner page degraded-data banner.
+    """
+    from app.tasks.quality import compute_universe_data_health
+
+    get_or_404(db, StockUniverse, universe_id, "Universe")
+
+    def _fetch():
+        health = compute_universe_data_health(db, universe_id)
+        return health
+
+    result = get_cached(f"mh:universe:{universe_id}:data-health", 300, _fetch)
+    return result
 
 
 @router.get("/list", response_model=List[StockUniverseResponse])
@@ -299,6 +341,8 @@ def export_universe_aggregates(
         return universe_export.export_aggregates(universe_id, request, db)
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
+    except UniverseValidationError as e:
+        raise HTTPException(status_code=400, detail=e.args[0])
 
 
 @router.get("/{universe_id}/stocks", response_model=List[MonitoredStockResponse])
@@ -442,4 +486,4 @@ def trigger_normalization(
     except UniverseNotFoundError:
         raise HTTPException(status_code=404, detail="Universe not found")
     except UniverseValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=e.args[0])

@@ -25,6 +25,7 @@ These must be set before starting the stack. The application will start without 
 | `PGADMIN_DEFAULT_PASSWORD` | Login password for pgAdmin web UI | `change_me` |
 | `SEQ_ADMIN_PASSWORD_HASH` | Bcrypt hash of the Seq admin password. Generate with: `echo 'YourPassword' \| docker run --rm -i datalust/seq config hash` | `$2a$11$...` |
 | `FLOWER_BASIC_AUTH` | Basic auth credentials for the Flower Celery UI (http://localhost:5555). Flower reads this automatically. Format: `user:password` | `admin:change_me_flower_password` |
+| `REDIS_PASSWORD` | Password for the Redis container (`requirepass`). All services derive their `REDIS_URL` from this. Generate with: `python -c "import secrets; print(secrets.token_urlsafe(32))"` | `change_me_redis_password` |
 
 ---
 
@@ -34,7 +35,7 @@ These must be set before starting the stack. The application will start without 
 |----------|---------|---------|
 | `POSTGRES_DB` | `stockscanner` | PostgreSQL database name |
 | `POSTGRES_USER` | `postgres` | PostgreSQL superuser name |
-| `REDIS_URL` | `redis://redis:6379/0` | Redis connection string. Overriding is only needed for external Redis. |
+| `REDIS_URL` | `redis://:${REDIS_PASSWORD}@redis:6379/0` | Redis connection string with password. Constructed automatically by docker-compose from `REDIS_PASSWORD`. Override only for an external Redis instance. |
 | `RATE_LIMITING_ENABLED` | `true` | When `false`, disables all API rate limiting (SlowAPI `enabled=False` — no-op at both middleware and decorator level). Useful during local development to avoid 429s while iterating on scanner endpoints. |
 | `ENVIRONMENT` | `production` | Set to `development` to include stack traces in API error responses. Defaults to `production` so unset envs never leak internals. |
 | `LOG_LEVEL` | `INFO` | Backend and Celery log verbosity: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
@@ -49,6 +50,36 @@ These must be set before starting the stack. The application will start without 
 | `DB_POOL_PRE_PING` | `true` | When `true`, tests each connection before use to automatically recover after PostgreSQL restarts. |
 | `DB_POOL_RECYCLE` | `3600` | Seconds before a pooled connection is replaced. Prevents stale connections after long idle periods. |
 | `DB_POOL_TIMEOUT` | `30` | Seconds to wait for a connection from the pool before raising an error. |
+
+---
+
+## Optional LLM Features
+
+LLM-powered narratives and semantic intelligence are disabled by default. Setting provider/model values alone does not affect deterministic scanner explainability; callers must explicitly enable LLM features and opt feature areas into the allowlist.
+
+Allowed feature areas: `scanner_narrative`, `alert_copy`, `post_mortem`, `semantic_search`, `analyst_qa`, `embeddings`.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LLM_FEATURES_ENABLED` | `false` | Master flag for optional LLM feature paths. When `false`, LLM guardrails deny every feature area. |
+| `LLM_PROVIDER` | `disabled` | Provider selector. Supported values: `disabled`, `openai`, `anthropic`, `local`. Must be non-`disabled` when `LLM_FEATURES_ENABLED=true`. |
+| `LLM_MODEL` | `` (empty) | Model identifier for the selected provider. Required when `LLM_FEATURES_ENABLED=true`. |
+| `LLM_MAX_TOKENS` | `800` | Maximum output tokens allowed for one LLM call. Must be greater than zero. |
+| `LLM_TIMEOUT_SECONDS` | `10.0` | Per-call timeout in seconds. Must be greater than zero. |
+| `LLM_MAX_RETRIES` | `1` | Maximum retry attempts after an LLM call failure. Must be zero or greater. |
+| `LLM_RETRY_BACKOFF_SECONDS` | `0.5` | Backoff delay between retry attempts in seconds. Must be greater than zero. |
+| `LLM_ALLOWED_FEATURES` | `` (empty) | Comma-separated allowlist of feature areas permitted to use LLMs, e.g. `scanner_narrative,semantic_search`. Unknown areas fail startup validation. |
+
+---
+
+## System Notifications
+
+Generic (non-scanner) email + browser-push notifications via `notify_system()` and `POST /api/v1/alerts/system`. Used by server-to-server callers such as the dark-factory scheduler.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `OPS_ALERT_EMAIL` | `` (empty) | Recipient address for system-level email notifications. When unset, the email channel is silently skipped (browser push still runs). |
+| `INTERNAL_API_TOKEN` | `` (empty) | Shared secret required by `POST /api/v1/alerts/system` (sent in the `X-Internal-Token` header). When unset the endpoint returns **503** (fail-closed); a mismatched token returns **401**. Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. |
 
 ---
 
@@ -115,6 +146,15 @@ Set when using the `--profile tls` Caddy service. See [deployment-guide.md — S
 
 ---
 
+## Weekly Restore Drill (`db-restore-drill` service)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RESTORE_DRILL_SCHEDULE` | `0 4 * * 0` | Supercronic cron expression (UTC) controlling when the restore drill runs. Default is Sundays at 4 AM UTC — one hour after the daily backup. |
+| `EXPECTED_ALEMBIC_HEAD` | `` (empty) | Expected alembic migration revision to assert after restore. When set, the drill fails if the restored `alembic_version` does not match this value exactly. When empty, the drill asserts only that `alembic_version` is non-empty. Set this in `.env` to the output of `python -m alembic current` after each migration. |
+
+---
+
 ## Monitoring
 
 | Variable | Default | Purpose |
@@ -163,6 +203,15 @@ curl http://localhost:8000/health
 
 ---
 
+## Scanner SLO
+
+| Variable | Default | Description |
+|---|---|---|
+| `SCAN_DURATION_SLO_SECONDS` | `120` | p95 scan duration threshold in seconds above which the SLO-breach alert fires (Grafana alert `scan-duration-slo-breach`). |
+| `SCAN_STALENESS_SLO_SECONDS` | `900` | Seconds since last successful scan completion before the missed-slot alert fires, when within the 08:00–15:00 UTC pre-market window (Grafana alert `scan-missed-slot-pre-market`). |
+
+---
+
 ## Adding a New Variable
 
 1. Add it to `.env.example` with a placeholder value and a comment.
@@ -170,3 +219,35 @@ curl http://localhost:8000/health
 3. Read it in `backend/app/core/config.py` via `os.getenv("VAR_NAME", "default")`.
 4. Restart containers: `docker-compose down && docker-compose up -d`.
 5. Document it in this file.
+
+
+---
+
+## Live Trading Safety Controls
+
+These variables control the non-bypassable order guards added at the `place_bracket_order` chokepoint (F-TRADE-01). They must be set at the container/env level — **they are not API-settable**.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `LIVE_TRADING_ARMED` | `false` | **Must be explicitly set to `true` to allow live IBKR order placement.** Defaults to `false` — any container without this env var set will refuse all live orders with `PermissionError`. Requires container restart to change. |
+| `TRADING_KILL_SWITCH` | `` (unset) | Boot-time env override for the emergency halt. Uses **deny-list semantics**: the switch is considered *disengaged* only if the value is one of `""` (unset), `0`, `false`, `no`, or `off` (case-insensitive, whitespace stripped). Any other value — including `1`, `true`, `yes`, `on`, or custom tokens — is treated as **ENGAGED** and all live orders are blocked with `PermissionError`. Requires a container restart to change; for instant runtime control use the Redis key below. |
+| `MAX_ORDER_NOTIONAL` | `10000.0` | Hard USD notional cap per order. Uses the **highest** available price (entry, target, or stop) so short orders cannot circumvent the cap by using a low-side target price. Orders exceeding this raise `ValueError` before connecting to IBKR. Override if your live account trades larger sizes (e.g. `MAX_ORDER_NOTIONAL=50000`). |
+| `MAX_ORDER_QTY` | `200` | Hard shares-per-order cap. Orders with `quantity > MAX_ORDER_QTY` raise `ValueError`. Override for large-cap positions where 200 shares is too restrictive. |
+
+> **Breaking default:** Any container currently placing live IBKR orders **must** set `LIVE_TRADING_ARMED=true` before deploying this change, or live order placement will be blocked. The default is intentionally safe/conservative.
+
+### Redis runtime kill switch
+
+The kill switch has a **Redis-backed runtime layer** (`trading:kill_switch` key) that can halt live orders instantly **without a container restart**:
+
+```bash
+# Engage — halt all live orders immediately
+docker exec stockscanner-redis redis-cli -a "$REDIS_PASSWORD" set trading:kill_switch 1
+
+# Disengage — resume live orders
+docker exec stockscanner-redis redis-cli -a "$REDIS_PASSWORD" del trading:kill_switch
+```
+
+**Fail-closed behavior:** If Redis is unreachable (connection refused, timeout, server down), the kill switch is treated as **ENGAGED** and all live orders are blocked. This is intentional — it is safer to halt trading than to place orders when the safety infrastructure is unavailable. A 1-second socket timeout prevents a hung Redis from blocking order placement indefinitely.
+
+Either the env var (boot-time) **or** the Redis key (runtime) engaging is sufficient to halt trading. They are independent; both must be clear for orders to proceed.

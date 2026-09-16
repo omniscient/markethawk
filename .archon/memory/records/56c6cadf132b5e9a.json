@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-07",
+      "evidence_tag": null,
+      "issue": 205,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-07",
+  "id": "56c6cadf132b5e9a",
+  "kind": "AVOID",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "Never use `except (pybreaker.CircuitBreakerError, Exception)` \u2014 `CircuitBreakerError` is an `Exception` subclass so the tuple is redundant, and the broad catch masks real defects as missing data. Use two separate handlers: `except pybreaker.CircuitBreakerError` \u2192 raise `ProviderError`, `except Exception` \u2192 log and return empty.",
+  "superseded_by": null,
+  "supersedes": []
+}

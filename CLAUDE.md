@@ -65,23 +65,9 @@ Three systems, all pre-configured. See [docs/ai-development.md](docs/ai-developm
 
 - **Superpowers** (interactive, in-session) — brainstorming, planning, implementation, and review via the `Skill` tool (`superpowers:brainstorming`, `superpowers:writing-plans`, `superpowers:verification-before-completion`, etc.).
 - **Archon** (autonomous, isolated worktrees) — fire-and-forget workflows that produce PRs: `archon workflow run <name> "description"` or *"Use archon to fix issue #3"*. Run `archon workflow list` for the catalog.
-- **Dark Factory** (autonomous Docker) — sandboxed container that builds features from GitHub issues with per-issue preview stacks. Always runs baked images (omits `docker-compose.override.yml`).
+- **Dark Factory** (autonomous Docker) — sandboxed container that builds features from GitHub issues with per-issue preview stacks. **Extracted to [omniscient/dark-factory](https://github.com/omniscient/dark-factory)**: the scheduler/harness code, bench suite, and its CI live there; this repo carries only the target-side adapter (`.factory/adapter.yaml` + `.factory/hooks/`) and agent memory (`.archon/memory/`). The production scheduler runs from that repo's `deploy/docker-compose.yml`.
 
-Work is tracked as [GitHub Issues](https://github.com/omniscient/markethawk/issues) with `priority:` (`must-have`/`should-have`) and `size:` (`S/M/L`) labels.
-
-### Replay Benchmark (harness regression gate)
-
-Before merging changes to factory prompts, DAG nodes, or gate thresholds, run the bench suite:
-
-```bash
-# Inside the factory container — one command, emits pass^k per size bucket
-bash dark-factory/bench/run_suite.sh
-
-# Dry run (plan only, no archon invocations)
-bash dark-factory/bench/run_suite.sh --dry-run
-```
-
-Results are written to `dark-factory/bench/results/`. See `dark-factory/bench/baseline.md` for the task manifest, scoring formula, and token cost guidance.
+Work is tracked as [GitHub Issues](https://github.com/omniscient/markethawk/issues) with `priority:` (`must-have`/`should-have`) and `size:` (`S/M/L`) labels. Factory harness changes (prompts, DAG nodes, gate thresholds) are gated by the replay bench suite in the dark-factory repo (`bench/run_suite.sh` there — set `BENCH_TARGET_DIR` at this repo's checkout).
 
 ## Development Rules
 
@@ -167,3 +153,5 @@ Wire the MCP server in `.claude/settings.local.json` (see eval doc) to use `get_
 - **Triage labels** — five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
 - **Domain docs** — single-context layout: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 - **Architecture review** — `/architecture-review` regenerates the comparable Architecture & Quality report series in `docs/architecture-reviews/` (frozen 16-dimension rubric + DORA + code-health sections). See `.claude/skills/architecture-review/SKILL.md`.
+- **Memory contract** — stable schema, lifecycle rules, and scoping matrix for `.archon/memory/*.md`. See [`omniscient/dark-factory:docs/dark-factory-memory-contract.md`](https://github.com/omniscient/dark-factory/blob/main/docs/dark-factory-memory-contract.md).
+- **Memory v2 operator guide** — rollout/fallback/maintenance runbook for the flat-file memory system. See [`omniscient/dark-factory:docs/dark-factory-memory-v2.md`](https://github.com/omniscient/dark-factory/blob/main/docs/dark-factory-memory-v2.md).

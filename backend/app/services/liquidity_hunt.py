@@ -15,22 +15,29 @@ import logging
 import math
 import time as _time
 from collections import defaultdict
-from datetime import date, datetime, time, timedelta, timezone
-from typing import Any
+from datetime import date, datetime, time, timedelta
+from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.core.metrics import scan_duration_seconds, scanner_events_total
+from app.core.metrics import (
+    scan_duration_seconds,
+    scan_failed_tickers_ratio,
+    scan_last_success_timestamp,
+    scanner_events_total,
+)
 from app.models.monitored_stock import MonitoredStock
 from app.models.stock_aggregate import StockAggregate
 from app.models.stock_split import StockSplit
 from app.models.ticker_reference import TickerReference
 from app.services.alert_service import save_event as _save_event
 from app.services.catalyst_parser import CatalystParser
+from app.services.data_readiness import DataReadinessService
+from app.services.scanner_explanations import build_liquidity_hunt_explanation
 from app.utils.session import get_market_today
-from app.utils.time import to_utc_naive
+from app.utils.time import ensure_utc, to_utc_naive
 
 _ET = ZoneInfo("America/New_York")
 _LOG = logging.getLogger(__name__)
@@ -301,7 +308,7 @@ def _get_rolling_baselines(
         lambda: {"pre": [], "post": [], "regular": []}
     )
     for r in rows:
-        ts_et = r.timestamp.replace(tzinfo=timezone.utc).astimezone(_ET)
+        ts_et = ensure_utc(r.timestamp).astimezone(_ET)
         d = ts_et.date()
         if r.is_pre_market:
             daily[d]["pre"].append(r)
@@ -421,6 +428,7 @@ async def run_liquidity_hunt_scan(
     end_date: date | None = None,
     config: dict | None = None,
     diagnostics_out: dict | None = None,
+    gate_metadata: dict | None = None,
 ) -> list[dict[str, Any]]:
     """
     Run liquidity_hunt_pre and liquidity_hunt_post scans over a date range.
@@ -437,126 +445,87 @@ async def run_liquidity_hunt_scan(
     errors) plus the resolved start/end dates and ticker count.
     """
     _start = _time.monotonic()
-    # The pre/post variants need a *completed* regular session as a baseline,
-    # so the no-args default rolls back to the previous trading day. This makes
-    # the "Run Scanner" button always produce something pre-open instead of
-    # silently dropping every ticker as no_data.
-    if start_date is None and end_date is None:
-        d = get_market_today() - timedelta(days=1)
-        while d.weekday() >= 5:  # Saturday=5, Sunday=6
-            d -= timedelta(days=1)
-        start_date = end_date = d
-    elif start_date is None:
-        start_date = end_date
-    elif end_date is None:
-        end_date = start_date
+    try:
+        # The pre/post variants need a *completed* regular session as a baseline,
+        # so the no-args default rolls back to the previous trading day. This makes
+        # the "Run Scanner" button always produce something pre-open instead of
+        # silently dropping every ticker as no_data.
+        if start_date is None and end_date is None:
+            d = get_market_today() - timedelta(days=1)
+            while d.weekday() >= 5:  # Saturday=5, Sunday=6
+                d -= timedelta(days=1)
+            start_date = end_date = d
+        elif start_date is None:
+            start_date = end_date
+        elif end_date is None:
+            end_date = start_date
 
-    results: list[dict[str, Any]] = []
-    counts = {
-        "no_session_metrics": 0,
-        "no_prior_close": 0,
-        "no_baseline": 0,
-        "evaluated": 0,
-        "fired_pre": 0,
-        "fired_post": 0,
-        "errors": 0,
-    }
+        results: list[dict[str, Any]] = []
+        counts = {
+            "no_session_metrics": 0,
+            "no_prior_close": 0,
+            "no_baseline": 0,
+            "evaluated": 0,
+            "fired_pre": 0,
+            "fired_post": 0,
+            "errors": 0,
+        }
 
-    trading_days = [
-        start_date + timedelta(days=i)
-        for i in range((end_date - start_date).days + 1)
-        if (start_date + timedelta(days=i)).weekday() < 5
-    ]
-    # Note: weekday() < 5 excludes weekends; market holidays pass through and are
-    # filtered naturally when _get_session_metrics returns None (no regular bars).
+        trading_days = [
+            start_date + timedelta(days=i)
+            for i in range((end_date - start_date).days + 1)
+            if (start_date + timedelta(days=i)).weekday() < 5
+        ]
+        # Note: weekday() < 5 excludes weekends; market holidays pass through and are
+        # filtered naturally when _get_session_metrics returns None (no regular bars).
 
-    for event_date in trading_days:
-        for ticker in tickers:
-            try:
-                session_metrics = _get_session_metrics(db, ticker, event_date)
-                if session_metrics is None:
-                    counts["no_session_metrics"] += 1
-                    continue
-
-                prior_day_close = _get_prior_day_close(db, ticker, event_date)
-                if prior_day_close is None:
-                    counts["no_prior_close"] += 1
-                    continue
-
-                event_date_regular_close = _get_event_date_regular_close(
-                    db, ticker, event_date
-                )
-
-                baselines = _get_rolling_baselines(db, ticker, event_date)
-                if baselines is None:
-                    counts["no_baseline"] += 1
-                    continue
-
-                counts["evaluated"] += 1
-
+        for event_date in trading_days:
+            for ticker in tickers:
                 try:
-                    enrichment = _get_enrichment(db, ticker, event_date)
-                except Exception:
-                    _LOG.warning(
-                        "Enrichment failed for %s on %s; proceeding with empty enrichment",
-                        ticker,
-                        event_date,
-                        exc_info=True,
-                    )
-                    enrichment = {
-                        "market_cap": None,
-                        "outstanding_shares": None,
-                        "recent_split_date": None,
-                        "catalyst_tags": [],
-                        "catalyst_summary": None,
-                    }
+                    session_metrics = _get_session_metrics(db, ticker, event_date)
+                    if session_metrics is None:
+                        counts["no_session_metrics"] += 1
+                        continue
 
-                # Pre-market variant
-                fires_pre, base_ind_pre, criteria_pre = _evaluate_criteria(
-                    session="pre",
-                    session_vol=session_metrics["pre_vol"],
-                    session_high=session_metrics["pre_high"],
-                    reference_close=prior_day_close,
-                    regular_vol=session_metrics["regular_vol"],
-                    regular_high=session_metrics["regular_high"],
-                    regular_low=session_metrics["regular_low"],
-                    regular_open=session_metrics["regular_open"],
-                    baselines=baselines,
-                    config=config,
-                )
-                if fires_pre:
-                    indicators_pre = _build_indicators(
-                        "pre",
-                        base_ind_pre,
-                        session_metrics["regular_open"],
-                        session_metrics["regular_close"],
-                        enrichment,
-                        event_date,
-                        session_metrics["pre_vol"],
-                    )
-                    event_dict = _save_event(
-                        db=db,
-                        ticker=ticker,
-                        event_date=event_date,
-                        scanner_type="liquidity_hunt_pre",
-                        indicators=indicators_pre,
-                        criteria_met=criteria_pre,
-                        enrichment=enrichment,
-                        previous_close=prior_day_close,
-                        opening_price=session_metrics["regular_open"],
-                        closing_price=session_metrics["regular_close"],
-                    )
-                    results.append(event_dict)
-                    counts["fired_pre"] += 1
-                    scanner_events_total.labels(scanner_type="liquidity_hunt_pre").inc()
+                    prior_day_close = _get_prior_day_close(db, ticker, event_date)
+                    if prior_day_close is None:
+                        counts["no_prior_close"] += 1
+                        continue
 
-                # Post-market variant (skip if no event_date regular close)
-                if event_date_regular_close is not None:
-                    fires_post, base_ind_post, criteria_post = _evaluate_criteria(
-                        session="post",
-                        session_vol=session_metrics["post_vol"],
-                        session_high=session_metrics["post_high"],
-                        reference_close=event_date_regular_close,
+                    event_date_regular_close = _get_event_date_regular_close(
+                        db, ticker, event_date
+                    )
+
+                    baselines = _get_rolling_baselines(db, ticker, event_date)
+                    if baselines is None:
+                        counts["no_baseline"] += 1
+                        continue
+
+                    counts["evaluated"] += 1
+
+                    try:
+                        enrichment = _get_enrichment(db, ticker, event_date)
+                    except Exception:
+                        _LOG.warning(
+                            "Enrichment failed for %s on %s; proceeding with empty enrichment",
+                            ticker,
+                            event_date,
+                            exc_info=True,
+                        )
+                        enrichment = {
+                            "market_cap": None,
+                            "outstanding_shares": None,
+                            "recent_split_date": None,
+                            "catalyst_tags": [],
+                            "catalyst_summary": None,
+                        }
+
+                    # Pre-market variant
+                    fires_pre, base_ind_pre, criteria_pre = _evaluate_criteria(
+                        session="pre",
+                        session_vol=session_metrics["pre_vol"],
+                        session_high=session_metrics["pre_high"],
+                        reference_close=prior_day_close,
                         regular_vol=session_metrics["regular_vol"],
                         regular_high=session_metrics["regular_high"],
                         regular_low=session_metrics["regular_low"],
@@ -564,76 +533,161 @@ async def run_liquidity_hunt_scan(
                         baselines=baselines,
                         config=config,
                     )
-                    if fires_post:
-                        indicators_post = _build_indicators(
-                            "post",
-                            base_ind_post,
+                    if fires_pre:
+                        indicators_pre = _build_indicators(
+                            "pre",
+                            base_ind_pre,
                             session_metrics["regular_open"],
                             session_metrics["regular_close"],
                             enrichment,
                             event_date,
-                            session_metrics["post_vol"],
+                            session_metrics["pre_vol"],
+                        )
+                        event_gate_metadata = (
+                            DataReadinessService.event_quality_gate_metadata(
+                                db=db,
+                                ticker=ticker,
+                                scanner_type="liquidity_hunt_pre",
+                                event_date=event_date,
+                                base_metadata=gate_metadata,
+                            )
                         )
                         event_dict = _save_event(
                             db=db,
                             ticker=ticker,
                             event_date=event_date,
-                            scanner_type="liquidity_hunt_post",
-                            indicators=indicators_post,
-                            criteria_met=criteria_post,
+                            scanner_type="liquidity_hunt_pre",
+                            indicators=indicators_pre,
+                            criteria_met=criteria_pre,
                             enrichment=enrichment,
-                            previous_close=event_date_regular_close,
+                            previous_close=prior_day_close,
                             opening_price=session_metrics["regular_open"],
                             closing_price=session_metrics["regular_close"],
+                            gate_metadata=event_gate_metadata,
+                            explanation=build_liquidity_hunt_explanation(
+                                scanner_type="liquidity_hunt_pre",
+                                indicators=indicators_pre,
+                                criteria_met=criteria_pre,
+                                gate_metadata=event_gate_metadata,
+                                config=config,
+                            ),
                         )
                         results.append(event_dict)
-                        counts["fired_post"] += 1
+                        counts["fired_pre"] += 1
                         scanner_events_total.labels(
-                            scanner_type="liquidity_hunt_post"
+                            scanner_type="liquidity_hunt_pre"
                         ).inc()
 
-            except Exception:
-                counts["errors"] += 1
-                _LOG.exception(
-                    "Error in liquidity_hunt scan for %s on %s", ticker, event_date
-                )
+                    # Post-market variant (skip if no event_date regular close)
+                    if event_date_regular_close is not None:
+                        fires_post, base_ind_post, criteria_post = _evaluate_criteria(
+                            session="post",
+                            session_vol=session_metrics["post_vol"],
+                            session_high=session_metrics["post_high"],
+                            reference_close=event_date_regular_close,
+                            regular_vol=session_metrics["regular_vol"],
+                            regular_high=session_metrics["regular_high"],
+                            regular_low=session_metrics["regular_low"],
+                            regular_open=session_metrics["regular_open"],
+                            baselines=baselines,
+                            config=config,
+                        )
+                        if fires_post:
+                            indicators_post = _build_indicators(
+                                "post",
+                                base_ind_post,
+                                session_metrics["regular_open"],
+                                session_metrics["regular_close"],
+                                enrichment,
+                                event_date,
+                                session_metrics["post_vol"],
+                            )
+                            event_gate_metadata = (
+                                DataReadinessService.event_quality_gate_metadata(
+                                    db=db,
+                                    ticker=ticker,
+                                    scanner_type="liquidity_hunt_post",
+                                    event_date=event_date,
+                                    base_metadata=gate_metadata,
+                                )
+                            )
+                            event_dict = _save_event(
+                                db=db,
+                                ticker=ticker,
+                                event_date=event_date,
+                                scanner_type="liquidity_hunt_post",
+                                indicators=indicators_post,
+                                criteria_met=criteria_post,
+                                enrichment=enrichment,
+                                previous_close=event_date_regular_close,
+                                opening_price=session_metrics["regular_open"],
+                                closing_price=session_metrics["regular_close"],
+                                gate_metadata=event_gate_metadata,
+                                explanation=build_liquidity_hunt_explanation(
+                                    scanner_type="liquidity_hunt_post",
+                                    indicators=indicators_post,
+                                    criteria_met=criteria_post,
+                                    gate_metadata=event_gate_metadata,
+                                    config=config,
+                                ),
+                            )
+                            results.append(event_dict)
+                            counts["fired_post"] += 1
+                            scanner_events_total.labels(
+                                scanner_type="liquidity_hunt_post"
+                            ).inc()
 
-    _LOG.info(
-        "liquidity_hunt scan complete: tickers=%d days=%d "
-        "dropped=(no_data:%d no_prior_close:%d no_baseline:%d) "
-        "evaluated=%d fired=(pre:%d post:%d) errors=%d",
-        len(tickers),
-        len(trading_days),
-        counts["no_session_metrics"],
-        counts["no_prior_close"],
-        counts["no_baseline"],
-        counts["evaluated"],
-        counts["fired_pre"],
-        counts["fired_post"],
-        counts["errors"],
-    )
+                except Exception:
+                    counts["errors"] += 1
+                    _LOG.exception(
+                        "Error in liquidity_hunt scan for %s on %s", ticker, event_date
+                    )
 
-    if diagnostics_out is not None:
-        diagnostics_out.update(
-            {
-                "tickers": len(tickers),
-                "days": len(trading_days),
-                "start_date": start_date.isoformat(),
-                "end_date": end_date.isoformat(),
-                "no_data": counts["no_session_metrics"],
-                "no_prior_close": counts["no_prior_close"],
-                "no_baseline": counts["no_baseline"],
-                "evaluated": counts["evaluated"],
-                "fired_pre": counts["fired_pre"],
-                "fired_post": counts["fired_post"],
-                "errors": counts["errors"],
-            }
+        _LOG.info(
+            "liquidity_hunt scan complete: tickers=%d days=%d "
+            "dropped=(no_data:%d no_prior_close:%d no_baseline:%d) "
+            "evaluated=%d fired=(pre:%d post:%d) errors=%d",
+            len(tickers),
+            len(trading_days),
+            counts["no_session_metrics"],
+            counts["no_prior_close"],
+            counts["no_baseline"],
+            counts["evaluated"],
+            counts["fired_pre"],
+            counts["fired_post"],
+            counts["errors"],
         )
 
-    scan_duration_seconds.labels(scanner_type="liquidity_hunt").observe(
-        _time.monotonic() - _start
-    )
-    return results
+        if diagnostics_out is not None:
+            diagnostics_out.update(
+                {
+                    "tickers": len(tickers),
+                    "days": len(trading_days),
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "no_data": counts["no_session_metrics"],
+                    "no_prior_close": counts["no_prior_close"],
+                    "no_baseline": counts["no_baseline"],
+                    "evaluated": counts["evaluated"],
+                    "fired_pre": counts["fired_pre"],
+                    "fired_post": counts["fired_post"],
+                    "errors": counts["errors"],
+                }
+            )
+
+        _total_units = len(tickers) * len(trading_days)
+        if _total_units == 0 or counts["errors"] < _total_units:
+            scan_last_success_timestamp.labels(scanner_type="liquidity_hunt").set(
+                _time.time()
+            )
+        scan_failed_tickers_ratio.labels(scanner_type="liquidity_hunt").set(
+            counts["errors"] / max(1, len(tickers) * len(trading_days))
+        )
+        return results
+    finally:
+        scan_duration_seconds.labels(scanner_type="liquidity_hunt").observe(
+            _time.monotonic() - _start
+        )
 
 
 async def run_liquidity_hunt_scan_for_date(
@@ -652,13 +706,22 @@ async def run_liquidity_hunt_scan_for_date(
 from app.services.scan_orchestrator import ScannerDescriptor, register  # noqa: E402
 
 
-async def _orchestrator_run(tickers: list, db: Any, event_date: date) -> list[dict]:
+async def _orchestrator_run(
+    tickers: list,
+    db: Any,
+    event_date: date,
+    scanner_run: Optional[
+        Any
+    ] = None,  # accepted for protocol conformance; not used here
+    gate_metadata: Optional[Any] = None,
+) -> list[dict]:
     """Adapter: maps the standard ScannerFn signature to run_liquidity_hunt_scan."""
     return await run_liquidity_hunt_scan(
         tickers=tickers,
         db=db,
         start_date=event_date,
         end_date=event_date,
+        gate_metadata=gate_metadata,
     )
 
 

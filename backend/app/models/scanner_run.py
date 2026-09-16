@@ -4,7 +4,16 @@ ScannerRun SQLAlchemy model.
 
 import uuid
 
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy import Uuid as UUID
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -29,7 +38,10 @@ class ScannerRun(Base):
     error_message = Column(Text, nullable=True)
     # Per-ticker failures from partial scan runs: [{ticker, error_type, message, retryable}, ...]
     failed_tickers = Column(JSONB, nullable=True)
+    # Full QualityGateAssessment persisted at scan start (advisory mode); null for nightly/live scans
+    quality_gate = Column(JSONB, nullable=True)
     created_at = Column(DateTime, default=utc_now)
     scan_start_date = Column(Date, nullable=True)
     scan_end_date = Column(Date, nullable=True)
     celery_task_id = Column(String(64), nullable=True, index=True)
+    data_degraded = Column(Boolean, nullable=True)

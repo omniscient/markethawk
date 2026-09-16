@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketHawk — Architecture &amp; Quality Report v4</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#0f172a;--surface:#1e293b;--surface2:#283548;--border:#334155;
+    --text:#e2e8f0;--text-dim:#94a3b8;--accent:#0ea5e9;
+    --green:#22c55e;--yellow:#eab308;--red:#ef4444;--orange:#f97316;--purple:#a78bfa;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+  .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+  h1{font-size:2rem;font-weight:700;color:#f8fafc;margin-bottom:.25rem}
+  h2{font-size:1.5rem;font-weight:600;color:#f8fafc;margin:2.5rem 0 1rem;padding-bottom:.5rem;border-bottom:2px solid var(--accent)}
+  h3{font-size:1.15rem;font-weight:600;color:#f1f5f9;margin:1.5rem 0 .5rem}
+  h4{font-size:1rem;font-weight:600;color:var(--accent);margin:1rem 0 .4rem}
+  p,li{color:var(--text)} a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  .subtitle{color:var(--text-dim);font-size:.95rem;margin-bottom:2rem}
+  .badge{display:inline-block;padding:2px 10px;border-radius:9999px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+  .badge-yellow{background:rgba(234,179,8,.15);color:var(--yellow)}
+  .badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+  .badge-orange{background:rgba(249,115,22,.15);color:var(--orange)}
+  .badge-blue{background:rgba(14,165,233,.15);color:var(--accent)}
+  .badge-purple{background:rgba(167,139,250,.15);color:var(--purple)}
+  .header-banner{background:linear-gradient(135deg,#0c4a6e 0%,#1e293b 100%);padding:2.5rem 2rem;border-radius:12px;margin-bottom:2rem;border:1px solid var(--border)}
+  .header-banner .meta{display:flex;gap:2rem;flex-wrap:wrap;margin-top:.5rem}
+  .header-banner .meta span{color:var(--text-dim);font-size:.85rem}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem}
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+  .score-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;text-align:center;position:relative}
+  .score-big{font-size:2.5rem;font-weight:800}
+  .score-label{font-size:.85rem;color:var(--text-dim);margin-top:.25rem}
+  .delta-pill{position:absolute;top:.6rem;right:.6rem;font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:9999px;background:rgba(34,197,94,.18);color:var(--green)}
+  .delta-pill.flat{background:rgba(148,163,184,.18);color:var(--text-dim)}
+  .delta-pill.down{background:rgba(239,68,68,.18);color:var(--red)}
+  .score-5{color:var(--green)}.score-4{color:#4ade80}.score-3{color:var(--yellow)}.score-2{color:var(--orange)}.score-1{color:var(--red)}.score-0{color:#6b7280}
+  table{width:100%;border-collapse:collapse;margin:.75rem 0 1.5rem;font-size:.9rem}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--surface2);color:#cbd5e1;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em}
+  tr:hover td{background:rgba(14,165,233,.04)}
+  td code,p code,li code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-family:'JetBrains Mono','Cascadia Code',monospace;font-size:.82rem}
+  .toc{columns:2;column-gap:2rem}.toc li{break-inside:avoid;margin-bottom:.3rem;font-size:.9rem}
+  .meter{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:.3rem 0}
+  .meter-fill{height:100%;border-radius:4px}
+  .meter-green .meter-fill{background:var(--green)}.meter-yellow .meter-fill{background:var(--yellow)}
+  .meter-orange .meter-fill{background:var(--orange)}.meter-red .meter-fill{background:var(--red)}
+  .sev-critical{color:var(--red);font-weight:700}.sev-high{color:var(--orange);font-weight:600}
+  .sev-medium{color:var(--yellow);font-weight:600}.sev-low{color:var(--green)}
+  ul,ol{padding-left:1.3rem;margin:.5rem 0}li{margin-bottom:.3rem}
+  .fp{color:var(--purple);font-family:'JetBrains Mono',monospace;font-size:.82rem}
+  .dimrow{display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:center;margin:.35rem 0}
+  .dimbar{display:flex;align-items:center;gap:.5rem}
+  .deltaup{color:var(--green);font-weight:700}.deltaflat{color:var(--text-dim);font-weight:700}.deltadown{color:var(--red);font-weight:700}
+  .callout{border-left:4px solid var(--accent);background:var(--surface2);padding:.8rem 1rem;border-radius:0 8px 8px 0;margin:.8rem 0}
+  .callout-red{border-color:var(--red)}.callout-green{border-color:var(--green)}.callout-yellow{border-color:var(--yellow)}
+  .mermaid{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;margin:1rem 0;text-align:center}
+  /* KPI cards for the DORA section */
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem}
+  .kpi .v{font-size:2rem;font-weight:800;color:#f8fafc}
+  .kpi .l{font-size:.8rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em}
+  .kpi .s{font-size:.78rem;color:var(--text-dim);margin-top:.3rem}
+  /* Trend table coloring */
+  .trend-flat{color:var(--text-dim)} .trend-up{color:var(--green)} .trend-down{color:var(--red)}
+  @media(max-width:768px){.toc{columns:1}.card-grid{grid-template-columns:1fr}}
+  @media print{body{background:#fff;color:#111}.card,th{background:#f3f4f6}.header-banner{background:#e0f2fe}h2{border-color:#0284c7}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="header-banner">
+  <h1>MarketHawk &mdash; Architecture &amp; Quality Report <span style="color:var(--accent)">v4</span></h1>
+  <div class="subtitle">Re-assessment after the Data Quality Trust Gate epic (#491) and the close-out of the defensive-security epic (#372, incl. live-IBKR guards #368) &mdash; and the resolution of every v3 &ldquo;honesty gap&rdquo; (backups, ruff-in-CI, readiness probe)</div>
+  <div class="meta">
+    <span>Repository: <strong>omniscient/markethawk</strong></span>
+    <span>Branch: <strong>main</strong> @ <strong>56ab037</strong></span>
+    <span>Commits: <strong>1323</strong> (+474 since v3)</span>
+    <span>Generated: <strong>2026-06-26</strong></span>
+    <span>Prior report: <strong>2026-06-09 (v3)</strong></span>
+  </div>
+</div>
+
+<div class="callout callout-green">
+  <strong>How to read this report.</strong> Identical scoring rubric to v1, v2 and v3 &mdash; every number is
+  directly comparable. Scored items carry a <span class="badge badge-green">Δ vs v3</span> pill.
+  Scores were verified against live code on <code>main</code> @ <code>56ab037</code> (<code>file:line</code> reads,
+  <code>docker-compose.yml</code>/CI config inspection, and <code>git</code>/<code>gh</code> DORA queries). The
+  frontend <code>tsc</code>/<code>eslint</code>/<code>build</code> and backend <code>pytest</code> gates were
+  <em>not</em> re-executed this review &mdash; CI-green is inferred from the all-checks-passing merged PRs
+  #619&ndash;#628 (stated plainly in &sect;20).
+</div>
+
+<h2 id="toc">Table of Contents</h2>
+<ol class="toc">
+  <li><a href="#exec-summary">Executive Summary</a></li>
+  <li><a href="#tech-overview">Repository &amp; Technology Overview</a></li>
+  <li><a href="#arch-assessment">Architecture Assessment</a></li>
+  <li><a href="#maintain">Maintainability Assessment</a></li>
+  <li><a href="#test">Testability &amp; Code Coverage</a></li>
+  <li><a href="#reliability">Reliability &amp; Operational Readiness</a></li>
+  <li><a href="#security">Security &amp; Compliance Review</a></li>
+  <li><a href="#perf">Performance &amp; Scalability</a></li>
+  <li><a href="#api-data">API, Data &amp; Integration Quality</a></li>
+  <li><a href="#devx">Developer Experience</a></li>
+  <li><a href="#code-health">Code Health Deep-Dive</a></li>
+  <li><a href="#dora">Delivery Performance (DORA)</a></li>
+  <li><a href="#trend">Score Trend</a></li>
+  <li><a href="#traceability">Ticket &rarr; Outcome Traceability</a></li>
+  <li><a href="#risk-register">Risk Register (v4)</a></li>
+  <li><a href="#scorecard">Quality Scorecard</a></li>
+  <li><a href="#roadmap">Prioritized Improvement Roadmap</a></li>
+  <li><a href="#final">Final Recommendations</a></li>
+  <li><a href="#evidence">Evidence Index</a></li>
+  <li><a href="#limitations">Limitations</a></li>
+</ol>
+
+<!-- ============ 1 EXEC SUMMARY ============ -->
+<h2 id="exec-summary">1. Executive Summary</h2>
+<div class="card-grid">
+  <div class="score-card"><span class="delta-pill">+1</span><div class="score-big score-4">91</div><div class="score-label">Overall Quality Score (0&ndash;100)</div><div style="font-size:.75rem;color:var(--text-dim)">was 90</div></div>
+  <div class="score-card"><span class="delta-pill flat">Δ 0</span><div class="score-big score-4">4.3</div><div class="score-label">Architecture Quality (0&ndash;5)</div><div style="font-size:.75rem;color:var(--text-dim)">was 4.3</div></div>
+  <div class="score-card"><span class="delta-pill">+0.06</span><div class="score-big score-4">4.12</div><div class="score-label">Weighted Scorecard (0&ndash;5)</div><div style="font-size:.75rem;color:var(--text-dim)">was 4.06</div></div>
+  <div class="score-card"><span class="delta-pill flat">was 22</span><div class="score-big" style="color:var(--purple)">21</div><div class="score-label">Docker services in the stack</div><div style="font-size:.75rem;color:var(--text-dim)">28,066 BE + 20,144 FE LOC</div></div>
+</div>
+
+<div class="card">
+<h3>Overall Health</h3>
+<p>MarketHawk is a mature single-tenant full-stack stock-scanning + paper/live-trading platform at a high plateau. In the 17 days since v3 it completed the <strong>Data Quality Trust Gate epic (#491, #498&ndash;#502)</strong> &mdash; a versioned <code>quality_gate.py</code>/<code>quality_gate_evidence.py</code> pair enforcing a survivorship + backtesting contract before a signal can arm a trade &mdash; closed out the <strong>defensive-security remediation epic (#372)</strong> including <strong>live-IBKR hard guards (#368)</strong> with a Redis-backed fail-closed kill switch and non-bypassable position caps (<code>providers/ibkr_orders.py:233-280</code>), and &mdash; the standout &mdash; <strong>turned all three v3 &ldquo;honesty gaps&rdquo; into real artifacts</strong>: automated DB backups with a weekly restore-drill sidecar (R01/#195, the item that shipped empty in v3), <code>ruff</code> now gating in CI (R02), and a deep readiness probe + migration-gate ADR-0012 (R05). A factory-platform outage (Python&nbsp;3.14/scipy) was diagnosed and fixed in the same window (#622). Overall quality rose <strong>90&rarr;91</strong>; the weighted scorecard <strong>4.06&rarr;4.12</strong>; the single dimension to move was <strong>Operational Readiness 3&rarr;4</strong>, breaking a three-review plateau.</p>
+<p>The character of the risk has shifted once more. v1 was <em>missing foundations</em>; v2 was <em>unfinished edges</em>; v3 was <em>process honesty at autonomous speed</em>; v4's risk is <strong>a mature single-tenant ceiling</strong>. What remains is no longer missing foundations but <em>structural</em> gaps that cap several dimensions at once and none of which is a defect today: there is no authorization model (single-user, RBAC pending #373 &mdash; now the #1 ceiling), the platform is single-replica with in-memory WebSocket connection counters (<code>core/ws_limits.py:18-19</code>) and no read replicas, and maintainability debt is quietly compounding &mdash; UTC-normalization duplication <em>grew</em> to 287 sites (still no <code>utils/time.py</code>) and the live-trading entrypoint <code>maybe_execute()</code> reached a 290-line, 15-branch guard cascade as #368&rsquo;s safety checks piled onto an already-large function. These are ceilings on multi-tenant and horizontal growth, not cracks in the current product.</p>
+</div>
+
+<h3>Top 5 Strengths (new since v3)</h3>
+<ol>
+  <li><strong>Automated, verified backups + restore-drill</strong> &mdash; the three-review-old existential data-loss risk is closed with <em>real</em> artifacts: a <code>db-backup</code> sidecar plus a weekly <code>db-restore-drill</code> that proves the dump restores (<code>docker-compose.yml:30-72</code>, <code>:368-407</code>). This single change moved Operational Readiness 3&rarr;4 and Backup/Recovery 1&rarr;5.</li>
+  <li><strong>Live-IBKR fail-closed kill switch</strong> &mdash; a Redis-backed kill switch plus non-bypassable position/notional caps gate every live order (#368, <code>providers/ibkr_orders.py:233-280</code>), survived two adversarial reviews, and raise the security posture without a single regression.</li>
+  <li><strong>Complete Data Quality Trust Gate</strong> &mdash; <code>quality_gate.py</code> + <code>quality_gate_evidence.py</code> implement a schema-versioned survivorship + backtesting contract with lineage (#491/#498&ndash;#502), shipped with tests; a clean module split rather than another god file.</li>
+  <li><strong>v3 honesty gaps closed in CI</strong> &mdash; <code>ruff check</code> now runs as a blocking CI step (R02 resolved), a deep <code>/ready</code> probe checks DB/Redis (<code>routers/health.py:34</code>), and migrations are gated by ADR-0012 &mdash; the &ldquo;documented gate that didn&rsquo;t gate&rdquo; problem from v3 is gone.</li>
+  <li><strong>Factory dependency modernization</strong> &mdash; the Python-3.14/scipy platform outage was root-caused and the scientific stack bumped to <code>cp314</code> wheels (#622, <code>requirements.txt</code>), keeping the autonomous pipeline itself buildable.</li>
+</ol>
+
+<h3>Top 5 Risks</h3>
+<ol>
+  <li><span class="sev-high">MEDIUM&ndash;HIGH</span> <strong>No authorization model</strong> &mdash; the platform is single-user with no RBAC; authorization is authenticated-vs-not only (&sect;7 Authz = 2/5). Split out as epic #373 with a design still pending. This is now the single largest ceiling on any multi-tenant trajectory. (carried)</li>
+  <li><span class="sev-medium">MEDIUM</span> <strong>Scalability is single-instance, four reviews running</strong> &mdash; in-memory WebSocket connection counters (<code>core/ws_limits.py:18-19</code>) are not multi-replica-safe and there are no read replicas; the API/DB tier cannot scale horizontally. (carried, structurally stuck)</li>
+  <li><span class="sev-medium">MEDIUM</span> <strong><code>maybe_execute()</code> guard cascade</strong> &mdash; the live-trading entrypoint is now 290 lines / ~15 branches after #368 piled safety checks onto an already-large function (<code>auto_trade_service.py:92-381</code>); a testability and maintainability hazard exactly where money moves. (R01v4)</li>
+  <li><span class="sev-medium">MEDIUM</span> <strong>UTC-normalization duplication grew to 287 sites</strong> &mdash; v3&rsquo;s R03 was never addressed; the <code>.astimezone(timezone.utc).replace(tzinfo=None)</code> idiom now appears 287 times with still no <code>utils/time.py</code> owner. (R03v4)</li>
+  <li><span class="sev-low">LOW</span> <strong>Frontend / API god files undecomposed four reviews</strong> &mdash; <code>api/scanner.ts</code> (787) and <code>QualityReportModal.tsx</code> (753) are byte-for-byte unchanged across v1&ndash;v4. (carried, R10 v3)</li>
+</ol>
+
+<h3>Top 5 Recommended Actions</h3>
+<ol>
+  <li>Resolve the authorization question &mdash; implement #373 RBAC <em>or</em> write an ADR formally accepting the single-user ceiling &mdash; <em>Effort: L, closes the #1 carried ceiling</em>.</li>
+  <li>Decompose <code>maybe_execute()</code> into extracted <code>_validate_*</code> decision steps &mdash; <em>Effort: M, closes R01v4</em>.</li>
+  <li>Create <code>app/utils/time.py</code> (<code>utc_now()</code>, <code>to_utc_naive()</code>) and codemod the 287 call sites &mdash; <em>Effort: M, closes R03v4 (4 reviews old)</em>.</li>
+  <li>Move WebSocket connection counters to Redis and add read replicas &mdash; <em>Effort: M, unsticks Scalability</em>.</li>
+  <li>Extract a <code>QualityGatePolicy</code> interface so a new evidence type touches one module, not three &mdash; <em>Effort: S, closes R04v4</em>.</li>
+</ol>
+
+<!-- ============ 2 TECH OVERVIEW ============ -->
+<h2 id="tech-overview">2. Repository &amp; Technology Overview</h2>
+<h3>What Changed in the Stack</h3>
+<table>
+  <tr><th>Area</th><th>v3 (2026-06-09)</th><th>v4 (2026-06-26)</th></tr>
+  <tr><td>Automated backups</td><td>Manual <code>pg_dump</code> only (#195 closed empty &mdash; R01)</td><td><code>db-backup</code> + weekly <code>db-restore-drill</code> sidecars (<code>docker-compose.yml:30-72</code>, <code>:368-407</code>)</td></tr>
+  <tr><td>ruff in CI</td><td>Red on main, not gated (65 errors, R02)</td><td><code>ruff check</code> blocking CI backend step (R02 resolved)</td></tr>
+  <tr><td>Readiness probe</td><td>Liveness-only <code>/api/health</code> (R05)</td><td>Deep <code>/ready</code> probe (DB/Redis) (<code>routers/health.py:34</code>)</td></tr>
+  <tr><td>Migrations on deploy</td><td>Manual <code>alembic upgrade</code></td><td><code>alembic check</code> gate + migration ADR-0012</td></tr>
+  <tr><td>Data quality trust gate</td><td>None</td><td><code>quality_gate.py</code> + <code>quality_gate_evidence.py</code> (#491; survivorship + backtesting contract)</td></tr>
+  <tr><td>Live IBKR trading</td><td>Basic order path</td><td>Fail-closed Redis kill switch + non-bypassable caps (#368, <code>ibkr_orders.py:233-280</code>)</td></tr>
+  <tr><td>Live-order observability</td><td>None</td><td><code>live_orders_total</code> metric + <code>LiveOrderPlaced</code> alert rule</td></tr>
+  <tr><td>Scientific stack</td><td>Pre-3.14 wheels (factory build broke)</td><td>Python 3.14 <code>cp314</code> modernized (#622)</td></tr>
+  <tr><td>Largest module</td><td>2 facades (206 / 90 lines)</td><td><code>auto_trade_service.py</code> 847 (new largest &mdash; grew with #368)</td></tr>
+  <tr><td>Docker services</td><td>22 (adds socket-proxy, Caddy)</td><td>21 (adds backup/restore-drill sidecars; net consolidation)</td></tr>
+</table>
+
+<h3>Codebase Metrics</h3>
+<table>
+  <tr><th>Metric</th><th>v3</th><th>v4</th></tr>
+  <tr><td>Total commits</td><td>849</td><td>1,323 (+474)</td></tr>
+  <tr><td>Backend LOC (app, excl. migrations)</td><td>&mdash;</td><td>28,066</td></tr>
+  <tr><td>Frontend LOC (src)</td><td>&mdash;</td><td>20,144</td></tr>
+  <tr><td>SQLAlchemy models</td><td>&mdash;</td><td>37</td></tr>
+  <tr><td>Routers</td><td>13</td><td>17</td></tr>
+  <tr><td>Service modules</td><td>~33</td><td>46</td></tr>
+  <tr><td>Alembic migrations</td><td>43</td><td>51 (single head)</td></tr>
+  <tr><td>Backend test files / functions</td><td>85 / 608</td><td>137 / ~993&ndash;1,211</td></tr>
+  <tr><td>Frontend test files / tests</td><td>21 / ~161</td><td>40 / 452</td></tr>
+  <tr><td>Docker services</td><td>22</td><td>21</td></tr>
+  <tr><td>ADRs</td><td>11 (#201 collision open)</td><td>14</td></tr>
+</table>
+<p class="subtitle" style="margin-bottom:1rem">Test-function count varies by counting method (host grep 1,211 vs. careful agent count 993 &mdash; class-method/parametrize variance); reported as ~1,000. See &sect;20.</p>
+
+<h3>Architectural Pattern</h3>
+<p><strong>Layered monolith with verified facade decomposition, now with a trust-gate cross-cut.</strong> Router &rarr; service &rarr; provider &rarr; model layering holds; scanner strategies still self-register into the scan-orchestrator registry via importlib side-effect imports. The window&rsquo;s new cross-cut is the data-quality trust gate &mdash; <code>auto_trade_service</code> consults <code>quality_gate</code> before arming a trade, and live orders pass through a Redis-backed fail-closed kill switch. The standing tension is that two of the platform&rsquo;s newest concerns (live trading, quality evidence) concentrate into <code>auto_trade_service.py</code> (847 lines, the new largest module) rather than dispersing into focused services the way the scanner did.</p>
+<div class="mermaid">
+flowchart LR
+  CADDY["Caddy :443 (tls profile)<br/>HSTS, auto-cert"] --> FE["React SPA :3333"]
+  CADDY --> BE
+  FE -->|/api/v1 + WS cookie-auth| BE["FastAPI :8000<br/>auth + CSRF + rate-limit + metrics + OTel"]
+  BE --> PG[("PostgreSQL<br/>pooled 20+10")]
+  BE --> RS[("Redis<br/>broker + cache + tokens + kill-switch")]
+  BE -->|breaker + 10s timeouts| POLY["Polygon.io"]
+  BE -->|breaker + live guards| IBKR["IBKR Gateway<br/>fail-closed caps (#368)"]
+  BE --> QG["Quality Gate (#491)<br/>survivorship + backtest contract"]
+  CW["Celery worker/beat"] --> PG
+  CW --> RS
+  CW -. shared multiproc vol .-> BE
+  BE -->|/metrics + live_orders_total| PROM["Prometheus"]
+  PROM --> GRAF["Grafana + LiveOrderPlaced alert"]
+  BE -->|OTLP| JAEG["Jaeger"]
+  PG -. nightly dump + weekly restore-drill .-> BK["db-backup / db-restore-drill"]
+  DF["dark-factory / scheduler"] -->|tcp 2375| SOCK["docker-socket-proxy<br/>EXEC/AUTH/SECRETS blocked"]
+</div>
+
+<!-- ============ 3 ARCHITECTURE ASSESSMENT ============ -->
+<h2 id="arch-assessment">3. Architecture Assessment</h2>
+
+<h3>3.1 Separation of Concerns</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> Routers stayed thin; the new quality-gate logic lives in services, not routers, and the domain exception hierarchy (<code>exceptions.py</code>) continues to keep web types out of the core.</p>
+  <p><strong>Finding (caps the score):</strong> <code>services/universe_export.py:11-12,59</code> still raises <code>HTTPException</code> directly from the service layer &mdash; the one place a web type crosses the seam, and the reason the service can&rsquo;t be unit-tested as a pure function. (R02v4)</p>
+</div>
+
+<h3>3.2 Module Boundaries</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> The quality-gate split (<code>quality_gate.py</code> + <code>quality_gate_evidence.py</code>) added clean new seams rather than another monolith; the facade surfaces from v3 hold.</p>
+  <p><strong>Finding (caps the score):</strong> there are still no interfaces beyond <code>providers/base.py</code>, lazy-import cycles persist, and coupling grew &mdash; <code>quality_gate_evidence</code> reaches into the <code>SplitAdjustment</code> model, so a new evidence type touches three modules. (R04v4)</p>
+</div>
+
+<h3>3.3 Dependency Direction</h3>
+<div class="card">
+  <strong>Score: 3/5</strong> <span class="badge badge-yellow">Acceptable</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-yellow"><div class="meter-fill" style="width:60%"></div></div>
+  <p><strong>Change:</strong> No new cycles; flow still inward; the registry remains populated by side-effect importlib imports and string-named beat tasks.</p>
+  <p><strong>Finding (caps the score):</strong> dispatch is static-method based throughout (<code>ScannerService</code>, <code>QualityGate</code>) and therefore not DI-injectable &mdash; tests can&rsquo;t substitute a fake without monkeypatching, and the trust gate inherits the same rigidity.</p>
+</div>
+
+<h3>3.4 Coupling and Cohesion</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> The scanner decomposition from v3 holds and the quality-gate concern is its own cohesive pair of modules.</p>
+  <p><strong>Finding (caps the score):</strong> <code>auto_trade_service</code> is hard-coupled to <code>quality_gate</code>, and there are three modules to touch per new evidence type (<code>quality_gate.py</code> + <code>quality_gate_evidence.py</code> + <code>auto_trade_service.py</code>) &mdash; orchestration coupling concentrating in the live-trading path. (R04v4)</p>
+</div>
+
+<h3>3.5 API Design</h3>
+<div class="card">
+  <strong>Score: 5/5</strong> <span class="badge badge-green">Excellent</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:100%"></div></div>
+  <p><strong>Finding:</strong> No drift. Uniform <code>/api/v1/</code> versioning, correct status codes, a schema-versioned quality gate, and sort allowlists on list endpoints. (The raw-JSONB exposure that pulls the &sect;9 <em>API Consistency</em> sub-score to 4 is a data-shaping concern, not a convention violation; N+1 belongs to 3.6.)</p>
+</div>
+
+<h3>3.6 Data Access Patterns</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Finding (caps the score):</strong> eager loading remains confined to two <code>selectinload</code> uses, leaving N+1 margins on list paths; there are still no transaction context managers, so multi-write operations rely on implicit session-scope commits.</p>
+</div>
+
+<h3>3.7 Error Handling Architecture</h3>
+<div class="card">
+  <strong>Score: 5/5</strong> <span class="badge badge-green">Excellent</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:100%"></div></div>
+  <p><strong>Finding:</strong> The typed domain hierarchy with deterministic <code>error_id</code> hashing and retryable semantics is intact; <code>CircuitBreakerError</code> still maps to a non-retryable provider error, and the new live-trading failures fold into the same hierarchy.</p>
+</div>
+
+<h3>3.8 Configuration Management</h3>
+<div class="card">
+  <strong>Score: 5/5</strong> <span class="badge badge-green">Excellent</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:100%"></div></div>
+  <p><strong>Finding:</strong> Fail-fast validators reject weak <code>JWT_SECRET_KEY</code> (&ge;32) and <code>REDIS_PASSWORD</code> (&ge;16) and all required fields at startup; live-trading arming (<code>LIVE_TRADING_ARMED</code>) and the kill switch are typed, env-tunable settings. No raw <code>os.getenv</code> in app code.</p>
+</div>
+
+<h3>3.9 Observability Architecture</h3>
+<div class="card">
+  <strong>Score: 5/5</strong> <span class="badge badge-green">Excellent</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:100%"></div></div>
+  <p><strong>Change:</strong> Metrics + tracing + logs + alerts remain wired end-to-end; this window added a <code>live_orders_total</code> counter and a <code>LiveOrderPlaced</code> Grafana alert (<code>grafana/provisioning/alerting/rules.yaml</code>).</p>
+  <p><strong>Finding:</strong> alert routing is webhook-only (no email/Slack/PagerDuty), and OTLP trace export remains conditional with no metric exporter &mdash; the corner that keeps Distributed Tracing at 4/5 in the &sect;6 table.</p>
+</div>
+
+<h3>3.10 Security Architecture</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> Epic #372 fully completed this window &mdash; secrets validators, CSRF, pre-accept WS auth, route-class rate limits, log redaction and Docker hardening &mdash; plus #368&rsquo;s live-IBKR fail-closed guards raised the posture with zero regressions.</p>
+  <p><strong>Finding (caps the score):</strong> there is still no authorization model (single-user, no RBAC &mdash; &sect;7 Authz = 2/5, epic #373), and TLS remains an opt-in <code>--profile tls</code> path rather than the default.</p>
+</div>
+
+<h3>3.11 Deployment Architecture</h3>
+<div class="card">
+  <strong>Score: 4/5</strong> <span class="badge badge-green">Good</span> <span class="delta-pill flat">Δ 0</span>
+  <div class="meter meter-green"><div class="meter-fill" style="width:80%"></div></div>
+  <p><strong>Change:</strong> The v3 deploy-path traps are closed &mdash; a deep readiness probe (<code>routers/health.py:34</code>), an <code>alembic check</code> migration gate (ADR-0012), an admin-env-check, and automated backups now exist in the compose path.</p>
+  <p><strong>Finding (caps the score):</strong> TLS is still opt-in (<code>--profile tls</code>) and there is no automated CD &mdash; deploys remain a human-triggered <code>docker compose</code> rather than a pipeline.</p>
+</div>
+
+<!-- ============ 4 MAINTAINABILITY ============ -->
+<h2 id="maintain">4. Maintainability Assessment</h2>
+
+<div class="card">
+  <h4>Code Organization &mdash; 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span></h4>
+  <p>The facade + submodule layout holds and the quality-gate concern was added as a clean pair of modules rather than another monolith. The organization enforcer is now genuinely enforced &mdash; <code>ruff</code> runs in CI (R02 resolved), reversing v3&rsquo;s &ldquo;documented gate that doesn&rsquo;t gate.&rdquo; The offset is concentration: <code>auto_trade_service.py</code> absorbed live trading <em>and</em> quality-gate orchestration to become the new largest module (847 lines), and its <code>maybe_execute()</code> grew to 290 lines / ~15 branches as #368&rsquo;s guards accreted.</p>
+</div>
+
+<h3>Complexity Hotspots <span class="badge badge-yellow">Score 4/5 — function-level debt, longitudinal spine</span></h3>
+<p>Module-level decomposition from v3 is intact; the new story is a single module accreting the platform&rsquo;s newest concerns. Files are never dropped from this table once tracked; rows without a fresh v4 count are marked <em>n/m</em> (not re-counted this review).</p>
+<table>
+  <tr><th>File</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th><th>Δ v3&rarr;v4</th><th>Note</th></tr>
+  <tr><td><code>services/auto_trade_service.py</code></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td><strong>847</strong></td><td class="deltadown">NEW &uarr;</td><td>New largest module; grew with #368 live-guards; <code>maybe_execute()</code> 290L/15br</td></tr>
+  <tr><td><code>providers/ibkr.py</code></td><td>679</td><td>694</td><td>752</td><td>752</td><td class="deltaflat">0</td><td>Stable; live-order path moved to <code>ibkr_orders.py</code></td></tr>
+  <tr><td><code>routers/scanner.py</code></td><td>857</td><td>698</td><td>708</td><td>730</td><td class="deltadown">+22</td><td>WS handler + filter accretion</td></tr>
+  <tr><td><code>services/liquidity_hunt.py</code></td><td>646</td><td>&mdash;</td><td>708</td><td>716</td><td class="deltadown">+8</td><td>Largest strategy module; cohesive</td></tr>
+  <tr><td><code>services/pre_market_scan.py</code></td><td>&mdash;</td><td>&mdash;</td><td>387</td><td>622</td><td class="deltadown">+235</td><td>Grew; still fuses detect&rarr;enrich&rarr;persist in one loop</td></tr>
+  <tr><td><code>services/scanner.py</code> (facade)</td><td>804</td><td>1,033</td><td>206</td><td>208</td><td class="deltadown">+2</td><td>Thin facade; stable</td></tr>
+  <tr><td><code>services/futures_data.py</code> (facade)</td><td>1,039</td><td>1,086</td><td>90</td><td>90</td><td class="deltaflat">0</td><td>Thin facade; stable</td></tr>
+  <tr><td><code>tasks/scanning.py</code></td><td>&mdash;</td><td>748</td><td>758</td><td>n/m</td><td class="deltaflat">&mdash;</td><td>Orchestration; not re-counted this review</td></tr>
+  <tr><td><code>main.py</code></td><td>265</td><td>469</td><td>506</td><td>n/m</td><td class="deltaflat">&mdash;</td><td>Inline middleware; not re-counted this review</td></tr>
+  <tr><td><code>frontend StockChart.tsx</code></td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>589</td><td class="deltadown">NEW</td><td>Largest chart component; complexity #3 (512-line render)</td></tr>
+  <tr><td><code>frontend api/scanner.ts</code></td><td>&mdash;</td><td>787</td><td>787</td><td>787</td><td class="deltaflat">0</td><td>Undecomposed &mdash; R10, four reviews</td></tr>
+  <tr><td><code>components/QualityReportModal.tsx</code></td><td>753</td><td>753</td><td>753</td><td>753</td><td class="deltaflat">0</td><td>Undecomposed &mdash; four reviews untouched</td></tr>
+</table>
+
+<div class="card">
+  <h4>Naming 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span> &nbsp; Duplication 3/5 <span class="delta-pill flat" style="position:static">Δ 0</span> &nbsp; Framework Usage 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span></h4>
+  <p>New module names stay exemplary (<code>quality_gate</code>, <code>quality_gate_evidence</code>). Duplication is the standing weak ledger and it is moving the wrong way: UTC-normalization <em>grew</em> from ~96 to <strong>287</strong> sites, inline Redis-JSON handling reached 195, raw json en/decode 127, and <code>get_or_404</code> boilerplate 65+ &mdash; the three consolidation targets (<code>utils/time.py</code>, <code>get_or_404</code>, a cache util) remain unbuilt, and there are now four near-identical scanner <em>detect&rarr;enrich&rarr;persist</em> implementations. Sync ORM stays per ADR-0004.</p>
+</div>
+
+<h3>Exemplary Files</h3>
+<table>
+  <tr><th>File</th><th>Why</th></tr>
+  <tr><td><code>docker-compose.yml:30-72</code> + <code>:368-407</code></td><td><code>db-backup</code> + <code>db-restore-drill</code> sidecars &mdash; backups that prove they restore, the marquee v4 fix</td></tr>
+  <tr><td><code>providers/ibkr_orders.py:233-280</code></td><td>Non-bypassable live-order caps + Redis fail-closed kill switch; survived two adversarial reviews (#368)</td></tr>
+  <tr><td><code>services/quality_gate.py</code> / <code>quality_gate_evidence.py</code></td><td>Schema-versioned survivorship + backtesting contract; a clean split, not another god file</td></tr>
+  <tr><td><code>core/circuit_breakers.py</code></td><td>Config-driven singletons, clean error mapping, dedicated test suite (carried exemplar)</td></tr>
+</table>
+
+<h3>Problematic Files</h3>
+<table>
+  <tr><th>File</th><th>Why</th></tr>
+  <tr><td><code>services/auto_trade_service.py</code></td><td><code>maybe_execute()</code>: 290 lines, ~15 branches &mdash; #368 guards piled onto an already-large function, in the live-trading path (R01v4)</td></tr>
+  <tr><td><code>services/discovery_service.py</code></td><td><code>run_screen</code>: ~217 lines, CC&asymp;43 &mdash; worst function four reviews running, never refactored (R04 v3)</td></tr>
+  <tr><td><code>services/pre_market_scan.py</code></td><td>~346-line single function still fusing detect/enrich/persist; module grew to 622 lines</td></tr>
+  <tr><td><code>services/universe_export.py</code></td><td>Raises <code>HTTPException</code> from a service (lines 11-12, 59) &mdash; web-layer leak, untestable as a pure service (R02v4)</td></tr>
+  <tr><td><code>frontend api/scanner.ts</code> / <code>QualityReportModal.tsx</code></td><td>787 / 753 lines, byte-identical across four reviews (R10 v3)</td></tr>
+</table>
+
+<!-- ============ 5 TESTABILITY ============ -->
+<h2 id="test">5. Testability &amp; Code Coverage</h2>
+<div class="card">
+  <h4>Backend Testing &mdash; 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span></h4>
+  <p>137 test files / ~993&ndash;1,211 test functions (counting variance noted in &sect;20), with <code>conftest</code> SAVEPOINT fixtures and <code>fakeredis</code>. Coverage is enforced at 60% with honest omissions (<code>main</code>, migrations, <code>futures_data</code> for its live-IBKR rationale). The cap: there are no service&rarr;service integration tests &mdash; each service is tested in isolation, so the new <code>auto_trade_service</code>&rarr;<code>quality_gate</code> orchestration coupling is only covered unit-deep; no mypy.</p>
+</div>
+<div class="card">
+  <h4>Frontend Testing &mdash; 4/5 <span class="delta-pill flat" style="position:static">Δ 0</span></h4>
+  <p>40 test files / 452 tests, with <code>tsc</code> strict genuinely gating green. Coverage runs on an adaptive ratchet at ~30% measured (<code>all: true, include: src/**</code>) &mdash; honest, but the ~30% level plus the absence of any end-to-end (Playwright/Cypress) layer caps the score.</p>
+</div>
+<table>
+  <tr><th>Signal</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th></tr>
+  <tr><td>Backend test isolation (SAVEPOINT)</td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-green">Yes</span></td><td><span class="badge badge-green">Yes</span></td></tr>
+  <tr><td>Frontend framework / breadth</td><td><span class="badge badge-red">None</span></td><td><span class="badge badge-yellow">Vitest, 0/15 pages</span></td><td><span class="badge badge-green">9/32 pages</span></td><td><span class="badge badge-green">40 files / 452 tests</span></td></tr>
+  <tr><td>Celery tasks in coverage</td><td><span class="badge badge-red">Excluded</span></td><td><span class="badge badge-red">Excluded</span></td><td><span class="badge badge-green">Included + tested</span></td><td><span class="badge badge-green">Included + tested</span></td></tr>
+  <tr><td>Coverage thresholds honest</td><td>&mdash;</td><td><span class="badge badge-red">7-file include</span></td><td><span class="badge badge-green">App-wide, measured</span></td><td><span class="badge badge-green">Adaptive ratchet ~30%</span></td></tr>
+  <tr><td>Service&rarr;service integration tests</td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td></tr>
+  <tr><td>End-to-end (E2E) layer</td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td></tr>
+  <tr><td>Python type checker (mypy)</td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td><td><span class="badge badge-red">No</span></td></tr>
+</table>
+
+<!-- ============ 6 RELIABILITY ============ -->
+<h2 id="reliability">6. Reliability &amp; Operational Readiness</h2>
+<table>
+  <tr><th>Capability</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th><th>Evidence / Note</th></tr>
+  <tr><td>Logging</td><td>4</td><td>5</td><td>5</td><td>5</td><td>Seq + GELF + OTel trace IDs in records; unchanged</td></tr>
+  <tr><td>Health Checks</td><td>4</td><td>4</td><td>4</td><td><span class="deltaup">5</span></td><td>Deep <code>/ready</code> probe (DB/Redis) added (<code>routers/health.py:34</code>) &mdash; R05 resolved</td></tr>
+  <tr><td>Retry Behavior</td><td>3</td><td>3</td><td>4</td><td>4</td><td>Fixed-countdown Celery retries; no exponential backoff yet</td></tr>
+  <tr><td>Timeout Handling</td><td>2</td><td>2</td><td>3</td><td><span class="deltaup">5</span></td><td>Provider connect/read timeouts everywhere; IBKR waits bounded</td></tr>
+  <tr><td>Graceful Degradation</td><td>3</td><td>4</td><td>4</td><td>4</td><td>Breakers fail fast into 503s; kill switch fails closed</td></tr>
+  <tr><td>Startup/Shutdown</td><td>4</td><td>4</td><td>4</td><td>4</td><td>Multiproc cleanup on worker exit; no WS-manager stop hook</td></tr>
+  <tr><td>Database Migrations</td><td>3</td><td>4</td><td>4</td><td><span class="deltaup">5</span></td><td><code>alembic check</code> gate + migration ADR-0012; 51 migrations single head</td></tr>
+  <tr><td>Connection Pooling</td><td>1</td><td>5</td><td>5</td><td>5</td><td>Pool size 20+10, <code>pre_ping</code>, exported as gauges</td></tr>
+  <tr><td>Metrics</td><td>0</td><td>3</td><td>4</td><td><span class="deltaup">5</span></td><td>Multiproc collector + <code>live_orders_total</code>; pipeline verified</td></tr>
+  <tr><td>Distributed Tracing</td><td>0</td><td>4</td><td>5</td><td><span class="deltadown">4</span></td><td>OTLP export now conditional; no metric exporter (granularity note)</td></tr>
+  <tr><td>Circuit Breakers</td><td>0</td><td>0</td><td>5</td><td>5</td><td>pybreaker: Polygon 5/60s, IBKR 3/120s; tested (<code>core/circuit_breakers.py:18-26</code>)</td></tr>
+  <tr><td>Backup/Recovery</td><td>1</td><td>1</td><td><span class="sev-critical">1</span></td><td><span class="deltaup">5</span></td><td><strong>Real sidecars now</strong>: <code>db-backup</code> + weekly <code>db-restore-drill</code> (<code>docker-compose.yml:30-72</code>) &mdash; R01 resolved</td></tr>
+  <tr><td>Feature Flags</td><td>0</td><td>0</td><td>1</td><td><span class="deltaup">4</span></td><td><code>is_active</code> + <code>LIVE_TRADING_ARMED</code> + Redis kill switch; no generic flag table</td></tr>
+</table>
+
+<!-- ============ 7 SECURITY ============ -->
+<h2 id="security">7. Security &amp; Compliance Review</h2>
+<p>Epic #372 fully completed this window; #368 live-guards raise posture. <strong>No regressions.</strong></p>
+<table>
+  <tr><th>Area</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th><th>Finding (file:line)</th></tr>
+  <tr><td>Authentication</td><td>0</td><td>3</td><td>4</td><td>4</td><td>WS pre-accept auth; refresh rotation; brute-force limits; no password policy</td></tr>
+  <tr><td>Authorization</td><td>0</td><td>1</td><td>2</td><td>2</td><td>Single-user; no RBAC (<code>models/user.py:10-22</code>) &mdash; epic #373 pending; the #1 ceiling</td></tr>
+  <tr><td>CORS</td><td>1</td><td>4</td><td>4</td><td>4</td><td>Env allowlist; <code>allow_methods=*</code> minor (acceptable with strict origins)</td></tr>
+  <tr><td>Input Validation</td><td>4</td><td>4</td><td>4</td><td>4</td><td>Pydantic throughout; ticker symbols not allowlisted</td></tr>
+  <tr><td>Secrets Management</td><td>3</td><td>2</td><td>4</td><td><span class="deltaup">5</span></td><td>Validators on JWT&ge;32 / REDIS&ge;16 / all required fields (<code>core/config.py</code>)</td></tr>
+  <tr><td>Rate Limiting</td><td>0</td><td>3</td><td>4</td><td>4</td><td>Route-class limits; in-memory WS counters; no per-message WS throttle</td></tr>
+  <tr><td>Dependency Vulnerabilities</td><td>3</td><td>4</td><td>4</td><td>4</td><td>Trivy blocks HIGH/CRITICAL; accepted pyasn1 CVE; no SBOM</td></tr>
+  <tr><td>Transport Security</td><td>2</td><td>2</td><td>3</td><td>3</td><td>Caddy TLS profile + HSTS opt-in; no default HSTS/CSP/X-Frame</td></tr>
+  <tr><td>Docker Security</td><td>2</td><td>3</td><td>4</td><td>4</td><td>Socket-proxy + non-root appuser; forecast-worker still root</td></tr>
+  <tr><td>Sensitive Data in Logs</td><td>3</td><td>3</td><td>3</td><td><span class="deltaup">5</span></td><td>Log redaction landed (#372); structured fields scrubbed</td></tr>
+</table>
+
+<!-- ============ 8 PERFORMANCE ============ -->
+<h2 id="perf">8. Performance &amp; Scalability</h2>
+<div class="card">
+  <h4>Resolved / improved since v3</h4>
+  <ul>
+    <li><strong>Outbound latency bounded</strong> &mdash; provider connect/read timeouts are now configured everywhere (Timeout 3&rarr;5 in &sect;6), so a slow Polygon/IBKR no longer blocks worker threads unbounded.</li>
+    <li><strong>Pool observability</strong> &mdash; pool size 20+10 with <code>pre_ping</code> and exported gauges; live-order throughput now has a <code>live_orders_total</code> counter.</li>
+  </ul>
+</div>
+<div class="card">
+  <h4>Still open</h4>
+  <ul>
+    <li><strong>Sparse eager loading</strong> &mdash; only 2 <code>selectinload</code> uses across the service layer; list endpoints retain N+1 margins.</li>
+    <li><strong>Sync ORM</strong> (ADR-0004, by design) &mdash; requests block threads on DB access.</li>
+    <li><strong>Single API instance / single DB</strong> &mdash; in-memory WS connection counters (<code>core/ws_limits.py:18-19</code>) and no read replicas.</li>
+  </ul>
+</div>
+<div class="card">
+  <p><strong>Scalability model:</strong> unchanged from v3 &mdash; Celery workers scale horizontally; the API tier is single-instance with WebSocket affinity unsolved and one Postgres with no replicas. Adequate for the single-user design point; the in-memory WS counters are the concrete blocker to running more than one API replica. This is the dimension structurally stuck at 3 for four reviews (&sect;13).</p>
+</div>
+
+<!-- ============ 9 API/DATA ============ -->
+<h2 id="api-data">9. API, Data &amp; Integration Quality</h2>
+<table>
+  <tr><th>Dimension</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th><th>Note</th></tr>
+  <tr><td>API Consistency</td><td>4</td><td>5</td><td>5</td><td><span class="deltadown">4</span></td><td>Versioning still uniform &amp; lint-enforced; <strong>JSONB columns exposed raw</strong> in responses is the new cap (a shaping concern, not a convention break &mdash; &sect;3.5 stays 5)</td></tr>
+  <tr><td>Data Model Clarity</td><td>4</td><td>4</td><td>4</td><td><span class="deltadown">3&ndash;4</span></td><td>JSONB-heavy (15+ models); pervasive <code>cast</code>/<code>astext</code> boilerplate pulls clarity down</td></tr>
+  <tr><td>Migration Approach</td><td>3</td><td>4</td><td>4</td><td>4</td><td>51 migrations single head; <code>alembic check</code> (ADR-0012) is check-only, not auto-apply</td></tr>
+</table>
+<p><strong>External integrations:</strong> the most fragile dependency is <strong>Polygon.io</strong> &mdash; a single API key with no round-robin or failover &mdash; followed by <strong>IBKR</strong> (single <code>clientId=5</code>, synchronous blocking client). The tweet-monitor&rsquo;s cookie-based X.com auth (30-day manual rotation) remains unticketed after four reviews and is the longest-standing integration risk.</p>
+
+<!-- ============ 10 DEVX ============ -->
+<h2 id="devx">10. Developer Experience</h2>
+<table>
+  <tr><th>Aspect</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th><th>Evidence</th></tr>
+  <tr><td>Local Setup</td><td>4</td><td>4</td><td>4</td><td>4</td><td>One-command compose; dev/live override split</td></tr>
+  <tr><td>README / Documentation</td><td>3</td><td>4</td><td>4</td><td><span class="deltaup">5</span></td><td>README/DEVELOPMENT/ARCHITECTURE + 14 ADRs; only minor drift (#201)</td></tr>
+  <tr><td>Build Simplicity</td><td>4</td><td>3</td><td>4</td><td><span class="deltaup">5</span></td><td>Clean <code>tsc</code>/build path; no flaky gates</td></tr>
+  <tr><td>Linting/Formatting</td><td>2</td><td>4</td><td>3</td><td><span class="deltaup">5</span></td><td><strong>ruff now in CI</strong> (R02 resolved) + eslint; v3 regression reversed</td></tr>
+  <tr><td>Type Checking</td><td>2</td><td>3</td><td>4</td><td><span class="deltaup">5</span></td><td>Frontend <code>tsc</code> strict gating green; backend mypy still absent</td></tr>
+  <tr><td>CI Feedback</td><td>2</td><td>4</td><td>4</td><td><span class="deltaup">5</span></td><td>Hard gates: ruff + eslint + tsc strict + pytest, no <code>|| true</code></td></tr>
+  <tr><td>Debugging Support</td><td>4</td><td>5</td><td>5</td><td>5</td><td>Seq/Prometheus/Grafana/Jaeger; error IDs + outbound spans</td></tr>
+  <tr><td>Onboarding Friction</td><td>3</td><td>4</td><td>4</td><td>4</td><td>Unchanged; IBKR creds still needed for full function</td></tr>
+</table>
+<p>The aspect scores climbed broadly (ruff-in-CI, type/build/CI all to 5), yet the scorecard <em>Developer Experience</em> dimension holds at 4 &mdash; capped by the three standing gaps the per-aspect grid doesn&rsquo;t have a row for: <strong>no backend mypy</strong>, <strong>no E2E layer</strong>, and <strong>no IDE/debugger launch config</strong>. It has now been flat at 4 for four reviews (&sect;13).</p>
+
+<!-- ============ 11 CODE HEALTH ============ -->
+<h2 id="code-health">11. Code Health Deep-Dive</h2>
+<p class="subtitle">Unscored evidence section. Tracks complexity, duplication, and coupling longitudinally. CC values are rank estimates from agent code-reading (branch counting), not a radon/lizard run &mdash; see &sect;20.</p>
+
+<h3>Cyclomatic complexity — top 10</h3>
+<table>
+  <tr><th>Function</th><th>File</th><th>Lines</th><th>CC est.</th><th>Primary issue</th></tr>
+  <tr><td><code>maybe_execute</code></td><td>services/auto_trade_service.py:92-381</td><td>290</td><td><span class="sev-critical">~15+</span></td><td><strong>NEW #1</strong> &mdash; #368 guard cascade piled onto the live-trading entrypoint; not on the v3 list (R01v4)</td></tr>
+  <tr><td><code>_fetch_bars_chunked</code></td><td>providers/ibkr.py:545-721</td><td>176</td><td><span class="sev-high">~24</span></td><td>Chunk-window pagination + dedup + retry branches</td></tr>
+  <tr><td><code>StockChart</code> render</td><td>frontend StockChart.tsx:78-590</td><td>512</td><td><span class="sev-high">~22</span></td><td>Single component fusing series setup, overlays, interaction</td></tr>
+  <tr><td><code>run_screen</code></td><td>services/discovery_service.py</td><td>~217</td><td><span class="sev-critical">~43</span></td><td>11+ nested criteria; stocks/futures interleaved &mdash; <strong>unchanged four reviews</strong> (R04 v3)</td></tr>
+  <tr><td><code>run_pre_market_scan</code></td><td>services/pre_market_scan.py</td><td>~346</td><td><span class="sev-high">~37</span></td><td>Detection + enrichment + persistence in one loop &mdash; still (R04 v3)</td></tr>
+  <tr><td><code>_build_indicators</code></td><td>services/pre_market_scan.py:240-325</td><td>85</td><td>~18</td><td>20+ inline column computations; no composition</td></tr>
+  <tr><td><code>scan_run_websocket</code></td><td>routers/scanner.py:254-336</td><td>83</td><td>~22</td><td>Message-type dispatch with nested try/except; implicit state machine</td></tr>
+  <tr><td><code>get_historical_from_db</code></td><td>services/stock_data.py:159-231</td><td>72</td><td>~16</td><td>Timespan/period branching + boundary detection</td></tr>
+  <tr><td><code>assess</code></td><td>services/quality_gate.py</td><td>~120</td><td>~15</td><td>Sequential evidence checks; new this window, already mid-pack</td></tr>
+  <tr><td><code>refresh_stock_data</code></td><td>services/stock_data.py</td><td>~183</td><td>~30</td><td>Date-range if/elif chains; per-timespan dedup</td></tr>
+</table>
+<p>Movement vs v3: the worst-three from v3 (<code>run_screen</code>, <code>run_pre_market_scan</code>) are unchanged; the new entrant and new #1 is <code>maybe_execute</code>, which the live-trading guards (#368) grew into the list.</p>
+
+<h3>Duplication — top 8</h3>
+<table>
+  <tr><th>Pattern</th><th>v3 count</th><th>v4 count</th><th>Layer</th><th>Consolidation</th></tr>
+  <tr><td>UTC normalization (<code>.astimezone(utc).replace(tzinfo=None)</code>)</td><td>~96</td><td><span class="deltadown">287</span></td><td>Backend</td><td><code>utils/time.py</code> &mdash; still unbuilt; <strong>grew</strong> (R03v4)</td></tr>
+  <tr><td>Inline Redis JSON read/write</td><td>14 files</td><td><span class="deltadown">195</span></td><td>Routers/tasks</td><td>General <code>core/cache.py</code> util</td></tr>
+  <tr><td>Raw <code>json</code> en/decode sites</td><td>&mdash;</td><td>127</td><td>Backend</td><td>Centralize (de)serialization helpers</td></tr>
+  <tr><td>Get-or-404 boilerplate</td><td>28</td><td><span class="deltadown">65+</span></td><td>Routers</td><td><code>get_or_404(db, Model, id)</code></td></tr>
+  <tr><td><code>db.query(...)</code> chains</td><td>&mdash;</td><td>74</td><td>Routers/services</td><td>Repository helpers / service layer</td></tr>
+  <tr><td>Scanner detect&rarr;enrich&rarr;persist loop</td><td>&mdash;</td><td>4 copies</td><td>Services</td><td><code>ScannerBase</code> abstraction for the 4 scanners</td></tr>
+  <tr><td>Frontend query + mutation scaffolding</td><td>&mdash;</td><td>~15</td><td>Frontend</td><td>Shared hook factory</td></tr>
+  <tr><td>Modal open/close state</td><td>~0</td><td>19</td><td>Frontend</td><td>Re-creeping; <code>isOpen</code>-prop convention</td></tr>
+</table>
+
+<h3>Coupling map</h3>
+<div class="mermaid">
+flowchart LR
+  subgraph qg["Quality-gate cluster (#491)"]
+    QG[quality_gate]
+    QGE[quality_gate_evidence]
+  end
+  ATS[auto_trade_service] -->|hard couple| QG
+  ATS --> QGE
+  QGE -->|cast| SADJ[SplitAdjustment model]
+  ATS -.->|live guard| IBKRO[ibkr_orders kill-switch]
+  subgraph strategies["Scanner strategies (self-registering)"]
+    PMS[pre_market_scan]
+    OBS[oversold_bounce_scan]
+    LH[liquidity_hunt]
+  end
+  REG[scan_orchestrator registry] --- strategies
+  PMS --> SM[session_metrics]
+  PMS --> SE[scan_enrichment]
+  SCF[scanner.py facade] -.lazy.-> AS[alert_service]
+  strategies --> SCF
+  SD[stock_data] -.lazy.-> FDF[futures_data facade]
+  UE[universe_export] -. HTTPException leak .-> WEB((web layer))
+  style UE fill:#7f1d1d,stroke:#ef4444
+  style WEB fill:#7f1d1d,stroke:#ef4444
+  style ATS fill:#7f1d1d,stroke:#ef4444
+  style SCF fill:#14532d,stroke:#22c55e
+  style FDF fill:#14532d,stroke:#22c55e
+</div>
+<p>Dashed = lazy (method-level) imports. Red = the v4 coupling concerns: <code>auto_trade_service</code> hard-couples the quality-gate pair plus the live-order kill switch (three modules per new evidence type, R04v4), and <code>universe_export</code> retains the lone surviving cross-layer leak (R02v4). Green facades stay acyclic.</p>
+
+<h3>Module depth candidates</h3>
+<div class="card">
+  <h4>1. Trading-time module <span class="badge badge-green">Strong</span></h4>
+  <p><strong>Files:</strong> 287 normalization call sites across services/tasks/routers. <strong>Problem:</strong> the time-normalization idiom grew unchecked with no owner. <strong>Deepening:</strong> <code>app/utils/time.py</code> with <code>utc_now()</code>, <code>to_utc_naive()</code>, <code>last_trading_day()</code> &mdash; a 3-function interface absorbing 287 sites&rsquo; worth of implementation. Highest leverage-per-effort in the codebase; session-boundary bugs gain locality. (R03v4)</p>
+</div>
+<div class="card">
+  <h4>2. <code>maybe_execute</code> decision pipeline <span class="badge badge-green">Strong</span></h4>
+  <p><strong>Files:</strong> <code>auto_trade_service.py:92-381</code>. <strong>Problem:</strong> 290 lines / ~15 branches fuse quality-gate consultation, cap checks, kill-switch checks and order placement. <strong>Deepening:</strong> extract <code>_validate_*</code> decision steps behind a small interface so each guard is independently testable and the entrypoint reads as a pipeline; locality of the money-path logic improves dramatically. (R01v4)</p>
+</div>
+<div class="card">
+  <h4>3. <code>QualityGatePolicy</code> interface <span class="badge badge-yellow">Worth exploring</span></h4>
+  <p><strong>Files:</strong> <code>quality_gate.py</code> + <code>quality_gate_evidence.py</code> + <code>auto_trade_service.py</code>. <strong>Problem:</strong> a new evidence type touches three modules. <strong>Deepening:</strong> a <code>QualityGatePolicy</code> seam so evidence providers register against one interface &mdash; the same registry leverage the scan-orchestrator already proves. (R04v4)</p>
+</div>
+<div class="card">
+  <h4>4. <code>EnrichmentProvider</code> from <code>scan_enrichment</code> <span class="badge badge-yellow">Worth exploring</span></h4>
+  <p><strong>Files:</strong> <code>scan_enrichment.py</code>; the four duplicate detect&rarr;enrich&rarr;persist scanner loops. <strong>Deepening:</strong> extract an <code>EnrichmentProvider</code> seam and a <code>ScannerBase</code> so the four scanners compose enrichment as a stage rather than copy it.</p>
+</div>
+<div class="card">
+  <h4>5. <code>futures_data.py</code> facade <span class="badge badge-blue">Speculative / OK as-is</span></h4>
+  <p><strong>Files:</strong> <code>futures_data.py</code> (90-line dispatcher). <strong>Note:</strong> shallow by design &mdash; an intentional thin facade over four futures services. No action recommended; listed for completeness so the &ldquo;shallow module&rdquo; scan stays honest.</p>
+</div>
+
+<!-- ============ 12 DORA ============ -->
+<h2 id="dora">12. Delivery Performance (DORA)</h2>
+<p class="subtitle">Window: 2026-06-09 &rarr; 2026-06-26 (~17 days, ~2.4 weeks). All four are <strong>proxies</strong> &mdash; single repo, no production deploy telemetry; derivations stated per metric. The merge-commit proxy is unreliable under squash-merge.</p>
+<div class="card-grid">
+  <div class="kpi"><div class="l">Deployment Frequency</div><div class="v">&asymp;55/wk</div><div class="s">133 merged PRs / ~2.4 wk &middot; ~204 commits/wk &middot; band: Elite (directional)</div></div>
+  <div class="kpi"><div class="l">Lead Time for Changes</div><div class="v">2.0 h</div><div class="s">median PR open&rarr;merge (max 70.9 h) &middot; band: Elite (&lt;1 day)</div></div>
+  <div class="kpi"><div class="l">Change Failure Rate</div><div class="v">12.7%</div><div class="s">62 fix/revert of 490 commits &middot; was 19% (v3) &middot; band: High (&le;15%)</div></div>
+  <div class="kpi"><div class="l">MTTR</div><div class="v">34.5 h</div><div class="s">median bug-issue open&rarr;close, n=15 &middot; was 16.1 h &middot; band: Medium (&lt;1 wk)</div></div>
+</div>
+<table>
+  <tr><th>Delivery extra</th><th>Value</th><th>Note</th></tr>
+  <tr><td>Commit cadence</td><td>490 commits / ~2.4 wk (&asymp;204/wk)</td><td>+474 on main since v3</td></tr>
+  <tr><td>Factory vs human authorship</td><td>286 factory : 190 human : 14 dependabot (&asymp;58% factory)</td><td>Down from 66% at v3 &mdash; more human authorship this window</td></tr>
+  <tr><td>Merged PRs / median size</td><td>133 PRs &middot; 167 lines median</td><td>Mean 1,100 lines (right-skewed by a few large PRs)</td></tr>
+</table>
+<p><strong>Reading:</strong> the proxies still sketch an elite-tempo, small-batch pipeline, and the failure-feedback loop <em>improved</em> &mdash; the fix-commit share fell 19%&rarr;12.7% as v3&rsquo;s ruff-in-CI gate began catching defects before merge. The one regression is MTTR (16.1 h &rarr; 34.5 h), reflecting a window of harder, security-epic bugs (#368/#372) rather than a process change. DORA bands assume production deployment, which this repo&rsquo;s merge-to-main proxy does not measure &mdash; treat bands as directional only, and the deployment-frequency figure as especially soft under squash-merge.</p>
+
+<!-- ============ 13 SCORE TREND ============ -->
+<h2 id="trend">13. Score Trend</h2>
+<div class="card" id="trendchart"></div>
+<table>
+  <tr><th>Dimension</th><th>v1</th><th>v2</th><th>v3</th><th>v4</th><th>Trajectory</th></tr>
+  <tr><td>Architecture Clarity</td><td>4</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">high-flat (4 reviews)</td></tr>
+  <tr><td>Modularity</td><td>4</td><td>4</td><td>5</td><td>5</td><td class="deltaflat">flat-at-5 since v3</td></tr>
+  <tr><td>Separation of Concerns</td><td>3</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Maintainability</td><td>4</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">high-flat (4 reviews)</td></tr>
+  <tr><td>Testability</td><td>3</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Code Coverage Maturity</td><td>2</td><td>3</td><td>4</td><td>4</td><td class="deltaflat">flat at 4</td></tr>
+  <tr><td>Reliability</td><td>3</td><td>4</td><td>5</td><td>5</td><td class="deltaflat">flat-at-5</td></tr>
+  <tr><td>Security Posture</td><td>1</td><td>3</td><td>4</td><td>4</td><td class="deltaflat">flat at 4</td></tr>
+  <tr><td>Observability</td><td>3</td><td>4</td><td>5</td><td>5</td><td class="deltaflat">flat-at-5</td></tr>
+  <tr><td>Performance Readiness</td><td>2</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Scalability Readiness</td><td>2</td><td>3</td><td>3</td><td>3</td><td class="deltadown">structurally stuck (4 reviews)</td></tr>
+  <tr><td>Deployment Readiness</td><td>3</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Developer Experience</td><td>4</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">high-flat (4 reviews)</td></tr>
+  <tr><td>Documentation</td><td>3</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Dependency Hygiene</td><td>3</td><td>4</td><td>4</td><td>4</td><td class="deltaflat">flat since v2</td></tr>
+  <tr><td>Operational Readiness</td><td>2</td><td>3</td><td>3</td><td>4</td><td class="deltaup">&#9650; v4 &mdash; finally un-stuck</td></tr>
+</table>
+<p><strong>Structurally stuck:</strong> the lone sub-4 dimension is <em>Scalability Readiness</em> (3 for four consecutive reviews &mdash; single API instance, in-memory WS counters, no read replicas), and <em>Developer Experience</em> sits high-flat at 4 for four reviews (capped by no-mypy / no-E2E / no IDE config). The headline of v4 is that <em>Operational Readiness</em> &mdash; stuck at 3 for three reviews because of the backups gap &mdash; <strong>finally moved to 4</strong> when real backup + restore-drill artifacts shipped. Scalability is now the candidate for the next roadmap&rsquo;s focus, but it is gated on the multi-user decision (#373): if the trajectory stays single-tenant, the honest move is to ADR the ceiling and re-scope the rubric expectation.</p>
+
+<!-- ============ 14 TRACEABILITY ============ -->
+<h2 id="traceability">14. Ticket &rarr; Outcome Traceability</h2>
+<p>This window&rsquo;s work, verified against code &mdash; not ticket state. v4 follow-ups carry the label <code>architecture-audit-v4</code>.</p>
+<table>
+  <tr><th>#</th><th>Ticket</th><th>Maps to v3</th><th>Verified outcome</th></tr>
+  <tr><td>491</td><td>Epic: Data Quality Trust Gate (#498&ndash;#502)</td><td>new capability</td><td><span class="badge badge-green">Done</span> <code>quality_gate.py</code> + <code>quality_gate_evidence.py</code> + lineage + tests (verified)</td></tr>
+  <tr><td>368</td><td>Live-IBKR hard guards + kill switch</td><td>part of #372</td><td><span class="badge badge-green">Done</span> non-bypassable caps + Redis fail-closed (<code>ibkr_orders.py:233-280</code>), 2 adversarial reviews</td></tr>
+  <tr><td>369&ndash;382</td><td>Epic #372 security remediation</td><td>v3 R08 / carried</td><td><span class="badge badge-green">Done</span> secrets validators, CSRF, WS auth, log redaction verified</td></tr>
+  <tr><td>195</td><td>Automated DB backups</td><td><strong>R01 (the v3 Broken item)</strong></td><td><span class="badge badge-green">Done &mdash; verified real</span> <code>db-backup</code> + weekly <code>db-restore-drill</code> sidecars (<code>docker-compose.yml:30-72</code>)</td></tr>
+  <tr><td>&mdash;</td><td>ruff in CI</td><td>R02</td><td><span class="badge badge-green">Done</span> blocking <code>ruff check</code> CI step; v3 &ldquo;red on main&rdquo; resolved</td></tr>
+  <tr><td>&mdash;</td><td>Readiness probe + migration gate</td><td>R05</td><td><span class="badge badge-green">Done</span> <code>/ready</code> (<code>routers/health.py:34</code>) + ADR-0012</td></tr>
+  <tr><td>622</td><td>Factory Python-3.14 / scipy outage</td><td>platform health</td><td><span class="badge badge-green">Done</span> <code>requirements.txt</code> <code>cp314</code> bumps (verified)</td></tr>
+  <tr><td>522</td><td>Memory guard</td><td>reliability</td><td><span class="badge badge-green">Done</span></td></tr>
+  <tr><td>617</td><td>Seq restart fix</td><td>observability infra</td><td><span class="badge badge-green">Done</span></td></tr>
+  <tr><td>148</td><td>AGT</td><td>&mdash;</td><td><span class="badge badge-blue">Deferred</span> evaluated, parked</td></tr>
+</table>
+<div class="callout callout-yellow">
+  <strong>Coverage gap in the follow-through:</strong> still never ticketed after <strong>four</strong> reviews &mdash;
+  <strong>tweet-monitor cookie auth</strong> (v1 R10) and <strong>mypy adoption</strong>. And one defect new to v4 that should
+  be filed: <code>services/universe_export.py</code> still leaks <code>HTTPException</code> from the service layer
+  (R02v4) &mdash; flagged since v3 (&sect;3.2), never opened as a ticket.
+</div>
+
+<!-- ============ 15 RISK REGISTER ============ -->
+<h2 id="risk-register">15. Risk Register (v4)</h2>
+<h3>Newly introduced</h3>
+<table>
+  <tr><th>ID</th><th>Description</th><th>Sev</th><th>Evidence</th><th>Mitigation</th></tr>
+  <tr><td>R01v4</td><td><code>maybe_execute()</code> is a 290-line / ~15-branch guard cascade &mdash; #368 live-guards piled onto an already-large function in the money path; testability + maintainability hazard</td><td><span class="sev-medium">Medium</span></td><td><code>auto_trade_service.py:92-381</code></td><td>Extract <code>_validate_*</code> decision steps behind a small interface</td></tr>
+  <tr><td>R02v4</td><td><code>universe_export.py</code> raises <code>HTTPException</code> from a service &mdash; SoC web-leak; untestable as a pure service</td><td><span class="sev-low">Low</span></td><td><code>universe_export.py:11-12,59</code></td><td>Raise a domain error; convert to HTTP in the router</td></tr>
+  <tr><td>R03v4</td><td>TZ-normalization duplication <strong>grew</strong> to 287 sites &mdash; v3 R03 (~96) never addressed; no <code>utils/time.py</code></td><td><span class="sev-medium">Medium</span></td><td>Grep counts, services/tasks-wide</td><td><code>utils/time.py</code> + codemod</td></tr>
+  <tr><td>R04v4</td><td>Growing quality-gate coupling &mdash; 3 modules to touch per new evidence type</td><td><span class="sev-medium">Low&ndash;Med</span></td><td><code>quality_gate.py</code> + <code>quality_gate_evidence.py</code> + <code>auto_trade_service.py</code></td><td><code>QualityGatePolicy</code> interface</td></tr>
+</table>
+<h3>Carried over (not yet addressed)</h3>
+<table>
+  <tr><th>Prior ID</th><th>Description</th><th>Sev</th><th>Status</th></tr>
+  <tr><td>&mdash; (new #1 ceiling)</td><td>Authorization model absent &mdash; single-user, no RBAC; the largest ceiling on multi-tenant growth</td><td><span class="sev-high">Med&ndash;High</span></td><td>Open &mdash; epic #373 split out, design pending</td></tr>
+  <tr><td>v3 carried</td><td>Scalability single-instance: in-memory WS counters (<code>ws_limits.py:18-19</code>), no read replicas</td><td><span class="sev-medium">Medium</span></td><td>Open &mdash; structurally stuck 4 reviews</td></tr>
+  <tr><td>R04 (v3)</td><td>Top complexity functions unchanged &mdash; <code>run_screen</code> CC&asymp;43, <code>run_pre_market_scan</code> ~346 lines</td><td><span class="sev-medium">Medium</span></td><td>Open &mdash; 4 reviews</td></tr>
+  <tr><td>R10 (v3)</td><td>Frontend god files <code>api/scanner.ts</code> 787 / <code>QualityReportModal.tsx</code> 753</td><td><span class="sev-low">Low</span></td><td>Open &mdash; undecomposed 4 reviews</td></tr>
+  <tr><td>R10 (v1)</td><td>Tweet-monitor cookie auth, 30-day manual rotation</td><td><span class="sev-medium">Medium</span></td><td>Open &mdash; never ticketed, 4+ reviews</td></tr>
+  <tr><td>&mdash;</td><td>No mypy on backend; no generic feature-flag system</td><td><span class="sev-medium">Med / Low</span></td><td>Open</td></tr>
+  <tr><td>R11 (v2)</td><td>Doc/reality drift &amp; ADR hygiene</td><td><span class="sev-low">Low</span></td><td>Open &mdash; ticket #201 exists</td></tr>
+</table>
+
+<!-- ============ 16 SCORECARD ============ -->
+<h2 id="scorecard">16. Quality Scorecard</h2>
+<p>Same 16 dimensions and rubric as v1/v2/v3. Bars show v4; pills show movement vs v3.</p>
+<div class="card" id="scorebars"></div>
+<div class="card" style="text-align:center;margin-top:1.5rem">
+  <div style="font-size:.9rem;color:var(--text-dim)">Weighted Average Score</div>
+  <div class="score-big score-4" style="font-size:3rem">4.12 / 5</div>
+  <div style="font-size:.85rem;color:var(--text-dim)">was 4.06 / 5 &mdash; <span class="deltaup">+0.06</span> &mdash; "Mature single-tenant platform at a high plateau; the remaining gaps are structural ceilings, not defects"</div>
+</div>
+
+<!-- ============ 17 ROADMAP ============ -->
+<h2 id="roadmap">17. Prioritized Improvement Roadmap (v4)</h2>
+<h3>Immediate (0&ndash;2 weeks) &mdash; make the single-tenant decision, shrink the money-path function</h3>
+<table>
+  <tr><th>Action</th><th>Closes</th><th>Effort</th></tr>
+  <tr><td>Decide the authorization question: implement #373 RBAC <em>or</em> write an ADR formally accepting the single-user ceiling</td><td>#1 carried ceiling</td><td>L</td></tr>
+  <tr><td>Decompose <code>maybe_execute()</code> into extracted <code>_validate_*</code> decision steps</td><td>R01v4</td><td>M</td></tr>
+</table>
+<h3>Short-term (2&ndash;4 weeks)</h3>
+<table>
+  <tr><th>Action</th><th>Closes</th><th>Effort</th></tr>
+  <tr><td><code>app/utils/time.py</code> + codemod the 287 TZ sites</td><td>R03v4 (4 reviews old)</td><td>M</td></tr>
+  <tr><td><code>QualityGatePolicy</code> interface so new evidence touches one module</td><td>R04v4</td><td>S</td></tr>
+  <tr><td>Fix the <code>universe_export</code> web-leak (domain error + router conversion)</td><td>R02v4</td><td>S</td></tr>
+  <tr><td>Decompose <code>run_screen</code> + stage <code>run_pre_market_scan</code></td><td>R04 (v3)</td><td>M</td></tr>
+  <tr><td>Decompose <code>api/scanner.ts</code> + <code>QualityReportModal.tsx</code></td><td>R10 (v3)</td><td>M</td></tr>
+</table>
+<h3>Medium / Strategic</h3>
+<table>
+  <tr><th>Action</th><th>Benefit</th><th>Effort</th></tr>
+  <tr><td>Multi-replica story: Redis-backed WS counters + read replicas</td><td>Unsticks Scalability (stuck 4 reviews)</td><td>M</td></tr>
+  <tr><td>mypy on backend <code>core/</code> first (incremental)</td><td>Type safety where money moves; unsticks DevX</td><td>L</td></tr>
+  <tr><td>Alert routing beyond webhook (email/Slack/PagerDuty)</td><td>Closes the last Observability corner</td><td>S</td></tr>
+  <tr><td><code>ScannerBase</code> abstraction for the 4 duplicate scanners</td><td>Kills the detect&rarr;enrich&rarr;persist duplication</td><td>M</td></tr>
+  <tr><td>Ticket + solve tweet-monitor auth (official API or expiry alerting)</td><td>Closes the oldest unticketed risk (4+ reviews)</td><td>M</td></tr>
+</table>
+
+<!-- ============ 18 FINAL ============ -->
+<h2 id="final">18. Final Recommendations</h2>
+<div class="card"><h4>Most important decision to make next</h4>
+<p><strong>Decide whether MarketHawk is single-tenant forever.</strong> The absence of an authorization model is now the single largest ceiling &mdash; it caps Security Authz at 2/5 and is the reason Scalability has been stuck at 3 for four reviews. Either commit to #373 (RBAC, multi-user, the work that unsticks two dimensions) or write the ADR that formally accepts the single-user design point and re-scopes the rubric&rsquo;s expectation. Leaving it implicit is the only thing keeping these dimensions ambiguous rather than honestly scored.</p></div>
+<div class="card"><h4>Most important practice to improve next</h4>
+<p><strong>Reverse the duplication drift before it compounds.</strong> The one ledger moving the wrong way is duplication: UTC normalization grew 96&rarr;287, Redis-JSON to 195, and the money-path function <code>maybe_execute</code> swelled to 290 lines as guards accreted. None is a bug today, but each is borrowed maintainability that the autonomous pipeline will keep paying interest on. A <code>utils/time.py</code> codemod and a <code>maybe_execute</code> decomposition are the highest-leverage hygiene moves available.</p></div>
+<div class="card"><h4>Most important testing gap to close next</h4>
+<p><strong>Service&rarr;service integration tests for the money path, plus backend mypy.</strong> The new <code>auto_trade_service</code>&rarr;<code>quality_gate</code>&rarr;<code>ibkr_orders</code> chain is exactly where a defect costs real money, yet it is only covered unit-deep (no integration tests) and entirely untyped (no mypy). These two together are what hold Testability and Developer Experience flat at 4.</p></div>
+<div class="card"><h4>Most important operational risk to reduce next</h4>
+<p><strong>The single-replica ceiling and webhook-only alerting.</strong> With backups now real, the next operational gap is that the platform cannot run a second API replica (in-memory WS counters) and its only alert channel is a webhook &mdash; no email/Slack/PagerDuty and no formal incident/on-call process. Move WS counters to Redis and add a second alert route; both are bounded-effort and remove the last single-points in the run-time story.</p></div>
+<div class="card"><h4>Conclusion</h4>
+<p>v4 closes the chapter v3 opened on process honesty: every one of v3&rsquo;s &ldquo;honesty gaps&rdquo; &mdash; the fictional backups closure, the bypassed ruff gate, the missing readiness probe &mdash; shipped as real, verifiable artifacts this window, and Operational Readiness broke a three-review plateau as a result. Overall quality ticked 90&rarr;91, the weighted scorecard 4.06&rarr;4.12, and no dimension regressed.</p>
+<p>The trajectory is now best described as a <strong>mature single-tenant ceiling</strong>. The platform has run out of cheap foundational wins; what remains are structural decisions, not bug fixes. The score will not climb much further on hygiene alone &mdash; the next point of overall quality is gated on the multi-user/RBAC decision (#373) and the scalability work behind it. The honest path forward is to make that decision explicitly: commit to multi-tenant and unstick Scalability and Authorization, or ADR the single-user ceiling and let the rubric reflect a platform that has, by design, reached the top of its intended envelope.</p></div>
+
+<!-- ============ 19 EVIDENCE ============ -->
+<h2 id="evidence">19. Evidence Index</h2>
+<table>
+  <tr><th>File / Directory</th><th>Purpose</th></tr>
+  <tr><td><code>docker-compose.yml</code> (30-72, 368-407)</td><td><code>db-backup</code> + <code>db-restore-drill</code> sidecars; service inventory (21 services)</td></tr>
+  <tr><td><code>backend/app/services/auto_trade_service.py</code> (92-381)</td><td><code>maybe_execute()</code> guard cascade; quality-gate orchestration; new largest module</td></tr>
+  <tr><td><code>backend/app/providers/ibkr_orders.py</code> (233-280)</td><td>Live-order caps + Redis fail-closed kill switch (#368)</td></tr>
+  <tr><td><code>backend/app/services/quality_gate.py</code> / <code>quality_gate_evidence.py</code></td><td>Data Quality Trust Gate (#491); coupling + complexity evidence</td></tr>
+  <tr><td><code>backend/app/core/config.py</code>, <code>core/circuit_breakers.py</code> (18-26)</td><td>Secrets validators (JWT&ge;32/REDIS&ge;16); breaker config</td></tr>
+  <tr><td><code>backend/app/routers/health.py</code> (34)</td><td>Deep <code>/ready</code> probe (R05)</td></tr>
+  <tr><td><code>backend/app/core/ws_limits.py</code> (18-19)</td><td>In-memory WS connection counters &mdash; scalability blocker</td></tr>
+  <tr><td><code>backend/app/services/universe_export.py</code> (11-12, 59)</td><td>HTTPException web-leak (R02v4)</td></tr>
+  <tr><td><code>backend/app/services/discovery_service.py</code>, <code>pre_market_scan.py</code>, <code>stock_data.py</code></td><td>Complexity top-10</td></tr>
+  <tr><td><code>core/metrics.py</code>, <code>core/tracing.py</code>, <code>grafana/provisioning/alerting/rules.yaml</code></td><td>Metrics/tracing pipeline; <code>live_orders_total</code> + <code>LiveOrderPlaced</code> alert</td></tr>
+  <tr><td><code>docs/adr/0012</code>, <code>requirements.txt</code></td><td>Migration-gate ADR; Python 3.14 <code>cp314</code> stack (#622)</td></tr>
+  <tr><td><code>.github/workflows/ci.yml</code></td><td>ruff-in-CI gate (R02); blocking checks inventory</td></tr>
+  <tr><td><code>gh pr list</code> / <code>gh issue list</code> / <code>git log</code></td><td>Traceability + DORA window data (merged PRs #619&ndash;#628)</td></tr>
+</table>
+
+<!-- ============ 20 LIMITATIONS ============ -->
+<h2 id="limitations">20. Limitations</h2>
+<div class="card"><ul>
+  <li><strong>Executed vs inferred.</strong> Frontend gates (<code>tsc</code>/<code>eslint</code>/<code>build</code>) and backend <code>pytest</code> were <em>not</em> executed live this review; CI-green on <code>main</code> is inferred from the merged PRs #619&ndash;#628 all passing their required checks. Scores are from code + config reads, not a fresh gate run.</li>
+  <li><strong>Test-function count varies by method.</strong> Host grep reports 1,211; a careful agent count reports 993 (class-method / parametrize variance) &mdash; reported as ~1,000.</li>
+  <li><strong>Complexity figures are estimates.</strong> CC values are rank estimates from agent code-reading, not a radon/lizard run; treat them as ranks, not absolutes.</li>
+  <li><strong>DORA metrics are proxies</strong> in a single-repo context with no production deploy telemetry; the merge-commit deployment-frequency proxy is especially unreliable under squash-merge, and the fix-commit CFR proxy over-counts factory iteration commits.</li>
+  <li><strong>Backups verified to exist, not exercised.</strong> The <code>db-backup</code> sidecar and weekly <code>db-restore-drill</code> are present in compose and configured; no live backup/restore was executed during this review.</li>
+  <li><strong>Scoring is comparative-rubric, not absolute.</strong> The 0&ndash;100 score maps the 16-dimension mean onto v1&rsquo;s calibration (2.8&rarr;62); it is a relative health indicator, not a security certification. The 2026-06-12 defensive-security review is a separate artifact and is not re-run here.</li>
+</ul></div>
+
+<div style="text-align:center;margin-top:3rem;padding:1.5rem;color:var(--text-dim);font-size:.85rem">
+  <p>Report generated 2026-06-26 by Opus 4.8 (1M context) &mdash; verified against <code>main</code> @ 56ab037</p>
+  <p>MarketHawk &mdash; Architecture &amp; Quality Report v4.0 &mdash; companion to v3 (2026-06-09), v2 (2026-06-03) and v1 (2026-05-26)</p>
+</div>
+
+</div>
+
+<script>
+mermaid.initialize({startOnLoad:true,theme:'dark',themeVariables:{primaryColor:'#1e293b',primaryBorderColor:'#334155',lineColor:'#64748b',fontSize:'13px'}});
+
+/* §16 scorebars — [name, v3, v4] */
+const dims = [
+  ["Architecture Clarity",4,4],["Modularity",5,5],["Separation of Concerns",4,4],
+  ["Maintainability",4,4],["Testability",4,4],["Code Coverage Maturity",4,4],
+  ["Reliability",5,5],["Security Posture",4,4],["Observability",5,5],
+  ["Performance Readiness",4,4],["Scalability Readiness",3,3],["Deployment Readiness",4,4],
+  ["Developer Experience",4,4],["Documentation",4,4],["Dependency Hygiene",4,4],
+  ["Operational Readiness",3,4]
+];
+const col = v => v>=5?'#22c55e':v>=4?'#4ade80':v>=3?'#eab308':v>=2?'#f97316':'#ef4444';
+let html = '';
+for(const [name,vp,vn] of dims){
+  const d = vn-vp;
+  const dcls = d>0?'deltaup':d<0?'deltadown':'deltaflat';
+  const dtxt = d>0?('+'+d):d<0?(''+d):'0';
+  html += `<div class="dimrow">
+    <div>${name} <span style="color:var(--text-dim);font-size:.8rem">(v3 ${vp})</span></div>
+    <div class="dimbar">
+      <div style="width:160px;background:var(--surface2);border-radius:4px;height:14px;overflow:hidden">
+        <div style="width:${vn/5*100}%;height:100%;background:${col(vn)}"></div>
+      </div>
+      <strong style="width:28px;text-align:right">${vn}</strong>
+      <span class="${dcls}" style="width:34px;text-align:right">${dtxt}</span>
+    </div>
+  </div>`;
+}
+document.getElementById('scorebars').innerHTML = html;
+
+/* §13 trend chart — overall score per review */
+const overall = [["v1 2026-05-26",62],["v2 2026-06-03",83],["v3 2026-06-09",90],["v4 2026-06-26",91]];
+const max = 100;
+let t = '<div style="display:flex;align-items:flex-end;gap:1.2rem;height:170px;padding:0 .5rem">';
+for(const [l,v] of overall){
+  t += `<div style="flex:1;text-align:center">
+    <div style="font-weight:800;color:#f8fafc">${v}</div>
+    <div style="height:${v/max*120}px;background:linear-gradient(180deg,#0ea5e9,#22c55e);border-radius:6px 6px 0 0;margin:0 auto;max-width:90px"></div>
+    <div style="font-size:.72rem;color:var(--text-dim);margin-top:.4rem">${l}</div>
+  </div>`;
+}
+t += '</div>';
+document.getElementById('trendchart').innerHTML = t;
+</script>
+</body>
+</html>

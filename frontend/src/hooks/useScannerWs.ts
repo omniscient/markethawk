@@ -30,6 +30,7 @@ export function useScannerWs(state: WsStateSlice, queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: ['scannerConfigs'] });
     queryClient.invalidateQueries({ queryKey: ['scannerResults'] });
     queryClient.invalidateQueries({ queryKey: ['scanStatusBlock'] });
+    queryClient.invalidateQueries({ queryKey: ['scannerCoverage'] });
   };
 
   const handleWsMessage = (msg: Record<string, unknown>) => {

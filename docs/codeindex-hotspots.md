@@ -1,44 +1,49 @@
-Files with blast score ≥ 5.0  (42 found)
+Files with blast score ≥ 5.0  (47 found)
 
-    74.0  frontend/src/api/client.ts  (26d / 96t)  78 loc
-    62.5  backend/app/routers/auth.py  (2d / 121t)  213 loc
-    36.5  frontend/src/api/scanner/index.ts  (26d / 21t)  53 loc
-    31.0  frontend/src/components/ui/Card.tsx  (21d / 20t)  44 loc
-    28.5  frontend/src/api/scanner/types.ts  (5d / 47t)  271 loc
-    28.5  frontend/src/components/ui/Button.tsx  (21d / 15t)  66 loc
-    28.0  backend/app/routers/scanner.py  (4d / 48t)  709 loc
-    27.0  backend/app/routers/system.py  (2d / 50t)  141 loc
-    27.0  services/tweet-monitor/app/main.py  (2d / 50t)  266 loc
-    25.0  backend/app/routers/futures.py  (1d / 48t)  188 loc
-    24.5  frontend/src/api/scanner/configs.ts  (1d / 47t)  21 loc
-    24.5  frontend/src/api/scanner/misc.ts  (1d / 47t)  99 loc
-    24.5  frontend/src/api/scanner/results.ts  (1d / 47t)  22 loc
-    24.5  frontend/src/api/scanner/reviews.ts  (1d / 47t)  35 loc
-    24.5  frontend/src/api/scanner/runs.ts  (1d / 47t)  49 loc
-    24.5  frontend/src/api/scanner/ws.ts  (1d / 47t)  26 loc
+    80.0  frontend/src/api/client.ts  (27d / 106t)  78 loc
+    68.0  backend/app/routers/auth.py  (2d / 132t)  213 loc
+    45.0  frontend/src/api/scanner/index.ts  (34d / 22t)  53 loc
+    33.0  frontend/src/api/scanner/types.ts  (5d / 56t)  371 loc
+    33.0  frontend/src/components/ui/Card.tsx  (23d / 20t)  44 loc
+    32.5  backend/app/routers/scanner.py  (4d / 57t)  747 loc
+    31.5  backend/app/routers/system.py  (2d / 59t)  141 loc
+    30.5  frontend/src/components/ui/Button.tsx  (23d / 15t)  66 loc
+    29.5  backend/app/routers/futures.py  (1d / 57t)  188 loc
+    29.5  services/tweet-monitor/app/main.py  (1d / 57t)  266 loc
+    29.0  frontend/src/api/scanner/configs.ts  (1d / 56t)  21 loc
+    29.0  frontend/src/api/scanner/misc.ts  (1d / 56t)  99 loc
+    29.0  frontend/src/api/scanner/results.ts  (1d / 56t)  22 loc
+    29.0  frontend/src/api/scanner/reviews.ts  (1d / 56t)  35 loc
+    29.0  frontend/src/api/scanner/runs.ts  (1d / 56t)  49 loc
+    29.0  frontend/src/api/scanner/ws.ts  (1d / 56t)  26 loc
     23.0  frontend/src/test-utils/renderWithQuery.tsx  (23d / 0t)  29 loc
-    14.5  frontend/src/api/universe.ts  (13d / 3t)  302 loc
-    14.5  frontend/src/components/ui/Modal.tsx  (9d / 11t)  87 loc
+    18.0  frontend/src/api/universe.ts  (16d / 4t)  317 loc
+    15.5  frontend/src/components/ui/Modal.tsx  (10d / 11t)  87 loc
+    14.5  frontend/src/api/trading.ts  (11d / 7t)  244 loc
     14.0  frontend/src/components/Ticker.tsx  (6d / 16t)  80 loc
-    12.5  frontend/src/api/outcomes.ts  (10d / 5t)  217 loc
-    12.5  frontend/src/api/trading.ts  (9d / 7t)  244 loc
-     9.0  backend/app/main.py  (1d / 16t)  516 loc
-     9.0  backend/app/routers/auto_trading.py  (1d / 16t)  365 loc
-     9.0  backend/app/routers/universe.py  (1d / 16t)  446 loc
-     9.0  frontend/src/components/ui/MetricCard.tsx  (6d / 6t)  71 loc
-     8.5  backend/app/routers/outcomes.py  (1d / 15t)  309 loc
+    12.5  frontend/src/api/outcomes.ts  (10d / 5t)  228 loc
+    11.0  backend/app/main.py  (1d / 20t)  535 loc
+    11.0  backend/app/routers/universe.py  (1d / 20t)  490 loc
+    10.5  frontend/src/components/ui/MetricCard.tsx  (7d / 7t)  71 loc
+    10.0  backend/app/routers/auto_trading.py  (1d / 18t)  380 loc
+     8.5  backend/app/routers/outcomes.py  (1d / 15t)  370 loc
      8.5  frontend/src/utils/url.ts  (3d / 11t)  36 loc
      8.0  frontend/src/hooks/useScorecard.ts  (5d / 6t)  98 loc
      8.0  frontend/src/pages/AutoTrading/components.tsx  (5d / 6t)  294 loc
      7.5  frontend/src/components/ReviewControls.tsx  (2d / 11t)  154 loc
-     7.5  frontend/src/hooks/useWatchlistLive.ts  (6d / 3t)  167 loc
-     6.5  backend/app/routers/news.py  (1d / 11t)  119 loc
+     7.5  frontend/src/components/TrustGateSummary.tsx  (3d / 9t)  185 loc
+     7.5  frontend/src/components/verdictConfig.ts  (2d / 11t)  13 loc
+     7.5  frontend/src/hooks/useWatchlistLive.ts  (6d / 3t)  182 loc
+     7.0  frontend/src/api/replay.ts  (6d / 2t)  188 loc
+     6.5  backend/app/routers/news.py  (1d / 11t)  137 loc
      6.5  frontend/src/api/news.ts  (2d / 9t)  46 loc
      6.5  frontend/src/hooks/useScannerState.ts  (4d / 5t)  109 loc
      6.0  frontend/src/api/alerts.ts  (4d / 4t)  199 loc
      6.0  frontend/src/hooks/useLiveStockData.ts  (4d / 4t)  115 loc
+     6.0  frontend/src/utils/indicators.ts  (2d / 8t)  106 loc
      5.5  frontend/src/components/QualityReportModal/GradeBadge.tsx  (3d / 5t)  35 loc
-     5.5  frontend/src/utils/indicators.ts  (2d / 7t)  106 loc
-     5.0  backend/app/routers/alerts.py  (1d / 8t)  415 loc
+     5.0  backend/app/routers/alerts.py  (1d / 8t)  458 loc
+     5.0  backend/app/routers/replay.py  (1d / 8t)  261 loc
      5.0  frontend/src/api/system.ts  (3d / 4t)  55 loc
      5.0  frontend/src/api/watchlist.ts  (4d / 2t)  70 loc
+     5.0  frontend/src/components/ui/StockChart.tsx  (2d / 6t)  617 loc
