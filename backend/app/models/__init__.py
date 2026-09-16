@@ -17,11 +17,17 @@ from app.models.monitored_stock import MonitoredStock
 from app.models.news_article import NewsArticle
 from app.models.news_preference import NewsPreference
 from app.models.push_subscription import PushSubscription
+from app.models.regime_model import RegimeModel
+from app.models.replay_run import ReplayRun
+from app.models.replay_trade import ReplayTrade
 from app.models.scanner_config import ScannerConfig
 from app.models.scanner_event import ScannerEvent
+from app.models.scanner_event_narrative import ScannerEventNarrative
 from app.models.scanner_outcome_snapshot import ScannerOutcomeSnapshot
 from app.models.scanner_outcome_summary import ScannerOutcomeSummary
+from app.models.scanner_replay_diff import ScannerReplayDiff
 from app.models.scanner_run import ScannerRun
+from app.models.semantic_embedding import SemanticEmbedding
 from app.models.signal_analysis_run import SignalAnalysisRun
 from app.models.signal_cluster import SignalCluster
 from app.models.signal_review import SignalReview
@@ -44,8 +50,10 @@ __all__ = [
     "StockUniverse",
     "MonitoredStock",
     "ScannerEvent",
+    "ScannerEventNarrative",
     "ScannerConfig",
     "ScannerRun",
+    "SemanticEmbedding",
     "TickerReference",
     "StockMetric",
     "StockAggregate",
@@ -68,6 +76,7 @@ __all__ = [
     "ActiveWatchlist",
     "TradingStrategy",
     "AutoTradeOrder",
+    "ScannerReplayDiff",
     "ScannerOutcomeSnapshot",
     "ScannerOutcomeSummary",
     "SignalAnalysisRun",
@@ -76,4 +85,7 @@ __all__ = [
     "MonitoredAccount",
     "TweetSignal",
     "User",
+    "RegimeModel",
+    "ReplayRun",
+    "ReplayTrade",
 ]

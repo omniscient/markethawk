@@ -1,0 +1,24 @@
+{
+  "confidence": 1.0,
+  "evidence": [
+    {
+      "date": "2026-06-05",
+      "evidence_tag": null,
+      "issue": 191,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-05",
+  "id": "4415d2b5bb5e749e",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "`AuthMiddleware` in `main.py` short-circuits for non-HTTP scopes \u2014 WebSocket routes are NOT covered. Protect WS endpoints by adding `_user: User = Depends(ws_get_current_user)` from `app.core.auth`; this raises `WebSocketException(code=1008)` before `accept()` if the cookie is absent or invalid.",
+  "superseded_by": null,
+  "supersedes": []
+}

@@ -1,0 +1,17 @@
+{
+  "confidence": 0.7,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "a73064e818e32236",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "architecture",
+  "source_file": "architecture.md",
+  "summary": "Agent memory is stored as plain markdown files in `.archon/memory/`, committed to the repo. Files are read at Phase 1 load time and updated post-run. This keeps memory human-readable, version-controlled, and accessible to all agents without any extra tooling.",
+  "superseded_by": null,
+  "supersedes": []
+}

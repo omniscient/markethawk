@@ -10,7 +10,13 @@ import pandas as pd
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from app.core.metrics import scan_duration_seconds, scanner_events_total
+from app.core.metrics import (
+    scan_data_to_detection_seconds,
+    scan_duration_seconds,
+    scan_failed_tickers_ratio,
+    scan_last_success_timestamp,
+    scanner_events_total,
+)
 from app.exceptions import DataFetchError, ProviderError, ScanError
 from app.models.stock_aggregate import StockAggregate
 from app.models.system_config import SystemConfig
@@ -18,7 +24,7 @@ from app.services.scan_enrichment import _SECTOR_ETF_MAP
 from app.services.scan_orchestrator import ScannerDescriptor, register
 from app.services.timeseries_forecast import compute_anomaly_score
 from app.utils.session import get_market_today
-from app.utils.time import to_utc_naive
+from app.utils.time import ensure_utc, to_utc_naive
 
 if TYPE_CHECKING:
     from app.models.scanner_run import ScannerRun
@@ -188,7 +194,7 @@ def _build_timing_features(
     if last_pre:
         bar_ts = last_pre.timestamp
         if bar_ts.tzinfo is None:
-            bar_ts = bar_ts.replace(tzinfo=timezone.utc)
+            bar_ts = ensure_utc(bar_ts)
         bar_ts_et = bar_ts.astimezone(_ET)
         pm_open_et = datetime.combine(event_date, time(4, 0), tzinfo=_ET)
         timing = {
@@ -222,9 +228,9 @@ def _build_catalyst_features(
     if cat_latest is not None and last_pre is not None:
         ref_ts = last_pre.timestamp
         if ref_ts.tzinfo is None:
-            ref_ts = ref_ts.replace(tzinfo=timezone.utc)
+            ref_ts = ensure_utc(ref_ts)
         if cat_latest.tzinfo is None:
-            cat_latest = cat_latest.replace(tzinfo=timezone.utc)
+            cat_latest = ensure_utc(cat_latest)
         result["catalyst_recency_hours"] = round(
             (ref_ts - cat_latest).total_seconds() / 3600, 2
         )
@@ -403,11 +409,36 @@ def _persist(
     event_date: date,
     ranker_config: Optional[Dict[str, Any]],
     scanner_run: Optional[Any],
+    gate_metadata: Optional[Dict[str, Any]] = None,
 ) -> list[Dict[str, Any]]:
+    from app.services.data_readiness import DataReadinessService
     from app.services.scanner import ScannerService
+    from app.services.scanner_explanations import build_pre_market_volume_explanation
+    from app.services.signal_ranker import compute_signal_quality_score
 
     results = []
     for signal in enriched:
+        signal_quality_score = None
+        if (
+            ranker_config
+            and ranker_config.get("enabled")
+            and ranker_config.get("weights")
+        ):
+            signal_quality_score = compute_signal_quality_score(
+                signal.indicators, ranker_config["weights"]
+            )
+        event_gate_metadata = DataReadinessService.event_quality_gate_metadata(
+            db=db,
+            ticker=signal.raw.ticker,
+            scanner_type="pre_market_volume_spike",
+            event_date=event_date,
+            base_metadata=gate_metadata,
+        )
+        explanation = build_pre_market_volume_explanation(
+            signal,
+            signal_quality_score=signal_quality_score,
+            gate_metadata=event_gate_metadata,
+        )
         event_dict = ScannerService._save_event(
             db=db,
             ticker=signal.raw.ticker,
@@ -420,6 +451,8 @@ def _persist(
             opening_price=signal.day_metrics.get("opening_price", 0.0),
             closing_price=signal.day_metrics.get("closing_price"),
             ranker_config=ranker_config,
+            gate_metadata=event_gate_metadata,
+            explanation=explanation,
         )
         results.append(event_dict)
         scanner_events_total.labels(scanner_type="pre_market_volume_spike").inc()
@@ -441,123 +474,165 @@ async def run_pre_market_scan(
     db: Session,
     event_date: date = None,
     scanner_run: Optional["ScannerRun"] = None,
+    gate_metadata: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """Run extended hours volume spike scanner using DB aggregates."""
     import app.services.scanner as _scanner_mod
     from app.services.scanner import ScannerService
 
     _start = _time.monotonic()
-    if event_date is None:
-        event_date = get_market_today()
+    try:
+        if event_date is None:
+            event_date = get_market_today()
 
-    _ET = ZoneInfo("America/New_York")
-    day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
-    day_start_utc = to_utc_naive(day_start_et)
-    day_end_utc = to_utc_naive((day_start_et + timedelta(days=1)))
-    hist_start_utc = to_utc_naive(day_start_et - timedelta(days=90))
+        _ET = ZoneInfo("America/New_York")
+        day_start_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
+        day_start_utc = to_utc_naive(day_start_et)
+        day_end_utc = to_utc_naive((day_start_et + timedelta(days=1)))
+        hist_start_utc = to_utc_naive(day_start_et - timedelta(days=90))
 
-    timesfm_enabled, anomaly_threshold, min_history_bars, fallback_multiplier = (
-        _load_timesfm_config(db)
-    )
-    ranker_config = _scanner_mod.load_ranker_config(db)
-    (
-        enrichment_batch,
-        market_context_dict,
-        sector_etf_pct_dict,
-    ) = await asyncio.to_thread(
-        ScannerService._get_batch_enrichment_data, tickers, event_date, db
-    )
+        timesfm_enabled, anomaly_threshold, min_history_bars, fallback_multiplier = (
+            _load_timesfm_config(db)
+        )
+        ranker_config = _scanner_mod.load_ranker_config(db)
+        (
+            enrichment_batch,
+            market_context_dict,
+            sector_etf_pct_dict,
+        ) = await asyncio.to_thread(
+            ScannerService._get_batch_enrichment_data, tickers, event_date, db
+        )
 
-    from opentelemetry import context as _otel_context
-    from opentelemetry import trace as _otel_trace
+        from opentelemetry import context as _otel_context
+        from opentelemetry import trace as _otel_trace
 
-    _tracer = _otel_trace.get_tracer(__name__)
-    raw_signals: List[RawSignal] = []
-    failed: List[Dict[str, Any]] = []
+        _tracer = _otel_trace.get_tracer(__name__)
+        raw_signals: List[RawSignal] = []
+        failed: List[Dict[str, Any]] = []
 
-    for ticker in tickers:
-        _span = _tracer.start_span("scanner.evaluate_ticker")
-        _token = _otel_context.attach(_otel_trace.set_span_in_context(_span))
-        try:
-            _span.set_attribute("ticker", ticker)
-            _span.set_attribute("scanner_type", "pre_market_volume_spike")
-            daily_bars = (
-                db.query(StockAggregate)
-                .filter(
-                    StockAggregate.ticker == ticker,
-                    StockAggregate.timespan == "day",
-                    StockAggregate.timestamp >= hist_start_utc,
-                    StockAggregate.timestamp < day_start_utc,
+        for ticker in tickers:
+            _span = _tracer.start_span("scanner.evaluate_ticker")
+            _token = _otel_context.attach(_otel_trace.set_span_in_context(_span))
+            try:
+                _span.set_attribute("ticker", ticker)
+                _span.set_attribute("scanner_type", "pre_market_volume_spike")
+                daily_bars = (
+                    db.query(StockAggregate)
+                    .filter(
+                        StockAggregate.ticker == ticker,
+                        StockAggregate.timespan == "day",
+                        StockAggregate.timestamp >= hist_start_utc,
+                        StockAggregate.timestamp < day_start_utc,
+                    )
+                    .order_by(StockAggregate.timestamp.asc())
+                    .all()
                 )
-                .order_by(StockAggregate.timestamp.asc())
-                .all()
-            )
-            pre_market_volume = float(
-                db.query(func.sum(StockAggregate.volume))
-                .filter(
-                    StockAggregate.ticker == ticker,
-                    StockAggregate.timespan == "minute",
-                    StockAggregate.is_pre_market == True,
-                    StockAggregate.timestamp >= day_start_utc,
-                    StockAggregate.timestamp < day_end_utc,
+                pre_market_volume = float(
+                    db.query(func.sum(StockAggregate.volume))
+                    .filter(
+                        StockAggregate.ticker == ticker,
+                        StockAggregate.timespan == "minute",
+                        StockAggregate.is_pre_market == True,
+                        StockAggregate.timestamp >= day_start_utc,
+                        StockAggregate.timestamp < day_end_utc,
+                    )
+                    .scalar()
+                    or 0
                 )
-                .scalar()
-                or 0
-            )
-            raw = _detect(
-                ticker,
-                daily_bars,
-                pre_market_volume,
-                timesfm_enabled,
-                anomaly_threshold,
-                min_history_bars,
-                fallback_multiplier,
-                _scanner_mod,
-            )
-            if raw is not None:
-                raw_signals.append(raw)
-        except (ScanError, DataFetchError, ProviderError) as e:
-            logging.error(
-                "pre_market_scan: domain error for %s: %s",
-                ticker,
-                e,
-                extra={"ticker": ticker, "error_type": type(e).__name__},
-            )
-            failed.append(
-                {
-                    "ticker": ticker,
-                    "error_type": type(e).__name__,
-                    "message": str(e),
-                    "retryable": e.is_retryable,
-                }
-            )
-        finally:
-            _span.end()
-            _otel_context.detach(_token)
+                raw = _detect(
+                    ticker,
+                    daily_bars,
+                    pre_market_volume,
+                    timesfm_enabled,
+                    anomaly_threshold,
+                    min_history_bars,
+                    fallback_multiplier,
+                    _scanner_mod,
+                )
+                if raw is not None:
+                    raw_signals.append(raw)
+            except (ScanError, DataFetchError, ProviderError) as e:
+                logging.error(
+                    "pre_market_scan: domain error for %s: %s",
+                    ticker,
+                    e,
+                    extra={"ticker": ticker, "error_type": type(e).__name__},
+                )
+                failed.append(
+                    {
+                        "ticker": ticker,
+                        "error_type": type(e).__name__,
+                        "message": str(e),
+                        "retryable": e.is_retryable,
+                    }
+                )
+            finally:
+                _span.end()
+                _otel_context.detach(_token)
 
-    enriched, enrich_failed = _enrich(
-        raw_signals,
-        enrichment_batch,
-        market_context_dict,
-        sector_etf_pct_dict,
-        day_start_utc,
-        day_end_utc,
-        event_date,
-        db,
-    )
-    failed.extend(enrich_failed)
-    results = _persist(enriched, failed, db, event_date, ranker_config, scanner_run)
-    scan_duration_seconds.labels(scanner_type="pre_market_volume_spike").observe(
-        _time.monotonic() - _start
-    )
-    return results
+        enriched, enrich_failed = _enrich(
+            raw_signals,
+            enrichment_batch,
+            market_context_dict,
+            sector_etf_pct_dict,
+            day_start_utc,
+            day_end_utc,
+            event_date,
+            db,
+        )
+        failed.extend(enrich_failed)
+        results = _persist(
+            enriched, failed, db, event_date, ranker_config, scanner_run, gate_metadata
+        )
+        # --- SLO metrics -------------------------------------------------------
+        if not tickers or len(failed) < len(tickers):
+            scan_last_success_timestamp.labels(
+                scanner_type="pre_market_volume_spike"
+            ).set(_time.time())
+        scan_failed_tickers_ratio.labels(scanner_type="pre_market_volume_spike").set(
+            len(failed) / len(tickers) if tickers else 0.0
+        )
+        # data-to-detection: freshest pre-market minute bar consumed vs. wall-clock now
+        _max_bar_ts = (
+            db.query(func.max(StockAggregate.timestamp))
+            .filter(
+                StockAggregate.ticker.in_(tickers),
+                StockAggregate.timespan == "minute",
+                StockAggregate.is_pre_market == True,
+                StockAggregate.timestamp >= day_start_utc,
+                StockAggregate.timestamp < day_end_utc,
+            )
+            .scalar()
+        )
+        if _max_bar_ts is not None and isinstance(_max_bar_ts, datetime):
+            _bar_utc = (
+                _max_bar_ts
+                if _max_bar_ts.tzinfo
+                else ensure_utc(_max_bar_ts)
+            )
+            scan_data_to_detection_seconds.labels(
+                scanner_type="pre_market_volume_spike"
+            ).observe((datetime.now(timezone.utc) - _bar_utc).total_seconds())
+        return results
+    finally:
+        scan_duration_seconds.labels(scanner_type="pre_market_volume_spike").observe(
+            _time.monotonic() - _start
+        )
 
 
 async def _run(
-    tickers: list[str], db: Any, event_date: date, scanner_run: Optional[Any] = None
+    tickers: list[str],
+    db: Any,
+    event_date: date,
+    scanner_run: Optional[Any] = None,
+    gate_metadata: Optional[Any] = None,
 ) -> list[dict]:
     return await run_pre_market_scan(
-        tickers, db, event_date=event_date, scanner_run=scanner_run
+        tickers,
+        db,
+        event_date=event_date,
+        scanner_run=scanner_run,
+        gate_metadata=gate_metadata,
     )
 
 

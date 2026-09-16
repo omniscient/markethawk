@@ -1,5 +1,6 @@
 """LiveDataProvider Protocol — the seam between main.py and any live data source."""
 
+import asyncio
 from typing import Awaitable, Callable, Protocol, runtime_checkable
 
 BarCallback = Callable[[str, object], Awaitable[None]]
@@ -35,4 +36,29 @@ class LiveDataProvider(Protocol):
 
     async def disconnect(self) -> None:
         """Tear down the underlying connection."""
+        ...
+
+    def wire_disconnect_queue(
+        self,
+        queue: asyncio.Queue,
+        disconnect_tag: str,
+        loop: asyncio.AbstractEventLoop,
+    ) -> None:
+        """Register a handler that puts (disconnect_tag, None, None) on the queue when the
+        underlying connection drops. Called once from run() after adapter and queue are created;
+        re-called from _reconnect_coro after a successful reconnect."""
+        ...
+
+    async def reconnect(self) -> bool:
+        """Re-establish the underlying connection with exponential-backoff retry.
+        Returns True on success, False when all retries are exhausted."""
+        ...
+
+    def is_connected(self) -> bool:
+        """Return True if the underlying connection is believed to be alive."""
+        ...
+
+    def force_disconnect(self) -> None:
+        """Force-close the connection so disconnectedEvent fires (used by the liveness watchdog
+        to recover from network-partition hangs where the process doesn't crash)."""
         ...

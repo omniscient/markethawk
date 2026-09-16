@@ -4,11 +4,21 @@ Pydantic schemas package.
 
 from app.schemas.auto_trade import AutoTradeOrderResponse, TradingStrategyResponse
 from app.schemas.event import ScannerEventResponse, ScannerEventSummary
+from app.schemas.quality_gate import (
+    QualityGateAssessment,
+    QualityGateIssue,
+    QualityGatePolicy,
+    QualityGateScope,
+    QualityGateVerdict,
+    QualityIssueCode,
+)
+from app.schemas.regime import RegimeBreakdownResponse, RegimeSliceSchema
 from app.schemas.scanner import (
     ClearEventsResponse,
     PreMarketMover,
     PreMarketMoversResponse,
     ScannerConfigResponse,
+    ScannerCoverageResponse,
     ScannerRangeRequest,
     ScannerRunAsyncResponse,
     ScannerRunRequest,
@@ -38,6 +48,7 @@ __all__ = [
     "ScannerRunStatusResponse",
     "ScannerStatsResponse",
     "ScannerConfigResponse",
+    "ScannerCoverageResponse",
     "ScannerEventResponse",
     "ScannerEventSummary",
     "MonitoredStockResponse",
@@ -46,4 +57,12 @@ __all__ = [
     "ScannerRangeRequest",
     "ScannerStatusBlockResponse",
     "ClearEventsResponse",
+    "RegimeSliceSchema",
+    "RegimeBreakdownResponse",
+    "QualityIssueCode",
+    "QualityGatePolicy",
+    "QualityGateVerdict",
+    "QualityGateScope",
+    "QualityGateIssue",
+    "QualityGateAssessment",
 ]

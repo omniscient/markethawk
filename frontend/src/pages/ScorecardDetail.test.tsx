@@ -10,6 +10,9 @@ const mockUseIntervals = vi.fn();
 const mockUseDistribution = vi.fn();
 const mockUseBackfillMutation = vi.fn();
 const mockUseSignals = vi.fn();
+const mockUseExplanationTraits = vi.fn();
+const mockUseExplanationArchetypes = vi.fn();
+const mockUseRegimeBreakdown = vi.fn();
 
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
@@ -24,6 +27,9 @@ vi.mock('../hooks/useScorecard', () => ({
   useEdgeDecay: (...args: unknown[]) => mockUseEdgeDecay(...args),
   useIntervals: (...args: unknown[]) => mockUseIntervals(...args),
   useDistribution: (...args: unknown[]) => mockUseDistribution(...args),
+  useExplanationTraits: (...args: unknown[]) => mockUseExplanationTraits(...args),
+  useExplanationArchetypes: (...args: unknown[]) => mockUseExplanationArchetypes(...args),
+  useRegimeBreakdown: (...args: unknown[]) => mockUseRegimeBreakdown(...args),
   useBackfillMutation: () => mockUseBackfillMutation(),
   useSignals: (...args: unknown[]) => mockUseSignals(...args),
 }));
@@ -49,11 +55,39 @@ const makeScorecard = (overrides: Partial<Scorecard> = {}): Scorecard => ({
   ...overrides,
 });
 
+const explanationFilters = {
+  scanner_type: 'pre_market_volume_spike',
+  start_date: null,
+  end_date: null,
+  severity: null,
+  min_sample_size: 5,
+};
+
 const noDataDefaults = () => {
   mockUseScorecard.mockReturnValue({ data: null, isLoading: false, isError: false });
   mockUseEdgeDecay.mockReturnValue({ data: [], isLoading: false });
   mockUseIntervals.mockReturnValue({ data: {}, isLoading: false });
   mockUseDistribution.mockReturnValue({ data: [], isLoading: false });
+  mockUseExplanationTraits.mockReturnValue({ data: { event_count: 0, traits: [] }, isLoading: false });
+  mockUseExplanationArchetypes.mockReturnValue({
+    data: {
+      analysis_run_id: null,
+      scanner_type: 'pre_market_volume_spike',
+      event_count: 0,
+      filters: explanationFilters,
+      archetypes: [],
+      warnings: [],
+    },
+    isLoading: false,
+  });
+  mockUseRegimeBreakdown.mockReturnValue({
+    data: {
+      scanner_type: 'pre_market_volume_spike',
+      total_events: 0,
+      breakdown: {},
+    },
+    isLoading: false,
+  });
   mockUseBackfillMutation.mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
@@ -93,6 +127,64 @@ describe('ScorecardDetail — shell', () => {
   it('shows back arrow link', () => {
     renderWithQuery(<ScorecardDetail />);
     expect(screen.getByRole('link')).toBeInTheDocument();
+  });
+});
+
+describe('ScorecardDetail — regime performance', () => {
+  beforeEach(noDataDefaults);
+
+  it('shows empty advisory state when no regime outcome evidence exists', () => {
+    renderWithQuery(<ScorecardDetail />);
+    expect(screen.getByText(/Regime Performance/i)).toBeInTheDocument();
+    expect(screen.getByText(/No regime outcome evidence yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/advisory evidence, not a trading rule/i)).toBeInTheDocument();
+  });
+
+  it('shows loading state while regime breakdown loads', () => {
+    mockUseRegimeBreakdown.mockReturnValue({ data: null, isLoading: true });
+    renderWithQuery(<ScorecardDetail />);
+    expect(screen.getByText(/Regime Performance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Loading regime evidence/i)).toBeInTheDocument();
+  });
+
+  it('renders conservative interpretations for populated and low-sample regimes', () => {
+    mockUseRegimeBreakdown.mockReturnValue({
+      isLoading: false,
+      data: {
+        scanner_type: 'pre_market_volume_spike',
+        total_events: 26,
+        breakdown: {
+          risk_on: {
+            sample_size: 18,
+            win_rate_pct: 68,
+            avg_mfe_pct: 4.2,
+            avg_mae_pct: -1.0,
+          },
+          high_volatility: {
+            sample_size: 3,
+            win_rate_pct: 80,
+            avg_mfe_pct: 6.5,
+            avg_mae_pct: -3.2,
+          },
+          risk_off: {
+            sample_size: 5,
+            win_rate_pct: 35,
+            avg_mfe_pct: 1.4,
+            avg_mae_pct: -4.1,
+          },
+        },
+      },
+    });
+
+    renderWithQuery(<ScorecardDetail />);
+
+    expect(screen.getByText(/Risk On/i)).toBeInTheDocument();
+    expect(screen.getByText(/Candidate favorable regime/i)).toBeInTheDocument();
+    expect(screen.getByText(/High Volatility/i)).toBeInTheDocument();
+    expect(screen.getByText(/Insufficient evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/Risk Off/i)).toBeInTheDocument();
+    expect(screen.getByText(/Candidate hostile regime/i)).toBeInTheDocument();
+    expect(screen.getByText(/n=18/i)).toBeInTheDocument();
   });
 });
 
@@ -141,5 +233,117 @@ describe('ScorecardDetail — derived values', () => {
   it('renders scanner type as uppercased heading', () => {
     renderWithQuery(<ScorecardDetail />);
     expect(screen.getByRole('heading', { name: 'PRE MARKET VOLUME SPIKE' })).toBeInTheDocument();
+  });
+});
+
+describe('ScorecardDetail — explanation intelligence', () => {
+  beforeEach(noDataDefaults);
+
+  it('shows explanation panel loading states', () => {
+    mockUseExplanationTraits.mockReturnValue({ data: null, isLoading: true });
+    mockUseExplanationArchetypes.mockReturnValue({ data: null, isLoading: true });
+    renderWithQuery(<ScorecardDetail />);
+    expect(screen.getByText(/Explanation Traits/i)).toBeInTheDocument();
+    expect(screen.getByText(/Archetypes/i)).toBeInTheDocument();
+  });
+
+  it('shows empty states when explanation intelligence has no rows', () => {
+    renderWithQuery(<ScorecardDetail />);
+    expect(screen.getByText(/No explanation trait performance yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/No explanation archetypes yet/i)).toBeInTheDocument();
+  });
+
+  it('shows low-sample warnings from trait performance', () => {
+    mockUseExplanationTraits.mockReturnValue({
+      isLoading: false,
+      data: {
+        event_count: 1,
+        traits: [
+          {
+            trait_type: 'criterion_passed',
+            trait_key: 'premarket.volume_spike',
+            trait_label: 'Volume Spike',
+            sample_size: 1,
+            event_ids: [1],
+            win_rate_pct: 100,
+            follow_through_rate_pct: 100,
+            avg_mfe_pct: 4,
+            avg_mae_pct: 1,
+            win_rate_ci_95_pct: { lower: 20, upper: 100 },
+            warnings: [{ code: 'weak_sample_size', message: 'Only 1 events matched this trait.' }],
+          },
+        ],
+      },
+    });
+    renderWithQuery(<ScorecardDetail />);
+    expect(screen.getByText(/Low sample/i)).toBeInTheDocument();
+    expect(screen.getByText(/Only 1 events matched this trait/i)).toBeInTheDocument();
+  });
+
+  it('renders populated trait and archetype performance', () => {
+    mockUseExplanationTraits.mockReturnValue({
+      isLoading: false,
+      data: {
+        event_count: 12,
+        traits: [
+          {
+            trait_type: 'criterion_passed',
+            trait_key: 'premarket.volume_spike',
+            trait_label: 'Volume Spike',
+            sample_size: 8,
+            event_ids: [1, 2],
+            win_rate_pct: 75,
+            follow_through_rate_pct: 70,
+            avg_mfe_pct: 5.5,
+            avg_mae_pct: 1.1,
+            win_rate_ci_95_pct: { lower: 40, upper: 90 },
+            warnings: [],
+          },
+          {
+            trait_type: 'warning',
+            trait_key: 'missing_float',
+            trait_label: 'Missing Float',
+            sample_size: 4,
+            event_ids: [3, 4],
+            win_rate_pct: 25,
+            follow_through_rate_pct: 25,
+            avg_mfe_pct: 1.5,
+            avg_mae_pct: 3.2,
+            win_rate_ci_95_pct: { lower: 5, upper: 55 },
+            warnings: [],
+          },
+        ],
+      },
+    });
+    mockUseExplanationArchetypes.mockReturnValue({
+      isLoading: false,
+      data: {
+        analysis_run_id: 1,
+        scanner_type: 'pre_market_volume_spike',
+        event_count: 12,
+        filters: explanationFilters,
+        warnings: [],
+        archetypes: [
+          {
+            cluster_id: 10,
+            cluster_index: 0,
+            label: 'Volume Spike / Positive Outcomes',
+            sample_size: 8,
+            event_ids: [1, 2],
+            centroid: {},
+            return_profile: { win_rate_pct: 75, avg_mfe_pct: 5.5 },
+            warnings: [],
+          },
+        ],
+      },
+    });
+
+    renderWithQuery(<ScorecardDetail />);
+
+    expect(screen.getByText(/Top Positive Traits/i)).toBeInTheDocument();
+    expect(screen.getByText(/Top Negative Traits/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Volume Spike$/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/^Missing Float$/i)).toBeInTheDocument();
+    expect(screen.getByText(/Volume Spike \/ Positive Outcomes/i)).toBeInTheDocument();
   });
 });

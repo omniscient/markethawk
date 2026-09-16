@@ -83,6 +83,15 @@ def list_strategies(
     return [TradingStrategyResponse.from_orm_dict(s).model_dump() for s in strategies]
 
 
+def _validate_live_strategy(paper_mode: bool, max_position_usd) -> None:
+    """Raise HTTP 422 if a live strategy has no or non-positive max_position_usd."""
+    if not paper_mode and (max_position_usd is None or float(max_position_usd) <= 0):
+        raise HTTPException(
+            status_code=422,
+            detail="max_position_usd is required when paper_mode=False",
+        )
+
+
 @router.post("/strategies", status_code=201)
 def create_strategy(
     payload: Dict[str, Any],
@@ -106,6 +115,9 @@ def create_strategy(
         max_slippage_pct=payload.get("max_slippage_pct", 0.5),
         allowed_sessions=payload.get("allowed_sessions", ["regular"]),
         direction=payload.get("direction", "long_only"),
+    )
+    _validate_live_strategy(
+        paper_mode=strategy.paper_mode, max_position_usd=strategy.max_position_usd
     )
     db.add(strategy)
     db.commit()
@@ -136,6 +148,9 @@ def update_strategy(
         if key in _STRATEGY_UPDATABLE:
             setattr(s, key, value)
 
+    _validate_live_strategy(
+        paper_mode=s.paper_mode, max_position_usd=s.max_position_usd
+    )
     s.updated_at = utc_now()
     db.commit()
     db.refresh(s)

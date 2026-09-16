@@ -160,6 +160,21 @@ export interface QualityReport {
   normalization_data: NormalizationProgress | null;
 }
 
+// ---- Data Health ---------------------------------------------------------- //
+
+export interface DataHealthResponse {
+  degraded: boolean;
+  stale_pct: number;
+  gapped_pct: number;
+  worst_staleness_hours: number;
+  grade: string;
+}
+
+export const getDataHealth = async (universeId: number): Promise<DataHealthResponse> => {
+  const response = await apiClient.get(`/universe/${universeId}/data-health`);
+  return response.data;
+};
+
 // ---- Universe CRUD -------------------------------------------------------- //
 
 export const fetchUniversesForTicker = async (ticker: string): Promise<UniverseSummary[]> => {

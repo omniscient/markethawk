@@ -1,0 +1,24 @@
+{
+  "confidence": 0.4,
+  "evidence": [
+    {
+      "date": "2026-06-22",
+      "evidence_tag": "test-output",
+      "issue": 494,
+      "source": "implement"
+    }
+  ],
+  "expires_at": "2026-12-22",
+  "id": "6103cc3046ee3456",
+  "kind": "PROVISIONAL",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "backend",
+  "source_file": "backend-patterns.md",
+  "summary": "To persist a Pydantic v2 model that contains `datetime` fields into a JSONB column, use `json.loads(json.dumps(model.model_dump(), default=str))` \u2014 `model.model_dump()` returns `datetime` objects which PostgreSQL's JSON encoder rejects; `default=str` coerces them to ISO strings and `json.loads` rebuilds a plain dict.",
+  "superseded_by": null,
+  "supersedes": []
+}

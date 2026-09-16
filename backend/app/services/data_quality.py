@@ -21,10 +21,16 @@ Grade scale
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
+
+from app.services.quality_helpers import (  # noqa: F401
+    _count_weekdays_between,
+    _detect_gaps,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,30 +59,30 @@ def _grade_color(grade: str) -> str:
     )
 
 
-def _count_weekdays_between(d1, d2) -> int:
-    """Count weekdays (Mon–Fri) strictly between two dates."""
-    count = 0
-    current = d1 + timedelta(days=1)
-    while current < d2:
-        if current.weekday() < 5:
-            count += 1
-        current += timedelta(days=1)
-    return count
-
-
 def _estimate_expected_bars(
     timestamps: List[datetime],
     timespan: str,
     multiplier: int,
     holiday_map: Optional[Dict] = None,
+    is_futures: bool = False,
 ):
     """
     Empirical P90 approach: group by date, take the 90th-percentile bar count
     per active day, multiply by number of active days.  Self-calibrates to
     whatever session type was originally requested (pre-market, full day, etc.).
 
-    Stub-day correction
-    ───────────────────
+    Asset-class correction
+    ──────────────────────
+    The P90 yardstick only makes sense when sessions produce a uniform bar
+    count — true for futures (continuous CME sessions), false for stocks:
+    an illiquid ticker emits intraday bars only for periods with trades, so
+    day-to-day bar-count variation is organic trading activity, not missing
+    data (verified bar-for-bar against the provider).  For stocks every day
+    with data therefore counts as complete (expected = actual); shortfalls
+    surface via gap detection, integrity checks, and the staleness sweep.
+
+    Stub-day correction (futures)
+    ─────────────────────────────
     Some calendar dates naturally hold far fewer bars than a full session:
       • Sunday opens: the CME session starts at 18:00 ET Sunday but the UTC
         date only captures 1–2 hours of bars before rolling to Monday.
@@ -136,6 +142,12 @@ def _estimate_expected_bars(
             expected += cnt
             holiday_days += 1
 
+        elif not is_futures:
+            # Stocks: intraday bars only exist for periods with trades, so a
+            # below-P90 day is organic activity, not missing data — no penalty
+            expected += cnt
+            full_days += 1
+
         elif cnt < stub_threshold:
             # Organic stub (Sunday open boundary, single-day holiday without a
             # calendar entry, etc.) — actual = expected, no penalty
@@ -172,59 +184,6 @@ def _estimate_expected_bars(
     }
 
     return expected, detail
-
-
-def _detect_gaps(
-    timestamps: List[datetime], timespan: str, multiplier: int
-) -> List[Dict]:
-    """
-    Return a list of data gaps.
-
-    A gap is a consecutive-timestamp pair where:
-      • the elapsed time exceeds 5 × the expected bar interval, AND
-      • more than 1 weekday falls between the two timestamps
-        (this filters out weekends and single-day holidays naturally).
-    """
-    if len(timestamps) < 2:
-        return []
-
-    expected_seconds = {
-        "minute": 60,
-        "hour": 3600,
-        "day": 86400,
-        "week": 604800,
-        "month": 2592000,
-    }.get(timespan, 60) * multiplier
-
-    threshold_seconds = expected_seconds * 5
-
-    gaps = []
-    for i in range(1, len(timestamps)):
-        prev = timestamps[i - 1]
-        curr = timestamps[i]
-        diff_seconds = (curr - prev).total_seconds()
-
-        if diff_seconds < threshold_seconds:
-            continue
-
-        # Calendar-day span: if ≤ 3 it could be a weekend+holiday — check weekdays
-        calendar_days = (curr.date() - prev.date()).days
-        if calendar_days <= 3:
-            weekdays = _count_weekdays_between(prev.date(), curr.date())
-            if weekdays <= 1:
-                continue  # normal weekend / single holiday
-
-        missing_bars = max(0, int(diff_seconds / expected_seconds) - 1)
-        gaps.append(
-            {
-                "from": prev,
-                "to": curr,
-                "duration_hours": round(diff_seconds / 3600, 1),
-                "missing_bars": missing_bars,
-            }
-        )
-
-    return gaps
 
 
 # ── per-ticker analysis ───────────────────────────────────────────────────────
@@ -326,7 +285,7 @@ def _analyze_ticker_timespan(
 
     # ── Coverage ──────────────────────────────────────────────────────────────
     expected_bars, coverage_detail = _estimate_expected_bars(
-        timestamps, timespan, multiplier, holiday_map
+        timestamps, timespan, multiplier, holiday_map, is_futures=is_futures
     )
     coverage_pct = min(
         100.0, (actual_bars / expected_bars * 100) if expected_bars > 0 else 100.0
@@ -402,6 +361,40 @@ def _analyze_ticker_timespan(
 
 
 class DataQualityService:
+    @staticmethod
+    def summarize_event_bars(rows: List[Any], timespan: str, multiplier: int) -> Dict:
+        """Return event-scoped integrity/continuity counts for aggregate rows."""
+        bad_bar_count = 0
+        timestamps = []
+        for row in rows:
+            timestamps.append(row.timestamp)
+            high = Decimal(row.high)
+            low = Decimal(row.low)
+            open_ = Decimal(row.open)
+            close = Decimal(row.close)
+            volume = int(row.volume)
+            if (
+                high < low
+                or high < open_
+                or high < close
+                or low > open_
+                or low > close
+                or open_ <= 0
+                or close <= 0
+                or high <= 0
+                or low <= 0
+                or volume < 0
+            ):
+                bad_bar_count += 1
+
+        duplicate_count = len(timestamps) - len(set(timestamps))
+        gaps = _detect_gaps(timestamps, timespan, multiplier)
+        return {
+            "bad_bar_count": bad_bar_count,
+            "duplicate_count": duplicate_count,
+            "gap_count": len(gaps),
+        }
+
     @staticmethod
     def analyze_universe(db: Session, universe_id: int) -> Dict:
         """

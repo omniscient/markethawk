@@ -24,6 +24,7 @@ from app.core.config import settings
 from app.core.metrics import ibkr_connection_status
 from app.exceptions import ProviderError
 from app.providers.base import BaseDataProvider
+from app.utils.time import ensure_utc
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +36,21 @@ try:
     from ib_insync.contract import ContractDetails
 
     IB_INSYNC_AVAILABLE = True
-except ImportError:
+except (ImportError, RuntimeError) as _ib_insync_err:
+    # RuntimeError covers Python 3.14+ environments (e.g. the dark-factory
+    # image) where ib_insync's transitive dep eventkit calls
+    # asyncio.get_event_loop() at import time and raises
+    # "There is no current event loop in thread 'MainThread'." Importing
+    # app.main must not hard-fail just because this optional provider can't
+    # load — it degrades gracefully via IB_INSYNC_AVAILABLE instead. The
+    # IBKR symbols (IB/Future/...) are only referenced inside methods, so
+    # leaving them unbound here is safe until IBKR features are used.
     IB_INSYNC_AVAILABLE = False
     logger.warning(
-        "ib_insync not installed. IBKRDataProvider will be unavailable. "
-        "Run: pip install ib_insync"
+        "ib_insync unavailable (%s). IBKRDataProvider will be disabled. "
+        "Run: pip install ib_insync (requires a Python runtime compatible "
+        "with ib_insync/eventkit).",
+        _ib_insync_err,
     )
 
 
@@ -269,9 +280,7 @@ class IBKRDataProvider(BaseDataProvider):
             # Normalise to 8-digit format
             expiry_8 = expiry_str.ljust(8, "0")[:8]
             try:
-                expiry_dt = datetime.strptime(expiry_8, "%Y%m%d").replace(
-                    tzinfo=timezone.utc
-                )
+                expiry_dt = ensure_utc(datetime.strptime(expiry_8, "%Y%m%d"))
             except ValueError:
                 continue
 
@@ -569,7 +578,7 @@ class IBKRDataProvider(BaseDataProvider):
         now_utc = datetime.now(timezone.utc)
         end_dt = (
             min(
-                datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                ensure_utc(datetime.strptime(to_date, "%Y-%m-%d"))
                 + timedelta(days=1, seconds=-1),
                 now_utc,
             )
@@ -577,7 +586,7 @@ class IBKRDataProvider(BaseDataProvider):
             else now_utc
         )
         start_dt = (
-            datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            ensure_utc(datetime.strptime(from_date, "%Y-%m-%d"))
             if from_date
             else end_dt - timedelta(days=3650)  # 10 years default
         )
@@ -738,7 +747,7 @@ class IBKRDataProvider(BaseDataProvider):
         if isinstance(bar_date, datetime):
             if bar_date.tzinfo is None:
                 # ib_insync already decoded the Unix ts into a naive UTC datetime
-                return bar_date.replace(tzinfo=timezone.utc)
+                return ensure_utc(bar_date)
             return bar_date.astimezone(timezone.utc)
 
         # String fallback (formatDate=1 legacy or date-only daily bars)
@@ -746,7 +755,7 @@ class IBKRDataProvider(BaseDataProvider):
         for fmt in ("%Y%m%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y%m%d", "%Y-%m-%d"):
             try:
                 dt = datetime.strptime(s, fmt)
-                return dt.replace(tzinfo=timezone.utc)
+                return ensure_utc(dt)
             except ValueError:
                 continue
         raise ValueError(f"IBKRDataProvider: Cannot parse bar date: {bar_date!r}")

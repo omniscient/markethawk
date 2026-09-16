@@ -1,0 +1,17 @@
+{
+  "confidence": 1.0,
+  "evidence": [],
+  "expires_at": "2026-12-02",
+  "id": "7661f6aa1f47070f",
+  "kind": "PATTERN",
+  "last_used_at": null,
+  "path_prefixes": [],
+  "project": "markethawk",
+  "rationale": null,
+  "retrieval_count": 0,
+  "scope": "frontend",
+  "source_file": "frontend-patterns.md",
+  "summary": "Query keys follow the format `['resource', id?]` \u2014 e.g. `['scanner-results']`, `['stock', ticker]`. Keep keys consistent across the file so React Query can cache and invalidate correctly.",
+  "superseded_by": null,
+  "supersedes": []
+}
