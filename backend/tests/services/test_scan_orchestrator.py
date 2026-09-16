@@ -5,23 +5,25 @@ from unittest.mock import AsyncMock
 import pytest
 
 import app.services.scan_orchestrator as orchestrator
+from app.exceptions import ExtensionDuplicateError
 from app.services.scan_orchestrator import ScannerDescriptor, get_all, register, run
 
 
 @pytest.fixture(autouse=True)
 def isolated_registry():
-    original = dict(orchestrator._REGISTRY)
+    original = orchestrator._REGISTRY.get_all()
     yield
     orchestrator._REGISTRY.clear()
-    orchestrator._REGISTRY.update(original)
+    for desc in original:
+        orchestrator._REGISTRY.register(desc, replace=True)
 
 
 def test_register_adds_descriptor():
     fn = AsyncMock(return_value=[])
     desc = ScannerDescriptor(key="test", display_name="Test", description="d", run=fn)
     register(desc)
-    assert "test" in orchestrator._REGISTRY
-    assert orchestrator._REGISTRY["test"] is desc
+    assert orchestrator._REGISTRY.get("test") is not None
+    assert orchestrator._REGISTRY.get("test") is desc
 
 
 def test_get_all_includes_registered():
@@ -45,8 +47,15 @@ def test_run_dispatches_to_registered_fn():
 
 
 def test_run_raises_for_unknown_type():
-    with pytest.raises(ValueError, match="Unknown scanner type: 'does_not_exist'"):
+    fn = AsyncMock(return_value=[])
+    register(
+        ScannerDescriptor(key="known_key", display_name="K", description="d", run=fn)
+    )
+    with pytest.raises(
+        ValueError, match="Unknown scanner type: 'does_not_exist'"
+    ) as exc_info:
         asyncio.run(run("does_not_exist", [], db=None, event_date=date.today()))
+    assert "known_key" in str(exc_info.value)
 
 
 def test_scanner_descriptor_is_frozen():
@@ -63,11 +72,43 @@ def test_register_returns_descriptor():
     assert returned is desc
 
 
+def test_descriptor_new_fields_default():
+    fn = AsyncMock(return_value=[])
+    desc = ScannerDescriptor(
+        key="defaults_test", display_name="D", description="d", run=fn
+    )
+    assert desc.asset_classes == ("stocks",)
+    assert desc.default_parameters == {}
+
+
+def test_duplicate_key_raises_without_replace():
+    fn = AsyncMock(return_value=[])
+    register(
+        ScannerDescriptor(key="dup_test", display_name="A", description="d", run=fn)
+    )
+    with pytest.raises(ExtensionDuplicateError):
+        register(
+            ScannerDescriptor(key="dup_test", display_name="B", description="d", run=fn)
+        )
+
+
+def test_duplicate_key_with_replace_succeeds():
+    fn = AsyncMock(return_value=[])
+    register(
+        ScannerDescriptor(key="replace_test", display_name="A", description="d", run=fn)
+    )
+    replacement = ScannerDescriptor(
+        key="replace_test", display_name="B", description="d", run=fn
+    )
+    register(replacement, replace=True)
+    assert orchestrator._REGISTRY.get("replace_test") is replacement
+
+
 def test_pre_market_scanner_registered():
     import app.services.pre_market_scan  # noqa: F401
 
-    assert "pre_market_volume_spike" in orchestrator._REGISTRY
-    desc = orchestrator._REGISTRY["pre_market_volume_spike"]
+    desc = orchestrator._REGISTRY.get("pre_market_volume_spike")
+    assert desc is not None
     assert desc.display_name == "Pre-Market Volume Spike"
     assert desc.supports_date_range is True
 
@@ -75,8 +116,8 @@ def test_pre_market_scanner_registered():
 def test_oversold_bounce_scanner_registered():
     import app.services.oversold_bounce_scan  # noqa: F401
 
-    assert "oversold_bounce" in orchestrator._REGISTRY
-    desc = orchestrator._REGISTRY["oversold_bounce"]
+    desc = orchestrator._REGISTRY.get("oversold_bounce")
+    assert desc is not None
     assert desc.display_name == "Oversold Bounce"
     assert desc.supports_date_range is True
 
@@ -85,7 +126,9 @@ def test_liquidity_hunt_variants_registered():
     import app.services.liquidity_hunt  # noqa: F401
 
     for key in ("liquidity_hunt", "liquidity_hunt_pre", "liquidity_hunt_post"):
-        assert key in orchestrator._REGISTRY, f"Expected {key!r} in registry"
+        assert orchestrator._REGISTRY.get(key) is not None, (
+            f"Expected {key!r} in registry"
+        )
 
 
 # ── New orchestration functions ────────────────────────────────────────────

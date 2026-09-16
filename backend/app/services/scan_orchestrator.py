@@ -1,14 +1,18 @@
 import json
 import uuid as _uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable, Optional, Tuple
 
 import redis as _redis
 
-ScannerFn = Callable[[list[str], Any, date], Awaitable[list[dict]]]
+from app.core.extensions import ExtensionRegistry
 
-_REGISTRY: dict[str, "ScannerDescriptor"] = {}
+ScannerFn = Callable[[list[str], Any, date], Awaitable[list[dict]]]
+# Every implementation accepts scanner_run= and gate_metadata= keyword arguments;
+# the alias above does not encode them (left unchanged in this ticket).
+
+_REGISTRY: ExtensionRegistry["ScannerDescriptor"] = ExtensionRegistry()
 
 
 @dataclass(frozen=True)
@@ -18,15 +22,18 @@ class ScannerDescriptor:
     description: str
     run: ScannerFn
     supports_date_range: bool = True
+    asset_classes: tuple[str, ...] = ("stocks",)
+    default_parameters: dict[str, Any] = field(default_factory=dict, hash=False)
 
 
-def register(descriptor: "ScannerDescriptor") -> "ScannerDescriptor":
-    _REGISTRY[descriptor.key] = descriptor
-    return descriptor
+def register(
+    descriptor: "ScannerDescriptor", *, replace: bool = False
+) -> "ScannerDescriptor":
+    return _REGISTRY.register(descriptor, replace=replace)
 
 
 def get_all() -> list["ScannerDescriptor"]:
-    return list(_REGISTRY.values())
+    return _REGISTRY.get_all()
 
 
 async def run(
@@ -40,7 +47,8 @@ async def run(
     descriptor = _REGISTRY.get(scanner_type)
     if descriptor is None:
         raise ValueError(
-            f"Unknown scanner type: {scanner_type!r}. Registered: {list(_REGISTRY)}"
+            f"Unknown scanner type: {scanner_type!r}. "
+            f"Registered: {[d.key for d in _REGISTRY.get_all()]}"
         )
     return await descriptor.run(
         tickers, db, event_date, scanner_run=scanner_run, gate_metadata=gate_metadata

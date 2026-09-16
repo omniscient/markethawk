@@ -148,7 +148,7 @@ def test_orchestrator_registration():
     import app.services.trend_pullback_scan  # noqa: F401 — triggers registration
     from app.services.scan_orchestrator import _REGISTRY
 
-    assert "trend_pullback" in _REGISTRY
+    assert _REGISTRY.get("trend_pullback") is not None
 
 
 # ---------------------------------------------------------------------------
