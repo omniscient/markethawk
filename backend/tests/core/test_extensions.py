@@ -190,3 +190,15 @@ def test_load_extension_modules_non_import_error_wrapped(fake_package):
     with pytest.raises(ExtensionImportError) as exc_info:
         load_extension_modules(["fake_ext_pkg_raises"])
     assert isinstance(exc_info.value.__cause__, ValueError)
+
+
+def test_create_app_calls_load_extension_modules(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "app.core.extensions.load_extension_modules",
+        lambda names: calls.append(names),
+    )
+    from app.main import create_app
+
+    create_app()
+    assert calls  # called at least once, with settings.MARKETHAWK_EXTENSION_MODULES
