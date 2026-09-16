@@ -9,12 +9,14 @@ host-.env-only setting and must never become settable through any runtime
 API.
 """
 
+import importlib
 import logging
 from typing import Generic, TypeVar
 
 from app.exceptions import (
     ExtensionDescriptorError,
     ExtensionDuplicateError,
+    ExtensionImportError,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,3 +55,25 @@ class ExtensionRegistry(Generic[T]):
     def clear(self) -> None:
         """Empty the registry. Test setup/teardown support only — not a runtime API."""
         self._entries.clear()
+
+
+def load_extension_modules(module_names: list[str]) -> None:
+    """Import each configured extension module.
+
+    Idempotent by contract: sys.modules makes repeat calls no-ops, so this
+    may be invoked from every process entry point (create_app, Celery
+    worker_init).
+    """
+    if not module_names:
+        logger.info("No extension modules configured")
+        return
+    logger.info("Loading extension modules: %s", module_names)
+    for name in module_names:
+        try:
+            importlib.import_module(name)
+        except Exception as exc:  # ModuleNotFoundError, SyntaxError, or anything the module body raises
+            raise ExtensionImportError(
+                f"Failed to import extension module {name!r}",
+                module_name=name,
+                original_error=str(exc),
+            ) from exc
