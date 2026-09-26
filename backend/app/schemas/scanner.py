@@ -43,6 +43,10 @@ class ScannerRunResponse(BaseModel):
     scan_start_date: Optional[date] = None
     scan_end_date: Optional[date] = None
     diagnostics: Optional[Dict[str, Any]] = None
+    # #388: live-degradation marking (ScannerRun.data_degraded) and the
+    # provider_gap issues with detail.subtype == "live_degradation".
+    data_degraded: Optional[bool] = None
+    live_provider_gaps: List[Dict[str, Any]] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -79,6 +83,10 @@ class ScannerRunStatusResponse(BaseModel):
     started_at: Optional[datetime] = None
     # Live progress, only present while running. Cleared on completion.
     progress: Optional[Dict[str, Any]] = None
+    # #388: live-degradation marking (ScannerRun.data_degraded) and the
+    # provider_gap issues with detail.subtype == "live_degradation".
+    data_degraded: Optional[bool] = None
+    live_provider_gaps: List[Dict[str, Any]] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
