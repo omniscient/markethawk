@@ -105,3 +105,14 @@ def db(db_engine) -> Generator:
 def client() -> Generator:
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def _isolate_provider_health_redis(monkeypatch):
+    """#388: keep provider-health records out of the real Redis during tests.
+
+    Tests that exercise the health record install a fakeredis via their own
+    fixture, which runs after this autouse fixture and overrides it.
+    """
+    monkeypatch.setattr("app.core.provider_health.get_redis", lambda: None)
+    monkeypatch.setattr("app.core.provider_health._redis_backoff_until", 0.0)
