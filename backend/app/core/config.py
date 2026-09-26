@@ -109,6 +109,24 @@ class Settings(BaseSettings):
     IBKR_CB_FAIL_MAX: int = 3
     IBKR_CB_RESET_TIMEOUT: int = 120
 
+    # ── Provider health / degraded-feed failover (#388, ADR-0013) ───────
+    # Rolling windows for the cross-process Polygon health record in Redis.
+    # 5 min error window mirrors the Celery failure-rate alert's [5m]; 15 min
+    # latency window mirrors the scanner p95 alert's 900 s range.
+    PROVIDER_HEALTH_ERROR_WINDOW_SECONDS: int = 300
+    PROVIDER_HEALTH_LATENCY_WINDOW_SECONDS: int = 900
+    # Below this many calls in a window, error rate / p95 are reported as 0 / None.
+    PROVIDER_HEALTH_MIN_CALLS: int = 20
+    # Error rate at/above which Polygon counts as degraded (blocker: scan stops).
+    POLYGON_HEALTH_ERROR_RATE_THRESHOLD: float = 0.25
+    # Rolling p95 latency at/above which Polygon counts as slow (warning: scan continues).
+    POLYGON_HEALTH_LATENCY_P95_THRESHOLD_SECONDS: float = 5.0
+    # Pre-market ingestion: freshest minute bar older than this during 04:00–09:30 ET
+    # (or no bar at all once this long past 04:00 ET) marks the run degraded.
+    PREMARKET_BAR_STALENESS_MINUTES: int = 10
+    # Fraction of evaluable tickers that must have pre-market volume; below → warning.
+    PREMARKET_MIN_COVERAGE_RATIO: float = 0.5
+
     # ── Interactive Brokers (IBKR) ─────────────────────────────────────
     # Host/port for TWS or IB Gateway:
     #   TWS live:    127.0.0.1:7496
