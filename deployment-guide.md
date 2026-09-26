@@ -287,6 +287,73 @@ See [DEVELOPMENT.md — Monitoring Services](DEVELOPMENT.md#monitoring-services)
 
 ---
 
+## Pre-Market Data Degradation Runbook
+
+Posture: [ADR-0013](docs/adr/0013-polygon-ibkr-hybrid-failover.md). Full-universe scans alert and
+degrade. They never switch to IBKR.
+
+### Check first (Grafana)
+
+1. **Infrastructure** dashboard → *Polygon Circuit Breaker*, *Polygon Error Rate (5m)*,
+   *Polygon Latency p95 (15m)*, *Polygon WS (chart stream)*.
+2. **Scanner Performance** dashboard → *Polygon Provider Health*, *Pre-Market Provider Gap Severity*.
+3. Alerts: `polygon-provider-degraded` (critical), `pre-market-scan-provider-gap` (critical),
+   `polygon-latency-elevated` (warning).
+
+### Which "degraded" is this?
+
+| Signal | Meaning | Where |
+|---|---|---|
+| Scanner banner **"Market data degraded during this scan"** / `quality_gate.issues[]` with `code=provider_gap` and `detail.subtype=live_degradation` | **Live** Polygon outage or ingestion stall during today's pre-market | `GET /api/v1/scanner/history?data_degraded=true`, or `GET /api/v1/scanner/runs/{scan_id}/status` → `live_provider_gaps` |
+| Scanner banner **"Data quality degraded"** (stale/gap %) | **Historical** aggregate staleness or gaps from the nightly quality report (`/data-health`) | Universes page → quality details |
+| `provider_gap` with `detail.subtype` of `absent` / `partial` / `structural` | Historical per-ticker coverage from `UniverseQualityReport` | Same as above; not a live outage |
+
+`detail.reason` identifies the failure class: `breaker_open`, `error_rate`, `latency`,
+`no_fresh_premarket_bars`, `stale_premarket_bars`, or `partial_coverage`. `detail.worker` identifies
+the process that observed it.
+
+### Breaker state is per process
+
+`POLYGON_BREAKER` lives in-process (`app/core/circuit_breakers.py`). A breaker tripped in a
+`celery-worker` child can read `closed` in the API process, and vice versa. **A partial trip is not a
+full outage.** The cross-process view is `provider_circuit_breaker_state` (worst state across
+processes) and the Redis hash `mh:provider_health:polygon:breaker` (one entry per `hostname:pid`):
+
+```bash
+docker-compose exec redis redis-cli -a "$REDIS_PASSWORD" HGETALL mh:provider_health:polygon:breaker
+```
+
+An `open` entry older than `POLYGON_CB_RESET_TIMEOUT` counts as half-open. Entries older than
+5 minutes are ignored.
+
+### Recovery
+
+- Polygon status page / API key plan limits: 429s surface as `error_rate` findings.
+- Once Polygon recovers, breakers half-open and close on the next successful call, and the gauges
+  clear within the 5-minute error window. Re-run the scan from the Scanner page. Runs that were
+  stopped keep `status=failed` and their `provider_gap` record.
+- **`pre-market-scan-provider-gap` does not clear on its own.** `scan_provider_gap_severity` is
+  written only by a scan that covers a live session day, so a blocker recorded at 07:00 keeps the
+  rule firing until the next live-day run of that `scanner_type` resets it — normally the next
+  trading morning. To clear it now, re-run that scanner for today from the Scanner page once
+  Polygon is healthy; otherwise silence the rule for the rest of the session.
+- `detail.phase` distinguishes the two abort points. `before_day` means the day was never scanned.
+  `at_completion` means the days *were* scanned and their events are persisted against the run —
+  the run is `failed` because ADR-0013 forbids presenting it as a clean success, not because the
+  events are wrong. Check `GET /api/v1/scanner/results` for that run before re-running.
+- Ingestion stall with healthy Polygon (`no_fresh_premarket_bars` but breaker closed, errors ~0):
+  check the sync pipeline (Catch-Up / universe orchestrator tasks in Flower). The scan only reads
+  what sync persisted.
+
+### What needs no troubleshooting
+
+The **Active Watchlist** (`/watchlist`) is IBKR-sourced end to end (`live_scanner/` → IB Gateway →
+Redis `watchlist:*` channels) and is unaffected by Polygon outages. For watchlist feed loss, use the
+IBKR runbook below. The per-ticker **stock detail chart** has no fallback: during a Polygon WS drop
+it shows "Live feed unavailable — showing last known data" until the stream reconnects.
+
+---
+
 ## IBKR Feed Loss Runbook
 
 ### What Operators See During a Feed Loss
