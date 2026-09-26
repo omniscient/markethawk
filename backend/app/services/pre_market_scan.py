@@ -475,8 +475,15 @@ async def run_pre_market_scan(
     event_date: date = None,
     scanner_run: Optional["ScannerRun"] = None,
     gate_metadata: Optional[Dict[str, Any]] = None,
+    diagnostics_out: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
-    """Run extended hours volume spike scanner using DB aggregates."""
+    """Run extended hours volume spike scanner using DB aggregates.
+
+    When ``diagnostics_out`` is supplied it is populated with per-ticker outcome
+    buckets (evaluated / no_premarket_data / no_history / errors), the ticker
+    count, and ``max_premarket_bar_ts`` (ISO-8601 UTC of the freshest pre-market
+    minute bar, or None) — the universe-wide ingestion-health signal (#388).
+    """
     import app.services.scanner as _scanner_mod
     from app.services.scanner import ScannerService
 
@@ -509,6 +516,10 @@ async def run_pre_market_scan(
         _tracer = _otel_trace.get_tracer(__name__)
         raw_signals: List[RawSignal] = []
         failed: List[Dict[str, Any]] = []
+        # Outcome buckets (house style: liquidity_hunt / pocket_pivot). Kept apart
+        # from `failed`, which drives scan_failed_tickers_ratio and its alert —
+        # "no data yet" is not an error (#388, ADR-0013).
+        counts = {"evaluated": 0, "no_premarket_data": 0, "no_history": 0, "errors": 0}
 
         for ticker in tickers:
             _span = _tracer.start_span("scanner.evaluate_ticker")
@@ -549,9 +560,16 @@ async def run_pre_market_scan(
                     fallback_multiplier,
                     _scanner_mod,
                 )
+                if len(daily_bars) < 20:
+                    counts["no_history"] += 1
+                elif pre_market_volume <= 0:
+                    counts["no_premarket_data"] += 1
+                else:
+                    counts["evaluated"] += 1
                 if raw is not None:
                     raw_signals.append(raw)
             except (ScanError, DataFetchError, ProviderError) as e:
+                counts["errors"] += 1
                 logging.error(
                     "pre_market_scan: domain error for %s: %s",
                     ticker,
@@ -609,6 +627,18 @@ async def run_pre_market_scan(
             scan_data_to_detection_seconds.labels(
                 scanner_type="pre_market_volume_spike"
             ).observe((datetime.now(timezone.utc) - _bar_utc).total_seconds())
+        if diagnostics_out is not None:
+            diagnostics_out.update(
+                {
+                    "tickers": len(tickers),
+                    **counts,
+                    "max_premarket_bar_ts": (
+                        ensure_utc(_max_bar_ts).isoformat()
+                        if isinstance(_max_bar_ts, datetime)
+                        else None
+                    ),
+                }
+            )
         return results
     finally:
         scan_duration_seconds.labels(scanner_type="pre_market_volume_spike").observe(
@@ -622,6 +652,7 @@ async def _run(
     event_date: date,
     scanner_run: Optional[Any] = None,
     gate_metadata: Optional[Any] = None,
+    diagnostics_out: Optional[dict] = None,
 ) -> list[dict]:
     return await run_pre_market_scan(
         tickers,
@@ -629,6 +660,7 @@ async def _run(
         event_date=event_date,
         scanner_run=scanner_run,
         gate_metadata=gate_metadata,
+        diagnostics_out=diagnostics_out,
     )
 
 
@@ -641,5 +673,6 @@ register(
         supports_date_range=True,
         asset_classes=("stocks",),
         default_parameters={},
+        supports_diagnostics=True,
     )
 )
