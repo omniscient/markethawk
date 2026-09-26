@@ -294,6 +294,78 @@
           "legendFormat": "{{scanner_type}}"
         }
       ]
+    },
+    {
+      "id": 9,
+      "title": "Polygon Provider Health",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "max(provider_error_rate{provider=\"polygon\"})",
+          "legendFormat": "error rate (5m)"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "max(provider_circuit_breaker_state{provider=\"polygon\"})",
+          "legendFormat": "breaker (2=open)"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "max(provider_request_latency_p95_seconds{provider=\"polygon\"})",
+          "legendFormat": "p95 latency s (15m)"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Pre-Market Provider Gap Severity",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 },
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 1 },
+            { "color": "red", "value": 2 }
+          ]
+        },
+        "mappings": [
+          {
+            "type": "value",
+            "options": { "0": { "text": "Clean" }, "1": { "text": "Warning" }, "2": { "text": "Blocker" } }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": { "0": { "text": "Clean" }, "1": { "text": "Warning" }, "2": { "text": "Blocker" } }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "max(scan_provider_gap_severity{scanner_type=\"pre_market_volume_spike\"})",
+          "legendFormat": "Pre-Market Provider Gap Severity"
+        }
+      ]
     }
   ],
   "templating": {

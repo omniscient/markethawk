@@ -232,6 +232,115 @@ groups:
               type: math
               expression: $B > 0.1
 
+      - uid: polygon-provider-degraded
+        title: Polygon Provider Degraded
+        condition: E
+        for: 2m
+        annotations:
+          summary: >
+            Polygon market data is degraded: circuit breaker open in some process,
+            rolling 5-minute error rate >= 25% (POLYGON_HEALTH_ERROR_RATE_THRESHOLD),
+            or the per-ticker WebSocket stream is disconnected. Live-day pre-market
+            scans stop or are marked degraded (ADR-0013). See deployment-guide.md
+            "Pre-Market Data Degradation Runbook".
+        labels:
+          severity: critical
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              # 0=closed, 1=half-open, 2=open (worst across processes)
+              expr: max(provider_circuit_breaker_state{provider="polygon"})
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: max(provider_error_rate{provider="polygon"})
+              refId: C
+          - refId: D
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              # 1=connected, 0=disconnected, -1=disabled by config (never alerts)
+              expr: max(polygon_ws_connected)
+              refId: D
+          - refId: E
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B >= 2 || $C >= 0.25 || $D == 0
+
+      - uid: polygon-latency-elevated
+        title: Polygon Latency Elevated
+        condition: C
+        for: 5m
+        annotations:
+          summary: >
+            Polygon rolling 15-minute p95 latency exceeds 5 s
+            (POLYGON_HEALTH_LATENCY_P95_THRESHOLD_SECONDS). Scans continue but are
+            marked degraded (warning) per ADR-0013 — informational, not a page.
+        labels:
+          severity: warning
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: max(provider_request_latency_p95_seconds{provider="polygon"})
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B > 5
+
+      - uid: pre-market-scan-provider-gap
+        title: Pre-Market Scan Ran on Degraded Data
+        condition: C
+        for: 0m
+        annotations:
+          summary: >
+            The latest pre_market_volume_spike run on today's session recorded a
+            blocker provider_gap (no/stale pre-market minute bars, breaker open, or
+            high error rate). Check the run's quality_gate via
+            GET /api/v1/scanner/history?data_degraded=true and the Polygon panels.
+        labels:
+          severity: critical
+        data:
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              # 0=none, 1=warning, 2=blocker
+              expr: max(scan_provider_gap_severity{scanner_type="pre_market_volume_spike"})
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "-- Grafana --"
+            model:
+              type: math
+              expression: $B >= 2
+
   - name: LiveTrading
     orgId: 1
     folder: MarketHawk
