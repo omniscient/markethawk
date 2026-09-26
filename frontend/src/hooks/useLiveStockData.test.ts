@@ -69,4 +69,20 @@ describe('useLiveStockData', () => {
 
     expect(MockWebSocket.lastInstance).toBeNull();
   });
+
+  it('feedAvailable is null until a feed_status frame arrives', () => {
+    const { result } = renderHook(() => useLiveStockData('AMD'));
+    expect(result.current.feedAvailable).toBeNull();
+  });
+
+  it('feed_status frames set feedAvailable and never reach liveData (#388)', () => {
+    const { result } = renderHook(() => useLiveStockData('AMD'));
+    act(() => { vi.advanceTimersByTime(50); });
+    act(() => { MockWebSocket.lastInstance!.simulateOpen(); });
+    act(() => { MockWebSocket.lastInstance!.simulateMessage({ type: 'feed_status', polygon_ws_connected: false }); });
+    expect(result.current.feedAvailable).toBe(false);
+    expect(result.current.liveData).toBeNull();
+    act(() => { MockWebSocket.lastInstance!.simulateMessage({ type: 'feed_status', polygon_ws_connected: true }); });
+    expect(result.current.feedAvailable).toBe(true);
+  });
 });
