@@ -9,6 +9,10 @@ Both are built from Settings at import time so parameters are tunable via env va
 (POLYGON_CB_FAIL_MAX, POLYGON_CB_RESET_TIMEOUT, IBKR_CB_FAIL_MAX, IBKR_CB_RESET_TIMEOUT).
 
 State is in-process per worker — no distributed coordination is needed or desired.
+
+POLYGON_BREAKER carries a HealthRecordingListener that mirrors each state change
+into the cross-process provider-health record (app/core/provider_health.py, #388)
+so a scan running in a different process can see a breaker tripped here.
 """
 
 import pybreaker
@@ -27,10 +31,31 @@ def _non_retryable_provider_error(exc: BaseException) -> bool:
     return isinstance(exc, ProviderError) and not exc.is_retryable
 
 
+class HealthRecordingListener(pybreaker.CircuitBreakerListener):
+    """Mirror breaker state changes into the Redis provider-health record.
+
+    The import is lazy because provider_health imports this module (for the
+    local POLYGON_BREAKER fast path). Errors are swallowed: a Redis problem
+    must never change breaker behaviour.
+    """
+
+    def __init__(self, provider: str):
+        self.provider = provider
+
+    def state_change(self, cb, old_state, new_state) -> None:
+        try:
+            from app.core.provider_health import record_breaker_state
+
+            record_breaker_state(self.provider, new_state.name)
+        except Exception:
+            pass
+
+
 POLYGON_BREAKER: pybreaker.CircuitBreaker = pybreaker.CircuitBreaker(
     fail_max=settings.POLYGON_CB_FAIL_MAX,
     reset_timeout=settings.POLYGON_CB_RESET_TIMEOUT,
     exclude=[_non_retryable_provider_error],
+    listeners=[HealthRecordingListener("polygon")],
 )
 
 IBKR_BREAKER: pybreaker.CircuitBreaker = pybreaker.CircuitBreaker(
