@@ -177,6 +177,13 @@ class ProviderHealthSnapshot:
 
 
 def _p95_from_buckets(counts: List[int]) -> Optional[float]:
+    """Upper bound of the LATENCY_BUCKETS bucket the 95th percentile falls in.
+
+    The value is quantised, never interpolated: a real p95 anywhere in
+    (2.5s, 5.0s] is reported as exactly 5.0. Consumers must therefore compare
+    with ``>`` (see provider_degradation.assess_provider_health and the
+    ``polygon-latency-elevated`` Grafana rule), not ``>=``.
+    """
     total = sum(counts)
     if total == 0:
         return None

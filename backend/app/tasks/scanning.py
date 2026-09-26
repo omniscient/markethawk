@@ -301,6 +301,11 @@ def _fail_scheduled_scanner_run(db: Session, run, started_at: float, exc: Except
     db.commit()
 
 
+def _tag_phase(findings, phase_key: str):
+    """#388 review A3: every finding records the phase it was raised in."""
+    return [replace(f, detail={**f.detail, "phase": phase_key}) for f in findings]
+
+
 def _stop_for_provider_degradation(
     db: Session,
     run,
@@ -323,7 +328,7 @@ def _stop_for_provider_degradation(
     are invalid. On-call and the UI need to tell these apart.
     """
     phase_key = "at_completion" if phase == "at completion" else "before_day"
-    findings = [replace(f, detail={**f.detail, "phase": phase_key}) for f in findings]
+    findings = _tag_phase(findings, phase_key)
     apply_provider_gaps(
         run,
         findings,
@@ -608,7 +613,7 @@ def _run_universe_scan_logic(
         if findings:
             apply_provider_gaps(
                 run,
-                findings,
+                _tag_phase(findings, "at_completion"),
                 universe_id=universe_id,
                 scanner_type=scanner_type,
                 worker=worker_id(),

@@ -3,7 +3,8 @@
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
 
-from app.core.provider_health import ProviderHealthSnapshot
+from app.core.config import settings
+from app.core.provider_health import LATENCY_BUCKETS, ProviderHealthSnapshot
 from app.services.provider_degradation import (
     LIVE_SUBTYPE,
     apply_provider_gaps,
@@ -129,6 +130,15 @@ def test_latency_is_warning_and_continues():
     assert (f.reason, f.severity, f.abort) == ("latency", "warning", False)
 
 
+def test_latency_exactly_at_the_threshold_bucket_is_not_a_finding():
+    """latency_p95_seconds is the bucket's upper bound, so == threshold means a
+    real p95 anywhere in (2.5s, 5.0s] — healthy-but-slow, not degraded."""
+    threshold = settings.POLYGON_HEALTH_LATENCY_P95_THRESHOLD_SECONDS
+    assert LATENCY_BUCKETS[5] == threshold == 5.0  # the reported bound
+    snap = ProviderHealthSnapshot(provider="polygon", latency_p95_seconds=threshold)
+    assert assess_provider_health(snap) == []
+
+
 # --- assess_premarket_ingestion -------------------------------------------
 
 
@@ -147,6 +157,14 @@ def test_no_premarket_bars_is_blocker():
         "blocker",
         False,
     )
+
+
+def test_empty_universe_is_not_a_polygon_outage():
+    """A universe with no tickers has no bars by construction; paging on it
+    would blame Polygon for a misconfigured universe."""
+    empty = _diag(max_bar=None, evaluated=0, no_pm=0, no_history=0)
+    assert empty["tickers"] == 0
+    assert assess_premarket_ingestion(empty, DAY, _utc(12)) == []
 
 
 def test_stale_premarket_bars_is_blocker():

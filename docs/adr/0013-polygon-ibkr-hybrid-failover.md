@@ -29,7 +29,7 @@ inside the pre-market window arithmetically impossible.
   |---|---|---|
   | Circuit breaker open in any process | blocker | Stop the scan (`status=failed`), mark degraded, page |
   | Error rate ≥ `POLYGON_HEALTH_ERROR_RATE_THRESHOLD` (5 min, ≥ `PROVIDER_HEALTH_MIN_CALLS`) | blocker | Stop, mark, page |
-  | p95 latency ≥ `POLYGON_HEALTH_LATENCY_P95_THRESHOLD_SECONDS` (15 min) | warning | Continue, mark, warning alert only |
+  | p95 latency > `POLYGON_HEALTH_LATENCY_P95_THRESHOLD_SECONDS` (15 min) | warning | Continue, mark, warning alert only |
   | No pre-market minute bars, or freshest bar older than `PREMARKET_BAR_STALENESS_MINUTES` before 09:30 ET | blocker | Complete, mark, page |
   | Pre-market coverage below `PREMARKET_MIN_COVERAGE_RATIO` | warning | Complete, mark, record `coverage_ratio` |
 
@@ -74,6 +74,15 @@ worker, so the record is keyed by `hostname:pid`, and the local breaker is OR'd 
   120 s -> half-open, 400 s -> closed). During a sustained outage with idle workers the
   `no_fresh_premarket_bars` / `stale_premarket_bars` ingestion checks are the backstop, not the
   breaker gauge.
+- `provider_request_latency_p95_seconds` is bucket-quantised, not interpolated: it reports the upper
+  bound of the `LATENCY_BUCKETS` bucket the p95 falls in. Both the finding check and the
+  `polygon-latency-elevated` rule therefore compare with `>`, so the effective meaning is "p95
+  landed in a bucket above the threshold". Set thresholds to bucket bounds.
+- The live-session-day holiday guard depends on `market_holidays` having NYSE `full_close` rows for
+  the date in question. The seed migration (`c5d6e7f8a9b0`) covers 2024–2026 only; without a row for
+  a weekday full close the guard is inert and that day pages with `no_fresh_premarket_bars`. The
+  table must be extended each year (it is the same dependency `services/data_quality.py` already
+  has).
 - Historical-range scans are unaffected. Their data quality remains the domain of
   `UniverseQualityReport` and the existing `quality_gate` evidence.
 - Real IBKR stock market-data support would be a separate ADR. It would not change the scan posture,

@@ -119,10 +119,15 @@ def assess_provider_health(
                 },
             )
         )
+    # Strictly greater, not >=: latency_p95_seconds is quantised to the upper
+    # bound of the LATENCY_BUCKETS bucket the p95 falls in, so a real p95
+    # anywhere in (2.5s, 5.0s] is reported as exactly 5.0. With >= that marked
+    # every ordinary slow-but-healthy window degraded. > means "p95 landed in a
+    # bucket above the threshold", and matches the Grafana rule's `$B > 5`.
     if (
         snapshot.latency_p95_seconds is not None
         and snapshot.latency_p95_seconds
-        >= settings.POLYGON_HEALTH_LATENCY_P95_THRESHOLD_SECONDS
+        > settings.POLYGON_HEALTH_LATENCY_P95_THRESHOLD_SECONDS
     ):
         findings.append(
             ProviderGapFinding(
@@ -155,6 +160,10 @@ def assess_premarket_ingestion(
         return []  # too early in the session to judge ingestion
 
     findings: List[ProviderGapFinding] = []
+    if diagnostics.get("tickers") == 0:
+        # An empty universe has no pre-market bars by construction. Reporting it
+        # as a Polygon ingestion stall would page on a misconfigured universe.
+        return findings
     max_bar_iso = diagnostics.get("max_premarket_bar_ts")
     if max_bar_iso is None:
         findings.append(

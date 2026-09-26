@@ -236,6 +236,25 @@ def test_findings_record_the_phase_they_were_raised_in():
     assert issue2["detail"]["phase"] == "at_completion"
     assert run2.events_detected == 0  # events, if any, stay recorded on the run
 
+    # Warning-only completion findings carry the phase too (they take the
+    # apply_provider_gaps path, not _stop_for_provider_degradation).
+    run3, _, _ = _run(
+        _healthy,
+        {
+            "tickers": 10,
+            "evaluated": 2,
+            "no_premarket_data": 8,
+            "no_history": 0,
+            "errors": 0,
+            "max_premarket_bar_ts": "2026-06-02T11:58:00+00:00",
+        },
+    )
+    (issue3,) = _live_issues(run3)
+    assert (issue3["severity"], issue3["detail"]["phase"]) == (
+        "warning",
+        "at_completion",
+    )
+
 
 def test_live_day_run_clears_a_latched_severity_gauge():
     """#388 review A2: a fresh live-day run must not inherit yesterday's blocker."""
@@ -256,6 +275,12 @@ def test_live_day_run_clears_a_latched_severity_gauge():
 
 def test_weekday_market_holiday_does_not_page():
     """#388 review A1: no pre-market bars on a NYSE full close is not an outage."""
+    from app.core.metrics import scan_provider_gap_severity
+
+    # A holiday is not a live session day, so the scan neither raises nor resets
+    # the gauge. Seed it here so the assertion below does not depend on an
+    # earlier test in this file having created the label's child.
+    scan_provider_gap_severity.labels(scanner_type="pre_market_volume_spike").set(0)
     diag = {
         "tickers": 10,
         "evaluated": 0,

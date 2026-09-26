@@ -335,8 +335,14 @@ An `open` entry older than `POLYGON_CB_RESET_TIMEOUT` counts as half-open. Entri
 - **`pre-market-scan-provider-gap` does not clear on its own.** `scan_provider_gap_severity` is
   written only by a scan that covers a live session day, so a blocker recorded at 07:00 keeps the
   rule firing until the next live-day run of that `scanner_type` resets it — normally the next
-  trading morning. To clear it now, re-run that scanner for today from the Scanner page once
-  Polygon is healthy; otherwise silence the rule for the rest of the session.
+  trading morning, but **across a weekend or a market holiday that is Monday or later**: a holiday
+  scan is not a live session day, so it neither pages nor clears the latch. To clear it now, re-run
+  that scanner for today from the Scanner page once Polygon is healthy; otherwise silence the rule
+  until the next trading morning.
+- **A weekday market holiday must have a `market_holidays` NYSE `full_close` row**, or the scan reads
+  it as a live session day and pages with `no_fresh_premarket_bars`. Rows are seeded for 2024–2026;
+  extend the table each year (`SELECT * FROM market_holidays WHERE exchange='NYSE' ORDER BY date DESC
+  LIMIT 5;`).
 - `detail.phase` distinguishes the two abort points. `before_day` means the day was never scanned.
   `at_completion` means the days *were* scanned and their events are persisted against the run —
   the run is `failed` because ADR-0013 forbids presenting it as a clean success, not because the
