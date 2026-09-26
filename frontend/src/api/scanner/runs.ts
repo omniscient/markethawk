@@ -8,6 +8,7 @@ import type {
   ScannerRunResponse,
   ScannerStatusBlock,
   ScannerCoverage,
+  ScannerHistoryFilters,
 } from './types';
 
 /** Enqueue a scan. Returns immediately with task/scan IDs; progress arrives via WS. */
@@ -33,8 +34,11 @@ export const runScannerRange = async (
   return response.data;
 };
 
-export const fetchScannerHistory = async (limit: number = 20): Promise<ScannerRunResponse[]> => {
-  const response = await apiClient.get('/scanner/history', { params: { limit } });
+export const fetchScannerHistory = async (
+  limit: number = 20,
+  filters: ScannerHistoryFilters = {},
+): Promise<ScannerRunResponse[]> => {
+  const response = await apiClient.get('/scanner/history', { params: { limit, ...filters } });
   return response.data;
 };
 

@@ -16,3 +16,4 @@ To add a new ADR: copy `template.md`, assign the next number, fill in the header
 | [0009](0009-naive-utc-timestamps.md) | Naive UTC Timestamps in the Database | Accepted | 2026-05-28 |
 | [0010](0010-api-versioning-policy.md) | API Versioning Policy | Accepted | 2026-05-29 |
 | [0011](0011-dark-factory-gelf-logging.md) | GELF Log Shipping for Dark Factory Containers | Accepted | 2026-05-29 |
+| [0013](0013-polygon-ibkr-hybrid-failover.md) | Polygon↔IBKR Hybrid Failover — Alert-and-Degrade for Scans | Accepted | 2026-09-26 |

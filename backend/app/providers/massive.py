@@ -16,6 +16,7 @@ from polygon import RESTClient
 from app.core.circuit_breakers import POLYGON_BREAKER
 from app.core.config import settings
 from app.core.metrics import polygon_api_calls_total
+from app.core.provider_health import track_provider_call
 from app.exceptions import ProviderError
 from app.providers.base import BaseDataProvider
 
@@ -31,6 +32,11 @@ def _is_plan_limit_error(exc: BaseException) -> bool:
     excluded from circuit-breaker fail counting.
     """
     return "NOT_AUTHORIZED" in str(exc)
+
+
+def _is_health_failure(exc: BaseException) -> bool:
+    """Plan-limit rejections are permanent per request, not provider ill-health."""
+    return not _is_plan_limit_error(exc)
 
 
 class MassiveDataProvider(BaseDataProvider):
@@ -161,16 +167,19 @@ class MassiveDataProvider(BaseDataProvider):
 
             while True:
                 polygon_api_calls_total.labels(endpoint="aggs").inc()
-                page = self._client.get_aggs(
-                    ticker=symbol.upper(),
-                    multiplier=multiplier,
-                    timespan=timespan,
-                    from_=current_from,
-                    to=to_date,
-                    adjusted=adjusted,
-                    sort=sort,
-                    limit=limit,
-                )
+                with track_provider_call(
+                    "polygon", "aggs", is_failure=_is_health_failure
+                ):
+                    page = self._client.get_aggs(
+                        ticker=symbol.upper(),
+                        multiplier=multiplier,
+                        timespan=timespan,
+                        from_=current_from,
+                        to=to_date,
+                        adjusted=adjusted,
+                        sort=sort,
+                        limit=limit,
+                    )
 
                 if not page:
                     break
@@ -224,7 +233,8 @@ class MassiveDataProvider(BaseDataProvider):
 
     def _get_ticker_details_impl(self, symbol: str) -> Dict[str, Any]:
         polygon_api_calls_total.labels(endpoint="ticker_details").inc()
-        details = self._client.get_ticker_details(symbol.upper())
+        with track_provider_call("polygon", "ticker_details"):
+            details = self._client.get_ticker_details(symbol.upper())
         if not details:
             return {}
 
@@ -301,7 +311,8 @@ class MassiveDataProvider(BaseDataProvider):
 
     def _fetch_snapshots_raw(self) -> list:
         polygon_api_calls_total.labels(endpoint="snapshot_all").inc()
-        return self._client.get_snapshot_all(market_type="stocks") or []
+        with track_provider_call("polygon", "snapshot_all"):
+            return self._client.get_snapshot_all(market_type="stocks") or []
 
     # ------------------------------------------------------------------ #
     #  Polygon-specific extras (not part of the base interface)           #
@@ -317,7 +328,8 @@ class MassiveDataProvider(BaseDataProvider):
             return []
         try:
             polygon_api_calls_total.labels(endpoint="snapshot_all").inc()
-            return self._client.get_snapshot_all(market_type=market_type) or []
+            with track_provider_call("polygon", "snapshot_all"):
+                return self._client.get_snapshot_all(market_type=market_type) or []
         except Exception as e:
             logger.error(f"MassiveDataProvider: Error fetching snapshot: {e}")
             return []
@@ -327,7 +339,8 @@ class MassiveDataProvider(BaseDataProvider):
             return None
         try:
             polygon_api_calls_total.labels(endpoint="snapshot_ticker").inc()
-            snap = self._client.get_snapshot_ticker("stocks", symbol)
+            with track_provider_call("polygon", "snapshot_ticker"):
+                snap = self._client.get_snapshot_ticker("stocks", symbol)
             if snap and snap.last_trade and snap.last_trade.price is not None:
                 return float(snap.last_trade.price)
             if snap and snap.day and snap.day.close is not None:

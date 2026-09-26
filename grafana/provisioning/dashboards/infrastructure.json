@@ -142,6 +142,178 @@
           "legendFormat": "active connections"
         }
       ]
+    },
+    {
+      "id": 9,
+      "title": "Polygon Circuit Breaker",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 20 },
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 1 },
+            { "color": "red", "value": 2 }
+          ]
+        },
+        "mappings": [
+          {
+            "type": "value",
+            "options": { "0": { "text": "Closed" }, "1": { "text": "Half-open" }, "2": { "text": "Open" } }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": { "0": { "text": "Closed" }, "1": { "text": "Half-open" }, "2": { "text": "Open" } }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "max(provider_circuit_breaker_state{provider=\"polygon\"})",
+          "legendFormat": "Polygon Circuit Breaker"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Polygon Error Rate (5m)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 20 },
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "red", "value": 0.25 }
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 0.25 }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "max(provider_error_rate{provider=\"polygon\"})",
+          "legendFormat": "Polygon Error Rate (5m)"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Polygon Latency p95 (15m)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 20 },
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 5 }
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "max(provider_request_latency_p95_seconds{provider=\"polygon\"})",
+          "legendFormat": "Polygon Latency p95 (15m)"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Polygon WS (chart stream)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 20 },
+      "options": {
+        "colorMode": "background",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "red", "value": null },
+            { "color": "blue", "value": -1 },
+            { "color": "red", "value": 0 },
+            { "color": "green", "value": 1 }
+          ]
+        },
+        "mappings": [
+          {
+            "type": "value",
+            "options": { "-1": { "text": "Disabled" }, "0": { "text": "Disconnected" }, "1": { "text": "Connected" } }
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "blue", "value": -1 },
+              { "color": "red", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": { "-1": { "text": "Disabled" }, "0": { "text": "Disconnected" }, "1": { "text": "Connected" } }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "$datasource" },
+          "expr": "max(polygon_ws_connected)",
+          "legendFormat": "Polygon WS (chart stream)"
+        }
+      ]
     }
   ],
   "templating": {

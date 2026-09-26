@@ -119,3 +119,40 @@ async def test_fan_out_delivers_cross_process_redis_message():
         pass
 
     StockWebSocketManager._instance = None
+
+
+def test_feed_status_none_when_disabled_by_config():
+    StockWebSocketManager._instance = None
+    manager = StockWebSocketManager()
+    manager.api_key = "k"
+    with patch("app.services.websocket_manager.settings.LIVE_WEBSOCKET_ENABLED", False):
+        assert manager.feed_status() is None
+    manager.api_key = ""
+    assert manager.feed_status() is None
+
+
+def test_connected_flag_resets_when_client_exits():
+    StockWebSocketManager._instance = None
+    manager = StockWebSocketManager()
+    manager.api_key = "k"
+    seen_during_run = []
+    client = MagicMock()
+    client.run.side_effect = lambda handler: seen_during_run.append(manager._connected)
+    targets = []
+    with (
+        patch("app.services.websocket_manager.settings.LIVE_WEBSOCKET_ENABLED", True),
+        patch("app.services.websocket_manager.WebSocketClient", return_value=client),
+        patch(
+            "app.services.websocket_manager.asyncio.get_event_loop",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "app.services.websocket_manager.threading.Thread",
+            side_effect=lambda target, daemon: targets.append(target) or MagicMock(),
+        ),
+    ):
+        manager.start()
+        targets[0]()  # run the client thread body synchronously
+        assert seen_during_run == [True]
+        assert manager._connected is False
+        assert manager.feed_status() is False

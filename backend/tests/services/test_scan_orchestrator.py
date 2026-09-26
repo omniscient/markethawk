@@ -292,3 +292,43 @@ def test_request_scan_cancel_sets_redis_key():
     ):
         request_scan_cancel("redis://localhost", "test-scan-uuid")
         assert server.get("scan_cancel:test-scan-uuid") == "1"
+
+
+def test_run_passes_diagnostics_out_only_when_supported():
+    fn = AsyncMock(return_value=[])
+    register(
+        ScannerDescriptor(
+            key="diag_scan",
+            display_name="D",
+            description="d",
+            run=fn,
+            supports_diagnostics=True,
+        )
+    )
+    today = date(2026, 5, 23)
+    diag: dict = {}
+    asyncio.run(
+        run("diag_scan", ["AAPL"], db=None, event_date=today, diagnostics_out=diag)
+    )
+    fn.assert_awaited_once_with(
+        ["AAPL"],
+        None,
+        today,
+        scanner_run=None,
+        gate_metadata=None,
+        diagnostics_out=diag,
+    )
+
+
+def test_run_omits_diagnostics_out_for_unsupported_scanner():
+    fn = AsyncMock(return_value=[])
+    register(
+        ScannerDescriptor(key="plain_scan", display_name="P", description="d", run=fn)
+    )
+    today = date(2026, 5, 23)
+    asyncio.run(
+        run("plain_scan", ["AAPL"], db=None, event_date=today, diagnostics_out={})
+    )
+    fn.assert_awaited_once_with(
+        ["AAPL"], None, today, scanner_run=None, gate_metadata=None
+    )

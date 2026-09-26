@@ -24,6 +24,8 @@ class ScannerDescriptor:
     supports_date_range: bool = True
     asset_classes: tuple[str, ...] = ("stocks",)
     default_parameters: dict[str, Any] = field(default_factory=dict, hash=False)
+    # True when run() accepts diagnostics_out= (per-ticker outcome buckets, #388).
+    supports_diagnostics: bool = False
 
 
 def register(
@@ -43,6 +45,7 @@ async def run(
     event_date: date,
     scanner_run: Optional[Any] = None,
     gate_metadata: Optional[Any] = None,
+    diagnostics_out: Optional[dict] = None,
 ) -> list[dict]:
     descriptor = _REGISTRY.get(scanner_type)
     if descriptor is None:
@@ -50,9 +53,13 @@ async def run(
             f"Unknown scanner type: {scanner_type!r}. "
             f"Registered: {[d.key for d in _REGISTRY.get_all()]}"
         )
-    return await descriptor.run(
-        tickers, db, event_date, scanner_run=scanner_run, gate_metadata=gate_metadata
-    )
+    kwargs: dict[str, Any] = {
+        "scanner_run": scanner_run,
+        "gate_metadata": gate_metadata,
+    }
+    if diagnostics_out is not None and descriptor.supports_diagnostics:
+        kwargs["diagnostics_out"] = diagnostics_out
+    return await descriptor.run(tickers, db, event_date, **kwargs)
 
 
 def compute_next_run(scanner_type: str) -> Optional[datetime]:

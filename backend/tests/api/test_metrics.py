@@ -93,3 +93,14 @@ def test_docker_compose_override_celery_worker_command_wipes_prometheus_dir():
         override = yaml.safe_load(f)
     cmd = override["services"]["celery-worker"]["command"]
     assert "rm -rf /tmp/prometheus_multiproc/*" in cmd
+
+
+def test_metrics_endpoint_exports_provider_health_gauges():
+    """#388: /metrics refreshes provider-health gauges at scrape time."""
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    body = response.text
+    assert 'provider_error_rate{provider="polygon"}' in body
+    assert 'provider_circuit_breaker_state{provider="polygon"}' in body
+    assert 'provider_request_latency_p95_seconds{provider="polygon"}' in body
+    assert "polygon_ws_connected" in body

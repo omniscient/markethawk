@@ -14,9 +14,17 @@ export interface LiveStockData {
   e: number;
 }
 
+/** Server status frame on the per-ticker stream (#388) — not a bar. */
+export interface FeedStatusFrame {
+  type: 'feed_status';
+  /** null = Polygon stream disabled by config; false = enabled but disconnected. */
+  polygon_ws_connected: boolean | null;
+}
+
 export const useLiveStockData = (symbol: string | undefined, resolution: 'minute' | 'second' = 'minute') => {
   const [liveData, setLiveData] = useState<LiveStockData | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [feedAvailable, setFeedAvailable] = useState<boolean | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -51,8 +59,12 @@ export const useLiveStockData = (symbol: string | undefined, resolution: 'minute
       ws.onmessage = (event) => {
         if (!isMounted) return;
         try {
-          const data = JSON.parse(event.data) as LiveStockData;
-          setLiveData(data);
+          const data = JSON.parse(event.data) as LiveStockData | FeedStatusFrame;
+          if ('type' in data && data.type === 'feed_status') {
+            setFeedAvailable(data.polygon_ws_connected);
+            return;
+          }
+          setLiveData(data as LiveStockData);
         } catch (err) {
           console.error('Error parsing live data:', err);
         }
@@ -110,5 +122,5 @@ export const useLiveStockData = (symbol: string | undefined, resolution: 'minute
     };
   }, [symbol, resolution]);
 
-  return { liveData, isConnected };
+  return { liveData, isConnected, feedAvailable };
 };

@@ -38,6 +38,18 @@ const Scanner: React.FC = () => {
     queryFn: () => fetchScannerHistory(10),
   });
 
+  // #388: latest run for the selected universe/scanner drives the degraded banner.
+  // Key starts with 'scannerHistory' so finishScan()'s invalidation refreshes it.
+  const { data: latestRuns } = useQuery({
+    queryKey: ['scannerHistory', 'latest', state.selectedUniverse, state.selectedConfig],
+    queryFn: () => fetchScannerHistory(1, {
+      universe_id: state.selectedUniverse!,
+      scanner_type: state.selectedConfig,
+    }),
+    enabled: !!state.selectedUniverse && !!state.selectedConfig,
+  });
+  const latestRun = latestRuns?.[0] ?? null;
+
   const { data: statusBlock } = useQuery({
     queryKey: ['scanStatusBlock', state.selectedConfig, state.selectedUniverse],
     queryFn: () => fetchScanStatusBlock(state.selectedConfig, state.selectedUniverse),
@@ -253,7 +265,7 @@ const Scanner: React.FC = () => {
         scannerMutationPending={scannerMutation.isPending}
       />
       <LiveProgressPanel isScanning={state.isScanning} activeScan={state.activeScan} progress={state.liveProgress} />
-      <ResultsPanel scanResults={state.scanResults} sortBy={state.sortBy} sortOrder={state.sortOrder} onSort={handleSort} />
+      <ResultsPanel scanResults={state.scanResults} sortBy={state.sortBy} sortOrder={state.sortOrder} onSort={handleSort} latestRun={latestRun} />
     </div>
   );
 };

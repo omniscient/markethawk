@@ -48,6 +48,7 @@ from app.schemas.signal_review import (
     SignalReviewStatsResponse,
 )
 from app.services import StockDataService
+from app.services.provider_degradation import live_provider_gaps
 from app.services.scan_orchestrator import get_scan_progress, request_scan_cancel
 from app.services.scanner import ScannerService
 from app.services.scanner_query_service import ScannerQueryService
@@ -234,6 +235,8 @@ def get_scan_status(scan_id: str, db: Session = Depends(get_db)):
         error_message=run.error_message,
         started_at=started_at,
         progress=progress,
+        data_degraded=run.data_degraded,
+        live_provider_gaps=live_provider_gaps(run.quality_gate),
     )
 
 
@@ -353,12 +356,20 @@ async def scan_run_websocket(
 @router.get("/history", response_model=List[ScannerRunResponse])
 def get_scanner_history(
     limit: int = Query(20, ge=1, le=200),
+    universe_id: Optional[int] = Query(None),
+    scanner_type: Optional[str] = Query(None, max_length=50),
+    data_degraded: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Get recent scanner runs."""
-    runs = (
-        db.query(ScannerRun).order_by(ScannerRun.created_at.desc()).limit(limit).all()
-    )
+    """Get recent scanner runs, optionally filtered (#388: data_degraded is queryable)."""
+    query = db.query(ScannerRun)
+    if universe_id is not None:
+        query = query.filter(ScannerRun.universe_id == universe_id)
+    if scanner_type is not None:
+        query = query.filter(ScannerRun.scanner_type == scanner_type)
+    if data_degraded is not None:
+        query = query.filter(ScannerRun.data_degraded.is_(data_degraded))
+    runs = query.order_by(ScannerRun.created_at.desc()).limit(limit).all()
 
     # Map to schema
     return [
@@ -371,6 +382,8 @@ def get_scanner_history(
             execution_time_ms=run.execution_time_ms,
             error_message=run.error_message,
             created_at=run.created_at,
+            data_degraded=run.data_degraded,
+            live_provider_gaps=live_provider_gaps(run.quality_gate),
         )
         for run in runs
     ]

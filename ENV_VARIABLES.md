@@ -213,6 +213,23 @@ curl http://localhost:8000/health
 
 ---
 
+## Provider Health / Degraded-Feed Failover
+
+See [ADR-0013](docs/adr/0013-polygon-ibkr-hybrid-failover.md). All are optional. To override one,
+add it to the `backend` and `celery-worker` `environment:` blocks.
+
+| Variable | Default | Description |
+|---|---|---|
+| `PROVIDER_HEALTH_ERROR_WINDOW_SECONDS` | `300` | Rolling window for `provider_error_rate` and the breaker-state staleness cut-off. |
+| `PROVIDER_HEALTH_LATENCY_WINDOW_SECONDS` | `900` | Rolling window for `provider_request_latency_p95_seconds`. |
+| `PROVIDER_HEALTH_MIN_CALLS` | `20` | Minimum calls in a window before error rate / p95 are reported (otherwise 0 / none). |
+| `POLYGON_HEALTH_ERROR_RATE_THRESHOLD` | `0.25` | Error rate at or above which live-day scans stop (blocker). Mirror changes in Grafana rule `polygon-provider-degraded`. |
+| `POLYGON_HEALTH_LATENCY_P95_THRESHOLD_SECONDS` | `5.0` | p95 latency **above** which live-day scans are marked degraded (warning). The reported p95 is quantised to the upper bound of the latency histogram bucket it falls in (`0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30`), so with the default a finding is raised once the p95 lands in the 5–10 s bucket. Set the threshold to a bucket bound. Mirror changes in rule `polygon-latency-elevated` (`$B > 5`). |
+| `PREMARKET_BAR_STALENESS_MINUTES` | `10` | Freshest pre-market minute bar older than this during 04:00–09:30 ET, or no bar by 04:00 ET + this, marks the run degraded (blocker). |
+| `PREMARKET_MIN_COVERAGE_RATIO` | `0.5` | Fraction of evaluable tickers that must have pre-market volume; below this, a `partial_coverage` warning is recorded. The default is deliberately lenient: many liquid names legitimately print no pre-market trades early in the session, so a higher ratio would fire on ordinary sparsity. Raise it once production cadence is known. |
+
+---
+
 ## Adding a New Variable
 
 1. Add it to `.env.example` with a placeholder value and a comment.

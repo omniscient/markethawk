@@ -417,6 +417,16 @@ def create_app() -> FastAPI:
 
     @app.get("/metrics", include_in_schema=False)
     def prometheus_metrics():
+        # #388: refresh provider-health gauges from the cross-process Redis
+        # record (and this process's Polygon WS state) before export.
+        from app.core.provider_health import refresh_provider_health_gauges
+
+        try:
+            refresh_provider_health_gauges(ws_connected=websocket_manager.feed_status())
+        except Exception:
+            logging.getLogger(__name__).debug(
+                "provider health gauge refresh failed", exc_info=True
+            )
         if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
             from prometheus_client.multiprocess import MultiProcessCollector
 

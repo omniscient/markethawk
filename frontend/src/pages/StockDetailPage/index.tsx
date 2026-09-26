@@ -11,6 +11,7 @@ import { useScanTask } from '../../hooks/useScanTask';
 import { ChartPanel } from './ChartPanel';
 import { MetadataPanel } from './MetadataPanel';
 import { ScannerHistoryPanel } from './ScannerHistoryPanel';
+import { LiveFeedUnavailableBadge } from './LiveFeedUnavailableBadge';
 
 const StockDetailPage: React.FC = () => {
   const { ticker } = useParams<{ ticker: string }>();
@@ -114,7 +115,7 @@ const StockDetailPage: React.FC = () => {
     staleTime: 120_000,
   });
 
-  const { liveData, isConnected } = useLiveStockData(symbol, wsResolution);
+  const { liveData, isConnected, feedAvailable } = useLiveStockData(symbol, wsResolution);
   const { data: systemInfo } = useQuery({ queryKey: ['systemInfo'], queryFn: getSystemInfo });
   const { data: tickerUniverses = [] } = useQuery({
     queryKey: ['tickerUniverses', symbol],
@@ -232,6 +233,8 @@ const StockDetailPage: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {feedAvailable === false && <LiveFeedUnavailableBadge />}
 
       {recentSplits.length > 0 && (
         <div className={`flex items-start gap-3 p-4 rounded-lg border ${splitPending ? 'bg-amber-500/10 border-amber-500/30' : 'bg-blue-500/10 border-blue-500/30'}`}>

@@ -353,3 +353,52 @@ def test_pre_market_scan_records_duration_when_persist_raises(db):
     mock_dur_lbl.observe.assert_called_once()
     # a failed run must not be marked successful
     mock_ts_lbl.set.assert_not_called()
+
+
+def test_pre_market_scan_diagnostics_buckets(db):
+    """#388: per-ticker outcome buckets + freshest pre-market bar → diagnostics_out."""
+    from app.services.pre_market_scan import run_pre_market_scan
+
+    event_date = date(2025, 3, 10)  # EDT
+    _ET = ZoneInfo("America/New_York")
+    base_et = datetime.combine(event_date, datetime.min.time(), tzinfo=_ET)
+
+    def _daily(ticker, n):
+        for i in range(n):
+            db.add(
+                _make_db_daily_bar(
+                    ticker,
+                    (base_et - timedelta(days=n - i))
+                    .astimezone(timezone.utc)
+                    .replace(tzinfo=None),
+                )
+            )
+
+    _daily("DGA", 25)  # evaluated (has pre-market volume, no spike)
+    _daily("DGB", 25)  # no_premarket_data
+    _daily("DGC", 5)  # no_history
+    pm_ts = datetime.combine(event_date, time(7, 0), tzinfo=_ET)
+    db.add(
+        _make_db_pm_bar(
+            "DGA", pm_ts.astimezone(timezone.utc).replace(tzinfo=None), volume=1_000
+        )
+    )
+    db.flush()
+
+    diag: dict = {}
+    with patch.object(
+        ScannerService, "_get_batch_enrichment_data", return_value=({}, {}, {})
+    ):
+        results = asyncio.run(
+            run_pre_market_scan(
+                ["DGA", "DGB", "DGC"], db, event_date=event_date, diagnostics_out=diag
+            )
+        )
+
+    assert results == []
+    assert diag["tickers"] == 3
+    assert diag["evaluated"] == 1
+    assert diag["no_premarket_data"] == 1
+    assert diag["no_history"] == 1
+    assert diag["errors"] == 0
+    assert diag["max_premarket_bar_ts"] == "2025-03-10T11:00:00+00:00"

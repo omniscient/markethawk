@@ -192,6 +192,29 @@ export interface QualityGateAssessment {
   issues: QualityGateIssue[];
 }
 
+/** A live-degradation provider_gap issue from ScannerRun.quality_gate (#388, ADR-0013). */
+export interface LiveProviderGapDetail {
+  subtype: 'live_degradation';
+  provider: string;
+  reason: string;
+  worker?: string | null;
+  coverage_ratio?: number;
+  [key: string]: unknown;
+}
+
+export interface LiveProviderGap {
+  code: 'provider_gap';
+  severity: 'blocker' | 'warning';
+  message: string;
+  detail: LiveProviderGapDetail;
+}
+
+export interface ScannerHistoryFilters {
+  universe_id?: number;
+  scanner_type?: string;
+  data_degraded?: boolean;
+}
+
 export interface ScannerRunResponse {
   scan_id: string;
   status: string;
@@ -206,6 +229,8 @@ export interface ScannerRunResponse {
   scan_end_date?: string;
   diagnostics?: ScannerDiagnostics;
   quality_gate?: QualityGateAssessment;
+  data_degraded?: boolean | null;
+  live_provider_gaps?: LiveProviderGap[];
 }
 
 export interface ScannerRunAsyncResponse {
@@ -239,6 +264,8 @@ export interface ScannerRunStatus {
     events_detected?: number;
     [k: string]: unknown;
   } | null;
+  data_degraded?: boolean | null;
+  live_provider_gaps?: LiveProviderGap[];
 }
 
 export interface ScannerRangeRequest {
