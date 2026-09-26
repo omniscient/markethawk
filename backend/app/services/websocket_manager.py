@@ -125,10 +125,26 @@ class StockWebSocketManager:
                 self.client.run(self._handle_msg)
             except Exception as e:
                 logger.error(f"Polygon WebSocket Error: {e}")
+            finally:
+                # client.run() can also return without raising (e.g. reconnects
+                # exhausted); either way the per-ticker stream is down now.
                 self._connected = False
+                logger.warning(
+                    "Polygon WebSocket client stopped — per-ticker live stream unavailable"
+                )
 
         thread = threading.Thread(target=run_client, daemon=True)
         thread.start()
+
+    def feed_status(self) -> Optional[bool]:
+        """Polygon per-ticker stream state for health/UI (#388).
+
+        None when the stream is disabled by configuration (no API key or
+        LIVE_WEBSOCKET_ENABLED=false); otherwise whether the client is connected.
+        """
+        if not self.api_key or not settings.LIVE_WEBSOCKET_ENABLED:
+            return None
+        return self._connected
 
     def subscribe(self, ticker: str):
         """Dynamically subscribe to a ticker for both minute and second updates."""

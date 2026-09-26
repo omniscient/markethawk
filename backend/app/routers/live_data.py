@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time
+from typing import Optional
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -17,6 +18,14 @@ from app.services.websocket_manager import websocket_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/live", tags=["live"])
+
+# How often an otherwise idle ticker stream re-checks Polygon WS status (#388).
+FEED_STATUS_POLL_SECONDS = 5.0
+
+
+def _feed_status_frame(connected: Optional[bool]) -> str:
+    """Status frame for the per-ticker stream; clients must not treat it as a bar."""
+    return json.dumps({"type": "feed_status", "polygon_ws_connected": connected})
 
 
 @router.websocket("/ws/{ticker}/{resolution}")
@@ -46,24 +55,32 @@ async def stock_live_websocket(
 
         deadline = time.monotonic() + settings.WS_MAX_LIFETIME_SECONDS
         idle_timeout = settings.WS_IDLE_TIMEOUT_SECONDS
+        last_message_at = time.monotonic()
+        feed_status = websocket_manager.feed_status()
 
         try:
+            await websocket.send_text(_feed_status_frame(feed_status))
             while True:
-                remaining = deadline - time.monotonic()
+                now = time.monotonic()
+                remaining = deadline - now
                 if remaining <= 0:
                     await websocket.close(1001)
                     break
-                wait = min(idle_timeout, remaining)
+                idle_left = idle_timeout - (now - last_message_at)
+                if idle_left <= 0:
+                    # Idle timeout exceeded
+                    await websocket.close(1000)
+                    break
+                wait = min(idle_left, remaining, FEED_STATUS_POLL_SECONDS)
                 try:
                     message = await asyncio.wait_for(queue.get(), timeout=wait)
                     await websocket.send_text(message)
+                    last_message_at = time.monotonic()
                 except asyncio.TimeoutError:
-                    if time.monotonic() >= deadline:
-                        await websocket.close(1001)
-                    else:
-                        # Idle timeout exceeded
-                        await websocket.close(1000)
-                    break
+                    current = websocket_manager.feed_status()
+                    if current != feed_status:
+                        feed_status = current
+                        await websocket.send_text(_feed_status_frame(feed_status))
         except WebSocketDisconnect:
             logger.info(f"Client disconnected from live updates for {ticker}")
         except Exception as e:
