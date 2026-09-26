@@ -58,6 +58,46 @@ ibkr_connection_status = Gauge(
     "IBKR connection status (1=connected, 0=disconnected)",
 )
 
+# ── Provider health (#388, ADR-0013) ────────────────────────────────────────
+# Set only by the API process at scrape time (refresh_provider_health_gauges in
+# app/core/provider_health.py) from the cross-process Redis health record, so
+# "livemostrecent" is the right multiprocess aggregation.
+provider_request_latency_p95_seconds = Gauge(
+    "provider_request_latency_p95_seconds",
+    "Rolling 15-minute p95 latency of provider REST requests (seconds; 0 = too few calls)",
+    ["provider"],
+    multiprocess_mode="livemostrecent",
+)
+
+provider_error_rate = Gauge(
+    "provider_error_rate",
+    "Rolling 5-minute provider request error rate (0.0–1.0; 0 = too few calls)",
+    ["provider"],
+    multiprocess_mode="livemostrecent",
+)
+
+provider_circuit_breaker_state = Gauge(
+    "provider_circuit_breaker_state",
+    "Worst provider circuit-breaker state across processes (0=closed, 1=half-open, 2=open)",
+    ["provider"],
+    multiprocess_mode="livemostrecent",
+)
+
+polygon_ws_connected = Gauge(
+    "polygon_ws_connected",
+    "Polygon per-ticker WebSocket stream (1=connected, 0=disconnected, -1=disabled by config)",
+    multiprocess_mode="livemostrecent",
+)
+
+# Set by the Celery worker at the end of each scan that touched a live session day.
+# "mostrecent" (not live) so the value survives prefork child recycling.
+scan_provider_gap_severity = Gauge(
+    "scan_provider_gap_severity",
+    "Live provider-gap severity of the most recent scan run (0=none, 1=warning, 2=blocker)",
+    ["scanner_type"],
+    multiprocess_mode="mostrecent",
+)
+
 celery_tasks_total = Counter(
     "celery_tasks_total",
     "Total Celery tasks executed",

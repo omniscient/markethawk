@@ -106,3 +106,27 @@ def test_slo_gauge_settable():
         )
         == 0.05
     )
+
+
+def test_provider_health_gauges_registered():
+    """#388: per-provider health gauges + Polygon WS + scan provider-gap severity."""
+    from app.core.metrics import (
+        polygon_ws_connected,
+        provider_circuit_breaker_state,
+        provider_error_rate,
+        provider_request_latency_p95_seconds,
+        scan_provider_gap_severity,
+    )
+
+    assert (
+        provider_request_latency_p95_seconds._name
+        == "provider_request_latency_p95_seconds"
+    )
+    assert provider_error_rate._name == "provider_error_rate"
+    assert provider_circuit_breaker_state._name == "provider_circuit_breaker_state"
+    assert polygon_ws_connected._name == "polygon_ws_connected"
+    assert scan_provider_gap_severity._name == "scan_provider_gap_severity"
+    assert provider_error_rate._labelnames == ("provider",)
+    assert scan_provider_gap_severity._labelnames == ("scanner_type",)
+    assert provider_error_rate._multiprocess_mode == "livemostrecent"
+    assert scan_provider_gap_severity._multiprocess_mode == "mostrecent"
