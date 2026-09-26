@@ -2,17 +2,20 @@
 import ScannerResults from '../../components/ScannerResults';
 import SignalReviewStats from '../../components/SignalReviewStats';
 import type { ScannerRunResponse } from '../../api/scanner';
+import { ProviderDegradedBanner } from './ProviderDegradedBanner';
 
 export interface ResultsPanelProps {
   scanResults: ScannerRunResponse | null;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
   onSort: (column: string) => void;
+  latestRun?: ScannerRunResponse | null;
 }
 
-export function ResultsPanel({ scanResults, sortBy, sortOrder, onSort }: ResultsPanelProps) {
+export function ResultsPanel({ scanResults, sortBy, sortOrder, onSort, latestRun }: ResultsPanelProps) {
   return (
     <>
+      <ProviderDegradedBanner run={latestRun} />
       {scanResults && (
         <div className="animate-slide-up">
           <ScannerResults
