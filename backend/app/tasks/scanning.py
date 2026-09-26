@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time as _time
+from dataclasses import replace
 from datetime import date, datetime
 from types import SimpleNamespace
 
@@ -11,8 +12,21 @@ from sqlalchemy.orm import Session
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.core.metrics import celery_task_duration_seconds, celery_tasks_total
+from app.core.metrics import (
+    celery_task_duration_seconds,
+    celery_tasks_total,
+    scan_provider_gap_severity,
+)
+from app.core.provider_health import get_provider_health, worker_id
+from app.models.market_holiday import MarketHoliday
 from app.models.monitored_stock import MonitoredStock
+from app.services.provider_degradation import (
+    apply_provider_gaps,
+    assess_premarket_ingestion,
+    assess_provider_health,
+    is_live_session_day,
+    severity_level,
+)
 from app.services.quality_gate import quality_gate_service
 from app.utils.time import ensure_utc, utc_now
 
@@ -287,6 +301,47 @@ def _fail_scheduled_scanner_run(db: Session, run, started_at: float, exc: Except
     db.commit()
 
 
+def _stop_for_provider_degradation(
+    db: Session,
+    run,
+    findings,
+    *,
+    universe_id: int,
+    scanner_type: str,
+    started_at: datetime,
+    events_total: int,
+    publish,
+    phase: str,
+) -> None:
+    """ADR-0013: breaker open / error rate → stop, mark degraded, never 'completed'.
+
+    #388 review A3: ``phase`` is recorded on every finding as ``detail.phase``.
+    A "before scanning <day>" abort means no data was read for that day. An
+    "at completion" abort means the days WERE scanned and their events are
+    already persisted against this run -- the run is marked ``failed`` because
+    ADR-0013 forbids presenting it as a clean success, not because the events
+    are invalid. On-call and the UI need to tell these apart.
+    """
+    phase_key = "at_completion" if phase == "at completion" else "before_day"
+    findings = [replace(f, detail={**f.detail, "phase": phase_key}) for f in findings]
+    apply_provider_gaps(
+        run,
+        findings,
+        universe_id=universe_id,
+        scanner_type=scanner_type,
+        worker=worker_id(),
+    )
+    reasons = "; ".join(f.message for f in findings if f.abort)
+    run.status = "failed"
+    run.error_message = f"Scan stopped {phase} — Polygon degraded: {reasons}"
+    run.events_detected = events_total
+    run.execution_time_ms = int((utc_now() - started_at).total_seconds() * 1000)
+    db.commit()
+    scan_provider_gap_severity.labels(scanner_type=scanner_type).set(2)
+    logger.error("run_universe_scan %s: %s", run.uuid, run.error_message)
+    publish({"type": "failed", "error": run.error_message, "data_degraded": True})
+
+
 def _run_universe_scan_logic(
     scan_id: str,
     scanner_type: str,
@@ -391,6 +446,16 @@ def _run_universe_scan_logic(
         "fired_post": 0,
     }
     events_total = 0
+    day_diagnostics: dict = {}
+    # #388/ADR-0013: a weekday NYSE full close has no pre-market bars by design;
+    # it must not read as a Polygon ingestion stall. Resolved once per scan.
+    market_holidays = {
+        row.date
+        for row in db.query(MarketHoliday.date).filter(
+            MarketHoliday.exchange == "NYSE",
+            MarketHoliday.event_type == "full_close",
+        )
+    }
 
     def _state_payload(day_index: int) -> dict:
         return {
@@ -420,6 +485,9 @@ def _run_universe_scan_logic(
         }
     )
 
+    if any(is_live_session_day(d, utc_now(), market_holidays) for d in trading_days):
+        scan_provider_gap_severity.labels(scanner_type=scanner_type).set(0)
+
     for i, day in enumerate(trading_days, start=1):
         if is_cancelled():
             run.status = "cancelled"
@@ -435,6 +503,22 @@ def _run_universe_scan_logic(
             )
             return
 
+        if is_live_session_day(day, utc_now(), market_holidays):
+            pre_findings = assess_provider_health(get_provider_health("polygon"))
+            if any(f.abort for f in pre_findings):
+                _stop_for_provider_degradation(
+                    db,
+                    run,
+                    pre_findings,
+                    universe_id=universe_id,
+                    scanner_type=scanner_type,
+                    started_at=started_at,
+                    events_total=events_total,
+                    publish=publish,
+                    phase=f"before scanning {day.isoformat()}",
+                )
+                return
+
         publish(
             {
                 "type": "day_started",
@@ -444,6 +528,8 @@ def _run_universe_scan_logic(
             }
         )
 
+        day_diag: dict = {}
+        day_diagnostics[day] = day_diag
         try:
             day_events = asyncio.run(
                 _orchestrator.run(
@@ -453,6 +539,7 @@ def _run_universe_scan_logic(
                     event_date=day,
                     scanner_run=run,
                     gate_metadata=gate_metadata,
+                    diagnostics_out=day_diag,
                 )
             )
         except Exception as e:
@@ -479,6 +566,60 @@ def _run_universe_scan_logic(
             }
         )
 
+    # --- Degraded-feed check at completion (#388, ADR-0013) ----------------
+    # data_degraded = start-of-scan quality report OR live provider health OR
+    # pre-market ingestion shortfall. Only live session days are assessed.
+    # #388 review A2: severity_level() below is the ONLY writer of this gauge at
+    # completion, and it is written only when live_days is non-empty. Combined with
+    # the scan-start reset added above, the gauge means "severity of the most recent
+    # live-session-day scan of this scanner_type". It therefore LATCHES between
+    # sessions: a blocker at 07:00 keeps `pre-market-scan-provider-gap` (for: 0m,
+    # critical) firing until the next live-day run clears it. That is intended --
+    # a degraded pre-market window must not go quiet -- but it must be in the
+    # runbook (Task 15) so on-call silences rather than re-investigates.
+    finish_now = utc_now()
+    live_days = [
+        d for d in trading_days if is_live_session_day(d, finish_now, market_holidays)
+    ]
+    if live_days:
+        findings = assess_provider_health(get_provider_health("polygon"))
+        for d in live_days:
+            diag = day_diagnostics.get(d) or {}
+            if "max_premarket_bar_ts" in diag:
+                findings += assess_premarket_ingestion(
+                    diag, d, finish_now, market_holidays
+                )
+        scan_provider_gap_severity.labels(scanner_type=scanner_type).set(
+            severity_level(findings)
+        )
+        if any(f.abort for f in findings):
+            _stop_for_provider_degradation(
+                db,
+                run,
+                findings,
+                universe_id=universe_id,
+                scanner_type=scanner_type,
+                started_at=started_at,
+                events_total=events_total,
+                publish=publish,
+                phase="at completion",
+            )
+            return
+        if findings:
+            apply_provider_gaps(
+                run,
+                findings,
+                universe_id=universe_id,
+                scanner_type=scanner_type,
+                worker=worker_id(),
+            )
+            log = logger.error if severity_level(findings) == 2 else logger.warning
+            log(
+                "run_universe_scan %s: data degraded — %s",
+                scan_id,
+                "; ".join(f.message for f in findings),
+            )
+
     run.status = "completed"
     run.events_detected = events_total
     run.execution_time_ms = int((utc_now() - started_at).total_seconds() * 1000)
@@ -487,6 +628,7 @@ def _run_universe_scan_logic(
         {
             "type": "completed",
             "events_detected": events_total,
+            "data_degraded": bool(run.data_degraded),
             "diagnostics": {
                 "tickers": len(tickers),
                 "days": len(trading_days),
@@ -557,9 +699,7 @@ def run_range_scan(
 
     r.set(
         f"scan:{ticker}:range",
-        json.dumps(
-            {"task_ids": [task_id], "started_at": utc_now().isoformat()}
-        ),
+        json.dumps({"task_ids": [task_id], "started_at": utc_now().isoformat()}),
         ex=14400,
     )
 
