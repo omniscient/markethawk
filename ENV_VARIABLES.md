@@ -75,7 +75,7 @@ Allowed feature areas: `scanner_narrative`, `alert_copy`, `post_mortem`, `semant
 
 ## System Notifications
 
-Generic (non-scanner) email + browser-push notifications via `notify_system()` and `POST /api/v1/alerts/system`. Used by server-to-server callers such as the dark-factory scheduler.
+Generic (non-scanner) email + browser-push notifications via `notify_system()` and `POST /api/v1/alerts/system`. Used by server-to-server callers such as the dark-factory scheduler (epic autopilot / main-red fixer), which must be configured with the same `INTERNAL_API_TOKEN`.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -191,16 +191,11 @@ curl http://localhost:8000/health
 
 ---
 
-## Dark Factory / Backlog Scheduler
+## Dark Factory (factory-only, not read by the app)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SCHEDULER_STATE_DIR` | `/var/lib/dark-factory` | Directory for durable scheduler retry state. Mounted from the `scheduler_state` named Docker volume in the `backlog-scheduler` service. |
-| `FACTORY_IMAGE` | `ghcr.io/omniscient/markethawk-dark-factory:latest` | Docker image the scheduler probes at startup and dispatches with `--no-build`. Override to use a locally-built tag. |
-| `IMAGE_TAG` | `latest` | Tag suffix for `FACTORY_IMAGE`. Used when `FACTORY_IMAGE` is not set explicitly. |
-| `DIRECT_TO_PR_LABEL` | `direct-to-pr` | Label name that opts a ticket into straight-through autonomous flow. Change only if your repo uses a different label string. |
-| `SPEC_GRACE_MINUTES` | `30` | Minutes the scheduler waits after posting the spec before auto-advancing a `direct-to-pr` ticket from Backlog to Refined. `0` = advance on the next poll. |
-| `PLAN_GRACE_MINUTES` | `30` | Minutes the scheduler waits after posting the plan before auto-advancing a `direct-to-pr` ticket from Refined to Ready. `0` = advance on the next poll. |
+The backlog scheduler and its variables (`SCHEDULER_STATE_DIR`, `FACTORY_IMAGE`/`IMAGE_REF`, `DIRECT_TO_PR_LABEL`, `SPEC_GRACE_MINUTES`, `PLAN_GRACE_MINUTES`, …) moved to [omniscient/dark-factory](https://github.com/omniscient/dark-factory) with the extraction and are configured in that repo's `deploy/instance.env`, not in this project's `.env`.
+
+The one cross-repo contract is `INTERNAL_API_TOKEN` (see [System Notifications](#system-notifications)): the dark-factory scheduler sends it as `X-Internal-Token` to `POST /api/v1/alerts/system`, so the value in the factory's env must match the backend's.
 
 ---
 
