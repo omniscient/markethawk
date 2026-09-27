@@ -576,6 +576,11 @@ services:
       - stockscanner-network
     restart: unless-stopped
 
+  # --- Factory preview infrastructure (kept after the dark-factory extraction) ---
+  # The factory scheduler itself now runs from omniscient/dark-factory, but MarketHawk's
+  # preview hook (.factory/hooks/preview-up) still builds preview images through the remote
+  # BuildKit daemon below on factory-network (#436). Don't remove these services or
+  # factory-network without checking with the dark-factory side first.
   # Docker Socket Proxy (factory) — full verbs for dark-factory: build/exec/networks/volumes + EXEC fixes postgres-probe
   docker-socket-proxy-factory:
     image: tecnativa/docker-socket-proxy:v0.4.2@sha256:1f3a6f303320723d199d2316a3e82b2e2685d86c275d5e3deeaf182573b47476
