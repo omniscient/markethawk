@@ -20,7 +20,7 @@ jobs:
     name: Chaos test (mock mode)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Run IBKR chaos test — mock mode
         env:
@@ -40,7 +40,7 @@ jobs:
     # The previous `if: ${{ secrets.IB_USERNAME != '' }}` made the whole workflow
     # invalid, failing on every push to main.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Run IBKR chaos test — live mode
         env:
