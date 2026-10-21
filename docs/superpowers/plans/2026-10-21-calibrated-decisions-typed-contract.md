@@ -1,4 +1,5 @@
 # Calibrated Decisions C1: Typed Decision Contract — Implementation Plan
+**Revised:** 2026-10-21 (operator amendment after plan gate — normalised distributions, protected_namespaces, hash-order test, duplicate distributions, #845 re-plan note)
 
 **Issue:** #872
 
@@ -23,7 +24,8 @@ or trading logic (spec §1, issue non-goals).
 
 ```
 backend/app/decisions/            (stdlib + pydantic ONLY — enforced by tests)
-  schema.py   FrozenContract base (frozen, extra="forbid", strict=True)
+  schema.py   FrozenContract base (frozen, extra="forbid", strict=True,
+              protected_namespaces=())
               canonical_json / sha256_hex, UntrustedText, answer spaces,
               DecisionQuestionDef, DecisionSchema (derived + tamper-checked schema_hash)
      ▲
@@ -225,6 +227,7 @@ def utc_plus(dt: datetime, hours: int) -> datetime:
 `backend/tests/decisions/test_schema.py`:
 
 ```python
+import json
 from datetime import timedelta
 
 import pytest
@@ -326,6 +329,9 @@ def test_schema_hash_deterministic():
     assert offset.data_cutoff.utcoffset() == timedelta(0)
     assert forward.schema_hash == reordered.schema_hash == offset.schema_hash
     assert forward == reordered == offset
+    dumped = json.loads(forward.model_dump_json())
+    reversed_json = json.dumps({k: dumped[k] for k in reversed(dumped)})
+    assert DecisionSchema.model_validate_json(reversed_json) == forward
 
 
 _SINGLE_FIELD_CHANGES = {
@@ -402,6 +408,9 @@ Expected: collection error, `ModuleNotFoundError: No module named 'app.decisions
 
 ```python
 """DecisionSchema — the versioned, hash-addressed question set for one strategy artifact.
+
+``schema_hash`` is Optional on input only so it can be omitted; after validation it is
+always a 64-hex string (derived, and tamper-checked when supplied).
 
 Everything in ``app.decisions`` depends only on the standard library and Pydantic.
 Never import ``app.schemas``, ``app.providers``, ``app.services``, ``app.models``,
@@ -482,7 +491,11 @@ def sha256_hex(payload: Any) -> str:
 class FrozenContract(BaseModel):
     """Base for every model in ``app.decisions``: immutable, closed, no coercion."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
+    # protected_namespaces=(): ``model_version`` (spec §3.4) would otherwise warn on
+    # pydantic < 2.10, whose default protected namespace is "model_".
+    model_config = ConfigDict(
+        frozen=True, extra="forbid", strict=True, protected_namespaces=()
+    )
 
 
 class UntrustedText(FrozenContract):
@@ -1851,6 +1864,13 @@ def test_validate_result_rejects_distribution_for_unknown_question():
         validate_result(make_result(schema, distributions=(bad,)), schema)
 
 
+def test_validate_result_rejects_duplicate_distributions():
+    schema = make_schema()
+    dist = make_result(schema).distributions[0]
+    with pytest.raises(DecisionContractViolation, match="duplicate"):
+        validate_result(make_result(schema, distributions=(dist, dist)), schema)
+
+
 def test_rule1_schema_ref_mismatch_abstains():
     schema = make_schema()
     request = make_request(schema)
@@ -1985,6 +2005,9 @@ def validate_result(result: DecisionResult, schema: DecisionSchema) -> None:
             "answer count differs from the schema's question count"
         )
     spaces = {q.question_id: q.answer_space for q in schema.questions}
+    distribution_ids = [d.question_id for d in result.distributions]
+    if len(set(distribution_ids)) != len(distribution_ids):
+        raise DecisionContractViolation("duplicate distribution for a question")
     for question, answer in zip(schema.questions, result.answers):
         if answer.question_id != question.question_id:
             raise DecisionContractViolation(
@@ -2036,7 +2059,7 @@ def decide(
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `python -m pytest tests/decisions -q --no-cov`
-Expected: `96 passed`.
+Expected: `97 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -2300,7 +2323,7 @@ __all__ = [
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `python -m pytest tests/decisions -q --no-cov`
-Expected: `108 passed`.
+Expected: `109 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -3133,7 +3156,7 @@ Create each file below with exactly the content shown. The JSON is ASCII-only:
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `python -m pytest tests/decisions -q --no-cov`
-Expected: `178 passed` (70 new: 13 malformed, 3 stale, 3 low-quality, 18 prompt-injected, and
+Expected: `179 passed` (70 new: 13 malformed, 3 stale, 3 low-quality, 18 prompt-injected, and
 33 injected-string cases).
 
 - [ ] **Step 6: Lint and commit**
@@ -3169,13 +3192,16 @@ python -m ruff format --check app/decisions tests/decisions
 python -m ruff check app/decisions tests/decisions
 ```
 
-Expected: `178 passed`, `16 files already formatted`, and `All checks passed!`.
+Expected: `179 passed`, `16 files already formatted`, and `All checks passed!`.
 
 - [ ] **Step 3: Confirm the fresh-interpreter import is clean by hand**
 
+This reuses the boundary test's own `_is_forbidden` predicate (dotted-boundary prefix
+match), so it is the same check the subprocess test performs, not a looser `startswith`:
+
 ```bash
 cd backend
-python -c "import sys, app.decisions; bad=[m for m in sys.modules if m.startswith(('ib_insync','app.schemas','app.providers','app.services','app.models','app.routers','app.tasks')) or 'auto_trade' in m]; print(bad)"
+python -c "import sys, app.decisions; from tests.decisions.test_architecture_boundary import _is_forbidden; print([m for m in sys.modules if _is_forbidden(m) or 'auto_trade' in m])"
 ```
 
 Expected: `[]`.
@@ -3205,17 +3231,18 @@ git commit -m "docs: point CLAUDE.md at the app/decisions contract package (#872
   green check.
 - `strategy_artifact_ref` uses the spec §6 fallback (bounded, id-shaped string), because #845
   was unmerged at plan time. Binding it to #845's artifact id is a `decision_schema.v2`
-  change for a later child.
+  change for a later child. If #845 merges before implementation dispatch, the operator
+  may re-run the plan phase so v1 binds `strategy_artifact_ref` directly; otherwise the
+  v2 rebinding is the follow-up.
 - `decide` deliberately does not re-check data cutoffs (spec §3.6 rule table). Callers in
   #873+ must call `validate_request` before dispatching a request to a provider.
-- Known C1 limit, flagged for #873+: `validate_result` does not reject two distributions for
-  the same `question_id`. Every point is still checked against its question's
-  `answer_space`.
+- `validate_result` rejects duplicate distributions for one `question_id` (plan-gate
+  amendment), and every point is checked against its question's `answer_space`.
 
 ## Self-review
 
 - Issue line `**Issue:** #872` is present under the title.
-- No placeholders. Every file is given in full, and every code block was executed: 178 tests
+- No placeholders. Every file is given in full, and every code block was executed: 179 tests
   pass on Python 3.14 / Pydantic 2.14.1, and the code is `ruff format`- and `ruff check`-clean
   under `backend/pyproject.toml`. The staged task order was replayed, and each task's
   "verify fail" step fails as stated before its "verify pass" step.

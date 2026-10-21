@@ -1,5 +1,5 @@
 # Calibrated Decisions C1: Typed Decision Schema, Provenance, and Provider-Neutral Contract
-**Revised:** 2026-10-21 (operator amendment after spec gate — hash round-trip and canonicalisation, null-gate rule, validate_request/validate_result + decide rule table, prefix-matched import boundary, #845 binding, per-AC tests, strict models)
+**Revised:** 2026-10-21 (operator amendment after spec gate — hash round-trip and canonicalisation, null-gate rule, validate_request/validate_result + decide rule table, prefix-matched import boundary, #845 binding, per-AC tests, strict models; plan-gate amendments: normalised distributions, protected_namespaces)
 
 **Issue:** #872
 **Date:** 2026-10-21
@@ -90,7 +90,9 @@ registry) are by typed ID/version/hash value fields only — `app/decisions/` ne
 
 ### 3.2 `DecisionSchema`
 
-Frozen Pydantic model (`model_config = ConfigDict(frozen=True, extra="forbid", strict=True)`):
+Frozen Pydantic model (`model_config = ConfigDict(frozen=True, extra="forbid", strict=True,
+protected_namespaces=())` — the last entry keeps the `model_version` field name warning-free
+on Pydantic < 2.10):
 
 - `schema_version: Literal["decision_schema.v1"]`
 - `schema_hash: str` — sha256 hex digest over the canonical JSON of every other field on the
@@ -133,7 +135,7 @@ mutated. `schema_hash` changes automatically with any field change, so a silent 
 
 ### 3.3 `DecisionRequest`
 
-Frozen Pydantic model, `extra="forbid"`, `strict=True`:
+Frozen Pydantic model, `extra="forbid"`, `strict=True`, `protected_namespaces=()`:
 
 - `request_id: UUID`
 - `schema_ref: str` — the `schema_hash` of the `DecisionSchema` this request answers against
@@ -189,7 +191,8 @@ Frozen Pydantic model, `extra="forbid"`, `strict=True`:
 
 ### 3.4 `DecisionResult`
 
-Frozen Pydantic model, `extra="forbid"` and `strict=True` at every nesting level:
+Frozen Pydantic model, `extra="forbid"`, `strict=True` and `protected_namespaces=()` at
+every nesting level:
 
 - `request_ref: str` (the `DecisionRequest.request_id`, stringified)
 - `schema_ref: str` (the `DecisionSchema.schema_hash` this result answers against)
@@ -199,7 +202,9 @@ Frozen Pydantic model, `extra="forbid"` and `strict=True` at every nesting level
   `validate_result(result, schema)` (§3.6), which rejects any value outside it. The Pydantic
   model alone cannot do that check — it holds only `schema_ref`, not the schema.
 - `distributions: Tuple[DecisionDistribution, ...]` — full probability/score distribution
-  per answer, same closed-shape constraint.
+  per answer, same closed-shape constraint. `distributions` are normalised probability
+  distributions (points in [0, 1], summing to 1 ± 1e-6); raw score distributions are out
+  of scope for v1.
 - `provider_confidence: Optional[float]` (`ge=0, le=1`) — the provider's **self-reported**
   confidence statistic.
 - `calibrated_probability: Optional[float]` (`ge=0, le=1`) — **nullable until fitted**,
