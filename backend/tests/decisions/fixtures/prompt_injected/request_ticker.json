@@ -1,0 +1,9 @@
+{
+  "target": "request",
+  "description": "SQL/instruction text in the ticker",
+  "patch": {
+    "market_snapshot": {
+      "ticker": "ACME; DROP TABLE trades;--"
+    }
+  }
+}

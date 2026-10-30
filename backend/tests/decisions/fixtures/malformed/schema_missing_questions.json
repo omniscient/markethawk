@@ -1,0 +1,10 @@
+{
+  "target": "schema",
+  "description": "required field omitted",
+  "patch": {
+    "questions": "__delete__"
+  },
+  "error_loc": [
+    "questions"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "target": "request",
+  "description": "blocked gate is valid data but escalates",
+  "patch": {
+    "quality_gate": {
+      "verdict": "blocked",
+      "trusted": false,
+      "issue_codes": [
+        "missing_bars",
+        "provider_gap"
+      ]
+    }
+  },
+  "expected_outcome": "ESCALATE_FOR_OFFLINE_REVIEW"
+}

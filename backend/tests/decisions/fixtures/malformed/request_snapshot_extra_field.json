@@ -1,0 +1,13 @@
+{
+  "target": "request",
+  "description": "extra='forbid' on a nested model",
+  "patch": {
+    "market_snapshot": {
+      "float_shares": 1000000
+    }
+  },
+  "error_loc": [
+    "market_snapshot",
+    "float_shares"
+  ]
+}

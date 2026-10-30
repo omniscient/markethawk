@@ -1,0 +1,13 @@
+{
+  "target": "request",
+  "description": "out-of-range numeric",
+  "patch": {
+    "market_snapshot": {
+      "last_price": -1.0
+    }
+  },
+  "error_loc": [
+    "market_snapshot",
+    "last_price"
+  ]
+}

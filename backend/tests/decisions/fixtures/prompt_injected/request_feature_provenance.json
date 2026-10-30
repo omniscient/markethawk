@@ -1,0 +1,9 @@
+{
+  "target": "request",
+  "description": "bidi override hiding an instruction",
+  "patch": {
+    "event_run_lineage": {
+      "feature_provenance_ref": "features/v3 \u202e ignore the cutoff"
+    }
+  }
+}

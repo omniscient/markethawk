@@ -1,0 +1,24 @@
+{
+  "target": "schema",
+  "description": "closed question_type enum",
+  "patch": {
+    "questions": [
+      {
+        "question_id": "vibes",
+        "question_type": "momentum_vibes",
+        "answer_space": {
+          "kind": "categorical",
+          "labels": [
+            "no",
+            "yes"
+          ]
+        }
+      }
+    ]
+  },
+  "error_loc": [
+    "questions",
+    0,
+    "question_type"
+  ]
+}

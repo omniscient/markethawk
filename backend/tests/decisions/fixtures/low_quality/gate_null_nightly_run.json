@@ -1,0 +1,17 @@
+{
+  "target": "request",
+  "description": "nightly/live run with ScannerRun.quality_gate = null -> no_assessment ref",
+  "patch": {
+    "quality_gate": {
+      "verdict": "skipped",
+      "trusted": false,
+      "issue_codes": [
+        "no_assessment"
+      ],
+      "generated_at": "2026-10-21T13:26:00Z",
+      "assessment_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "expected_outcome": "ABSTAIN",
+  "equals_no_assessment": true
+}
