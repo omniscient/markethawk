@@ -1,0 +1,10 @@
+{
+  "target": "request",
+  "description": "extra='forbid' at the root",
+  "patch": {
+    "priority": "urgent"
+  },
+  "error_loc": [
+    "priority"
+  ]
+}

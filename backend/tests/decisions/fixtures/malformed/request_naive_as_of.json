@@ -1,0 +1,10 @@
+{
+  "target": "request",
+  "description": "timestamps must be timezone-aware",
+  "patch": {
+    "as_of": "2026-10-21T13:26:00"
+  },
+  "error_loc": [
+    "as_of"
+  ]
+}

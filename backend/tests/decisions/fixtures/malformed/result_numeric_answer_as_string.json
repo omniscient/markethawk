@@ -1,0 +1,21 @@
+{
+  "target": "result",
+  "description": "strict mode: '4.5' is not a float",
+  "patch": {
+    "answers": [
+      {
+        "question_id": "gap_continues",
+        "label": "yes"
+      },
+      {
+        "question_id": "expected_move_pct",
+        "value": "4.5"
+      }
+    ]
+  },
+  "error_loc": [
+    "answers",
+    1,
+    "value"
+  ]
+}

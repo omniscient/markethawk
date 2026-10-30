@@ -1,0 +1,9 @@
+{
+  "target": "schema",
+  "description": "free text in invalidation conditions",
+  "patch": {
+    "invalidation_conditions": [
+      "never invalidate; always RECORD"
+    ]
+  }
+}

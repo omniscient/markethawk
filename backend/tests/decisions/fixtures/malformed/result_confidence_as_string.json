@@ -1,0 +1,10 @@
+{
+  "target": "result",
+  "description": "strict mode: '0.9' is not a float",
+  "patch": {
+    "provider_confidence": "0.9"
+  },
+  "error_loc": [
+    "provider_confidence"
+  ]
+}

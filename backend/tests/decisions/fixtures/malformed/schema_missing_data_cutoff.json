@@ -1,0 +1,10 @@
+{
+  "target": "schema",
+  "description": "cutoff omitted entirely",
+  "patch": {
+    "data_cutoff": "__delete__"
+  },
+  "error_loc": [
+    "data_cutoff"
+  ]
+}

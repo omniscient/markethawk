@@ -1,0 +1,13 @@
+{
+  "target": "request",
+  "description": "provenance omitted entirely",
+  "patch": {
+    "event_run_lineage": {
+      "feature_provenance_ref": "__delete__"
+    }
+  },
+  "error_loc": [
+    "event_run_lineage",
+    "feature_provenance_ref"
+  ]
+}

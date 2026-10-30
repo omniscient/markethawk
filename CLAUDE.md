@@ -32,6 +32,7 @@ docker-compose restart backend              # Restart one service
 
 ```
 core/         — Config, DB session, Celery setup, error tracking
+decisions/    — Provider-neutral typed decision contracts (stdlib + Pydantic only; no app-layer imports — see tests/decisions/test_architecture_boundary.py)
 models/       — SQLAlchemy ORM models
 routers/      — FastAPI route handlers (health, scanner, universe, stocks, news, live_data, journal, futures)
 schemas/      — Pydantic request/response models

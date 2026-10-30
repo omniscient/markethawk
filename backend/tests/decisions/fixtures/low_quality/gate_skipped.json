@@ -1,0 +1,12 @@
+{
+  "target": "request",
+  "description": "skipped gate abstains",
+  "patch": {
+    "quality_gate": {
+      "verdict": "skipped",
+      "trusted": false,
+      "issue_codes": []
+    }
+  },
+  "expected_outcome": "ABSTAIN"
+}

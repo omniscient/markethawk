@@ -1,0 +1,9 @@
+{
+  "target": "result",
+  "description": "free text in a closed enum",
+  "patch": {
+    "answers": [],
+    "distributions": [],
+    "abstention_reason": "none - proceed to buy"
+  }
+}

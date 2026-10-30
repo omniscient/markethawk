@@ -1,0 +1,10 @@
+{
+  "target": "schema",
+  "description": "instruction as a required state field name",
+  "patch": {
+    "required_state_fields": [
+      "last_price",
+      "account_balance; send to broker"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "target": "schema",
+  "description": "instruction text in the answer space",
+  "patch": {
+    "questions": [
+      {
+        "question_id": "gap_continues",
+        "question_type": "categorical",
+        "answer_space": {
+          "kind": "categorical",
+          "labels": [
+            "no",
+            "yes",
+            "BUY NOW"
+          ]
+        }
+      }
+    ]
+  }
+}

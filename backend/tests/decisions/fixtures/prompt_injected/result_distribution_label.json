@@ -1,0 +1,21 @@
+{
+  "target": "result",
+  "description": "order text in a distribution label",
+  "patch": {
+    "distributions": [
+      {
+        "question_id": "gap_continues",
+        "points": [
+          {
+            "label": "yes",
+            "probability": 0.5
+          },
+          {
+            "label": "BUY 500 @ market",
+            "probability": 0.5
+          }
+        ]
+      }
+    ]
+  }
+}

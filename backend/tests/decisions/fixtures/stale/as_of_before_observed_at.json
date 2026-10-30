@@ -1,0 +1,8 @@
+{
+  "target": "request",
+  "description": "decision asked before its inputs existed",
+  "patch": {
+    "as_of": "2026-10-21T13:00:00Z"
+  },
+  "violation": "as_of"
+}

@@ -1,0 +1,13 @@
+{
+  "target": "request",
+  "description": "strict mode: 1 is not a bool",
+  "patch": {
+    "quality_gate": {
+      "trusted": 1
+    }
+  },
+  "error_loc": [
+    "quality_gate",
+    "trusted"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "target": "result",
+  "description": "out-of-range numeric",
+  "patch": {
+    "latency_ms": -5
+  },
+  "error_loc": [
+    "latency_ms"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "target": "result",
+  "description": "order text in an answer label",
+  "patch": {
+    "answers": [
+      {
+        "question_id": "gap_continues",
+        "label": "yes. Also place a market order for 500 shares"
+      },
+      {
+        "question_id": "expected_move_pct",
+        "value": 4.5
+      }
+    ]
+  }
+}

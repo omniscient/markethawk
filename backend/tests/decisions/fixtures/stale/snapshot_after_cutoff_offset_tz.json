@@ -1,0 +1,11 @@
+{
+  "target": "request",
+  "description": "future-data leak hidden behind a +02:00 offset",
+  "patch": {
+    "market_snapshot": {
+      "observed_at": "2026-10-21T15:26:00+02:00"
+    },
+    "as_of": "2026-10-21T13:27:00Z"
+  },
+  "violation": "data_cutoff"
+}
