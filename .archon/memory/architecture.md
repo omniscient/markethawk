@@ -22,6 +22,7 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+- [AVOID] In a serial multi-slice epic with an MCP server, a slice's MCP tool list can legitimately include write tools for a model owned by an earlier slice (e.g. epic #902 slice 4 / #907 ships add_roster_etf/deactivate_roster_etf for the slice-1 roster model) when the earlier slice's own issue scope explicitly excluded MCP/write work. Resolve by checking which slice's issue scope actually covers MCP write tools, not by naive 1:1 model-to-slice ownership matching — and add a matching REST endpoint for consistency with the one-tool-one-endpoint convention rather than leaving an MCP-only asymmetry. <!-- issue:#907 date:2026-11-06 expires:2027-05-06 source:refine agent:refine scope:architecture path:docs/superpowers/specs/ -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
