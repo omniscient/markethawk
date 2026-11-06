@@ -22,6 +22,7 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+- [AVOID] Route every new Polygon reference-endpoint call (dividends, splits, etc.) through MassiveDataProvider + POLYGON_BREAKER, not a raw unbreakered httpx call. sync_stock_splits (backend/app/tasks/sync.py) is an older exception that calls https://api.polygon.io/v3/reference/splits directly with httpx, bypassing DataProviderFactory and POLYGON_BREAKER entirely — do not copy it. MassiveDataProvider.get_ticker_details() already proves reference-endpoint calls go through POLYGON_BREAKER.call(...) in this provider, so a new breaker-wrapped method on MassiveDataProvider (e.g. get_dividends()) is the pattern to extend; a raw call would keep hitting Polygon while the breaker is open and would be invisible to app/core/provider_health.py. <!-- issue:#912 date:2026-11-06 expires:2027-05-06 source:refine agent:refine scope:architecture path:backend/app/providers/ -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
