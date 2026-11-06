@@ -22,6 +22,7 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+- [AVOID] There is no Celery task-chaining/dependency mechanism in this codebase (no chain()/chord() usage). Every 'task B runs after task A' relationship in celery_app.py's beat_schedule is implemented purely as a fixed crontab time offset (e.g. nightly sync at 01:30 UTC, then dependent checks at 03:00/04:00 UTC), never an actual completion signal. Design new 'runs after the nightly sync' tasks the same way — pick a later fixed time, don't reach for task chaining. <!-- issue:#905 date:2026-11-06 expires:2027-05-06 source:refine agent:refine scope:architecture path:backend/app/core/ -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
