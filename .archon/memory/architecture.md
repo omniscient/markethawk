@@ -22,6 +22,7 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+- [AVOID] An 'exactly one current row' singleton invariant (e.g. a target_allocation.is_current flag) has no DB-level enforcement anywhere in this codebase (no partial unique index, no trigger) — the precedent (RegimeModel/regime_service.py, extended for lt_target_allocation in #908) is service-layer archive-then-insert inside one transaction: flip the old current row(s) off, then insert the new current row, both before commit. Adding a DB constraint for a new singleton table would be inconsistent with every existing instance of this pattern. <!-- issue:#908 date:2026-11-06 expires:2027-05-06 source:refine agent:refine scope:architecture path:backend/app/services/ -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
