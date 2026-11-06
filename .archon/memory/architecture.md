@@ -22,6 +22,7 @@ entries as higher-confidence than source:refine entries when the two conflict.
 
 - [AVOID] Do not store agent memory in CLAUDE.md — that file is the primary developer reference and polluting it with machine-generated observations makes it harder to maintain. Memory files are the designated separation. <!-- bootstrap date:2026-06-02 expires:2026-12-02 source:refine -->
 
+- [AVOID] When a spec-pending-review issue explicitly depends on a sibling issue that is also still spec-pending-review (not planned/implemented, no code artifacts exist), write the dependent issue's spec as forward-looking: document the exact interfaces/schemas/functions it expects to consume from the sibling in a dedicated section, and instruct the implementer to stop and reconcile rather than invent a replacement if they mismatch at implementation time. Do not expand the dependent issue's scope to include stub/minimal versions of the sibling's pieces — that risks the dependent issue's stubs colliding with the sibling's own migrations/models when it lands. Confirmed for epic #902's slice 1 (#913 depends on #904/#912); likely recurs for slices 2-5 of the same epic, which have the same serial-dependency shape. <!-- issue:#913 date:2026-11-06 expires:2027-05-06 source:refine agent:refine scope:architecture path:docs/superpowers/specs/ -->
 ---
 <!-- PROVISIONAL — entries below are from a single observed run; unverified.
      Do not rely on these as authoritative guidance. They are excluded from
