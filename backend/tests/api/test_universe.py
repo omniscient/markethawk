@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.main import app
 from tests.fixtures.core import seed_monitored_stocks, seed_tickers, seed_universes
+from tests.fixtures.lt_etf import load_lt_etf_migration
 
 client = TestClient(app)
 
@@ -265,3 +266,50 @@ def test_by_ticker_returns_empty_for_unknown_ticker(db: Session):
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+# ---------------------------------------------------------------------------
+# Static "Long-Term ETFs" universe (#904)
+# ---------------------------------------------------------------------------
+
+
+def test_refresh_static_universe_lists_same_tickers_as_seed(db: Session):
+    from app.models import LtEtf, StockUniverse
+
+    mig = load_lt_etf_migration()
+    conn = db.connection()
+    mig.seed_roster(conn)
+    mig.seed_universe(conn)
+    uid = (
+        db.query(StockUniverse).filter(StockUniverse.name == mig.UNIVERSE_NAME).one().id
+    )
+    roster = {t for (t,) in db.query(LtEtf.ticker).filter(LtEtf.is_active == True)}
+
+    before = client.get(f"/api/v1/universe/{uid}/stocks")
+    assert before.status_code == 200
+    seeded = {s["ticker"] for s in before.json()}
+
+    refreshed = client.post(f"/api/v1/universe/{uid}/refresh")
+    assert refreshed.status_code == 200
+    assert refreshed.json()["added"] == 65
+
+    after = client.get(f"/api/v1/universe/{uid}/stocks")
+    assert after.status_code == 200
+    stocks = after.json()
+    assert {s["ticker"] for s in stocks} == seeded == roster
+    assert len(roster) == 65
+    by_ticker = {s["ticker"]: s for s in stocks}
+    assert by_ticker["XIU.TO"]["data_source"] == "yfinance"
+    assert by_ticker["SPY"]["data_source"] == "massive"
+
+
+def test_list_includes_seeded_static_universe(db: Session):
+    mig = load_lt_etf_migration()
+    conn = db.connection()
+    mig.seed_roster(conn)
+    mig.seed_universe(conn)
+
+    response = client.get("/api/v1/universe/list?include_stats=false")
+
+    assert response.status_code == 200
+    assert mig.UNIVERSE_NAME in {u["name"] for u in response.json()}
