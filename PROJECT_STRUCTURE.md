@@ -42,6 +42,7 @@ MarketHawk/
 │   │   │   ├── futures_contract.py
 │   │   │   ├── futures_aggregate.py
 │   │   │   ├── futures_rollover.py
+│   │   │   ├── lt_etf.py           (LtEtf — long-term ETF roster; source for static universes)
 │   │   │   ├── market_holiday.py
 │   │   │   ├── trade.py
 │   │   │   ├── universe_quality_report.py
