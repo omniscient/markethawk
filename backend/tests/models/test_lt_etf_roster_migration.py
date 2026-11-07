@@ -166,3 +166,41 @@ def test_seed_universe_survives_sequence_behind_explicit_ids(db: Session):
 
     u = db.query(StockUniverse).filter(StockUniverse.name == mig.UNIVERSE_NAME).one()
     assert u.id > nxt
+
+
+def test_seed_universe_ignores_same_named_user_universe(db: Session):
+    """A user-created screened universe that happens to share the name must not
+    be adopted: it gets no roster rows and keeps kind='screened'."""
+    conn = db.connection()
+    user_u = StockUniverse(name=mig.UNIVERSE_NAME, criteria={"min_volume": 1})
+    db.add(user_u)
+    db.flush()
+
+    mig.seed_roster(conn)
+    mig.seed_universe(conn)
+
+    db.refresh(user_u)
+    assert user_u.kind == "screened"
+    assert (
+        db.query(MonitoredStock).filter(MonitoredStock.universe_id == user_u.id).count()
+        == 0
+    )
+    assert (
+        db.query(StockUniverseTicker)
+        .filter(StockUniverseTicker.universe_id == user_u.id)
+        .count()
+        == 0
+    )
+
+    static_u = (
+        db.query(StockUniverse)
+        .filter(StockUniverse.name == mig.UNIVERSE_NAME, StockUniverse.kind == "static")
+        .one()
+    )
+    assert static_u.id != user_u.id
+    assert (
+        db.query(MonitoredStock)
+        .filter(MonitoredStock.universe_id == static_u.id)
+        .count()
+        == 65
+    )
