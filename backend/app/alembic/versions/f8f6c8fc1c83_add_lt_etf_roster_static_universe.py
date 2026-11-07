@@ -229,6 +229,34 @@ def seed_universe(conn) -> None:
     )
 
 
+def remove_static_universe(conn) -> None:
+    """Delete the static universe and its membership rows. Scoped to
+    kind='static' so a same-named user universe survives the downgrade."""
+    params = {"name": UNIVERSE_NAME}
+    conn.execute(
+        sa.text("""
+        DELETE FROM monitored_stocks
+        WHERE universe_id IN (
+            SELECT id FROM stock_universes WHERE name = :name AND kind = 'static'
+        )
+    """),
+        params,
+    )
+    conn.execute(
+        sa.text("""
+        DELETE FROM stock_universe_tickers
+        WHERE universe_id IN (
+            SELECT id FROM stock_universes WHERE name = :name AND kind = 'static'
+        )
+    """),
+        params,
+    )
+    conn.execute(
+        sa.text("DELETE FROM stock_universes WHERE name = :name AND kind = 'static'"),
+        params,
+    )
+
+
 def upgrade() -> None:
     op.create_table(
         "lt_etf",
@@ -293,30 +321,7 @@ def downgrade() -> None:
         existing_nullable=False,
     )
 
-    conn = op.get_bind()
-    params = {"name": UNIVERSE_NAME}
-    conn.execute(
-        sa.text("""
-        DELETE FROM monitored_stocks
-        WHERE universe_id IN (
-            SELECT id FROM stock_universes WHERE name = :name AND kind = 'static'
-        )
-    """),
-        params,
-    )
-    conn.execute(
-        sa.text("""
-        DELETE FROM stock_universe_tickers
-        WHERE universe_id IN (
-            SELECT id FROM stock_universes WHERE name = :name AND kind = 'static'
-        )
-    """),
-        params,
-    )
-    conn.execute(
-        sa.text("DELETE FROM stock_universes WHERE name = :name AND kind = 'static'"),
-        params,
-    )
+    remove_static_universe(op.get_bind())
 
     op.drop_column("stock_universes", "kind")
     op.drop_index(op.f("ix_lt_etf_ticker"), table_name="lt_etf")

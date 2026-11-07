@@ -5,6 +5,7 @@ so these tests exercise the exact SQL the migration runs.
 """
 
 from collections import Counter
+from datetime import date
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -204,3 +205,30 @@ def test_seed_universe_ignores_same_named_user_universe(db: Session):
         .count()
         == 65
     )
+
+
+def test_remove_static_universe_spares_same_named_user_universe(db: Session):
+    """Downgrade cleanup deletes only the static universe and its membership; a
+    user universe sharing the name keeps its row and its monitored stocks."""
+    conn = db.connection()
+    user_u = StockUniverse(name=mig.UNIVERSE_NAME, criteria={"min_volume": 1})
+    db.add(user_u)
+    db.flush()
+    db.add(
+        MonitoredStock(
+            ticker="AAPL", universe_id=user_u.id, added_date=date(2026, 1, 2)
+        )
+    )
+    db.add(StockUniverseTicker(universe_id=user_u.id, ticker="AAPL"))
+    db.flush()
+
+    mig.seed_roster(conn)
+    mig.seed_universe(conn)
+    mig.remove_static_universe(conn)
+    db.expire_all()
+
+    assert db.query(StockUniverse).filter(StockUniverse.kind == "static").count() == 0
+    survivors = db.query(StockUniverse).filter(StockUniverse.name == mig.UNIVERSE_NAME)
+    assert [u.id for u in survivors] == [user_u.id]
+    assert db.query(MonitoredStock).count() == 1
+    assert db.query(StockUniverseTicker).count() == 1
