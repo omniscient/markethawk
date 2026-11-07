@@ -190,7 +190,9 @@ def seed_universe(conn) -> None:
                                      is_active, created_at, updated_at)
         SELECT gen_random_uuid(), :name, :desc, CAST('{}' AS json), 'static', true,
                now() AT TIME ZONE 'utc', now() AT TIME ZONE 'utc'
-        WHERE NOT EXISTS (SELECT 1 FROM stock_universes WHERE name = :name)
+        WHERE NOT EXISTS (
+            SELECT 1 FROM stock_universes WHERE name = :name AND kind = 'static'
+        )
     """),
         params,
     )
@@ -200,7 +202,7 @@ def seed_universe(conn) -> None:
                                             data_source, created_at)
         SELECT su.id, e.ticker, 'stocks', e.data_source, now() AT TIME ZONE 'utc'
         FROM lt_etf e, stock_universes su
-        WHERE e.is_active AND su.name = :name
+        WHERE e.is_active AND su.name = :name AND su.kind = 'static'
         AND NOT EXISTS (SELECT 1 FROM stock_universe_tickers sut
                         WHERE sut.universe_id = su.id AND sut.ticker = e.ticker)
     """),
@@ -219,7 +221,7 @@ def seed_universe(conn) -> None:
                CAST(now() AT TIME ZONE 'America/New_York' AS date), true, 0,
                now() AT TIME ZONE 'utc', now() AT TIME ZONE 'utc'
         FROM lt_etf e, stock_universes su
-        WHERE e.is_active AND su.name = :name
+        WHERE e.is_active AND su.name = :name AND su.kind = 'static'
         AND NOT EXISTS (SELECT 1 FROM monitored_stocks ms
                         WHERE ms.universe_id = su.id AND ms.ticker = e.ticker)
     """),
@@ -237,10 +239,17 @@ def upgrade() -> None:
         sa.Column("country", sa.String(length=2), nullable=False),
         sa.Column("currency", sa.String(length=3), nullable=False),
         sa.Column("exchange", sa.String(length=20), nullable=True),
-        sa.Column("data_source", sa.String(length=50), nullable=False),
+        sa.Column(
+            "data_source",
+            sa.String(length=50),
+            nullable=False,
+            server_default="massive",
+        ),
         sa.Column("inception_date", sa.Date(), nullable=True),
-        sa.Column("is_active", sa.Boolean(), nullable=False),
-        sa.Column("is_benchmark", sa.Boolean(), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column(
+            "is_benchmark", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
         sa.Column("tags", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
@@ -289,18 +298,25 @@ def downgrade() -> None:
     conn.execute(
         sa.text("""
         DELETE FROM monitored_stocks
-        WHERE universe_id IN (SELECT id FROM stock_universes WHERE name = :name)
+        WHERE universe_id IN (
+            SELECT id FROM stock_universes WHERE name = :name AND kind = 'static'
+        )
     """),
         params,
     )
     conn.execute(
         sa.text("""
         DELETE FROM stock_universe_tickers
-        WHERE universe_id IN (SELECT id FROM stock_universes WHERE name = :name)
+        WHERE universe_id IN (
+            SELECT id FROM stock_universes WHERE name = :name AND kind = 'static'
+        )
     """),
         params,
     )
-    conn.execute(sa.text("DELETE FROM stock_universes WHERE name = :name"), params)
+    conn.execute(
+        sa.text("DELETE FROM stock_universes WHERE name = :name AND kind = 'static'"),
+        params,
+    )
 
     op.drop_column("stock_universes", "kind")
     op.drop_index(op.f("ix_lt_etf_ticker"), table_name="lt_etf")

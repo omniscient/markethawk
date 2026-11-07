@@ -11,7 +11,7 @@ data_source values
   yfinance  — TSX listings (".TO" suffix); routed by LT-1b, unread in LT-1a
 """
 
-from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Integer, String
+from sqlalchemy import JSON, Boolean, Column, Date, DateTime, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.database import Base
@@ -28,10 +28,16 @@ class LtEtf(Base):
     country = Column(String(2), nullable=False)  # "US" | "CA"
     currency = Column(String(3), nullable=False)  # "USD" | "CAD"
     exchange = Column(String(20), nullable=True)
-    data_source = Column(String(50), nullable=False, default="massive")
+    data_source = Column(
+        String(50), nullable=False, default="massive", server_default="massive"
+    )
     inception_date = Column(Date, nullable=True)
-    is_active = Column(Boolean, nullable=False, default=True)
-    is_benchmark = Column(Boolean, nullable=False, default=False)
+    is_active = Column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    is_benchmark = Column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
     tags = Column(JSON().with_variant(JSONB, "postgresql"), default=list)
     created_at = Column(DateTime, default=utc_now)
 
