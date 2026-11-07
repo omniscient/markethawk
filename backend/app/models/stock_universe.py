@@ -37,6 +37,11 @@ class StockUniverse(Base):
         onupdate=utc_now,
     )
     is_active = Column(Boolean, default=True)
+    # "screened" — /refresh runs DiscoveryService.run_screen(criteria)
+    # "static"   — /refresh mirrors active lt_etf roster rows (criteria unused)
+    kind = Column(
+        String(20), nullable=False, default="screened", server_default="screened"
+    )
 
     # Cached aggregate stats — refreshed on demand via POST /{id}/refresh-stats
     cached_ticker_count = Column(Integer, nullable=True)

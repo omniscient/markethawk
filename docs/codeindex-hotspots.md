@@ -1,49 +1,58 @@
-Files with blast score ≥ 5.0  (47 found)
+Files with blast score ≥ 5.0  (56 found)
 
-    80.0  frontend/src/api/client.ts  (27d / 106t)  78 loc
-    68.0  backend/app/routers/auth.py  (2d / 132t)  213 loc
-    45.0  frontend/src/api/scanner/index.ts  (34d / 22t)  53 loc
-    33.0  frontend/src/api/scanner/types.ts  (5d / 56t)  371 loc
-    33.0  frontend/src/components/ui/Card.tsx  (23d / 20t)  44 loc
-    32.5  backend/app/routers/scanner.py  (4d / 57t)  747 loc
-    31.5  backend/app/routers/system.py  (2d / 59t)  141 loc
-    30.5  frontend/src/components/ui/Button.tsx  (23d / 15t)  66 loc
-    29.5  backend/app/routers/futures.py  (1d / 57t)  188 loc
-    29.5  services/tweet-monitor/app/main.py  (1d / 57t)  266 loc
-    29.0  frontend/src/api/scanner/configs.ts  (1d / 56t)  21 loc
-    29.0  frontend/src/api/scanner/misc.ts  (1d / 56t)  99 loc
-    29.0  frontend/src/api/scanner/results.ts  (1d / 56t)  22 loc
-    29.0  frontend/src/api/scanner/reviews.ts  (1d / 56t)  35 loc
-    29.0  frontend/src/api/scanner/runs.ts  (1d / 56t)  49 loc
-    29.0  frontend/src/api/scanner/ws.ts  (1d / 56t)  26 loc
-    23.0  frontend/src/test-utils/renderWithQuery.tsx  (23d / 0t)  29 loc
+    84.0  frontend/src/api/client.ts  (27d / 114t)  93 loc
+    72.0  backend/app/routers/auth.py  (2d / 140t)  213 loc
+    49.0  frontend/src/api/scanner/index.ts  (37d / 24t)  53 loc
+    35.5  backend/app/routers/scanner.py  (4d / 63t)  790 loc
+    35.5  frontend/src/api/scanner/types.ts  (5d / 61t)  420 loc
+    35.0  frontend/src/components/ui/Card.tsx  (24d / 22t)  44 loc
+    34.0  backend/app/routers/system.py  (2d / 64t)  148 loc
+    32.5  services/tweet-monitor/app/main.py  (1d / 63t)  266 loc
+    32.5  frontend/src/api/scanner/runs.ts  (2d / 61t)  64 loc
+    32.0  backend/app/routers/futures.py  (1d / 62t)  188 loc
+    32.0  frontend/src/components/ui/Button.tsx  (24d / 16t)  66 loc
+    31.5  frontend/src/api/scanner/configs.ts  (1d / 61t)  21 loc
+    31.5  frontend/src/api/scanner/misc.ts  (1d / 61t)  99 loc
+    31.5  frontend/src/api/scanner/results.ts  (1d / 61t)  22 loc
+    31.5  frontend/src/api/scanner/reviews.ts  (1d / 61t)  35 loc
+    31.5  frontend/src/api/scanner/ws.ts  (1d / 61t)  26 loc
+    24.0  frontend/src/test-utils/renderWithQuery.tsx  (24d / 0t)  29 loc
     18.0  frontend/src/api/universe.ts  (16d / 4t)  317 loc
+    16.0  frontend/src/api/outcomes.ts  (14d / 4t)  499 loc
     15.5  frontend/src/components/ui/Modal.tsx  (10d / 11t)  87 loc
     14.5  frontend/src/api/trading.ts  (11d / 7t)  244 loc
     14.0  frontend/src/components/Ticker.tsx  (6d / 16t)  80 loc
-    12.5  frontend/src/api/outcomes.ts  (10d / 5t)  228 loc
-    11.0  backend/app/main.py  (1d / 20t)  535 loc
+    11.0  backend/app/main.py  (1d / 20t)  552 loc
     11.0  backend/app/routers/universe.py  (1d / 20t)  490 loc
-    10.5  frontend/src/components/ui/MetricCard.tsx  (7d / 7t)  71 loc
+    11.0  dark-factory/scripts/factory_core/adapter_defaults.py  (7d / 8t)  141 loc
+    11.0  frontend/src/components/ui/MetricCard.tsx  (7d / 8t)  71 loc
+    10.5  dark-factory/scripts/factory_core/adapter.py  (7d / 7t)  327 loc
     10.0  backend/app/routers/auto_trading.py  (1d / 18t)  380 loc
-     8.5  backend/app/routers/outcomes.py  (1d / 15t)  370 loc
+    10.0  backend/app/routers/outcomes.py  (1d / 18t)  588 loc
+     9.5  dark-factory/scripts/factory_core/verdict.py  (3d / 13t)  67 loc
+     9.0  dark-factory/scripts/factory_core/identity.py  (6d / 6t)  39 loc
+     8.5  dark-factory/scripts/factory_core/verifier.py  (2d / 13t)  232 loc
      8.5  frontend/src/utils/url.ts  (3d / 11t)  36 loc
-     8.0  frontend/src/hooks/useScorecard.ts  (5d / 6t)  98 loc
+     8.0  frontend/src/hooks/useScorecard.ts  (5d / 6t)  138 loc
      8.0  frontend/src/pages/AutoTrading/components.tsx  (5d / 6t)  294 loc
+     7.5  frontend/src/api/system.ts  (4d / 7t)  72 loc
      7.5  frontend/src/components/ReviewControls.tsx  (2d / 11t)  154 loc
      7.5  frontend/src/components/TrustGateSummary.tsx  (3d / 9t)  185 loc
      7.5  frontend/src/components/verdictConfig.ts  (2d / 11t)  13 loc
      7.5  frontend/src/hooks/useWatchlistLive.ts  (6d / 3t)  182 loc
+     7.0  dark-factory/scripts/factory_core/providers/__init__.py  (4d / 6t)  66 loc
      7.0  frontend/src/api/replay.ts  (6d / 2t)  188 loc
      6.5  backend/app/routers/news.py  (1d / 11t)  137 loc
      6.5  frontend/src/api/news.ts  (2d / 9t)  46 loc
      6.5  frontend/src/hooks/useScannerState.ts  (4d / 5t)  109 loc
      6.0  frontend/src/api/alerts.ts  (4d / 4t)  199 loc
-     6.0  frontend/src/hooks/useLiveStockData.ts  (4d / 4t)  115 loc
+     6.0  frontend/src/hooks/useLiveStockData.ts  (4d / 4t)  127 loc
      6.0  frontend/src/utils/indicators.ts  (2d / 8t)  106 loc
+     5.5  dark-factory/scripts/factory_core/board.py  (3d / 5t)  129 loc
+     5.5  dark-factory/scripts/factory_core/run_record.py  (3d / 5t)  915 loc
      5.5  frontend/src/components/QualityReportModal/GradeBadge.tsx  (3d / 5t)  35 loc
      5.0  backend/app/routers/alerts.py  (1d / 8t)  458 loc
      5.0  backend/app/routers/replay.py  (1d / 8t)  261 loc
-     5.0  frontend/src/api/system.ts  (3d / 4t)  55 loc
+     5.0  dark-factory/scripts/factory_core/model_proxy.py  (1d / 8t)  399 loc
      5.0  frontend/src/api/watchlist.ts  (4d / 2t)  70 loc
      5.0  frontend/src/components/ui/StockChart.tsx  (2d / 6t)  617 loc

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.celery_app import celery_app
 from app.core.config import settings
 from app.exceptions import UniverseNotFoundError, UniverseValidationError
-from app.models import MonitoredStock, StockUniverse, StockUniverseTicker
+from app.models import LtEtf, MonitoredStock, StockUniverse, StockUniverseTicker
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.stock_aggregate import StockAggregate
 from app.models.universe_quality_report import UniverseQualityReport
@@ -31,11 +31,31 @@ logger = logging.getLogger(__name__)
 # so cross-importing at module level is risky.
 
 
+def _static_roster_results(db: Session) -> list[dict]:
+    """Membership rows for a static universe: every active lt_etf roster row.
+
+    Same mapping as the f8f6c8fc1c83 seed migration, so the seeded membership
+    and a later /refresh always produce the same ticker set.
+    """
+    roster_rows = (
+        db.query(LtEtf).filter(LtEtf.is_active.is_(True)).order_by(LtEtf.ticker).all()
+    )
+    return [
+        {
+            "ticker": r.ticker,
+            "company_name": r.name,
+            "data_source": r.data_source,
+        }
+        for r in roster_rows
+    ]
+
+
 def discover_and_refresh(universe_id: int, db: Session) -> dict:
     """
-    Refresh stocks in a universe using the Universe Discovery Engine.
-    Clears MonitoredStock + StockUniverseTicker, runs DiscoveryService.run_screen(),
-    bulk-inserts results, refreshes cached stats.
+    Refresh stocks in a universe.
+    Clears MonitoredStock + StockUniverseTicker, then rebuilds membership from
+    DiscoveryService.run_screen() (kind="screened") or from active lt_etf roster
+    rows (kind="static"), bulk-inserts results, refreshes cached stats.
     Raises UniverseNotFoundError if the universe does not exist.
     """
     from app.services.discovery_service import DiscoveryService
@@ -49,34 +69,51 @@ def discover_and_refresh(universe_id: int, db: Session) -> dict:
         StockUniverseTicker.universe_id == universe_id
     ).delete()
 
-    service = DiscoveryService(db)
-    criteria = universe.criteria or {}
-    results = service.run_screen(criteria)
+    is_static = universe.kind == "static"
+    if is_static:
+        results = _static_roster_results(db)
+    else:
+        service = DiscoveryService(db)
+        criteria = universe.criteria or {}
+        results = service.run_screen(criteria)
 
     added_count = 0
     for res in results:
-        monitored_stock = MonitoredStock(
-            ticker=res["ticker"],
-            universe_id=universe_id,
-            added_date=get_market_today(),
-            is_active=True,
-            asset_class=res.get("asset_class", "stocks"),
-            data_source=res.get("data_source", "massive"),
-            company_name=res["name"],
-            sector=res["sector"],
-            market_cap=res["market_cap"],
-            stock_metadata={
-                "source": "discovery_engine",
-                "close_price": res["close_price"],
-                "volume": res["volume"],
-                "primary_exchange": res.get("primary_exchange"),
-                "employees": res.get("employees"),
-                "sic_code": res.get("sic_code"),
-                "description_preview": (res.get("description") or "")[:100] + "..."
-                if res.get("description")
-                else None,
-            },
-        )
+        if is_static:
+            # Roster rows carry no price/fundamentals — screener-only columns
+            # (sector, market_cap, metadata) stay at their column defaults.
+            monitored_stock = MonitoredStock(
+                ticker=res["ticker"],
+                universe_id=universe_id,
+                added_date=get_market_today(),
+                is_active=True,
+                asset_class="stocks",
+                data_source=res["data_source"],
+                company_name=res["company_name"],
+            )
+        else:
+            monitored_stock = MonitoredStock(
+                ticker=res["ticker"],
+                universe_id=universe_id,
+                added_date=get_market_today(),
+                is_active=True,
+                asset_class=res.get("asset_class", "stocks"),
+                data_source=res.get("data_source", "massive"),
+                company_name=res["name"],
+                sector=res["sector"],
+                market_cap=res["market_cap"],
+                stock_metadata={
+                    "source": "discovery_engine",
+                    "close_price": res["close_price"],
+                    "volume": res["volume"],
+                    "primary_exchange": res.get("primary_exchange"),
+                    "employees": res.get("employees"),
+                    "sic_code": res.get("sic_code"),
+                    "description_preview": (res.get("description") or "")[:100] + "..."
+                    if res.get("description")
+                    else None,
+                },
+            )
         db.add(monitored_stock)
 
         stock_ticker = StockUniverseTicker(
@@ -100,11 +137,12 @@ def discover_and_refresh(universe_id: int, db: Session) -> dict:
     universe.stats_refreshed_at = utc_now()
     db.commit()
 
+    source = "ETF roster" if is_static else "Discovery Engine"
     return {
         "status": "completed",
         "scanned": "ALL",
         "added": added_count,
-        "message": f"Successfully refreshed universe. Added {added_count} assets from Discovery Engine.",
+        "message": f"Successfully refreshed universe. Added {added_count} assets from {source}.",
     }
 
 
@@ -129,7 +167,16 @@ def sync_missing_aggregates(universe_id: int, db: Session) -> dict:
 
     now_utc = utc_now()
     today = now_utc.strftime("%Y-%m-%d")
-    stock_tickers = [s.ticker for s in stocks if s.asset_class != "futures"]
+    non_futures_stocks = [s for s in stocks if s.asset_class != "futures"]
+    skipped_tickers = [
+        s.ticker for s in non_futures_stocks if s.data_source != "massive"
+    ]
+    if skipped_tickers:
+        logger.warning(
+            f"Universe {universe_id}: skipping aggregate sync for non-massive-sourced "
+            f"tickers {skipped_tickers} (no Polygon data for this data_source)."
+        )
+    stock_tickers = [s.ticker for s in non_futures_stocks if s.data_source == "massive"]
     futures_stocks = [s for s in stocks if s.asset_class == "futures"]
     futures_tickers = list({s.ticker for s in futures_stocks})
 
@@ -394,6 +441,13 @@ def sync_aggregates(
             queued_futures.add(symbol)
             futures_count += 1
         else:
+            if stock.data_source != "massive":
+                logger.warning(
+                    f"Universe {universe_id}: skipping aggregate sync for "
+                    f"'{stock.ticker}' (data_source={stock.data_source!r}, not "
+                    f"massive/Polygon)."
+                )
+                continue
             result = sync_stock_aggregates.delay(
                 ticker=stock.ticker,
                 from_date=from_date,

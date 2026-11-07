@@ -15,7 +15,7 @@ class StockAggregate(Base):
     __tablename__ = "stock_aggregates"
 
     id = Column(Integer, primary_key=True, index=True)
-    ticker = Column(String(10), nullable=False, index=True)
+    ticker = Column(String(20), nullable=False, index=True)
     timestamp = Column(DateTime, nullable=False, index=True)
     multiplier = Column(Integer, nullable=False, default=1)
     timespan = Column(String(20), nullable=False, default="minute")
