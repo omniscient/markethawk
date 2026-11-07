@@ -38,7 +38,7 @@ def _static_roster_results(db: Session) -> list[dict]:
     and a later /refresh always produce the same ticker set.
     """
     roster_rows = (
-        db.query(LtEtf).filter(LtEtf.is_active == True).order_by(LtEtf.ticker).all()
+        db.query(LtEtf).filter(LtEtf.is_active.is_(True)).order_by(LtEtf.ticker).all()
     )
     return [
         {
@@ -167,7 +167,16 @@ def sync_missing_aggregates(universe_id: int, db: Session) -> dict:
 
     now_utc = utc_now()
     today = now_utc.strftime("%Y-%m-%d")
-    stock_tickers = [s.ticker for s in stocks if s.asset_class != "futures"]
+    non_futures_stocks = [s for s in stocks if s.asset_class != "futures"]
+    skipped_tickers = [
+        s.ticker for s in non_futures_stocks if s.data_source != "massive"
+    ]
+    if skipped_tickers:
+        logger.warning(
+            f"Universe {universe_id}: skipping aggregate sync for non-massive-sourced "
+            f"tickers {skipped_tickers} (no Polygon data for this data_source)."
+        )
+    stock_tickers = [s.ticker for s in non_futures_stocks if s.data_source == "massive"]
     futures_stocks = [s for s in stocks if s.asset_class == "futures"]
     futures_tickers = list({s.ticker for s in futures_stocks})
 
@@ -432,6 +441,13 @@ def sync_aggregates(
             queued_futures.add(symbol)
             futures_count += 1
         else:
+            if stock.data_source != "massive":
+                logger.warning(
+                    f"Universe {universe_id}: skipping aggregate sync for "
+                    f"'{stock.ticker}' (data_source={stock.data_source!r}, not "
+                    f"massive/Polygon)."
+                )
+                continue
             result = sync_stock_aggregates.delay(
                 ticker=stock.ticker,
                 from_date=from_date,
