@@ -11,6 +11,7 @@ from app.models.backtest_trade import BacktestTrade
 from app.models.futures_aggregate import FuturesAggregate
 from app.models.futures_contract import FuturesContract
 from app.models.futures_rollover import FuturesRollover
+from app.models.lt_etf import LtEtf
 from app.models.market_holiday import MarketHoliday
 from app.models.monitored_account import MonitoredAccount
 from app.models.monitored_stock import MonitoredStock
@@ -88,4 +89,5 @@ __all__ = [
     "RegimeModel",
     "ReplayRun",
     "ReplayTrade",
+    "LtEtf",
 ]
